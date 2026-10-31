@@ -388,7 +388,7 @@ set local role authenticated;
 
 -- bank_status_counts_unused: open-game = k1,k2,k3 (used 제외), 나머지 0
 select results_eq($$select game_id, remaining from public.admin_bank_status() order by game_id$$,
-  $$values ('free-only', 0), ('number-guess', 0), ('open-game', 3), ('who-are-ya', 0)$$,
+  $$values ('free-only', 0), ('number-guess', 0), ('open-game', 3), ('who-are-ya', 0), ('yacht', 0)$$,
   'bank_status_counts_unused: per game_modes game, unused rows only');
 
 -- ---------------------------------------------------------------- anon
