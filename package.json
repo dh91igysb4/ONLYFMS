@@ -8,7 +8,8 @@
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "db:test": "bash scripts/db-test.sh"
+    "db:test": "bash scripts/db-test.sh",
+    "fn:test": "bash scripts/fn-test.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",
