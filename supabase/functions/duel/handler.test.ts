@@ -299,6 +299,10 @@ t('join_rules', async () => {
   const own = await call(a, { action: 'join', match_id: id }, T0)
   assert.equal(own.status, 409)
   assert.equal(own.body.error, 'own_match')
+  assert.equal(own.body.match_id, id)
+  const ownByCode = await call(a, { action: 'join', code: cr.body.invite_code }, T0)
+  assert.equal(ownByCode.status, 409)
+  assert.deepEqual(ownByCode.body, { error: 'own_match', match_id: id })
 
   bcasts = []
   const j = await call(b, { action: 'join', code: cr.body.invite_code }, T0 + SEC)

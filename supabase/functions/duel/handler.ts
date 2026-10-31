@@ -488,7 +488,8 @@ async function join(
   if (seatOf(m, me.id) !== null) return { out: out(200, await buildView(tx, m, me, game?.logic, now)) }
   if (m.status === 'active' || m.status === 'finished') return { out: err(409, 'full') }
   if (m.status === 'void') return { out: err(409, 'not_waiting') }
-  if (m.created_by === me.id) return { out: err(409, 'own_match') }
+  // 만든 사람이 자기 링크를 연 경우: 그 대국으로 보내도록 id를 싣는다(본인이므로 새는 정보 없음)
+  if (m.created_by === me.id) return { out: err(409, 'own_match', { match_id: m.id }) }
   if (!game) return { out: err(404, 'unknown_game') }
   // 10분 지난 대기 대국, 만든 사람이 지워진 대국, 지금 manifest에 맞지 않는 설정은 시작할 수 없다
   const expired = expireIfStale(m, now)
