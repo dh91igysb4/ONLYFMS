@@ -23,7 +23,12 @@ export function ContestItemPage() {
       await syncServerTime()
       const [items, entries] = await Promise.all([getItems(id), getEntries(id)])
       const it = items.find((x) => x.position === Number(position))
-      if (!it) return set({ kind: 'error', message: '없는 문제예요' })
+      if (!it) {
+        return set({
+          kind: 'error',
+          message: items.length === 0 ? '대회를 찾을 수 없거나, 초대 링크로만 참가할 수 있어요' : '없는 문제예요',
+        })
+      }
       // 참가 기록이 없으면 먼저 참가시킨다(멱등). open이 403 not_joined가 되지 않게 한다.
       if (!profile?.id || !entries.includes(profile.id)) {
         try {

@@ -40,6 +40,8 @@ export function ContestPage() {
   const [entries, setEntries] = useState<string[]>([])
   const [code, setCode] = useState<string | null>(null)
   const [lb, setLb] = useState<LbRow[]>([])
+  const [lbError, setLbError] = useState(false)
+  const [lbAttempt, setLbAttempt] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [joining, setJoining] = useState(false)
@@ -93,10 +95,11 @@ export function ContestPage() {
   useEffect(() => {
     if (phase !== 'live' && phase !== 'ended') return
     let alive = true
+    const ended = phase === 'ended'
     const fetchLb = () =>
       rpc<LbRow[] | null>('lb_contest', { p_contest: id })
-        .then((rows) => { if (alive) setLb(rows ?? []) })
-        .catch(() => {})
+        .then((rows) => { if (alive) { setLb(rows ?? []); setLbError(false) } })
+        .catch(() => { if (alive && ended) setLbError(true) }) // 진행 중 폴링 실패는 조용히 넘긴다
     void fetchLb()
     if (phase === 'ended') {
       getItems(id).then((its) => { if (alive) setItems(its) }).catch(() => {})
@@ -104,7 +107,7 @@ export function ContestPage() {
     }
     const t = setInterval(() => void fetchLb(), POLL_MS)
     return () => { alive = false; clearInterval(t) }
-  }, [phase, id])
+  }, [phase, id, lbAttempt])
 
   const join = useCallback(async () => {
     if (!me) return
@@ -155,14 +158,13 @@ export function ContestPage() {
   if (contest === null || !phase) {
     return (
       <div className="stack">
-        <p className="notice">대회를 찾을 수 없어요</p>
+        <p className="notice">대회를 찾을 수 없거나, 초대 링크로만 참가할 수 있어요</p>
         <Link className="btn btn-ghost" to="/contests">대회 목록</Link>
       </div>
     )
   }
 
   const canJoinWithoutCode = contest.visibility === 'public' || isCreator || isAdmin
-  const inviteOnly = !joined && !canJoinWithoutCode && phase !== 'cancelled' && phase !== 'ended'
   const canCancel = (phase === 'lobby' && (isCreator || isAdmin)) || (phase === 'live' && isAdmin)
   const startMs = Date.parse(contest.starts_at)
   const endMs = Date.parse(contest.ends_at)
@@ -188,7 +190,6 @@ export function ContestPage() {
       )}
       {phase === 'live' && <p className="countdown">종료까지 {countdown(endMs - now())}</p>}
 
-      {inviteOnly && <p className="notice">초대 링크로만 참가할 수 있어요</p>}
       {actionError && <p className="form-error" role="alert">{actionError}</p>}
 
       {phase !== 'cancelled' && !joined && canJoinWithoutCode && phase !== 'ended' && (
@@ -227,7 +228,12 @@ export function ContestPage() {
       {(phase === 'live' || phase === 'ended') && (
         <section className="stack" aria-label="순위">
           <h3 className="section-title">{phase === 'live' ? '실시간 순위' : '최종 순위'}</h3>
-          {lb.length === 0 ? (
+          {lbError ? (
+            <div className="stack" role="alert">
+              <p className="form-error">순위를 불러오지 못했어요</p>
+              <button className="btn btn-primary" onClick={() => setLbAttempt((n) => n + 1)}>다시 시도</button>
+            </div>
+          ) : lb.length === 0 ? (
             <p className="muted">아직 기록이 없어요</p>
           ) : (
             <table className="table">

@@ -1,17 +1,23 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import { games } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { syncServerTime } from './clock.ts'
 import { InviteLink } from './InviteLink.tsx'
 import { validateContest, type ContestItemInput } from './validate.ts'
 
 const pad = (n: number) => String(n).padStart(2, '0')
-// datetime-local 값 ('YYYY-MM-DDTHH:mm', 브라우저 로컬 시각)
-function toLocalInput(ms: number): string {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+const KST_MS = 9 * 3_600_000
+// datetime-local 값 ('YYYY-MM-DDTHH:mm')을 한국 시간 기준으로 만든다
+function toKstInput(ms: number): string {
+  const d = new Date(ms + KST_MS)
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+}
+// 입력값을 KST 벽시계 시각으로 읽는다 (한국은 서머타임이 없다)
+function parseKstInput(v: string): Date {
+  return new Date(`${v}:00+09:00`)
 }
 
 const FIELD_OF: Record<string, string> = {
@@ -36,7 +42,7 @@ export function ContestNewPage() {
   const allowed = games.filter((g) => g.manifest.modes.contest && (!g.manifest.hidden || isAdmin))
 
   const [title, setTitle] = useState('')
-  const [start, setStart] = useState(() => toLocalInput(now() + 30 * 60_000))
+  const [start, setStart] = useState(() => toKstInput(now() + 30 * 60_000))
   const [duration, setDuration] = useState('30')
   const [visibility, setVisibility] = useState<'public' | 'invite'>('public')
   const [official, setOfficial] = useState(false)
@@ -48,6 +54,17 @@ export function ContestNewPage() {
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<Created | null>(null)
 
+  const [startTouched, setStartTouched] = useState(false)
+  // 서버 시각과 맞춘 뒤, 사용자가 건드리지 않았다면 기본 시작 시각을 다시 잡는다
+  useEffect(() => {
+    let alive = true
+    void syncServerTime().then(() => {
+      if (alive && !startTouched) setStart(toKstInput(now() + 30 * 60_000))
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const total = items.reduce((s, it) => s + (Number.isFinite(it.count) ? it.count : 0), 0)
   const patchItem = (i: number, p: Partial<ContestItemInput>) =>
     setItems((prev) => prev.map((it, k) => (k === i ? { ...it, ...p } : it)))
@@ -57,7 +74,7 @@ export function ContestNewPage() {
     if (busy) return
     setFormError(null)
     const input = {
-      title, startsAt: new Date(start), durationMin: Number(duration), visibility, items, official: isAdmin && official,
+      title, startsAt: parseKstInput(start), durationMin: Number(duration), visibility, items, official: isAdmin && official,
     }
     const errs = validateContest(input, now())
     setErrors(errs)
@@ -110,7 +127,7 @@ export function ContestNewPage() {
 
       <label className="field">
         <span>시작 시각 (한국 시간 기준)</span>
-        <input className="input" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+        <input className="input" type="datetime-local" value={start} onChange={(e) => { setStartTouched(true); setStart(e.target.value) }} />
         <span className="muted">지금부터 5분 뒤 ~ 30일 안</span>
         {errors.startsAt && <span className="form-error">{errors.startsAt}</span>}
       </label>

@@ -1,3 +1,5 @@
+process.env.TZ = 'America/New_York' // 한국 시간이 아닌 브라우저를 흉내낸다
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -29,7 +31,7 @@ test('invalid form shows field errors and does not call the server', () => {
   render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }))
   expect(screen.getByText('제목은 1~40자로 적어 주세요')).toBeInTheDocument()
-  expect(rpcMock).not.toHaveBeenCalled()
+  expect(rpcMock).not.toHaveBeenCalledWith('create_contest', expect.anything())
 })
 
 test('invite contest shows the join link after creation', async () => {
@@ -52,4 +54,25 @@ test('server error is mapped to its field', async () => {
   fireEvent.change(screen.getByLabelText('제목'), { target: { value: '테스트' } })
   fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }))
   await waitFor(() => expect(screen.getByText('대회에 쓸 수 없는 게임이 들어 있어요')).toBeInTheDocument())
+})
+
+test('start time is read as KST even when the browser is not in KST', async () => {
+  admin = true
+  rpcMock.mockImplementation(async (name: string) => (name === 'create_contest' ? [{ id: 'c1', invite_code: null }] : null))
+  const startInput = () => screen.getByLabelText(/시작 시각/) as HTMLInputElement
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  // 기본값은 KST 벽시계: 지금(UTC)+30분+9시간
+  const expectDefault = new Date(Date.now() + 30 * 60_000 + 9 * 3_600_000).toISOString().slice(0, 16)
+  expect(Math.abs(Date.parse(startInput().value + 'Z') - Date.parse(expectDefault + 'Z'))).toBeLessThanOrEqual(2 * 60_000)
+  const kst = new Date(Date.now() + 2 * 3_600_000 + 9 * 3_600_000)
+  const wall = kst.toISOString().slice(0, 16) // KST 벽시계 2시간 뒤
+  fireEvent.change(startInput(), { target: { value: wall } })
+  fireEvent.change(screen.getByLabelText('제목'), { target: { value: '시간 테스트' } })
+  fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }))
+  await screen.findByText('대회를 만들었어요')
+  const args = rpcMock.mock.calls.find((c) => c[0] === 'create_contest')![1] as { p_starts_at: string }
+  expect(args.p_starts_at).toBe(new Date(`${wall}:00+09:00`).toISOString())
+  expect(Date.parse(args.p_starts_at) - Date.now()).toBeGreaterThan(115 * 60_000)
+  expect(Date.parse(args.p_starts_at) - Date.now()).toBeLessThan(125 * 60_000)
+  expect(rpcMock).toHaveBeenCalledWith('server_now')
 })

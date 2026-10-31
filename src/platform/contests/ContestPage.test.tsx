@@ -166,14 +166,44 @@ test('item page joins by itself when opened directly', async () => {
 })
 
 test('invite_contest_without_code_shows_join_required', async () => {
-  dataMock.getContest.mockResolvedValue(
-    contest({ visibility: 'invite', starts_at: iso(sNow() - 10 * MIN), ends_at: iso(sNow() + 50 * MIN) }),
-  )
+  // RLS가 초대 대회를 숨기므로 getContest는 null을 돌려준다
+  dataMock.getContest.mockResolvedValue(null)
   setup({ entries: [] })
   renderAt()
-  expect(await screen.findByText('초대 링크로만 참가할 수 있어요')).toBeInTheDocument()
+  expect(await screen.findByText('대회를 찾을 수 없거나, 초대 링크로만 참가할 수 있어요')).toBeInTheDocument()
   expect(calls).not.toContain('join_contest')
-  expect(screen.queryByRole('link', { name: /1번/ })).toBeNull()
+})
+
+test('item page shows the same message when nothing is visible', async () => {
+  dataMock.getContest.mockResolvedValue(null)
+  setup({ entries: [] })
+  dataMock.getItems.mockResolvedValue([])
+  renderAt('/contests/c1/1')
+  expect(await screen.findByText('대회를 찾을 수 없거나, 초대 링크로만 참가할 수 있어요')).toBeInTheDocument()
+  expect(playMock).not.toHaveBeenCalled()
+})
+
+test('ended ranking failure shows an error with retry', async () => {
+  dataMock.getContest.mockResolvedValue(
+    contest({ starts_at: iso(sNow() - 120 * MIN), ends_at: iso(sNow() - 60 * MIN) }),
+  )
+  setup({ entries: ['u1'] })
+  let fail = true
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'lb_contest') {
+      if (fail) throw new Error('boom')
+      return [{ rank: 1, user_id: 'u1', handle: 'kane', score: 5, solved_items: 1, action_count: 2, last_finished_at: null }]
+    }
+    return null
+  })
+  renderAt()
+  expect(await screen.findByText('순위를 불러오지 못했어요')).toBeInTheDocument()
+  expect(screen.queryByText('아직 기록이 없어요')).toBeNull()
+  fail = false
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+  expect(await screen.findByText('kane')).toBeInTheDocument()
 })
 
 test('ended_shows_results_and_answers', async () => {
