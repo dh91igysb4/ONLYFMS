@@ -212,16 +212,11 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
       </div>
 
       <div className="wya-card">
-        <div className="wya-stage">
-          {finished && answer ? (
-            <div className="wya-ans">{answer.name}<small>{answer.team}</small></div>
-          ) : (
-            <>
-              <Revealed s={s} />
-              <div className="wya-q" aria-hidden="true">?</div>
-            </>
-          )}
-        </div>
+        {finished && answer ? (
+          <div className="wya-stage"><div className="wya-ans">{answer.name}<small>{answer.team}</small></div></div>
+        ) : (
+          <Revealed s={s} />
+        )}
 
         {finished ? (
           answer && <ul className="wya-rows" aria-label="정답"><GuessRowView g={answer} fb={compare(answer, answer)} className="wya-answer" /></ul>

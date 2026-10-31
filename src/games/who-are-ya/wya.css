@@ -18,14 +18,13 @@
   background: var(--card);
   color: var(--wya-card-ink);
   border-radius: 14px;
-  padding: 14px 14px 16px;
+  padding: 12px 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
-.wya-stage { position: relative; display: grid; place-items: center; min-height: 130px; }
-.wya-q { font-family: var(--wya-display); font-weight: 900; font-size: 116px; line-height: 1; color: var(--wya-q); }
-.wya-rev { position: absolute; left: 0; top: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; max-width: 46%; }
+.wya-stage { display: grid; place-items: center; padding: 6px 0 2px; }
+.wya-rev { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .wya-rev .wya-x { font-family: var(--wya-display); font-weight: 900; font-size: 20px; line-height: 1; }
 .wya-rev .wya-flag { width: 28px; height: 28px; }
 .wya-rev .wya-flag span { font-size: 22px; }
@@ -133,9 +132,7 @@
 }
 
 @media (min-width: 481px) {
-  .wya-card { padding: 18px 20px 22px; gap: 16px; }
-  .wya-stage { min-height: 170px; }
-  .wya-q { font-size: 150px; }
+  .wya-card { padding: 16px 18px 18px; gap: 12px; }
   .wya-rev .wya-x { font-size: 26px; }
   .wya-rev .wya-shirt { width: 38px; height: 38px; }
   .wya-rev .wya-flag { width: 34px; height: 34px; }
