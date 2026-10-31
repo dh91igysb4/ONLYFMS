@@ -222,8 +222,8 @@ test('ended_shows_results_and_answers', async () => {
   expect(await screen.findByText('종료')).toBeInTheDocument()
   expect(screen.getByText('son')).toBeInTheDocument()
   expect(screen.getByText('18')).toBeInTheDocument()
-  expect(screen.getByText(/42/)).toBeInTheDocument()
-  expect(screen.getByText(/77/)).toBeInTheDocument()
+  expect(screen.getByText(/"answer": 42/)).toBeInTheDocument()
+  expect(screen.getByText(/"answer": 77/)).toBeInTheDocument()
   expect(calls.filter((c) => c === 'lb_contest')).toHaveLength(1)
 })
 
