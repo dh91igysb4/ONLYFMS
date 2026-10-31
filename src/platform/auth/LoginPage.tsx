@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.ts'
 import { errorMessage } from '../../lib/api.ts'
 import { safeRedirect } from './redirect.ts'
+import { Brand } from '../layout/Brand.tsx'
 
 export function LoginPage() {
   const [params] = useSearchParams()
@@ -24,7 +25,7 @@ export function LoginPage() {
 
   return (
     <main className="auth-page">
-      <h1 className="app-title">ONLYFMS</h1>
+      <Brand />
       <p className="muted">축구 퀴즈를 친구들과 함께</p>
       <button className="btn btn-primary" onClick={login}>구글로 로그인</button>
       {error && <p role="alert" className="form-error">{error}</p>}
