@@ -116,10 +116,20 @@ export function DuelHomePage() {
   const [joinError, setJoinError] = useState<string | null>(null)
   const ticking = useRef(new Set<string>())
 
-  const load = useCallback(async (alive: () => boolean) => {
+  // duel_list는 한 번에 하나. 진행 중에 또 필요해지면 끝난 뒤 한 번만 다시 부른다
+  const inflight = useRef(false)
+  const rerun = useRef(false)
+  const alive = useRef(true)
+
+  const load = useCallback(async (): Promise<void> => {
+    if (inflight.current) {
+      rerun.current = true
+      return
+    }
+    inflight.current = true
     try {
       const r = await rpc<DuelList>('duel_list')
-      if (!alive()) return
+      if (!alive.current) return
       setList(r)
       setError(null)
       // 마감 지난 내 대국: 아무도 tick을 안 보내면 멈추므로 여기서 한 번씩 보낸다 (설계 §4.9). 오류는 무시
@@ -131,17 +141,24 @@ export function DuelHomePage() {
           .finally(() => ticking.current.delete(id))
       }
     } catch (e) {
-      if (alive()) setError(duelErrorMessage(e instanceof ApiError ? e.code : 'network'))
+      if (alive.current) setError(duelErrorMessage(e instanceof ApiError ? e.code : 'network'))
+    } finally {
+      inflight.current = false
+      if (rerun.current && alive.current) {
+        rerun.current = false
+        void load()
+      }
     }
   }, [])
 
   useEffect(() => {
-    let alive = true
-    const isAlive = () => alive
-    void load(isAlive)
+    alive.current = true
+    inflight.current = false
+    rerun.current = false
+    void load()
     // 대기실은 Realtime 없이 화면이 열려 있는 동안 5초마다 다시 읽는다
-    const t = setInterval(() => { void load(isAlive) }, POLL_MS)
-    return () => { alive = false; clearInterval(t) }
+    const t = setInterval(() => { void load() }, POLL_MS)
+    return () => { alive.current = false; clearInterval(t) }
   }, [load])
 
   async function join(id: string) {
@@ -162,7 +179,8 @@ export function DuelHomePage() {
   return (
     <div className="stack">
       <h2 className="page-title">대전</h2>
-      <CreateForm visible={visible} />
+      {/* 관리자 프로필이 늦게 오면 보이는 게임이 바뀌므로 기본값을 다시 잡는다 */}
+      <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {!error && list === null && <p className="page-note" role="status">불러오는 중…</p>}

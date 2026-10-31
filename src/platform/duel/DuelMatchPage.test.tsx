@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 // ---- 가짜 Realtime 채널
 type Handler = () => void
 let broadcastHandler: Handler | null = null
 let subscribeStatus = 'SUBSCRIBED'
+let channelThrows = false
 const removeChannel = vi.fn()
 const channelMock = vi.fn((name: string) => {
+  if (channelThrows) throw new Error('realtime unavailable')
   const ch = {
     name,
     on: vi.fn((_type: string, _filter: unknown, cb: Handler) => { broadcastHandler = cb; return ch }),
@@ -66,6 +68,12 @@ function Where() {
   return <p data-testid="where">{l.pathname}</p>
 }
 
+let nav: NavigateFunction | null = null
+function Nav() {
+  nav = useNavigate()
+  return null
+}
+
 function renderAt(path = '/duel/m1', state?: unknown) {
   return render(
     <MemoryRouter initialEntries={[{ pathname: path, state }]}>
@@ -74,6 +82,7 @@ function renderAt(path = '/duel/m1', state?: unknown) {
         <Route path="*" element={<p>다른 화면</p>} />
       </Routes>
       <Where />
+      <Nav />
     </MemoryRouter>,
   )
 }
@@ -92,6 +101,7 @@ beforeEach(() => {
   channelMock.mockClear()
   broadcastHandler = null
   subscribeStatus = 'SUBSCRIBED'
+  channelThrows = false
   boardMissing = false
   current = dv()
   duelMock.mockImplementation(async (b: { action: string }) => {
@@ -170,15 +180,39 @@ test('match_tick: 409 not_due waits for a new deadline, silently', async () => {
 })
 
 test('match_polls_without_realtime', async () => {
-  subscribeStatus = 'CHANNEL_ERROR'
+  // Realtime을 아예 쓸 수 없어도(채널 생성이 던짐) 5초 폴링으로 진행된다
+  channelThrows = true
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const { unmount } = renderAt()
   await flush()
   expect(channelMock).toHaveBeenCalledWith('duel:m1')
+  expect(warn).toHaveBeenCalled()
+  expect(calls('view')).toHaveLength(1)
+  current = dv({ to_move: 1, action_no: 1 })
+  await advance(5000)
+  expect(calls('view')).toHaveLength(2)
+  expect(screen.getByText('상대 차례')).toBeInTheDocument()
+  await advance(5000)
+  expect(calls('view')).toHaveLength(3)
+  unmount()
+  await advance(20_000)
+  expect(calls('view')).toHaveLength(3)
+  expect(removeChannel).not.toHaveBeenCalled()
+  warn.mockRestore()
+})
+
+test('match_polls_when_subscribe_reports_error; broadcast triggers a view', async () => {
+  subscribeStatus = 'CHANNEL_ERROR'
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const { unmount } = renderAt()
+  await flush()
+  expect(warn).toHaveBeenCalledWith('duel: realtime', 'CHANNEL_ERROR')
   expect(calls('view')).toHaveLength(1)
   await advance(5000)
   expect(calls('view')).toHaveLength(2)
   await advance(5000)
   expect(calls('view')).toHaveLength(3)
+  warn.mockRestore()
   // 신호가 오면 바로 다시 읽는다
   await act(async () => { broadcastHandler?.() ; await vi.advanceTimersByTimeAsync(0) })
   expect(calls('view')).toHaveLength(4)
@@ -277,4 +311,94 @@ test('not a participant shows an error with a link to the duel tab', async () =>
   await flush()
   expect(screen.getByText('참가한 대국이 아니에요')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '대전 탭으로' })).toHaveAttribute('href', '/duel')
+})
+
+type Deferred<T> = { promise: Promise<T>; resolve(v: T): void }
+function deferred<T>(): Deferred<T> {
+  let resolve!: (v: T) => void
+  const promise = new Promise<T>((r) => { resolve = r })
+  return { promise, resolve }
+}
+
+test('late view with a lower action_no does not undo a move response', async () => {
+  current = dv({ to_move: 0, action_no: 3 })
+  renderAt()
+  await flush()
+  expect(screen.getByText('내 차례')).toBeInTheDocument()
+  const slow = deferred<DuelView>()
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'view') return slow.promise
+    if (b.action === 'move') return dv({ to_move: 1, action_no: 4 })
+    throw new Error(b.action)
+  })
+  await advance(5000) // 폴링 view가 걸려 있는 동안
+  expect(calls('view')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: '둔다' }))
+  await flush()
+  expect(screen.getByText('상대 차례')).toBeInTheDocument()
+  // 수를 두기 전에 읽은 옛 화면이 늦게 도착
+  await act(async () => { slow.resolve(dv({ to_move: 0, action_no: 3 })); await vi.advanceTimersByTimeAsync(0) })
+  expect(screen.getByText('상대 차례')).toBeInTheDocument()
+  expect(screen.getByText('보드 1')).toBeInTheDocument()
+})
+
+test('switching match: old channel removed, new one subscribed, late old view ignored', async () => {
+  const m1Slow = deferred<DuelView>()
+  let m1Calls = 0
+  duelMock.mockImplementation(async (b: { action: string; match_id: string }) => {
+    if (b.action !== 'view') throw new Error(b.action)
+    if (b.match_id === 'm1') {
+      m1Calls += 1
+      return m1Calls === 1 ? dv({ to_move: 0 }) : m1Slow.promise
+    }
+    return dv({ match_id: 'm2', to_move: 1, players: [{ id: 'u1', handle: 'kane', rating: 1000 }, { id: 'u9', handle: 'park', rating: 1200 }] })
+  })
+  renderAt()
+  await flush()
+  expect(screen.getByText('son')).toBeInTheDocument()
+  await advance(5000) // m1 view 하나가 걸려 있다
+  expect(m1Calls).toBe(2)
+  await act(async () => { nav!('/duel/m2'); await vi.advanceTimersByTimeAsync(0) })
+  expect(removeChannel).toHaveBeenCalledTimes(1)
+  expect(channelMock).toHaveBeenLastCalledWith('duel:m2')
+  expect(screen.getByText('park')).toBeInTheDocument()
+  await act(async () => { m1Slow.resolve(dv({ to_move: 0, action_no: 9 })); await vi.advanceTimersByTimeAsync(0) })
+  expect(screen.getByText('park')).toBeInTheDocument()
+  expect(screen.queryByText('son')).toBeNull()
+  expect(screen.getByText('상대 차례')).toBeInTheDocument()
+})
+
+test('slow view: no overlapping view calls, one rerun after it finishes', async () => {
+  const slow = deferred<DuelView>()
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'view') return calls('view').length === 1 ? slow.promise : current
+    throw new Error(b.action)
+  })
+  renderAt()
+  await flush()
+  await advance(12_000) // 폴링 두 번 + 신호
+  await act(async () => { broadcastHandler?.(); await vi.advanceTimersByTimeAsync(0) })
+  expect(calls('view')).toHaveLength(1)
+  await act(async () => { slow.resolve(current); await vi.advanceTimersByTimeAsync(0) })
+  await flush()
+  expect(calls('view')).toHaveLength(2)
+  expect(screen.getByText('내 차례')).toBeInTheDocument()
+})
+
+test('no early tick when the browser clock runs ahead of the server', async () => {
+  // 서버 시계가 브라우저보다 10초 느리다. 마감은 서버 기준 5초 뒤(브라우저 기준으로는 이미 지난 시각)
+  const skew = -10_000
+  const deadline = new Date(Date.now() + skew + 5000).toISOString()
+  current = dv({ turn_deadline: deadline, to_move: 1 })
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'view') return { ...current, server_now: Date.now() + skew }
+    if (b.action === 'tick') return new Promise<never>(() => {})
+    throw new Error(b.action)
+  })
+  renderAt()
+  await flush()
+  await advance(3000)
+  expect(calls('tick')).toHaveLength(0)
+  await advance(3000)
+  expect(calls('tick')).toHaveLength(1)
 })

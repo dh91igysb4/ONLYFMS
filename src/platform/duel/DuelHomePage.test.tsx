@@ -152,3 +152,17 @@ test('home_lists: lobby join goes to the match', async () => {
   expect(calls('join')).toEqual([[{ action: 'join', match_id: 'l1' }]])
   expect(screen.getByTestId('where')).toHaveTextContent('/duel/l1')
 })
+
+test('home_lists: slow duel_list does not stack overlapping calls', async () => {
+  let resolve!: (v: unknown) => void
+  rpcMock.mockReset()
+  rpcMock.mockImplementationOnce(() => new Promise((r) => { resolve = r }))
+  rpcMock.mockResolvedValue(empty)
+  renderHome()
+  await flush()
+  await advance(16_000)
+  expect(rpcMock.mock.calls.filter((c) => c[0] === 'duel_list')).toHaveLength(1)
+  await act(async () => { resolve(empty); await vi.advanceTimersByTimeAsync(0) })
+  await flush()
+  expect(rpcMock.mock.calls.filter((c) => c[0] === 'duel_list')).toHaveLength(2)
+})

@@ -62,23 +62,10 @@ test('join_page_states: full shows a message and a duel tab link', async () => {
 })
 
 test('join_page_states: own_match goes to that match', async () => {
-  duelMock.mockRejectedValue(new ApiError('own_match', 409, { error: 'own_match' }))
-  rpcMock.mockImplementation(async (name: string, args?: { p_match: string }) => {
-    if (name === 'duel_list') {
-      return {
-        lobby: [], recent: [], due: [],
-        mine: [
-          { id: 'w1', status: 'waiting', players: [{ id: 'u1', handle: 'kane', rating: 1000 }] },
-          { id: 'w2', status: 'waiting', players: [{ id: 'u1', handle: 'kane', rating: 1000 }] },
-        ],
-      }
-    }
-    if (name === 'duel_invite_code') return args?.p_match === 'w2' ? 'abcde12345' : 'zzzzz00000'
-    throw new Error(name)
-  })
+  duelMock.mockRejectedValue(new ApiError('own_match', 409, { error: 'own_match', match_id: 'w2' }))
   renderJoin()
   await flush()
-  await flush()
+  expect(rpcMock).not.toHaveBeenCalled()
   expect(screen.getByTestId('where')).toHaveTextContent('/duel/w2')
 })
 

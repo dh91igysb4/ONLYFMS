@@ -63,11 +63,19 @@ export function useDuelMatch(id: string): DuelMatch {
   const viewRef = useRef<DuelView | null>(null)
   const busyRef = useRef(false)
   const alive = useRef(true)
+  /** 대국이 바뀔 때마다 1 증가. 이전 대국의 응답·오류는 이 값이 다르면 버린다 */
+  const gen = useRef(0)
+  /** view 요청은 한 번에 하나. 진행 중에 또 필요해지면 끝난 뒤 한 번만 다시 부른다 */
+  const inflightRef = useRef(false)
+  const rerunRef = useRef(false)
   /** 이 마감에 대해 tick을 이미 보냈다 */
   const tickedFor = useRef<string | null>(null)
   const tickRetryAt = useRef(0)
   const idRef = useRef(id)
   idRef.current = id
+
+  /** 요청을 보낸 시점의 대국이 아직 이 화면의 대국인가 */
+  const current = useCallback((g: number, forId: string) => alive.current && g === gen.current && forId === idRef.current, [])
 
   const apply = useCallback((v: DuelView) => {
     if (!alive.current || v.match_id !== idRef.current) return
@@ -78,22 +86,41 @@ export function useDuelMatch(id: string): DuelMatch {
   }, [])
 
   // 화면만 서버 상태로 맞춘다. 실패는 조용히 넘기고 다음 폴링이 다시 맞춘다.
+  const refreshRef = useRef<() => Promise<void>>(async () => {})
   const refresh = useCallback(async () => {
+    if (inflightRef.current) {
+      rerunRef.current = true
+      return
+    }
+    inflightRef.current = true
+    const g = gen.current
     const forId = idRef.current
     try {
       const v = await duel({ action: 'view', match_id: forId })
+      if (!current(g, forId)) return
       apply(v)
-      if (alive.current && forId === idRef.current) setFatal(null)
+      setFatal(null)
     } catch (e) {
+      if (!current(g, forId)) return
       const v = bodyView(e)
       if (v) {
         apply(v)
         if (e instanceof ApiError && e.code === 'version_changed') setError(duelErrorMessage(e.code))
       } else if (e instanceof ApiError && (e.status === 403 || e.status === 404) && !viewRef.current) {
-        if (alive.current && forId === idRef.current) setFatal(duelErrorMessage(e.code))
+        setFatal(duelErrorMessage(e.code))
+      }
+    } finally {
+      // 대국이 바뀌었으면 새 대국 쪽이 이미 상태를 초기화했다
+      if (g === gen.current) {
+        inflightRef.current = false
+        if (rerunRef.current && alive.current) {
+          rerunRef.current = false
+          void refreshRef.current()
+        }
       }
     }
-  }, [apply])
+  }, [apply, current])
+  refreshRef.current = refresh
 
   /** 사용자 행동(move·resign·cancel). 한 번에 하나만 */
   const send = useCallback(
@@ -102,9 +129,13 @@ export function useDuelMatch(id: string): DuelMatch {
       busyRef.current = true
       setBusy(true)
       setError(null)
+      const g = gen.current
+      const forId = idRef.current
       try {
-        apply(await duel({ ...body, match_id: idRef.current }))
+        const v = await duel({ ...body, match_id: forId })
+        if (current(g, forId)) apply(v)
       } catch (e) {
+        if (!current(g, forId)) return
         const v = bodyView(e)
         if (v) {
           // stale·not_your_turn·finished 등: 최신 화면으로 조용히 바꾼다
@@ -123,46 +154,57 @@ export function useDuelMatch(id: string): DuelMatch {
           void refresh()
         }
       } finally {
-        busyRef.current = false
-        if (alive.current) setBusy(false)
+        if (g === gen.current) {
+          busyRef.current = false
+          if (alive.current) setBusy(false)
+        }
       }
     },
-    [apply, refresh],
+    [apply, current, refresh],
   )
 
   const tickIfDue = useCallback(() => {
     const v = viewRef.current
     if (!v || v.status !== 'active' || v.my_seat === null || !v.turn_deadline) return
     if (tickedFor.current === v.turn_deadline) return
+    // 서버 시계로 보정한 지금 (브라우저 시계가 빨라도 마감 전에는 보내지 않는다)
     if (Date.parse(v.turn_deadline) - now() > 0) return
     if (Date.now() < tickRetryAt.current) return
     const deadline = v.turn_deadline
+    const g = gen.current
+    const forId = v.match_id
     tickedFor.current = deadline
-    duel({ action: 'tick', match_id: v.match_id })
-      .then(apply)
+    duel({ action: 'tick', match_id: forId })
+      .then((r) => { if (current(g, forId)) apply(r) })
       .catch((e) => {
+        if (!current(g, forId)) return
         const fresh = bodyView(e)
         if (fresh) {
           // not_due·finished 등: 받은 화면으로 맞추고, 같은 마감에는 다시 보내지 않는다
           apply(fresh)
-          if (e instanceof ApiError && e.code === 'version_changed' && alive.current) setError(duelErrorMessage(e.code))
+          if (e instanceof ApiError && e.code === 'version_changed') setError(duelErrorMessage(e.code))
         } else if (tickedFor.current === deadline) {
           // 보내지 못했다(네트워크 등): 잠시 뒤 다시 보낸다
           tickedFor.current = null
           tickRetryAt.current = Date.now() + TICK_RETRY_MS
         }
       })
-  }, [apply])
+  }, [apply, current])
 
   // 대국이 바뀌면 처음부터
   useEffect(() => {
     alive.current = true
+    gen.current += 1
+    inflightRef.current = false
+    rerunRef.current = false
+    busyRef.current = false
     viewRef.current = null
     tickedFor.current = null
     tickRetryAt.current = 0
     setView(null)
     setError(null)
     setFatal(null)
+    setBusy(false)
     void refresh()
 
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -170,9 +212,12 @@ export function useDuelMatch(id: string): DuelMatch {
       channel = supabase
         .channel(`duel:${id}`)
         .on('broadcast', { event: 'update' }, () => { void refresh() })
-        .subscribe()
+        .subscribe((status: string) => {
+          // 실패해도 5초 폴링이 계속 맞춘다
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('duel: realtime', status)
+        })
     } catch (e) {
-      console.error('duel: realtime subscribe failed', e)
+      console.warn('duel: realtime subscribe failed', e)
     }
     // 신호와 무관하게 돈다 (Realtime이 끊겨도 대국이 끝까지 진행되도록)
     const poll = setInterval(() => {
