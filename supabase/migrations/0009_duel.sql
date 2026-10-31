@@ -27,7 +27,8 @@ create table public.duel_matches (
   -- 대회 초대 코드와 같은 방식(_new_invite_code). 초대 대국에는 반드시 있다.
   invite_code   text unique,
   status        public.duel_status not null default 'waiting',
-  created_by    uuid not null references public.profiles (id) on delete cascade,
+  -- 계정이 지워져도 대국·상대 전적은 남긴다(contests.created_by와 같이 null로)
+  created_by    uuid references public.profiles (id) on delete set null,
   players       uuid[],                       -- [선공, 후공]. 참가 때 확정
   state         jsonb,                        -- 브라우저 읽기 불가(컬럼 권한 없음)
   action_no     int not null default 0,
@@ -57,6 +58,7 @@ create table public.duel_matches (
   constraint duel_matches_moved check (cardinality(moved) = 2),
   constraint duel_matches_winner check (winner is null or (winner in (0, 1) and status = 'finished')),
   constraint duel_matches_end_reason check ((status in ('finished', 'void')) = (end_reason is not null)),
+  constraint duel_matches_void_reason check (end_reason <> 'void' or status = 'void'),
   constraint duel_matches_final_scores check (final_scores is null or cardinality(final_scores) = 2)
 );
 
@@ -183,8 +185,9 @@ begin
     return;
   end if;
 
+  -- 좌석 순서가 아니라 user_id 순서로 넣고 잠근다(좌석이 뒤바뀐 두 대국이 동시에 끝나도 교착 없음)
   insert into public.duel_ratings (user_id, game_id)
-  values (m.players[1], m.game_id), (m.players[2], m.game_id)
+  select u.uid, m.game_id from unnest(m.players) as u(uid) order by u.uid
   on conflict do nothing;
   -- 두 행을 같은 순서로 잠근다
   perform 1 from public.duel_ratings
@@ -229,7 +232,7 @@ language sql stable security definer set search_path = public as $$
   select coalesce((select r.rating from public.duel_ratings r where r.user_id = p_user and r.game_id = p_game), 1000)
 $$;
 
--- 목록 항목. state·invite_code는 넣지 않는다. waiting이면 players = [만든 사람].
+-- 목록 항목. state·invite_code는 넣지 않는다. waiting이면 players = [만든 사람](지워졌으면 []).
 create function public._duel_item(m public.duel_matches) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
@@ -242,7 +245,7 @@ language sql stable security definer set search_path = public as $$
     'players', (select coalesce(jsonb_agg(jsonb_build_object(
                           'id', u.uid, 'handle', p.handle::text, 'rating', public._duel_rating(u.uid, m.game_id))
                         order by u.ord), '[]'::jsonb)
-                  from unnest(coalesce(m.players, array[m.created_by])) with ordinality as u(uid, ord)
+                  from unnest(coalesce(m.players, array_remove(array[m.created_by], null))) with ordinality as u(uid, ord)
                   left join public.profiles p on p.id = u.uid),
     'created_by_handle', (select p.handle::text from public.profiles p where p.id = m.created_by),
     'created_at', m.created_at,
@@ -306,7 +309,7 @@ $$;
 
 -- ------------------------------------------------------------------ public RPCs
 -- 대전 탭 목록. 호출할 때 10분 지난 waiting을 void로 정리한다.
---   lobby:  공개 waiting(내가 만든 것 제외 — mine에 있다)
+--   lobby:  공개 waiting(내가 만든 것 제외 — mine에 있다. 만든 사람이 지워진 것도 제외)
 --   mine:   내 waiting/active
 --   recent: 내 최근 종료 10개(finished, 시작된 뒤 무효가 된 void)
 --   due:    내가 참가자이고 active이며 마감이 지난 대국 id. 화면이 각각에 tick을 보낸다.
@@ -330,7 +333,8 @@ begin
   select coalesce(jsonb_agg(public._duel_item(m) order by m.created_at desc, m.id), '[]'::jsonb)
     into v_lobby
     from public.duel_matches m
-   where m.status = 'waiting' and m.visibility = 'public' and m.created_by <> v_uid
+   where m.status = 'waiting' and m.visibility = 'public'
+     and m.created_by is not null and m.created_by <> v_uid
      and (v_admin or not public._is_hidden_game(m.game_id));
 
   select coalesce(jsonb_agg(public._duel_item(m) order by m.created_at desc, m.id), '[]'::jsonb)

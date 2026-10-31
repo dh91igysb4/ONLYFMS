@@ -2,7 +2,7 @@
 -- 한 트랜잭션 안에서 now()는 고정이다. 대국 행은 슈퍼유저(= Edge Function의 소유자 연결)로 직접 넣는다.
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-*)을 쓰고, 숨김 게임 확인에만 yacht를 쓴다.
 begin;
-select plan(76);
+select plan(96);
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000c0","role":"authenticated"}'
 \set C1  '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}'
@@ -83,6 +83,10 @@ insert into public.duel_matches
      null, 'void', null, '{false,false}', now() - interval '2 hours', now() - interval '2 hours', now() - interval '70 minutes'),
   ('f0000000-0000-0000-0000-000000000026', 'g-h2h', 1, true, 'public', 'finished', :'u1', array[:'u1', :'u3']::uuid[], 60,
      0, 'normal', '{9,4}', '{true,true}', now() - interval '2 hours', now() - interval '2 hours', now() - interval '60 minutes'),
+  ('f0000000-0000-0000-0000-000000000041', 'yacht', 1, true, 'public', 'finished', :'u1', array[:'u1', :'u2']::uuid[], 60,
+     0, 'normal', '{250,200}', '{true,true}', now() - interval '1 hour', now() - interval '1 hour', now() - interval '55 minutes'),
+  ('f0000000-0000-0000-0000-000000000051', 'g-del', 1, true, 'public', 'finished', :'u4', array[:'u4', :'u3']::uuid[], 60,
+     1, 'normal', '{1,2}', '{true,true}', now() - interval '1 hour', now() - interval '1 hour', now() - interval '45 minutes'),
   ('f0000000-0000-0000-0000-000000000031', 'g-moves', 1, true, 'public', 'finished', :'u1', array[:'u1', :'u2']::uuid[], 60,
      0, 'normal', '{1,0}', '{true,true}', now() - interval '1 hour', now() - interval '1 hour', now() - interval '50 minutes');
 
@@ -104,6 +108,9 @@ insert into public.duel_ratings (user_id, game_id, rating, rated_games, wins, dr
   (:'u2', 'g-lb', 1200, 4, 4, 0, 0),
   (:'u3', 'g-lb', 1050, 7, 3, 1, 3),
   (:'u1', 'yacht', 1000, 1, 1, 0, 0);
+-- 숨김 게임 대국의 레이팅 변화(레이팅 행은 그대로 두려고 직접 넣는다)
+insert into public.duel_rating_changes (match_id, user_id, before, after) values
+  ('f0000000-0000-0000-0000-000000000041', :'u1', 980, 1000);
 
 -- ---------------------------------------------------------------- schema
 select has_table('public', 'duel_matches', 'duel_matches exists');
@@ -112,6 +119,12 @@ select has_table('public', 'duel_ratings', 'duel_ratings exists');
 select has_table('public', 'duel_rating_changes', 'duel_rating_changes exists');
 select results_eq($$select enum_range(null::public.duel_status)::text$$, $$values ('{waiting,active,finished,void}')$$,
   'duel_status enum');
+select is((select count(*)::int from pg_publication_tables
+            where schemaname = 'public'
+              and tablename in ('duel_matches', 'duel_moves', 'duel_ratings', 'duel_rating_changes')), 0,
+  'no duel table is in any publication (no realtime postgres_changes)');
+select throws_ok($$update public.duel_matches set end_reason = 'void' where id = 'f0000000-0000-0000-0000-000000000011'$$,
+  '23514', null, 'constraint: finished match cannot have end_reason void');
 select results_eq($$select enum_range(null::public.duel_end_reason)::text$$, $$values ('{normal,resign,timeout,void}')$$,
   'duel_end_reason enum');
 
@@ -257,6 +270,22 @@ select results_eq($$select handle, rating, rated_games, placed from public.lb_du
   $$values ('duelb'::text, 1200, 4, false), ('duela'::text, 1100, 5, true), ('duelc'::text, 1050, 7, true)$$,
   'lb_placed: placed = rated_games >= 5, ordered by rating desc');
 
+-- 숨김 게임(yacht): 비관리자에게는 통계·상대 전적·레이팅·레이팅 변화가 보이지 않는다
+select is(public.duel_stats('duela', 'yacht'), null::jsonb, 'hidden_game_excluded: duel_stats(yacht) null for non-admin');
+select ok(not (public.duel_stats('duela', null) @> '[{"game_id":"yacht"}]'),
+  'hidden_game_excluded: duel_stats(all games) has no yacht for non-admin');
+select is(public.duel_h2h('duela', 'duelb', 'yacht') -> 'games', '[]'::jsonb,
+  'hidden_game_excluded: duel_h2h(yacht) empty for non-admin');
+select ok(not (public.duel_h2h('duela', 'duelb', null) -> 'games' @> '[{"game_id":"yacht"}]')
+          and not (public.duel_h2h('duela', 'duelb', null) -> 'recent' @> '[{"game_id":"yacht"}]'),
+  'hidden_game_excluded: duel_h2h(all games) has no yacht for non-admin');
+select is((select count(*)::int from public.duel_ratings where game_id = 'yacht'), 0,
+  'hidden_game_excluded: duel_ratings RLS hides yacht from non-admin');
+select is((select count(*)::int from public.duel_rating_changes where match_id = 'f0000000-0000-0000-0000-000000000041'), 0,
+  'hidden_game_excluded: duel_rating_changes RLS hides yacht from non-admin');
+select is((select count(*)::int from public.duel_rating_changes where match_id = 'f0000000-0000-0000-0000-000000000011'), 2,
+  'duel_rating_changes: approved user reads non-hidden changes');
+
 -- ---------------------------------------------------------------- duel_list
 set local request.jwt.claims = :'C1';
 select ok(not (public.duel_list() -> 'lobby' @> '[{"id":"f0000000-0000-0000-0000-000000000006"}]'),
@@ -293,16 +322,56 @@ set local request.jwt.claims = :'ADM';
 select ok(public.duel_list() -> 'lobby' @> '[{"id":"f0000000-0000-0000-0000-000000000008","game_id":"yacht"}]',
   'hidden_game_excluded: admin lobby shows yacht match');
 select is((select count(*)::int from public.lb_duel('yacht')), 1, 'hidden_game_excluded: admin sees lb_duel(yacht)');
+select is(public.duel_stats('duela', 'yacht') -> 'all' ->> 'w', '1', 'hidden_game_excluded: admin sees duel_stats(yacht)');
+select is(public.duel_h2h('duela', 'duelb', 'yacht') -> 'games',
+  '[{"game_id":"yacht","a_wins":1,"draws":0,"b_wins":0}]'::jsonb, 'hidden_game_excluded: admin sees duel_h2h(yacht)');
+select is((select count(*)::int from public.duel_ratings where game_id = 'yacht'), 1,
+  'hidden_game_excluded: admin reads yacht duel_ratings');
+select is((select count(*)::int from public.duel_rating_changes where match_id = 'f0000000-0000-0000-0000-000000000041'), 1,
+  'hidden_game_excluded: admin reads yacht duel_rating_changes');
 
 -- ---------------------------------------------------------------- invite code
 set local request.jwt.claims = :'C2';
 select is(public.duel_invite_code('f0000000-0000-0000-0000-000000000001'), 'duelinv001', 'invite_code_owner_only: creator gets code');
 set local request.jwt.claims = :'C3';
 select is(public.duel_invite_code('f0000000-0000-0000-0000-000000000003'), null, 'invite_code_owner_only: joined player gets null');
+set local request.jwt.claims = :'C5';
+select is(public.duel_invite_code('f0000000-0000-0000-0000-000000000001'), null, 'invite_code_owner_only: third party gets null');
+reset role;
+update public.profiles set status = 'pending' where id = :'u2';
+set local role authenticated;
+set local request.jwt.claims = :'C2';
+select is(public.duel_invite_code('f0000000-0000-0000-0000-000000000001'), null,
+  'invite_code_owner_only: creator who is no longer approved gets null');
+reset role;
+update public.profiles set status = 'approved' where id = :'u2';
+set local role authenticated;
 
 -- ---------------------------------------------------------------- pending / anon
 set local request.jwt.claims = :'PU';
 select throws_ok($$select public.duel_list()$$, 'P0001', 'forbidden', 'duel_list: pending user forbidden');
+reset role;
+
+-- ---------------------------------------------------------------- creator deleted
+-- d(만든 사람, 선공)가 c에게 진 랭크 대국. d를 지워도 대국과 c의 레이팅 변화는 남는다.
+select lives_ok($$select public._duel_apply_elo('f0000000-0000-0000-0000-000000000051')$$, 'apply_elo 51');
+delete from auth.users where id = :'u4';
+select is((select created_by is null and players[1] = '00000000-0000-0000-0000-0000000000c4'
+             from public.duel_matches where id = 'f0000000-0000-0000-0000-000000000051'), true,
+  'creator_deleted: match kept with created_by null');
+select results_eq($$select user_id::text, before, after from public.duel_rating_changes
+                     where match_id = 'f0000000-0000-0000-0000-000000000051'$$,
+  $$values ('00000000-0000-0000-0000-0000000000c3', 1000, 1020)$$,
+  'creator_deleted: opponent''s rating change kept, deleted user''s removed');
+insert into public.duel_matches (id, game_id, logic_version, rated, visibility, status, created_by, turn_seconds)
+values ('f0000000-0000-0000-0000-000000000052', 'g-del', 1, true, 'public', 'waiting', null, 60);
+set local role authenticated;
+set local request.jwt.claims = :'C3';
+select ok(not (public.duel_list() -> 'lobby' @> '[{"id":"f0000000-0000-0000-0000-000000000052"}]')
+          and public.duel_list() -> 'recent' @> '[{"id":"f0000000-0000-0000-0000-000000000051","created_by_handle":null}]',
+  'creator_deleted: orphan waiting not in lobby, finished match still in opponent''s recent');
+select is(public.duel_stats('duelc', 'g-del') -> 'all', '{"w":1,"d":0,"l":0,"rate":1.000}'::jsonb,
+  'creator_deleted: opponent''s stats keep the match');
 reset role;
 set local role anon;
 select throws_ok($$select public.duel_list()$$, '42501', null, 'anon cannot execute duel_list');
