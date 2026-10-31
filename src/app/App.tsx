@@ -1,7 +1,13 @@
+import { BrowserRouter } from 'react-router-dom'
+import { AuthProvider } from '../platform/auth/AuthProvider.tsx'
+import { AppRoutes } from './routes.tsx'
+
 export function App() {
   return (
-    <header className="app-header">
-      <h1 className="app-title">ONLYFMS</h1>
-    </header>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
