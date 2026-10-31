@@ -1,6 +1,6 @@
 # ONLYFMS
 
-친구들과 즐기는 축구 퀴즈 게임 플랫폼. 구글 로그인 후 관리자 승인을 받으면 데일리 퀴즈, 자유 플레이, 친선·공식 대회와 리더보드를 쓸 수 있다. 게임은 등록부에 모듈로 추가하는 방식이고, 정답은 서버(Edge Function)에서만 판정한다.
+축구 퀴즈 게임 플랫폼. 구글 로그인 후 관리자 승인을 받으면 데일리 퀴즈, 자유 플레이, 친선·공식 대회와 리더보드를 쓸 수 있다. 게임은 등록부에 모듈로 추가하는 방식이고, 정답은 서버(Edge Function)에서만 판정한다.
 
 ## 스택
 React 18 + Vite + TypeScript, react-router, Supabase(Auth, Postgres + RLS, Edge Function `play` on Deno), Vercel, 테스트는 Vitest·pgTAP·`deno test`.
