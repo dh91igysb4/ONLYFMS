@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { rpc } from '../../lib/api.ts'
 import { kstDate } from '../../shared/kst.ts'
+import { now } from '../../lib/serverTime.ts'
 import { games } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { UpcomingContests } from './UpcomingContests.tsx'
@@ -23,7 +24,7 @@ export function HomePage() {
 
   useEffect(() => {
     let alive = true
-    const today = kstDate(Date.now())
+    const today = kstDate(now()) // 서버 시계 기준 (브라우저 시계가 틀려도 같은 날짜)
     for (const g of games.filter((x) => (!x.manifest.hidden || profile?.is_admin) && x.manifest.modes.daily)) {
       rpc<DailyRow[] | null>('lb_daily', { p_day: today, p_game: g.manifest.id })
         .then((rows) => {

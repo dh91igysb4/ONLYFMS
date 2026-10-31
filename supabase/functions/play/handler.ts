@@ -225,7 +225,8 @@ function view(game: GameModule, item: ItemRow, attempt: AttemptRow | undefined, 
     public_state: attempt && attempt.logic_version === game.logic.version
       ? game.logic.publicState(attempt.state)
       : null,
-    finished: attempt?.finished ?? false,
+    // 대회가 끝났으면 더 풀 수 없으므로 끝난 것으로 보여 준다 (정답도 이때 공개된다)
+    finished: (attempt?.finished ?? false) || ended,
     score: attempt ? Number(attempt.score) : null,
     action_count: attempt?.action_count ?? 0,
     ends_at: item.ends_at.toISOString(),
@@ -394,7 +395,7 @@ async function act(
     }
 
     const r = step(game.logic, it.puzzle, attempt.state, payload, ctxFor(now, it, attempt.started_at.getTime()))
-    if (!r.ok) return err(400, 'invalid_action', { message: r.error })
+    if (!r.ok) return err(400, 'invalid_action', r.error === undefined ? {} : { message: r.error })
 
     const at = new Date(now)
     const [saved] = await tx<AttemptRow[]>`

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ApiError, errorMessage, play } from '../../lib/api.ts'
 import { getGame } from '../../games/index.ts'
@@ -11,12 +11,14 @@ export function DailyPage() {
   const [itemId, setItemId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [dayChanged, setDayChanged] = useState(false)
 
   useEffect(() => {
     if (!supported) return
     let alive = true
     setItemId(null)
     setError(null)
+    setDayChanged(false)
     play({ action: 'daily', game_id: game })
       .then((v) => {
         // daily 응답은 {contest_id, item_id}
@@ -27,6 +29,8 @@ export function DailyPage() {
       })
     return () => { alive = false }
   }, [game, supported, attempt])
+
+  const onEnded = useCallback(() => setDayChanged(true), [])
 
   if (!supported) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
   return (
@@ -39,7 +43,13 @@ export function DailyPage() {
         </>
       )}
       {!error && !itemId && <p className="muted">불러오는 중…</p>}
-      {itemId && <PlayRunner mode="server" itemId={itemId} />}
+      {dayChanged && (
+        <div className="stack" role="status">
+          <p className="notice">날짜가 바뀌었어요</p>
+          <button className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>새 데일리 열기</button>
+        </div>
+      )}
+      {itemId && <PlayRunner mode="server" itemId={itemId} onEnded={onEnded} />}
     </div>
   )
 }

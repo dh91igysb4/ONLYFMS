@@ -48,6 +48,16 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
     setView(v)
   }, [])
 
+  // 오류 메시지는 그대로 두고 화면만 서버 상태로 맞춘다. 실패해도 조용히 넘긴다.
+  const refreshView = useCallback(async () => {
+    try {
+      applyView(await play({ action: 'open', item_id: itemId }))
+    } catch (e) {
+      // 409에 화면이 실려 오면 그것을 쓰고, 나머지는 다음 행동에서 다시 맞춰진다
+      if (e instanceof ApiError && bodyOf(e).view) applyView(bodyOf(e).view as PlayView)
+    }
+  }, [itemId, applyView])
+
   const run = useCallback(
     async (kind: 'open' | 'act', payload?: unknown, reopened = false): Promise<void> => {
       if (busyRef.current) return
@@ -74,9 +84,11 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
           // 서버에 저장됐는지 모르므로 화면은 그대로 두고 다시 시도하게 한다.
           setError(errorMessage('network'))
           setRetry(kind === 'open' ? { kind: 'open' } : { kind: 'act', payload })
-        } else if ((e.code === 'stale' || e.code === 'version_changed') && bodyOf(e).view) {
+        } else if (e.status === 409 && bodyOf(e).view) {
+          // stale·version_changed·finished·ended: 서버가 준 화면(상태·점수·정답)을 그대로 보여 준다
           applyView(bodyOf(e).view as PlayView)
-          setNotice(errorMessage(e.code))
+          if (e.code === 'ended' && onEnded) onEnded()
+          else setNotice(errorMessage(e.code))
         } else if (e.code === 'ended' && kind === 'act') {
           busyRef.current = false
           if (onEnded) {
@@ -90,6 +102,8 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
           }
         } else if (e.code === 'invalid_action') {
           setError(bodyOf(e).message ?? errorMessage('invalid_action'))
+          // 응답을 놓친 앞선 행동(예: 힌트)이 이미 반영됐을 수 있으니 화면을 서버 상태로 새로 고친다
+          if (kind === 'act') void refreshView()
         } else if (kind === 'open') {
           setFatal(errorMessage(e.code))
         } else {
@@ -100,7 +114,7 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
         setBusy(false)
       }
     },
-    [itemId, applyView, onEnded],
+    [itemId, applyView, onEnded, refreshView],
   )
 
   useEffect(() => {
@@ -148,6 +162,7 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
       ) : (
         <>
           {view.score !== null && <p role="status">{view.score}점으로 마무리됐어요</p>}
+          {view.score === null && view.finished && <p className="muted" role="status">이 문제는 풀지 않고 끝났어요</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
         </>
       )}

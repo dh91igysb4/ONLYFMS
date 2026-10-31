@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import type { GameLogic } from '../../../src/games/types.ts'
 import { logic as numberGuess } from '../../../src/games/number-guess/logic.ts'
 import { pickFresh, step } from './engine.ts'
@@ -54,6 +54,18 @@ describe('engine', () => {
     const r = step(numberGuess, puzzle, state, { type: 'guess', value: 101 }, ctx)
     expect(r).toEqual({ ok: false, status: 400, error: '1~100 사이로 입력해 주세요' })
     expect(JSON.stringify(state)).toBe(before)
+  })
+
+  test('step hides exception messages from logic.apply', () => {
+    const puzzle = { range: 100 as const, answer: 42 }
+    const state = numberGuess.initState(puzzle, ctx)
+    const throwing = { ...numberGuess, apply: () => { throw new Error('secret answer is 42') } }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = step(throwing, puzzle, state, { type: 'guess', value: 1 }, ctx)
+    expect(r).toEqual({ ok: false, status: 400 })
+    expect(JSON.stringify(r)).not.toContain('secret')
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
   })
 
   test('step rejects malformed actions', () => {

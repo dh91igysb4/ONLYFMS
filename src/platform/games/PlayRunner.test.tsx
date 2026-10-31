@@ -107,10 +107,42 @@ test('ended_409_without_handler_reopens_the_item', async () => {
   render(<PlayRunner mode="server" itemId="it1" />)
   await screen.findByText('남은 기회 8')
   playMock.mockRejectedValueOnce(new ApiError('ended', 409, { error: 'ended' }))
-  playMock.mockResolvedValueOnce(view({ finished: true, score: 0, reveal: { answer: 77 }, public_state: stateWith([1], ['up']) }))
+  // 실제 서버: 끝나지 않은 기록이라도 대회가 끝났으면 open은 finished: true와 정답을 준다.
+  // score는 기록에 저장된 "지금 포기하면 받을 점수"다.
+  playMock.mockResolvedValueOnce(view({
+    finished: true, score: 0, action_count: 1, reveal: { answer: 77 }, public_state: stateWith([1], ['up']),
+    ends_at: new Date(Date.now() - 1000).toISOString(),
+  }))
   guess(50)
   await screen.findByText(/정답은 77/)
   expect(playMock.mock.calls[2][0]).toEqual({ action: 'open', item_id: 'it1' })
+  expect(screen.queryByRole('button', { name: '추측' })).toBeNull()
+})
+
+test('ended_409_with_view_shows_answer_and_calls_handler', async () => {
+  const onEnded = vi.fn()
+  playMock.mockResolvedValueOnce(view())
+  render(<PlayRunner mode="server" itemId="it1" onEnded={onEnded} />)
+  await screen.findByText('남은 기회 8')
+  const done = view({ finished: true, score: 0, reveal: { answer: 12 }, ends_at: new Date(Date.now() - 1000).toISOString() })
+  playMock.mockRejectedValueOnce(new ApiError('ended', 409, { error: 'ended', view: done }))
+  guess(50)
+  await screen.findByText(/정답은 12/)
+  expect(onEnded).toHaveBeenCalledTimes(1)
+  expect(playMock).toHaveBeenCalledTimes(2) // 다시 열지 않는다
+})
+
+test('finished_409_with_view_shows_score_and_answer', async () => {
+  playMock.mockResolvedValueOnce(view())
+  render(<PlayRunner mode="server" itemId="it1" />)
+  await screen.findByText('남은 기회 8')
+  const done = view({ finished: true, score: 7, action_count: 2, reveal: { answer: 42 }, public_state: stateWith([30, 42], ['up', 'hit']) })
+  playMock.mockRejectedValueOnce(new ApiError('finished', 409, { error: 'finished', view: done }))
+  guess(50)
+  await screen.findByText(/정답은 42/)
+  expect(screen.getByText('7점')).toBeInTheDocument()
+  expect(screen.getByText('이미 끝낸 문제예요')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '추측' })).toBeNull()
 })
 
 test('version_changed_409_shows_notice', async () => {
@@ -124,14 +156,18 @@ test('version_changed_409_shows_notice', async () => {
   expect(screen.queryByRole('button', { name: '추측' })).toBeNull()
 })
 
-test('invalid_action_shows_message_without_changing_state', async () => {
+test('invalid_action_shows_message_and_refreshes_view', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
   await screen.findByText('남은 기회 8')
-  playMock.mockRejectedValueOnce(new ApiError('invalid_action', 400, { error: 'invalid_action', message: '이미 낸 숫자예요' }))
-  guess(50)
-  await screen.findByText('이미 낸 숫자예요')
-  expect(screen.getByText('남은 기회 8')).toBeInTheDocument()
+  playMock.mockRejectedValueOnce(new ApiError('invalid_action', 400, { error: 'invalid_action', message: '이미 힌트를 썼어요' }))
+  // 응답을 놓친 힌트가 서버에는 반영돼 있었다
+  playMock.mockResolvedValueOnce(view({ action_count: 1, public_state: { ...emptyState, hintUsed: true, parity: 'even' } }))
+  fireEvent.click(screen.getByRole('button', { name: '힌트 (-1점)' }))
+  await screen.findByText('이미 힌트를 썼어요')
+  await screen.findByText('힌트: 정답은 짝수예요')
+  expect(playMock.mock.calls[2][0]).toEqual({ action: 'open', item_id: 'it1' })
+  expect(screen.getByText('이미 힌트를 썼어요')).toBeInTheDocument()
 })
 
 test('local_mode_submits_free_play_on_finish', async () => {

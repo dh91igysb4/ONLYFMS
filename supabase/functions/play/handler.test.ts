@@ -494,16 +494,63 @@ t('reveal_only_when_finished_or_ended', async () => {
   const ob3 = await call(b, { action: 'open', item_id: c.items[0] }, T0 + HOUR)
   assert.equal(ob3.status, 200)
   assert.deepEqual(ob3.body.reveal, { answer: ans })
-  assert.equal(ob3.body.finished, false)
+  assert.equal(ob3.body.finished, true)
   // 한 번도 열지 않은 사람: 기록 없이 결과만
   const on = await call(never, { action: 'open', item_id: c.items[0] }, T0 + HOUR + 1)
   assert.equal(on.status, 200)
   assert.equal(on.body.public_state, null)
-  assert.equal(on.body.finished, false)
+  assert.equal(on.body.finished, true)
   assert.equal(on.body.score, null)
   assert.deepEqual(on.body.reveal, { answer: ans })
   const [{ n }] = await sql`select count(*)::int as n from public.attempts where item_id = ${c.items[0]} and user_id = ${never}`
   assert.equal(n, 0)
+})
+
+t('open_after_end_on_unfinished_attempt_is_finished_with_reveal', async () => {
+  const u = await user()
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  await call(u, { action: 'open', item_id: c.items[0] }, T0)
+  const ans = await answerOf(c.items[0])
+  const a1 = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, T0 + 1000)
+  assert.equal(a1.status, 200)
+  assert.equal(a1.body.finished, false)
+  // 종료 뒤 행동: 409 ended + 끝난 화면
+  const late = await call(u, { action: 'act', item_id: c.items[0], expected_count: 1, payload: { type: 'give_up' } }, T0 + HOUR)
+  assert.equal(late.status, 409)
+  assert.equal(late.body.error, 'ended')
+  const lv = late.body.view as Record<string, unknown>
+  assert.equal(lv.finished, true)
+  assert.deepEqual(lv.reveal, { answer: ans })
+  // 종료 뒤 open: 기록은 미완료로 남아 있지만 화면은 끝난 상태와 정답
+  const o = await call(u, { action: 'open', item_id: c.items[0] }, T0 + HOUR + 1)
+  assert.equal(o.status, 200)
+  assert.equal(o.body.finished, true)
+  assert.deepEqual(o.body.reveal, { answer: ans })
+  assert.equal(o.body.action_count, 1)
+  assert.equal(o.body.score, Number(a1.body.score))
+  const [at] = await sql`select finished from public.attempts where item_id = ${c.items[0]} and user_id = ${u}`
+  assert.equal(at.finished, false)
+})
+
+t('logic_exception_is_400_without_detail', async () => {
+  const u = await user()
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['fake-ver'], join: [u] })
+  const o = await call(u, { action: 'open', item_id: c.items[0] }, T0)
+  assert.equal(o.status, 200)
+  const origError = console.error
+  console.error = () => {}
+  try {
+    extra.set('fake-ver', {
+      ...fakeVerV1,
+      logic: { ...fakeVerV1.logic, apply: () => { throw new Error('internal detail 42') } },
+    } as GameModule)
+    const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: 1 } }, T0 + 1000)
+    assert.equal(r.status, 400)
+    assert.deepEqual(r.body, { error: 'invalid_action' })
+  } finally {
+    console.error = origError
+    extra.set('fake-ver', fakeVerV1)
+  }
 })
 
 // ---------------------------------------------------------------- bank

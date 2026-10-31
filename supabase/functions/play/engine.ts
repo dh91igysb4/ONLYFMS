@@ -36,7 +36,8 @@ export function normalizeScore(score: number): number {
 
 export type StepResult =
   | { ok: true; state: unknown; finished: boolean; score: number; actionCount: number }
-  | { ok: false; status: 400; error: string }
+  /** error가 없으면 내부 오류(던짐)다. 메시지를 브라우저에 보내지 않는다 */
+  | { ok: false; status: 400; error?: string }
 
 /** 행동 하나를 적용한다. 오류면 상태를 바꾸지 않고 400을 돌려준다. */
 export function step(
@@ -58,7 +59,9 @@ export function step(
   try {
     res = logic.apply(puzzle, copy, structuredClone(action), ctx)
   } catch (e) {
-    return { ok: false, status: 400, error: e instanceof Error ? e.message : String(e) }
+    // 예외 내용은 서버 로그에만 남긴다
+    console.error('play: logic.apply threw', e)
+    return { ok: false, status: 400 }
   }
   if ('error' in res) return { ok: false, status: 400, error: res.error }
   return {

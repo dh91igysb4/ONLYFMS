@@ -3,11 +3,14 @@ import { useParams } from 'react-router-dom'
 import { errorMessage } from '../../lib/api.ts'
 import { getGame } from '../../games/index.ts'
 import { PlayRunner } from './PlayRunner.tsx'
+import { useAuth } from '../auth/AuthProvider.tsx'
 
 export function FreePage() {
   const { game = '' } = useParams()
+  const { profile } = useAuth()
   const mod = getGame(game)
-  const supported = !!mod?.manifest.modes.free
+  // 숨김 게임은 관리자에게만 있는 게임이다. 그 밖의 사람에게는 없는 게임과 똑같이 보인다.
+  const supported = !!mod?.manifest.modes.free && (!mod.manifest.hidden || !!profile?.is_admin)
   const [options, setOptions] = useState<Record<string, string>>(() =>
     Object.fromEntries((mod?.manifest.options ?? []).map((o) => [o.key, o.default])),
   )
