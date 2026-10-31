@@ -12,6 +12,11 @@ vi.mock('../../games/index.ts', () => ({
   games: [{ manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } }],
 }))
 
+let authProfile: { handle: string } | null = null
+vi.mock('../auth/AuthProvider.tsx', () => ({
+  useAuth: () => ({ profile: authProfile, refresh: async () => {} }),
+}))
+
 import { ProfilePage } from './ProfilePage.tsx'
 
 const renderAt = (h: string) => render(
@@ -20,7 +25,7 @@ const renderAt = (h: string) => render(
   </MemoryRouter>,
 )
 
-beforeEach(() => rpcMock.mockReset())
+beforeEach(() => { rpcMock.mockReset(); authProfile = null })
 
 test('profile_not_found_message', async () => {
   rpcMock.mockResolvedValue(null)
@@ -45,4 +50,15 @@ test('profile_renders_sections', async () => {
   expect(screen.getByText('50%')).toBeTruthy()
   expect(screen.getByText('숫자 맞추기', { selector: 'td' })).toBeTruthy()
   expect(screen.getByText(/숫자 맞추기 · 9점/)).toBeTruthy()
+})
+
+test('settings_only_on_own_profile', async () => {
+  authProfile = { handle: 'kane' }
+  rpcMock.mockResolvedValue({ daily_by_game: [], contests: [], free_by_game: [], recent: [] })
+  const own = renderAt('kane')
+  expect(await own.findByRole('heading', { name: '화면 설정' })).toBeTruthy()
+  own.unmount()
+  const other = renderAt('other')
+  await other.findByRole('heading', { name: 'other' })
+  expect(other.queryByRole('heading', { name: '화면 설정' })).toBeNull()
 })
