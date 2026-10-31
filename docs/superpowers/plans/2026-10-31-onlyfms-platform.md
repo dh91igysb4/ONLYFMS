@@ -6,7 +6,7 @@
 
 **Architecture:** Vite+React SPA를 Vercel에 정적 배포한다. Supabase가 Auth(Google), Postgres(RLS·집계 함수), Edge Function `play`(출제·판정)를 맡는다. 게임 로직은 `src/games/<id>/logic.ts` 순수 함수로, 브라우저(자유 플레이)와 Edge Function(데일리·대회)이 공유한다. 데일리는 kind=`daily` 대회로 처리한다.
 
-**Tech Stack:** Vite 5.4, React 18.3, TypeScript 5.6, React Router 6.28, @supabase/supabase-js 2.45, Vitest 2.1, @testing-library/react 16, Supabase CLI(1.200 이상), pgTAP, Deno 1.46(Edge Function), postgres.js 3.4(`npm:postgres@3.4.4`, Edge Function의 트랜잭션용)
+**Tech Stack:** Vite 5.4, React 18.3, TypeScript 5.6, React Router 6.28, @supabase/supabase-js 2.x 최신(새 publishable key 지원 버전), Vitest 2.1, @testing-library/react 16, Supabase CLI(1.200 이상), pgTAP, Deno 1.46(Edge Function), postgres.js 3.4(`npm:postgres@3.4.4`, Edge Function의 트랜잭션용)
 
 **Spec:** `docs/superpowers/specs/2026-10-31-onlyfms-platform-design.md` — 구현 전에 반드시 함께 읽는다. 장 번호(§)는 이 문서를 가리킨다.
 
@@ -21,7 +21,7 @@
 - 문제 은행 잔량 경고 기준: 30개 미만.
 - 자유 플레이 오프라인 대기열 최대 50개. 진행 중 대회 순위표 새로고침 5초.
 - 게임 로직 파일은 외부 의존 없음, 상대 import에 `.ts` 확장자 명시(Deno 호환). 플랫폼 코드에 게임별 분기 금지.
-- 비밀값: Vercel `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` / Edge Function `PLAY_SECRET`. 비밀값 커밋 금지.
+- 비밀값: Vercel `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` / Edge Function `PLAY_SECRET`. 비밀값 커밋 금지.
 - Supabase 리전 ap-northeast-2. DB 변경은 `supabase/migrations/`의 마이그레이션 파일로만.
 - 모든 화면 문구는 한국어, 모바일 우선, 짙은 보라 톤(§10).
 
@@ -37,7 +37,7 @@
 
 이 항목은 코드 작업이 아니다. Task 8 Step 1과 Task 14에 필요하다.
 
-1. Supabase에서 프로젝트를 만든다(리전 Seoul, ap-northeast-2). Project ref와 anon key를 확보한다.
+1. Supabase에서 프로젝트를 만든다(리전 Seoul, ap-northeast-2). Project ref와 publishable key(`sb_publishable_…`)를 확보한다. 완료: ref `xhikfflklkrysmakaqoj`.
 2. Google Cloud Console에서 OAuth 클라이언트(웹)를 만들고 Supabase Auth → Providers → Google에 등록한다. 승인된 리디렉션 URI는 Supabase가 보여주는 콜백 주소다.
 3. Supabase Auth → URL Configuration에 `https://onlyfms.vercel.app`, `https://*-<vercel팀>.vercel.app`, `http://localhost:5173`을 추가한다.
 4. Vercel 프로젝트를 이 레포에 연결한다(Task 14 전까지는 main에 머지하지 않으므로 운영 화면은 바뀌지 않는다).
@@ -570,7 +570,7 @@ test('step stores give-up score while unfinished', () => { /* 미완료 상태 s
   - `supabase link --project-ref <ref> && supabase db push`
   - `supabase secrets set PLAY_SECRET=<32바이트 무작위>`
   - `supabase functions deploy play`
-- [ ] **Step 2: Vercel 환경 변수 설정** — Vercel에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`를 넣고 PR 미리보기를 확인한다.
+- [ ] **Step 2: Vercel 환경 변수 설정** — Vercel에 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`를 넣고 PR 미리보기를 확인한다.
 - [ ] **Step 3: 첫 관리자 지정** — 미리보기에서 관리자 계정으로 로그인하고 아이디를 정한 뒤, Supabase SQL 편집기에서 `update profiles set is_admin = true, status = 'approved' where handle = '<관리자 아이디>'`.
 - [ ] **Step 4: 수동 확인 목록** — 미리보기 주소, 폰과 PC에서 확인한다. 각 항목에 결과를 체크한다.
   1. 두 번째 구글 계정 가입 → 대기 화면 → 관리자 승인 → 게임 목록 보임

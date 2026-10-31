@@ -37,7 +37,7 @@
 
 ```
 [브라우저: Vite + React + TS, Vercel 정적 배포]
-    │  supabase-js (anon key + 로그인 세션)
+    │  supabase-js (publishable key + 로그인 세션)
     ├──▶ Supabase Auth (Google OAuth)
     ├──▶ Supabase Postgres (RLS로 권한 강제, 대회 개설·리더보드 함수)
     └──▶ Supabase Edge Function `play` (데일리·대회 문제 출제와 판정, service role로 기록)
@@ -427,7 +427,7 @@ POST 요청이며, Authorization 헤더의 사용자 JWT로 호출자를 확인�
   - 커밋·PR 규칙
   - 금지 사항: 비밀값 커밋 금지, 플랫폼 코드에 게임별 분기 금지
 - 비밀값:
-  - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (공개용 키)
+  - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)
   - Supabase Edge Function 시크릿: `PLAY_SECRET`
   - Google OAuth 클라이언트는 Supabase 대시보드에 등록하고, 허용 리디렉션에 운영 주소·Vercel 미리보기 와일드카드·localhost를 넣는다.
 - DB 변경은 마이그레이션 파일로만 한다. 대시보드에서 직접 스키마를 바꾸지 않는다.
