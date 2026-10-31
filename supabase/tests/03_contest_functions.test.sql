@@ -1,7 +1,7 @@
 -- 대회 개설·수정·취소·참가, 문제 은행 함수 (Task 6)
 -- 한 트랜잭션 안에서 now()는 고정이므로 시작 전/진행 중/종료는 starts_at·ends_at을 now() 기준으로 잡아 흉내낸다.
 begin;
-select plan(119);
+select plan(121);
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000a0","role":"authenticated"}'
 \set A1  '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}'
@@ -392,6 +392,11 @@ set local role authenticated;
 select results_eq($$select game_id, remaining from public.admin_bank_status() order by game_id$$,
   $$values ('free-only', 0), ('open-game', 3), ('test-guess', 0), ('who-are-ya', 0)$$,
   'bank_status_counts_unused: per game_modes game, unused rows only');
+-- 솔로 모드가 하나도 없는 게임(대전 전용, 예: yacht)은 문제 은행 대상이 아니다
+select ok(not exists (select 1 from public.admin_bank_status() where game_id = 'yacht'),
+  'bank_status: duel-only game (no daily/contest/free) not listed');
+select throws_ok($$select * from public.admin_upload_puzzles('yacht', '[{"puzzle_key":"k9","puzzle":{}}]')$$,
+  'P0001', 'game_not_allowed', 'upload: duel-only game rejected');
 
 -- ---------------------------------------------------------------- anon
 reset role;

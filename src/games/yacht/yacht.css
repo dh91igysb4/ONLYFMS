@@ -1,0 +1,45 @@
+/* 요트 다이스 화면. 색은 theme.css 토큰을 쓴다.
+   주사위 면은 팔레트·모드와 상관없이 흰 바탕에 짙은 눈(고정색)으로 그린다. */
+.yacht { --yacht-pip: #1c1030; }
+.yacht { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.yacht-dice { display: flex; gap: 8px; justify-content: center; }
+.yacht-die {
+  flex: 0 1 56px;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 12px;
+  border: 3px solid transparent;
+  background: var(--card);
+  /* 라이트 모드의 밝은 바탕에서도 주사위 윤곽이 보이게 */
+  box-shadow: inset 0 0 0 1px var(--miss);
+  cursor: pointer;
+}
+.yacht-die:disabled { cursor: default; }
+.yacht-die.yacht-kept { border-color: var(--accent-strong); box-shadow: 0 0 0 2px var(--accent-strong); }
+.yacht-face { width: 100%; height: 100%; display: block; }
+.yacht-pip { fill: var(--yacht-pip); }
+.yacht-roll { align-self: stretch; }
+.yacht-hint { margin: 0; text-align: center; font-size: 13px; }
+
+.yacht-sheet { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+.yacht-sheet th, .yacht-sheet td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--panel); }
+.yacht-sheet th[scope='row'] { text-align: left; font-weight: 500; width: 44%; overflow-wrap: anywhere; }
+.yacht-sheet thead th { overflow-wrap: anywhere; }
+.yacht-sheet thead th.yacht-active { color: var(--accent-strong); border-bottom: 2px solid var(--accent-strong); }
+.yacht-done { font-weight: 700; }
+.yacht-empty { color: var(--muted); }
+.yacht-sub th, .yacht-sub td { color: var(--muted); font-size: 12px; }
+.yacht-total th, .yacht-total td { font-size: 18px; font-weight: 800; border-bottom: 0; }
+.yacht-cell {
+  font: inherit;
+  min-width: 44px;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px dashed var(--accent-strong);
+  background: transparent;
+  color: var(--accent-strong);
+  font-weight: 700;
+  cursor: pointer;
+}
+.yacht-cell:disabled { opacity: 0.4; cursor: default; }
+.yacht-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

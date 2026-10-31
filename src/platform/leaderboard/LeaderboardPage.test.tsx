@@ -17,6 +17,10 @@ vi.mock('../../games/index.ts', () => ({
     { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } },
     { manifest: { id: 'secret', name: '비밀 게임', hidden: true } },
   ],
+  duels: [
+    { manifest: { id: 'yacht', name: '요트 다이스', hidden: false } },
+    { manifest: { id: 'secret-duel', name: '비밀 대전', hidden: true } },
+  ],
 }))
 
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
@@ -131,4 +135,47 @@ test('error_shows_retry', async () => {
   renderPage()
   fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }))
   await screen.findByText('아직 기록이 없어요')
+})
+
+const duelRow = (handle: string, rating: number, rated_games: number, wins: number, draws: number, losses: number, placed: boolean) => ({
+  handle, rating, rated_games, wins, draws, losses, placed,
+})
+
+test('leaderboard_duel_tab', async () => {
+  setup({
+    lb_duel: [
+      duelRow('messi', 1120, 10, 7, 1, 2, true),
+      duelRow('kane', 1050, 6, 3, 0, 3, true),
+      duelRow('newbie', 1010, 2, 1, 0, 1, false),
+    ],
+  })
+  renderPage()
+  tab('대전')
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_duel', { p_game: 'yacht' }))
+  const messi = (await screen.findByText('messi')).closest('tr')!
+  expect(within(messi).getByText('1')).toBeTruthy()
+  expect(within(messi).getByText('1120')).toBeTruthy()
+  expect(within(messi).getByText('70%')).toBeTruthy()
+  const kane = screen.getByText('kane').closest('tr')!
+  expect(within(kane).getByText('2')).toBeTruthy()
+  expect(within(kane).getByText('50%')).toBeTruthy()
+  expect(kane.className).toContain('me')
+  // 배치 중은 순위표 밖
+  const newbie = screen.getByText('newbie')
+  expect(newbie.closest('tr')).toBeNull()
+  expect(screen.getByText('배치 중')).toBeTruthy()
+  // 숨김 대전 게임은 비관리자 선택지에 없음
+  expect(screen.getByRole('option', { name: '요트 다이스' })).toBeTruthy()
+  expect(screen.queryByRole('option', { name: '비밀 대전' })).toBeNull()
+})
+
+test('leaderboard_duel_hidden_game_for_admin', async () => {
+  admin = true
+  setup({ lb_duel: [] })
+  renderPage()
+  tab('대전')
+  expect(await screen.findByRole('option', { name: '비밀 대전' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'secret-duel' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_duel', { p_game: 'secret-duel' }))
+  expect(await screen.findByText('아직 기록이 없어요')).toBeTruthy()
 })

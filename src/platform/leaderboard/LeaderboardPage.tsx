@@ -5,14 +5,16 @@ import { games } from '../../games/index.ts'
 import { now } from '../../lib/serverTime.ts'
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { DuelBoard } from './DuelBoard.tsx'
 
-type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free'
+type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free' | 'duel'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'daily', label: '오늘' },
   { id: 'week', label: '주간' },
   { id: 'all', label: '전체' },
   { id: 'contests', label: '대회' },
   { id: 'free', label: '자유 플레이' },
+  { id: 'duel', label: '대전' },
 ]
 
 type ScoreRow = { rank: number; user_id: string; handle: string; score: number; action_count: number; finished_at: string | null }
@@ -52,6 +54,7 @@ export function LeaderboardPage() {
   const visible = games.filter((g) => !g.manifest.hidden || profile?.is_admin)
 
   useEffect(() => {
+    if (tab === 'duel') return
     let alive = true
     setError(null)
     setData(null)
@@ -87,7 +90,7 @@ export function LeaderboardPage() {
           </button>
         ))}
       </div>
-      {tab !== 'contests' && (
+      {tab !== 'contests' && tab !== 'duel' && (
         <label className="field">
           <span className="muted">게임</span>
           <select className="input" value={game} onChange={(e) => setGame(e.target.value)}>
@@ -105,14 +108,15 @@ export function LeaderboardPage() {
           ))}
         </div>
       )}
-      {error && (
+      {tab === 'duel' && <DuelBoard />}
+      {tab !== 'duel' && error && (
         <div className="stack" role="alert">
           <p className="form-error">{error}</p>
           <button className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>다시 시도</button>
         </div>
       )}
-      {!error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
-      {!error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
+      {tab !== 'duel' && !error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
+      {tab !== 'duel' && !error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
         (ready as ScoreRow[]).length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">

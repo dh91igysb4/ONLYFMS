@@ -6,10 +6,10 @@ import { safeRedirect } from './redirect.ts'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
 import { Brand } from '../layout/Brand.tsx'
+import { normalizeHandle } from '../../shared/handle.ts'
 
 // 서버(0009_hangul_handle)와 같은 규칙: 영문 소문자·숫자·_·완성형 한글, 2~16자, NFC로 저장
 export const HANDLE_RE = /^[a-z0-9_가-힣]{2,16}$/
-export const normalizeHandle = (s: string) => s.trim().normalize('NFC').toLowerCase()
 
 export function WelcomePage() {
   const { session, profile, loading, error: loadError, refresh } = useAuth()
