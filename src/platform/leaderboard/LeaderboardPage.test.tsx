@@ -85,9 +85,11 @@ test('free_tab_sort_toggle', async () => {
   await screen.findByText('alpha')
   const order = () => screen.getAllByRole('link').map((a) => a.textContent)
   expect(order()).toEqual(['gamma', 'alpha', 'beta']) // 정답 수 기본
-  fireEvent.click(screen.getByRole('button', { name: '정답률' }))
+  const sort = screen.getByLabelText('정렬') as HTMLSelectElement
+  expect(sort.value).toBe('wins')
+  fireEvent.change(sort, { target: { value: 'rate' } })
   expect(order()).toEqual(['beta', 'alpha', 'gamma'])
-  fireEvent.click(screen.getByRole('button', { name: '플레이 수' }))
+  fireEvent.change(sort, { target: { value: 'plays' } })
   expect(order()).toEqual(['gamma', 'alpha', 'beta'])
   expect(screen.getByText('100%')).toBeTruthy()
 })
@@ -137,6 +139,50 @@ test('error_shows_retry', async () => {
   await screen.findByText('아직 기록이 없어요')
 })
 
+test('top_three_rows_marked', async () => {
+  setup({ lb_daily: [row(1, 'a', 'one'), row(2, 'b', 'two'), row(3, 'c', 'three'), row(4, 'd', 'four')] })
+  renderPage()
+  const tr = async (h: string) => (await screen.findByText(h)).closest('tr')!
+  for (const h of ['one', 'two', 'three']) expect((await tr(h)).className).toContain('top')
+  expect((await tr('four')).className).not.toContain('top')
+})
+
+test('key_column_marked_with_aria_sort', async () => {
+  setup({ lb_daily: [row(1, 'u9', 'messi')], lb_free: [free('a', 'alpha', 10, 3, 0.3)] })
+  renderPage()
+  expect((await screen.findByRole('columnheader', { name: '점수' })).getAttribute('aria-sort')).toBe('descending')
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  expect(screen.getByRole('columnheader', { name: '정답' }).getAttribute('aria-sort')).toBe('descending')
+  fireEvent.change(screen.getByLabelText('정렬'), { target: { value: 'rate' } })
+  expect(screen.getByRole('columnheader', { name: '정답률' }).getAttribute('aria-sort')).toBe('descending')
+  expect(screen.getByRole('columnheader', { name: '정답' }).getAttribute('aria-sort')).toBeNull()
+})
+
+test('sort_only_on_free_tab_and_period_is_tablist', async () => {
+  setup()
+  renderPage()
+  await screen.findByText('아직 기록이 없어요')
+  expect(screen.getByRole('tablist', { name: '기간' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: '오늘' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByLabelText('정렬')).toBeNull()
+})
+
+test('contest_podium_is_table_with_top_rows', async () => {
+  setup({
+    lb_contests: {
+      contests: [{ contest_id: 'c1', title: '개막 대회', ends_at: '2026-10-01T00:00:00Z', podium: [{ handle: 'messi', score: 20 }, { handle: 'son', score: 15 }] }],
+      totals: [],
+    },
+  })
+  renderPage()
+  tab('대회')
+  const messi = (await screen.findByText('messi')).closest('tr')!
+  expect(messi.className).toContain('top')
+  expect(within(messi).getByText('20')).toBeTruthy()
+  expect(screen.getByText('son').closest('tr')!.className).toContain('top')
+})
+
 const duelRow = (handle: string, rating: number, rated_games: number, wins: number, draws: number, losses: number, placed: boolean) => ({
   handle, rating, rated_games, wins, draws, losses, placed,
 })
@@ -156,6 +202,9 @@ test('leaderboard_duel_tab', async () => {
   expect(within(messi).getByText('1')).toBeTruthy()
   expect(within(messi).getByText('1120')).toBeTruthy()
   expect(within(messi).getByText('70%')).toBeTruthy()
+  // 다른 탭과 같은 표: 1~3위 막대, 레이팅이 정렬 기준
+  expect(messi.className).toContain('top')
+  expect(screen.getByRole('columnheader', { name: '레이팅' }).getAttribute('aria-sort')).toBe('descending')
   const kane = screen.getByText('kane').closest('tr')!
   expect(within(kane).getByText('2')).toBeTruthy()
   expect(within(kane).getByText('50%')).toBeTruthy()

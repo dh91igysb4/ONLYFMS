@@ -6,6 +6,8 @@ import { now } from '../../lib/serverTime.ts'
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { DuelBoard } from './DuelBoard.tsx'
+import { LbTable } from './LbTable.tsx'
+import './leaderboard.css'
 
 type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free' | 'duel'
 const TABS: { id: Tab; label: string }[] = [
@@ -40,6 +42,9 @@ function sortFree(rows: FreeRow[], s: Sort): FreeRow[] {
 function Handle({ handle }: { handle: string }) {
   return <Link to={`/u/${handle}`}>{handle}</Link>
 }
+
+const SORTS: [Sort, string][] = [['wins', '정답 수'], ['rate', '정답률'], ['plays', '플레이 수']]
+const SORT_COLUMN: Record<Sort, string> = { wins: '정답', rate: '정답률', plays: '플레이' }
 
 export function LeaderboardPage() {
   const { profile } = useAuth()
@@ -77,35 +82,32 @@ export function LeaderboardPage() {
 
   const ready = data && data.tab === tab ? data.rows : null
   const freeRows = useMemo(() => (tab === 'free' && Array.isArray(ready) ? sortFree(ready as FreeRow[], sort) : []), [tab, ready, sort])
-  const meCls = (id: string) => (id === myId ? 'me' : undefined)
 
   return (
     <div className="stack">
       <h2 className="page-title">리더보드</h2>
-      <div className="row" role="tablist" aria-label="기간">
+      <div className="lb-tabs" role="tablist" aria-label="기간">
         {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id}
-            className={`btn ${tab === t.id ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(t.id)}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="lb-tab" onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
       </div>
       {tab !== 'contests' && tab !== 'duel' && (
-        <label className="field">
-          <span className="muted">게임</span>
-          <select className="input" value={game} onChange={(e) => setGame(e.target.value)}>
-            <option value="">전체 합계</option>
-            {visible.map((g) => <option key={g.manifest.id} value={g.manifest.id}>{g.manifest.name}</option>)}
-          </select>
-        </label>
-      )}
-      {tab === 'free' && (
-        <div className="row" aria-label="정렬">
-          {([['wins', '정답 수'], ['rate', '정답률'], ['plays', '플레이 수']] as [Sort, string][]).map(([id, label]) => (
-            <button key={id} className={`btn ${sort === id ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={sort === id} onClick={() => setSort(id)}>
-              {label}
-            </button>
-          ))}
+        <div className="lb-filters">
+          <span className="lb-pill">
+            <select aria-label="게임" value={game} onChange={(e) => setGame(e.target.value)}>
+              <option value="">전체 합계</option>
+              {visible.map((g) => <option key={g.manifest.id} value={g.manifest.id}>{g.manifest.name}</option>)}
+            </select>
+          </span>
+          {tab === 'free' && (
+            <span className="lb-pill">
+              <select aria-label="정렬" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                {SORTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </select>
+            </span>
+          )}
         </div>
       )}
       {tab === 'duel' && <DuelBoard />}
@@ -118,41 +120,35 @@ export function LeaderboardPage() {
       {tab !== 'duel' && !error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
       {tab !== 'duel' && !error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
         (ready as ScoreRow[]).length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead><tr><th>순위</th><th>아이디</th><th>점수</th><th>행동</th></tr></thead>
-              <tbody>
-                {(ready as ScoreRow[]).map((r) => (
-                  <tr key={r.user_id} className={meCls(r.user_id)}>
-                    <td>{r.rank}</td><td><Handle handle={r.handle} /></td><td>{r.score}</td><td>{r.action_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="lb-panel">
+            <LbTable
+              cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '점수', num: true, sorted: true }, { label: '행동', num: true }]}
+              rows={(ready as ScoreRow[]).map((r) => ({
+                id: r.user_id, top: r.rank <= 3, me: r.user_id === myId,
+                cells: [r.rank, <Handle handle={r.handle} />, r.score, r.action_count],
+              }))}
+            />
           </div>
         )
       )}
       {!error && ready && tab === 'contests' && <ContestsView data={ready as ContestsData} myId={myId} />}
       {!error && ready && tab === 'free' && (
         freeRows.length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>아이디</th><th>플레이</th><th>정답</th><th>정답률</th><th>평균</th>
-                  {game && <><th>연속</th><th>최고 연속</th></>}
-                </tr>
-              </thead>
-              <tbody>
-                {freeRows.map((r) => (
-                  <tr key={r.user_id} className={meCls(r.user_id)}>
-                    <td><Handle handle={r.handle} /></td><td>{r.plays}</td><td>{r.wins}</td>
-                    <td>{pct(r.win_rate)}</td><td>{r.avg_score}</td>
-                    {game && <><td>{r.current_streak}</td><td>{r.best_streak ?? '-'}</td></>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="lb-panel">
+            <LbTable
+              cols={[
+                { label: '아이디' },
+                ...(['플레이', '정답', '정답률', '평균'].map((label) => ({ label, num: true, sorted: SORT_COLUMN[sort] === label }))),
+                ...(game ? [{ label: '연속', num: true }, { label: '최고 연속', num: true }] : []),
+              ]}
+              rows={freeRows.map((r, i) => ({
+                id: r.user_id, top: i < 3, me: r.user_id === myId,
+                cells: [
+                  <Handle handle={r.handle} />, r.plays, r.wins, pct(r.win_rate), r.avg_score,
+                  ...(game ? [r.current_streak, r.best_streak ?? '-'] : []),
+                ],
+              }))}
+            />
           </div>
         )
       )}
@@ -166,27 +162,20 @@ function ContestsView({ data, myId }: { data: ContestsData; myId?: string }) {
     <>
       <h3 className="section-title">공식 대회 시상대</h3>
       {data.contests.map((c) => (
-        <div key={c.contest_id} className="card">
-          <Link to={`/contests/${c.contest_id}`} className="card-title">{c.title}</Link>
-          <ol className="list">
-            {c.podium.map((p, i) => (
-              <li key={p.handle} className="list-row">{i + 1}위 <Handle handle={p.handle} /> · {p.score}점</li>
-            ))}
-          </ol>
-        </div>
+        <section key={c.contest_id} className="lb-panel">
+          <h4 className="lb-caption"><Link to={`/contests/${c.contest_id}`}>{c.title}</Link></h4>
+          <LbTable
+            cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '점수', num: true, sorted: true }]}
+            rows={c.podium.map((p, i) => ({ id: p.handle, top: true, me: false, cells: [i + 1, <Handle handle={p.handle} />, p.score] }))}
+          />
+        </section>
       ))}
       <h3 className="section-title">누적 점수</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="table">
-          <thead><tr><th>순위</th><th>아이디</th><th>합계</th></tr></thead>
-          <tbody>
-            {data.totals.map((t, i) => (
-              <tr key={t.user_id} className={t.user_id === myId ? 'me' : undefined}>
-                <td>{i + 1}</td><td><Handle handle={t.handle} /></td><td>{t.total}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="lb-panel">
+        <LbTable
+          cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '합계', num: true, sorted: true }]}
+          rows={data.totals.map((t, i) => ({ id: t.user_id, top: i < 3, me: t.user_id === myId, cells: [i + 1, <Handle handle={t.handle} />, t.total] }))}
+        />
       </div>
     </>
   )

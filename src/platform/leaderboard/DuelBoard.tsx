@@ -4,6 +4,7 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { duels } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { duelRate } from './duelFormat.ts'
+import { LbTable } from './LbTable.tsx'
 
 type DuelRow = { handle: string; rating: number; rated_games: number; wins: number; draws: number; losses: number; placed: boolean }
 
@@ -34,12 +35,13 @@ export function DuelBoard() {
 
   return (
     <>
-      <label className="field">
-        <span className="muted">게임</span>
-        <select className="input" value={game} onChange={(e) => { setGame(e.target.value); setRows(null) }}>
-          {visible.map((d) => <option key={d.manifest.id} value={d.manifest.id}>{d.manifest.name}</option>)}
-        </select>
-      </label>
+      <div className="lb-filters">
+        <span className="lb-pill">
+          <select aria-label="게임" value={game} onChange={(e) => { setGame(e.target.value); setRows(null) }}>
+            {visible.map((d) => <option key={d.manifest.id} value={d.manifest.id}>{d.manifest.name}</option>)}
+          </select>
+        </span>
+      </div>
       {error && (
         <div className="stack" role="alert">
           <p className="form-error">{error}</p>
@@ -49,19 +51,14 @@ export function DuelBoard() {
       {!error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
       {!error && ready && ready.length === 0 && <p className="muted">아직 기록이 없어요</p>}
       {!error && placed.length > 0 && (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="table">
-            <thead><tr><th>순위</th><th>아이디</th><th>레이팅</th><th>판수</th><th>승률</th></tr></thead>
-            <tbody>
-              {placed.map((r, i) => (
-                <tr key={r.handle} className={meCls(r.handle)}>
-                  <td>{i + 1}</td>
-                  <td><Link to={`/u/${r.handle}`}>{r.handle}</Link></td>
-                  <td>{r.rating}</td><td>{r.rated_games}</td><td>{duelRate(r.wins, r.draws, r.losses)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="lb-panel">
+          <LbTable
+            cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '레이팅', num: true, sorted: true }, { label: '판수', num: true }, { label: '승률', num: true }]}
+            rows={placed.map((r, i) => ({
+              id: r.handle, top: i < 3, me: r.handle === profile?.handle,
+              cells: [i + 1, <Link to={`/u/${r.handle}`}>{r.handle}</Link>, r.rating, r.rated_games, duelRate(r.wins, r.draws, r.losses)],
+            }))}
+          />
         </div>
       )}
       {!error && pending.length > 0 && (
