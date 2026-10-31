@@ -185,3 +185,23 @@ test('local_mode_submits_free_play_on_finish', async () => {
   expect(submitMock.mock.calls[0]).not.toContain('played_at')
   vi.restoreAllMocks()
 })
+
+test('timeout_409_shows_result_and_notice', async () => {
+  playMock.mockResolvedValueOnce(view())
+  render(<PlayRunner mode="server" itemId="it1" />)
+  await screen.findByText('남은 기회 8')
+  const done = view({ finished: true, score: 0, reveal: { answer: 42 } })
+  playMock.mockRejectedValueOnce(new ApiError('timeout', 409, { error: 'timeout', view: done }))
+  guess(50)
+  await screen.findByText('제한 시간이 끝났어요')
+})
+
+test('timer_reaching_zero_reopens_once_and_shows_notice', async () => {
+  playMock.mockResolvedValueOnce(view({ ends_at: new Date(Date.now() + 1500).toISOString() }))
+  render(<PlayRunner mode="server" itemId="it1" />)
+  await screen.findByText('남은 기회 8')
+  playMock.mockResolvedValue(view({ finished: true, score: 0, reveal: { answer: 42 }, ends_at: new Date(Date.now()).toISOString() }))
+  await screen.findByText('제한 시간이 끝났어요', {}, { timeout: 4000 })
+  expect(playMock).toHaveBeenCalledTimes(2)
+  expect(playMock).toHaveBeenLastCalledWith({ action: 'open', item_id: 'it1' })
+})

@@ -117,7 +117,11 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
     [itemId, applyView, onEnded, refreshView],
   )
 
+  // 남은 시간이 0이 된 뒤 한 번만 다시 연다. 서버가 그 시점 점수로 확정한 화면을 받는다.
+  const expiredRef = useRef(false)
+
   useEffect(() => {
+    expiredRef.current = false
     void run('open')
     // 문제가 바뀔 때만 다시 연다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,6 +133,16 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
     const t = setInterval(() => setTick((n) => n + 1), 1000)
     return () => clearInterval(t)
   }, [live])
+
+  const remainingMs = view && !view.finished ? Math.max(0, Date.parse(view.ends_at) - now()) : null
+  useEffect(() => {
+    if (remainingMs !== 0 || expiredRef.current) return
+    expiredRef.current = true
+    void (async () => {
+      await refreshView()
+      if (viewRef.current?.finished) setNotice(errorMessage('timeout'))
+    })()
+  }, [remainingMs, refreshView])
 
   const Game = view ? getGameComponent(view.game_id) : undefined
 
@@ -142,8 +156,6 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
     )
   }
   if (!Game) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
-
-  const remainingMs = view.finished ? null : Math.max(0, Date.parse(view.ends_at) - now())
 
   return (
     <div className="stack">
