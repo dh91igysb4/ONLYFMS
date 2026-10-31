@@ -27,6 +27,7 @@
 .yacht-sheet thead th { overflow-wrap: anywhere; }
 .yacht-sheet thead th.yacht-active { color: var(--accent-strong); border-bottom: 2px solid var(--accent-strong); }
 .yacht-done { font-weight: 700; }
+.yacht-sheet td.yacht-last { background: var(--lime); color: var(--on-accent); border-radius: 6px; }
 .yacht-empty { color: var(--muted); }
 .yacht-sub th, .yacht-sub td { color: var(--muted); font-size: 12px; }
 .yacht-total th, .yacht-total td { font-size: 18px; font-weight: 800; border-bottom: 0; }

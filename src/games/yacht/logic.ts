@@ -11,6 +11,10 @@ export type YState = {
   dice: number[]
   /** 이번 턴에 굴린 횟수 0~3 */
   rolls: number
+  /** 이번 턴 가장 최근 굴리기에서 고정(다시 굴리지 않은) 주사위 자리. 첫 굴리기·턴 넘김 후 []. 옛 상태에는 없을 수 있다(없으면 []). */
+  kept?: number[]
+  /** 가장 최근에 기록된 칸(어느 쪽이든). 다음 기록 때까지 유지. 옛 상태에는 없을 수 있다(없으면 null). */
+  last?: { seat: Seat; category: Category } | null
 }
 
 export type YAction = { type: 'roll'; keep: number[] } | { type: 'score'; category: Category }
@@ -34,7 +38,7 @@ function apply(state: YState, seat: Seat, action: YAction, rng: () => number): {
     }
     const dice: number[] = []
     for (let i = 0; i < 5; i++) dice.push(seen.has(i) ? state.dice[i] : Math.floor(rng() * 6) + 1)
-    return { state: { ...state, dice, rolls: state.rolls + 1 } }
+    return { state: { ...state, dice, rolls: state.rolls + 1, kept: [...keep].sort((a, b) => a - b) } }
   }
   if (action.type === 'score') {
     if (state.rolls === 0) return { error: 'roll_first' }
@@ -48,7 +52,7 @@ function apply(state: YState, seat: Seat, action: YAction, rng: () => number): {
     sheets[seat] = { ...sheet, [action.category]: points }
     const bonus: [number, number] = [state.bonus[0], state.bonus[1]]
     bonus[seat] += add
-    return { state: { sheets, bonus, seat: seat === 0 ? 1 : 0, dice: [], rolls: 0 } }
+    return { state: { sheets, bonus, seat: seat === 0 ? 1 : 0, dice: [], rolls: 0, kept: [], last: { seat, category: action.category } } }
   }
   return { error: 'invalid_action' }
 }
@@ -68,7 +72,7 @@ function bestCategory(dice: number[], sheet: Sheet): Category {
 
 export const logic: DuelLogic<YState, YAction, YState> = {
   version: 1,
-  init: () => ({ sheets: [{}, {}], bonus: [0, 0], seat: 0, dice: [], rolls: 0 }),
+  init: () => ({ sheets: [{}, {}], bonus: [0, 0], seat: 0, dice: [], rolls: 0, kept: [], last: null }),
   toMove: (state) => state.seat,
   apply,
   /** 굴리기 전이면 굴리기, 굴렸으면 허용 칸 중 최고점 칸(동점이면 CATEGORIES 순서상 앞). 주사위를 미리 보지 않는다. */

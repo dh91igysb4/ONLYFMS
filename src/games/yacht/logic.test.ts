@@ -275,3 +275,45 @@ test('view is the state itself', () => {
   expect(logic.view(s, 0)).toEqual(s)
   expect(logic.view(s, null)).toEqual(s)
 })
+
+describe('kept_and_last', () => {
+  test('kept: first roll [], later roll = keep, reset after score', () => {
+    const rng = seeded(11)
+    let s = logic.init(rng, {})
+    expect(s.kept).toEqual([])
+    expect(s.last).toBeNull()
+    s = ok(logic.apply(s, 0, roll(), rng))
+    expect(s.kept).toEqual([])
+    s = ok(logic.apply(s, 0, roll([1, 3]), rng))
+    expect(s.kept).toEqual([1, 3])
+    s = ok(logic.apply(s, 0, roll([0]), rng))
+    expect(s.kept).toEqual([0])
+    const cat = allowed(s.dice, s.sheets[0])[0]
+    s = ok(logic.apply(s, 0, score(cat), rng))
+    expect(s.kept).toEqual([])
+  })
+  test('last set on score by seat and kept until next score', () => {
+    const rng = seeded(12)
+    let s = ok(logic.apply(logic.init(rng, {}), 0, roll(), rng))
+    const c0 = allowed(s.dice, s.sheets[0])[0]
+    s = ok(logic.apply(s, 0, score(c0), rng))
+    expect(s.last).toEqual({ seat: 0, category: c0 })
+    s = ok(logic.apply(s, 1, roll(), rng))
+    expect(s.last).toEqual({ seat: 0, category: c0 })
+    const c1 = allowed(s.dice, s.sheets[1])[0]
+    s = ok(logic.apply(s, 1, score(c1), rng))
+    expect(s.last).toEqual({ seat: 1, category: c1 })
+  })
+  test('old state without the fields still applies', () => {
+    const old = { sheets: [{}, {}], bonus: [0, 0], seat: 0, dice: [], rolls: 0 } as unknown as YState
+    const rng = seeded(13)
+    let s = ok(logic.apply(old, 0, roll(), rng))
+    expect(s.kept).toEqual([])
+    s = ok(logic.apply(s, 0, roll([2]), rng))
+    expect(s.kept).toEqual([2])
+    const cat = allowed(s.dice, s.sheets[0])[0]
+    s = ok(logic.apply(s, 0, score(cat), rng))
+    expect(s.last).toEqual({ seat: 0, category: cat })
+    expect(logic.timeoutAction(old)).toEqual({ type: 'roll', keep: [] })
+  })
+})

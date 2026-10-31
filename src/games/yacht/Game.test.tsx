@@ -111,4 +111,45 @@ describe('yacht Game', () => {
     render(<Game {...props(s)} />)
     expect(screen.getByText('가가')).toBeTruthy()
   })
+
+  test('opponent_turn_shows_kept_dice_as_held', () => {
+    const v: YState = { ...base, seat: 0, dice: [1, 2, 3, 4, 5], rolls: 2, kept: [0, 2] }
+    render(<Game {...props(v, { mySeat: 1, toMove: 0 })} />)
+    expect(screen.getByRole('button', { name: '주사위 1, 고정됨' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '주사위 3, 고정됨' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '주사위 2' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '주사위 3, 고정됨' }).className).toContain('yacht-kept')
+  })
+
+  test('opponent_turn_without_kept_field_shows_none_held', () => {
+    render(<Game {...props({ ...base, dice: [1, 2, 3, 4, 5], rolls: 2 }, { mySeat: 1, toMove: 0 })} />)
+    expect(screen.queryByRole('button', { name: /고정됨/ })).toBeNull()
+  })
+
+  test('my_turn_ignores_view_kept_uses_local_toggle', () => {
+    render(<Game {...props({ ...base, dice: [1, 2, 3, 4, 5], rolls: 2, kept: [0, 2] })} />)
+    expect(screen.queryByRole('button', { name: /고정됨/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '주사위 2' }))
+    expect(screen.getByRole('button', { name: '주사위 2, 고정됨' })).toBeTruthy()
+  })
+
+  test('last_cell_highlighted', () => {
+    const v: YState = { ...base, sheets: [{}, { fours: 8, choice: 20 }], seat: 0, last: { seat: 1, category: 'fours' } }
+    const { container } = render(<Game {...props(v)} />)
+    const marked = container.querySelectorAll('td[aria-current="true"]')
+    expect(marked).toHaveLength(1)
+    expect(marked[0].textContent).toContain('8')
+    expect(marked[0].textContent).toContain('방금 기록')
+    expect(marked[0].className).toContain('yacht-last')
+    expect(within(marked[0].closest('tr') as HTMLElement).getByText('포')).toBeTruthy()
+    expect(marked[0].previousElementSibling?.tagName).toBe('TD')
+  })
+
+  test('no_highlight_when_last_null_or_missing', () => {
+    const a = render(<Game {...props({ ...base, sheets: [{ fours: 8 }, {}], last: null })} />)
+    expect(a.container.querySelectorAll('td[aria-current="true"]')).toHaveLength(0)
+    a.unmount()
+    const b = render(<Game {...props({ ...base, sheets: [{ fours: 8 }, {}] })} />)
+    expect(b.container.querySelectorAll('td[aria-current="true"]')).toHaveLength(0)
+  })
 })
