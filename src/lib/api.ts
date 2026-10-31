@@ -29,6 +29,7 @@ export class ApiError extends Error {
 
 const MESSAGES: Record<string, string> = {
   handle_taken: '이미 쓰는 아이디예요',
+  appearance_invalid: '화면 설정 값이 올바르지 않아요',
   handle_invalid: '아이디는 한글, 영문 소문자, 숫자, _ 로 2~16자예요',
   handle_already_set: '아이디는 이미 정해졌어요',
   forbidden: '권한이 없어요',

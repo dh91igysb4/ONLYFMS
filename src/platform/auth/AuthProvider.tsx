@@ -8,6 +8,8 @@ export type Profile = {
   handle: string | null
   status: 'pending' | 'approved' | 'rejected'
   is_admin: boolean
+  palette?: string
+  appearance?: string
 }
 
 type AuthValue = {
