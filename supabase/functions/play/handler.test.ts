@@ -635,10 +635,11 @@ t('who_are_ya_daily_plays_through_handler', async () => {
   assert.equal(win.body.action_count, 4)
   assert.deepEqual(win.body.reveal, answer)
 
-  // 숨김 게임이라 일반 사용자는 못 연다
+  // 공개 게임이라 다른 승인 사용자도 같은 데일리를 연다 (0007)
   const other = await user()
   const f = await call(other, { action: 'open', item_id: itemId }, now + 8000)
-  assert.equal(f.status, 403)
+  assert.equal(f.status, 200, JSON.stringify(f.body))
+  assert.equal(f.body.finished, false)
 })
 
 t('teardown', async () => {
