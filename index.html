@@ -13,7 +13,8 @@
           if (!c || typeof c !== 'object') return
           var mode = c.appearance
           if (mode === 'system') {
-            mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            var dark = !window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches
+            mode = dark ? 'dark' : 'light'
           }
           var vars = c[mode]
           if (!vars || typeof vars !== 'object') return

@@ -70,6 +70,30 @@ describe('index.html 첫 렌더 전 스크립트', () => {
     expect(bg()).toBe('#0f1b2d')
   })
 
+  const systemCache = () =>
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        appearance: 'system',
+        dark: { '--bg': '#0f1b2d' },
+        light: { '--bg': '#f1f4f9' },
+      }),
+    )
+
+  it('system_without_matchmedia_is_dark', () => {
+    expect(window.matchMedia).toBeUndefined()
+    systemCache()
+    run()
+    expect(bg()).toBe('#0f1b2d')
+  })
+
+  it('system_light_when_media_false', () => {
+    stubMatchMedia(false)
+    systemCache()
+    run()
+    expect(bg()).toBe('#f1f4f9')
+  })
+
   it('no_cache_does_nothing', () => {
     expect(() => run()).not.toThrow()
     expect(bg()).toBe('')
@@ -88,5 +112,6 @@ describe('index.html 첫 렌더 전 스크립트', () => {
     )
     run()
     expect(bg()).toBe('')
+    expect(meta()).toBe('#1c1030')
   })
 })
