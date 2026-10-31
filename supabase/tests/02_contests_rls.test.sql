@@ -32,11 +32,11 @@ insert into public.contests (id, kind, title, created_by, visibility, invite_cod
      now() - interval '10 minutes', now() + interval '1 hour');
 
 insert into public.contest_items (id, contest_id, position, game_id, options, puzzle, puzzle_key, logic_version, generated_at) values
-  ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 1, 'who-are-ya', '{}', '{"answer":42}', 'k42', 1, now()),
-  ('d0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 1, 'who-are-ya', '{}', '{"answer":7}',  'k7',  1, now()),
-  ('d0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 1, 'who-are-ya', '{}', '{"answer":9}',  'k9',  1, now()),
+  ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 1, 'open-game', '{}', '{"answer":42}', 'k42', 1, now()),
+  ('d0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 1, 'open-game', '{}', '{"answer":7}',  'k7',  1, now()),
+  ('d0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 1, 'open-game', '{}', '{"answer":9}',  'k9',  1, now()),
   ('d0000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', 1, 'number-guess', '{"range":"100"}', '{"answer":5}', '100:5', 1, now()),
-  ('d0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', 1, 'who-are-ya', '{}', '{"answer":3}',  'k3',  1, now());
+  ('d0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', 1, 'open-game', '{}', '{"answer":3}',  'k3',  1, now());
 
 insert into public.contest_entries (contest_id, user_id) values
   ('c0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1'),
@@ -58,12 +58,12 @@ insert into public.attempts (item_id, user_id, state, logic_version, finished, s
   ('d0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-0000000000a2', '{"answer":3}',  1, true, 6.0, 5, now()),
   ('d0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a1', '{"secret":42}', 1, false, 2.0, 1, null);
 
-insert into public.puzzle_bank (game_id, puzzle, puzzle_key) values ('who-are-ya', '{"answer":1}', 'p1');
+insert into public.puzzle_bank (game_id, puzzle, puzzle_key) values ('open-game', '{"answer":1}', 'p1');
 
 -- a2의 자유 플레이: 숨김 게임 1건, 일반 게임 1건
 insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count) values
   ('f0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2', 'number-guess', '{}', 1, true, 9.0, 2),
-  ('f0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a2', 'who-are-ya',   '{}', 1, false, 0.0, 8);
+  ('f0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a2', 'open-game',   '{}', 1, false, 0.0, 8);
 
 -- schema sanity
 select has_view('public', 'contest_items_public', 'contest_items_public view exists');
@@ -76,7 +76,7 @@ set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a0","r
 
 -- pending_cannot_insert_free_play
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, true, 5.0, 3)$$, '42501', null,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, true, 5.0, 3)$$, '42501', null,
   'pending_cannot_insert_free_play: RLS rejects insert from pending user');
 select is((select count(*)::int from public.free_plays), 0, 'pending user reads no free_plays');
 select is((select count(*)::int from public.contests), 0, 'pending user sees no contests');
@@ -87,23 +87,23 @@ set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000a1","r
 
 -- approved_inserts_own_free_play
 select lives_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'who-are-ya', '{"x":"1"}', 1, true, 10.0, 3)$$,
+  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'open-game', '{"x":"1"}', 1, true, 10.0, 3)$$,
   'approved_inserts_own_free_play: insert succeeds');
 select is((select count(*)::int from public.free_plays where user_id = auth.uid()), 1,
   'approved_inserts_own_free_play: row is readable by owner');
 
 -- free_play_score_bounds
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, true, 10.1, 3)$$, '23514', null,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, true, 10.1, 3)$$, '23514', null,
   'free_play_score_bounds: 10.1 rejected');
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, true, 10.05, 3)$$, '23514', null,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, true, 10.05, 3)$$, '23514', null,
   'free_play_score_bounds: 10.05 (rounds to 10.1) rejected');
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, true, -0.1, 3)$$, '23514', null,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, true, -0.1, 3)$$, '23514', null,
   'free_play_score_bounds: -0.1 rejected');
 select lives_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, false, 0.0, 8)$$,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, false, 0.0, 8)$$,
   'free_play_score_bounds: 0.0 accepted');
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
   values (gen_random_uuid(), auth.uid(), 'Bad Game', '{}', 1, false, 0.0, 8)$$, '23514', null,
@@ -111,12 +111,12 @@ select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, o
 
 -- free_play_other_user_id_denied
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a3', 'who-are-ya', '{}', 1, true, 5.0, 3)$$, '42501', null,
+  values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a3', 'open-game', '{}', 1, true, 5.0, 3)$$, '42501', null,
   'free_play_other_user_id_denied: insert for another user rejected');
 
 -- free_play_duplicate_client_id_ignored
 select lives_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'who-are-ya', '{}', 1, false, 1.0, 9)
+  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'open-game', '{}', 1, false, 1.0, 9)
   on conflict (client_id) do nothing$$,
   'free_play_duplicate_client_id_ignored: on conflict do nothing succeeds');
 select is((select count(*)::int from public.free_plays where client_id = 'f0000000-0000-0000-0000-0000000000a1'), 1,
@@ -124,13 +124,13 @@ select is((select count(*)::int from public.free_plays where client_id = 'f00000
 select is((select score from public.free_plays where client_id = 'f0000000-0000-0000-0000-0000000000a1'), 10.0::numeric,
   'free_play_duplicate_client_id_ignored: original row unchanged');
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'who-are-ya', '{}', 1, false, 1.0, 9)$$, '23505', null,
+  values ('f0000000-0000-0000-0000-0000000000a1', auth.uid(), 'open-game', '{}', 1, false, 1.0, 9)$$, '23505', null,
   'free_plays.client_id is unique');
 select throws_ok($$insert into public.free_plays (id, client_id, user_id, game_id, options, logic_version, solved, score, action_count)
-  values (999, gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, false, 1.0, 9)$$, null, null,
+  values (999, gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, false, 1.0, 9)$$, null, null,
   'free_plays.id cannot be chosen by the client');
 select throws_ok($$insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count, played_at)
-  values (gen_random_uuid(), auth.uid(), 'who-are-ya', '{}', 1, false, 1.0, 9, now() - interval '1 year')$$, '42501', null,
+  values (gen_random_uuid(), auth.uid(), 'open-game', '{}', 1, false, 1.0, 9, now() - interval '1 year')$$, '42501', null,
   'free_plays.played_at cannot be backdated by the client');
 
 -- free_play_update_delete_denied
@@ -190,7 +190,7 @@ select is(public.contest_invite_code('c0000000-0000-0000-0000-000000000003'), 'A
 
 -- puzzle_bank_admin_only (non-admin)
 select is((select count(*)::int from public.puzzle_bank), 0, 'puzzle_bank_admin_only: approved non-admin reads 0 rows');
-select throws_ok($$insert into public.puzzle_bank (game_id, puzzle, puzzle_key) values ('who-are-ya', '{}', 'zz')$$, '42501', null,
+select throws_ok($$insert into public.puzzle_bank (game_id, puzzle, puzzle_key) values ('open-game', '{}', 'zz')$$, '42501', null,
   'puzzle_bank_admin_only: direct insert denied');
 
 -- ---------------------------------------------------------------- a3 (approved, 초대 대회 비참가자)
@@ -216,7 +216,7 @@ select is((select count(*)::int from public.attempts where item_id = 'd0000000-0
   'hidden_game_rows_admin_only: hidden-game attempts invisible to non-admin');
 select is((select count(*)::int from public.free_plays where game_id = 'number-guess'), 0,
   'hidden_game_rows_admin_only: hidden-game free_plays invisible to non-admin');
-select is((select count(*)::int from public.free_plays where game_id = 'who-are-ya'), 3,
+select is((select count(*)::int from public.free_plays where game_id = 'open-game'), 3,
   'approved users read everyone''s non-hidden free_plays');
 
 -- ---------------------------------------------------------------- 대회 c5를 종료시킨다 (superuser)
