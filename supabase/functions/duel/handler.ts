@@ -1,8 +1,8 @@
 // 1대1 대전 핸들러 (대전 설계 §4, §7). 시각은 모두 deps.now()(서버 시계)에서 온다.
 // 게임 상태(state)와 초대 코드는 DuelView에 넣지 않는다. 브라우저에는 logic.view 결과만 간다.
 // 모든 변경은 대국 행을 `for update`로 잠근 트랜잭션 안에서 하고, 커밋 뒤에 "바뀜" 신호만 보낸다.
-import type { Sql, Tx } from '../play/db.ts'
-import { txOn } from '../play/db.ts'
+import type { Sql, Tx } from '../_shared/db.ts'
+import { txOn } from '../_shared/db.ts'
 import { getDuel } from '../../../src/games/index.ts'
 import type { DuelLogic, DuelModule, Manifest, Seat } from '../../../src/games/types.ts'
 import { hmacSeed, rngFromSeed } from '../../../src/shared/rng.ts'
@@ -134,7 +134,8 @@ async function route(req: Request, deps: DuelDeps): Promise<Out> {
       return await create(deps, reg, me, b)
     case 'join': {
       const id = matchId()
-      const code = typeof b.code === 'string' && CODE_RE.test(b.code) ? b.code : null
+      const rawCode = typeof b.code === 'string' ? b.code.trim().toLowerCase() : null
+      const code = rawCode !== null && CODE_RE.test(rawCode) ? rawCode : null
       if (!id && !code) return bad('match_id 또는 code가 필요해요')
       return await run(deps, (tx) => join(tx, deps, reg, me, id ? { id } : { code: code! }))
     }
@@ -213,6 +214,7 @@ async function save(tx: Tx, m: MatchRow): Promise<void> {
   await tx`
     update public.duel_matches
        set logic_version = ${m.logic_version},
+           options       = ${tx.json(m.options)},
            status        = ${m.status}::public.duel_status,
            players       = ${m.players ? tx.array(m.players) : null}::uuid[],
            state         = ${m.state == null ? null : tx.json(m.state as never)},
@@ -350,54 +352,74 @@ async function notActive(tx: Tx, m: MatchRow, me: Me, logic: Logic | undefined, 
 }
 
 // ---------------------------------------------------------------- timeouts
+type TurnOutcome =
+  | { kind: 'ok'; seat: Seat; state: unknown; moves: unknown[]; over: false | { winner: Seat | null; scores?: [number, number] } }
+  | { kind: 'broken'; reason: string }
+
+/**
+ * 마감이 지난 한 턴의 기본 수를 순수하게 계산한다(DB 쓰기 없음). 로직이 던지거나, 기본 수가 거절되거나,
+ * 8번 안에 턴을 넘기지 못하면 broken.
+ */
+async function timeoutTurn(deps: DuelDeps, m: MatchRow, logic: Logic): Promise<TurnOutcome> {
+  try {
+    const seat = logic.toMove(m.state) as Seat
+    if (seat !== 0 && seat !== 1) return { kind: 'broken', reason: `toMove returned ${String(seat)}` }
+    const startTurn = logic.turnNo(m.state)
+    let state = m.state
+    const moves: unknown[] = []
+    for (let i = 0; i < MAX_AUTO_PER_TURN; i++) {
+      const action = logic.timeoutAction(state)
+      const r = logic.apply(state, seat, action, await rngFor(deps.secret, m.id, m.action_no + i))
+      if ('error' in r) return { kind: 'broken', reason: `timeout action rejected: ${r.error}` }
+      moves.push(action)
+      state = r.state
+      const res = logic.result(state)
+      if (res.over) return { kind: 'ok', seat, state, moves, over: { winner: res.winner, scores: res.scores } }
+      if (logic.turnNo(state) !== startTurn) return { kind: 'ok', seat, state, moves, over: false }
+    }
+    return { kind: 'broken', reason: `turn did not advance within ${MAX_AUTO_PER_TURN} actions` }
+  } catch (e) {
+    return { kind: 'broken', reason: `logic threw: ${e instanceof Error ? e.stack ?? e.message : String(e)}` }
+  }
+}
+
 /**
  * 마감이 지난 턴을 모두 처리한다(설계 §4.4). 턴마다 timeoutAction을 turnNo가 바뀌거나 게임이 끝날 때까지
  * 하나씩 적용(최대 8번, 행동마다 그 순번의 난수)하고, 그 좌석의 연속 초과를 1 올린다. 2회면 상대 승.
- * 새 마감 = 이전 마감 + turn_seconds. 바뀐 것이 있으면 true.
+ * 새 마감 = 이전 마감 + turn_seconds. 기본 수 처리가 고장 나면(로직 오류) 선수 잘못이 아니므로 무효.
  */
-async function runTimeouts(tx: Tx, deps: DuelDeps, m: MatchRow, logic: Logic, now: number): Promise<boolean> {
-  let changed = false
+async function runTimeouts(tx: Tx, deps: DuelDeps, m: MatchRow, logic: Logic, now: number): Promise<void> {
   while (m.status === 'active' && m.turn_deadline && m.turn_deadline.getTime() <= now) {
-    changed = true
-    const seat = logic.toMove(m.state) as Seat
-    const startTurn = logic.turnNo(m.state)
-    let advanced = false
-    for (let i = 0; i < MAX_AUTO_PER_TURN; i++) {
-      let action: unknown
-      let r: { state: unknown } | { error: string }
-      try {
-        action = logic.timeoutAction(m.state)
-        r = logic.apply(m.state, seat, action, await rngFor(deps.secret, m.id, m.action_no))
-      } catch (e) {
-        console.error('duel: timeout action threw', m.id, e)
-        break
-      }
-      if ('error' in r) {
-        console.error('duel: timeout action rejected', m.id, r.error)
-        break
-      }
-      await recordMove(tx, m, seat, action, true, now)
-      m.state = r.state
-      m.action_no += 1
-      if (logic.turnNo(m.state) !== startTurn || logic.result(m.state).over) {
-        advanced = true
-        break
-      }
+    const t = await timeoutTurn(deps, m, logic)
+    if (t.kind === 'broken') {
+      console.error('duel: timeout processing broken, voiding match', m.id, t.reason)
+      voidMatch(m, now)
+      return
     }
-    m.turn_no = logic.turnNo(m.state)
+    let turnNo: number
+    try {
+      turnNo = logic.turnNo(t.state)
+    } catch (e) {
+      console.error('duel: timeout processing broken, voiding match', m.id, e)
+      voidMatch(m, now)
+      return
+    }
+    for (const action of t.moves) {
+      await recordMove(tx, m, t.seat, action, true, now)
+      m.action_no += 1
+    }
+    m.state = t.state
+    m.turn_no = turnNo
     m.timeouts = [...m.timeouts]
-    m.timeouts[seat] += 1
-    const res = logic.result(m.state)
-    // 연속 2회 초과, 또는 기본 수로 턴을 넘기지 못하면(로직 오류) 그 좌석의 시간 초과 패
-    if (m.timeouts[seat] >= 2 || !advanced) {
-      finish(m, seat === 0 ? 1 : 0, 'timeout', now)
-    } else if (res.over) {
-      finish(m, res.winner, 'normal', now, res.scores)
+    m.timeouts[t.seat] += 1
+    if (m.timeouts[t.seat] >= 2) {
+      finish(m, t.seat === 0 ? 1 : 0, 'timeout', now)
+    } else if (t.over) {
+      finish(m, t.over.winner, 'normal', now, t.over.scores)
     } else {
       m.turn_deadline = new Date(m.turn_deadline.getTime() + m.turn_seconds * 1000)
     }
   }
-  return changed
 }
 
 // ---------------------------------------------------------------- create
@@ -460,6 +482,7 @@ async function join(
   const now = deps.now()
   const m = 'id' in key ? await lockById(tx, key.id) : await lockByCode(tx, key.code)
   if (!m) return { out: err(404, 'not_found') }
+  if ((await isHidden(tx, m.game_id)) && !me.admin) return { out: err(404, 'unknown_game') }
   const game = reg.getDuel(m.game_id)
   // 이미 참가자면 그 대국 화면 (멱등)
   if (seatOf(m, me.id) !== null) return { out: out(200, await buildView(tx, m, me, game?.logic, now)) }
@@ -467,14 +490,15 @@ async function join(
   if (m.status === 'void') return { out: err(409, 'not_waiting') }
   if (m.created_by === me.id) return { out: err(409, 'own_match') }
   if (!game) return { out: err(404, 'unknown_game') }
-  if ((await isHidden(tx, m.game_id)) && !me.admin) return { out: err(404, 'unknown_game') }
-  // 10분 지난 대기 대국, 만든 사람이 지워진 대국은 시작할 수 없다
+  // 10분 지난 대기 대국, 만든 사람이 지워진 대국, 지금 manifest에 맞지 않는 설정은 시작할 수 없다
   const expired = expireIfStale(m, now)
-  if (expired || m.created_by === null) {
+  const options = parseOptions(game.manifest, m.options)
+  if (expired || m.created_by === null || !options) {
     if (!expired) voidMatch(m, now)
     await save(tx, m)
     return { out: err(409, 'not_waiting') }
   }
+  m.options = options
 
   // 선공: action_no = -1 시드의 첫 값 < 0.5면 참가자. 같은 난수열의 나머지로 init
   const rng = await rngFor(deps.secret, m.id, -1)
@@ -546,7 +570,8 @@ async function move(
   if (m.turn_deadline && m.turn_deadline.getTime() <= now) {
     await runTimeouts(tx, deps, m, logic, now)
     await save(tx, m)
-    return { out: err(409, 'stale', { view: await buildView(tx, m, me, logic, now) }), signal: signalOf(m) }
+    const code = m.status === 'active' ? 'stale' : 'finished'
+    return { out: err(409, code, { view: await buildView(tx, m, me, logic, now) }), signal: signalOf(m) }
   }
   const seat = seatOf(m, me.id)
   if (seat === null || logic.toMove(m.state) !== seat) {

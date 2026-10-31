@@ -130,7 +130,7 @@ waiting ──참가──▶ active ──종료 조건──▶ finished
 | id | uuid PK | |
 | game_id | text | 등록부 id |
 | options | jsonb | 게임 설정 |
-| logic_version | int | 생성 당시 |
+| logic_version | int | 시작(참가) 당시. 참가 때 그 시점 로직 버전으로 갱신 |
 | rated | boolean | 랭크 여부 |
 | visibility | enum `public`/`invite` | |
 | invite_code | text unique | 대회 초대 코드와 같은 생성 방식 |

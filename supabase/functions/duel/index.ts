@@ -1,7 +1,7 @@
 // Edge Function `duel` 진입점: 실제 연결(SUPABASE_DB_URL), JWT 확인(supabase-js), PLAY_SECRET, CORS,
 // Realtime REST 브로드캐스트(대전 설계 §7.2). 구조는 play/index.ts와 같다.
 import { createClient } from '@supabase/supabase-js'
-import { createSql } from '../play/db.ts'
+import { createSql } from '../_shared/db.ts'
 import { handle } from './handler.ts'
 
 const CORS: Record<string, string> = {

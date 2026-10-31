@@ -55,6 +55,24 @@ const extra = new Map<string, DuelModule>([
   ['coin', { manifest: coinManifest('coin', false), logic: coinLogic(1) }],
   ['coin-hidden', { manifest: coinManifest('coin-hidden', true), logic: coinLogic(1) }],
 ])
+// 기본 수 처리가 고장 난 게임들: turnNo가 0을 고른 상태에서 던짐 / 기본 수가 거절됨 / 기본 수가 턴을 넘기지 않음
+const base = coinLogic(1)
+const brokenLogics: Record<string, DuelLogic<CoinState, CoinAction, CoinState>> = {
+  'coin-turn-throws': {
+    ...base,
+    turnNo: (s) => {
+      if (s.picks.includes(0)) throw new Error('turnNo boom')
+      return base.turnNo(s)
+    },
+  },
+  'coin-rejected': { ...base, timeoutAction: () => ({ type: 'pick', n: 99 }) },
+  'coin-stuck': {
+    ...base,
+    // 같은 좌석이 계속 두는 것처럼 상태를 바꾸지 않는 기본 수
+    apply: (s, seat, a, rng) => (a.type === 'pick' && a.n === 0 ? { state: s } : base.apply(s, seat, a, rng)),
+  },
+}
+for (const [id, logic] of Object.entries(brokenLogics)) extra.set(id, { manifest: coinManifest(id, false), logic })
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -163,11 +181,10 @@ async function row(id: string) {
 const move = (uid: string, id: string, n: number, payload: unknown, now: number) =>
   call(uid, { action: 'move', match_id: id, expected_action_no: n, payload }, now)
 
-// 테스트 DB 준비: 요트는 숨김에서 빼고(숨김 검사는 coin-hidden으로), coin-hidden을 숨긴다
-t('setup', async () => {
-  await sql`delete from public.hidden_games where game_id = 'yacht'`
-  await sql`insert into public.hidden_games (game_id) values ('coin-hidden') on conflict do nothing`
-})
+// 테스트 DB 준비(모듈 로드 때 한 번, --filter로 일부만 돌려도 적용): 요트는 숨김에서 빼고
+// (숨김 검사는 coin-hidden으로), coin-hidden을 숨긴다. teardown에서 되돌린다.
+await sql`delete from public.hidden_games where game_id = 'yacht'`
+await sql`insert into public.hidden_games (game_id) values ('coin-hidden') on conflict do nothing`
 
 // ---------------------------------------------------------------- auth / errors
 t('unapproved_403', async () => {
@@ -665,9 +682,116 @@ t('broadcast_failure_does_not_fail_request', async () => {
   }
 })
 
-// 마지막: 지금까지의 모든 응답에서 상태는 view 안에만 있다
+// ---------------------------------------------------------------- hardening
+for (const id of Object.keys(brokenLogics)) {
+  t(`broken_timeout_logic_voids_${id}`, async () => {
+    const s = await started({ game: id, rated: true })
+    await move(s.first, s.id, 0, { type: 'pick', n: 5 }, T0 + 2 * SEC)
+    // 둘 다 둔 것으로 둬서, 고장이 아니라면 정상 종료(finished)가 됐을 상황을 만든다
+    await sql`update public.duel_matches set moved = '{true,true}' where id = ${s.id}`
+    bcasts = []
+    const r = await call(s.first, { action: 'tick', match_id: s.id }, T0 + 2 * SEC + 60 * SEC)
+    assert.equal(r.status, 200, JSON.stringify(r.body))
+    const v = r.body as unknown as View
+    assert.equal(v.status, 'void')
+    assert.equal(v.end_reason, 'void')
+    assert.equal(v.winner, null)
+    assert.equal(v.turn_deadline, null)
+    const m = await row(s.id)
+    assert.equal(m.status, 'void')
+    const [{ n }] = await sql`select count(*)::int as n from public.duel_rating_changes where match_id = ${s.id}`
+    assert.equal(n, 0)
+    assert.equal(bcasts.length, 1)
+    const [{ autos }] = await sql`select count(*)::int as autos from public.duel_moves where match_id = ${s.id} and auto`
+    assert.equal(autos, 0)
+    // 다시 tick해도 더 이상 마감 지난 진행 대국이 아니다
+    const again = await call(s.first, { action: 'tick', match_id: s.id }, T0 + 10 * 60 * SEC)
+    assert.equal(again.status, 409)
+    assert.equal(again.body.error, 'finished')
+  })
+}
+
+t('late_move_that_ends_match_is_409_finished', async () => {
+  const s = await yachtBothMoved()
+  // 선공이 이미 한 번 초과한 상태로 만든다
+  await sql`update public.duel_matches set timeouts = '{1,0}' where id = ${s.id}`
+  const r = await move(s.first, s.id, 4, { type: 'roll', keep: [] }, s.deadline + SEC)
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, 'finished')
+  const v = r.body.view as View
+  assert.equal(v.status, 'finished')
+  assert.equal(v.end_reason, 'timeout')
+  assert.equal(v.winner, 1)
+})
+
+t('join_hidden_checked_before_full', async () => {
+  const admin1 = await user('approved', true)
+  const admin2 = await user('approved', true)
+  const u = await user()
+  const cr = await create(admin1, T0, { game: 'coin-hidden' })
+  assert.equal((await call(admin2, { action: 'join', match_id: cr.body.match_id }, T0)).status, 200)
+  const r = await call(u, { action: 'join', match_id: cr.body.match_id }, T0)
+  assert.equal(r.status, 404)
+  assert.equal(r.body.error, 'unknown_game')
+})
+
+t('join_code_case_insensitive', async () => {
+  const a = await user()
+  const b = await user()
+  const cr = await create(a, T0)
+  const r = await call(b, { action: 'join', code: `  ${(cr.body.invite_code as string).toUpperCase()} ` }, T0)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.equal((r.body as unknown as View).match_id, cr.body.match_id)
+})
+
+t('join_with_options_no_longer_valid_voids', async () => {
+  const a = await user()
+  const b = await user()
+  const cr = await create(a, T0, { options: { mode: 'b' } })
+  const prev = extra.get('coin')!
+  const opts = prev.manifest.options.map((o) => ({ ...o, choices: o.choices.filter((c) => c.value !== 'b') }))
+  extra.set('coin', { manifest: { ...prev.manifest, options: opts }, logic: prev.logic })
+  try {
+    const r = await call(b, { action: 'join', match_id: cr.body.match_id }, T0 + SEC)
+    assert.equal(r.status, 409)
+    assert.equal(r.body.error, 'not_waiting')
+    const m = await row(cr.body.match_id as string)
+    assert.equal(m.status, 'void')
+    assert.equal(m.players, null)
+  } finally {
+    extra.set('coin', prev)
+  }
+})
+
+t('join_fills_new_default_options', async () => {
+  const a = await user()
+  const b = await user()
+  const cr = await create(a, T0)
+  const prev = extra.get('coin')!
+  const extraOpt = { key: 'speed', label: '속도', choices: [{ value: 'x', label: 'X' }], default: 'x' }
+  extra.set('coin', { manifest: { ...prev.manifest, options: [...prev.manifest.options, extraOpt] }, logic: prev.logic })
+  try {
+    const r = await call(b, { action: 'join', match_id: cr.body.match_id }, T0 + SEC)
+    assert.equal(r.status, 200)
+    assert.deepEqual((await row(cr.body.match_id as string)).options, { mode: 'a', speed: 'x' })
+  } finally {
+    extra.set('coin', prev)
+  }
+})
+
+// 지금까지의 모든 응답에서 상태는 view 안에만 있다
 t('state_never_in_response', async () => {
-  assert.ok(allBodies.length > 50)
+  // 이 테스트 안에서 모든 행동 종류를 한 번씩 거친다(다른 테스트 순서와 무관)
+  allBodies.length = 0
+  const s = await yachtBothMoved()
+  await call(s.first, { action: 'view', match_id: s.id }, s.now)
+  await call(s.first, { action: 'tick', match_id: s.id }, s.now) // not_due + view
+  await move(s.second, s.id, s.v.action_no, { type: 'roll', keep: [] }, s.now) // not_your_turn + view
+  await move(s.first, s.id, 0, { type: 'roll', keep: [] }, s.now) // stale + view
+  await call(s.second, { action: 'tick', match_id: s.id }, s.deadline + SEC)
+  await call(s.second, { action: 'resign', match_id: s.id }, s.deadline + 2 * SEC)
+  await move(s.first, s.id, 0, { type: 'roll', keep: [] }, s.deadline + 3 * SEC) // finished + view
+  assert.ok(allBodies.length > 10)
   const check = (b: Record<string, unknown>) => {
     for (const k of Object.keys(b)) {
       assert.notEqual(k, 'state')
@@ -685,5 +809,7 @@ t('state_never_in_response', async () => {
 })
 
 t('teardown', async () => {
+  await sql`delete from public.hidden_games where game_id = 'coin-hidden'`
+  await sql`insert into public.hidden_games (game_id) values ('yacht') on conflict do nothing`
   await sql.end()
 })

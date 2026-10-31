@@ -160,7 +160,7 @@
 **Files:**
 - Create: `supabase/functions/duel/index.ts`, `handler.ts`, `deno.json`(play와 같은 imports), `handler.test.ts`
 - Modify: `supabase/config.toml` (`[functions.duel] verify_jwt = false`), `scripts/fn-test.sh`(play와 duel 두 디렉터리를 모두 돌린다)
-- 재사용: `../play/db.ts`(`createSql`, `txOn`, `Sql`, `Tx` — 상대 import), `../../../src/shared/rng.ts`, `../../../src/games/index.ts`
+- 재사용: `../_shared/db.ts`(`createSql`, `txOn`, `Sql`, `Tx` — 상대 import), `../../../src/shared/rng.ts`, `../../../src/games/index.ts`
 
 **Interfaces:**
 - Consumes: Task 1 `getDuel`, `DuelLogic`; Task 3 테이블과 `_duel_apply_elo`.

@@ -1,8 +1,8 @@
 // 출제·판정 핸들러 (설계 §8). 시각은 모두 deps.now()(서버 시계)에서 온다 — 클라이언트 시각은 쓰지 않는다.
 // 정답(puzzle)과 내부 상태(state)는 응답에 넣지 않는다. 브라우저에는 logic.publicState와,
 // 기록이 끝났거나 대회가 끝난 뒤에만 logic.reveal을 보낸다.
-import type { Sql, Tx } from './db.ts'
-import { txOn } from './db.ts'
+import type { Sql, Tx } from '../_shared/db.ts'
+import { txOn } from '../_shared/db.ts'
 import { normalizeScore, pickFresh, step } from './engine.ts'
 import { registry as defaultRegistry, type Registry } from './registry.ts'
 import type { Ctx, GameModule } from '../../../src/games/types.ts'
