@@ -21,22 +21,26 @@ export function FreePage() {
 
   return (
     <div className="stack">
-      <h2>{mod.manifest.name} · 자유 플레이</h2>
-      <div className="free-options">
-        {mod.manifest.options.map((o) => (
-          <label key={o.key} className="free-option">
-            <span className="muted">{o.label}</span>
-            <select
-              className="input"
-              value={options[o.key]}
-              onChange={(e) => { setOptions({ ...options, [o.key]: e.target.value }); next() }}
-            >
-              {o.choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </label>
-        ))}
-        <button className="btn btn-ghost" onClick={next}>새 판</button>
+      <div className="free-head">
+        <h2 className="free-title">{mod.manifest.name} <span className="muted">· 자유 플레이</span></h2>
+        <button className="btn btn-ghost btn-sm" onClick={next}>새 판</button>
       </div>
+      {mod.manifest.options.length > 0 && (
+        <div className="free-options">
+          {mod.manifest.options.map((o) => (
+            <label key={o.key} className="free-option">
+              <span className="sr-only">{o.label}</span>
+              <select
+                className="input input-sm"
+                value={options[o.key]}
+                onChange={(e) => { setOptions({ ...options, [o.key]: e.target.value }); next() }}
+              >
+                {o.choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      )}
       <PlayRunner key={round} mode="local" gameId={game} options={options} onNext={next} />
     </div>
   )

@@ -10,7 +10,7 @@
   gap: 14px;
 }
 .wya-meta { display: flex; align-items: baseline; gap: 8px; }
-.wya-meta strong { font-size: 20px; }
+.wya-meta strong { font-size: 15px; }
 .wya-time { margin-left: auto; }
 
 /* 미스터리 카드 */
