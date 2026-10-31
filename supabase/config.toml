@@ -421,3 +421,8 @@ enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false
+
+# ONLYFMS: play 함수는 Authorization 토큰을 함수 안에서 직접 확인한다(auth.getUser).
+# 플랫폼의 JWT 검사는 끈다. 반영되지 않으면 `functions deploy play --no-verify-jwt`로 배포 (docs/deploy-checklist.md §3).
+[functions.play]
+verify_jwt = false
