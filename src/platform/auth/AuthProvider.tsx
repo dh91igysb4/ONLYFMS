@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase.ts'
-import { ApiError, rpc } from '../../lib/api.ts'
+import { ApiError, onAccessDenied, rpc } from '../../lib/api.ts'
 
 export type Profile = {
   id: string
@@ -94,6 +94,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(r.code) // 이전 프로필은 그대로 둔다
     }
   }, [])
+
+  // 요청이 승인 문제로 거부되면 프로필을 다시 읽는다. 승인이 취소됐으면 가드가 /welcome으로 보낸다.
+  // 이미 다시 읽는 중이면 겹쳐 부르지 않는다.
+  const refreshing = useRef(false)
+  useEffect(() => onAccessDenied(() => {
+    if (refreshing.current) return
+    refreshing.current = true
+    void refresh().finally(() => { refreshing.current = false })
+  }), [refresh])
 
   const value = useMemo(() => ({ session, profile, loading, error, refresh }), [session, profile, loading, error, refresh])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

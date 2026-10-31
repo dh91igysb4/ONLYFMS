@@ -57,10 +57,31 @@ const MESSAGES: Record<string, string> = {
   invalid_status: '잘못된 상태예요',
   cannot_change_self: '자기 자신은 바꿀 수 없어요',
   contest_closed: '이미 끝났거나 취소된 대회예요',
+  invalid_action: '할 수 없는 행동이에요',
 }
 
 export function errorMessage(code: string): string {
   return MESSAGES[code] ?? `문제가 생겼어요 (${code})`
+}
+
+// ------------------------------------------------------------------ 승인 취소 알림 (설계 §11)
+// 승인이 취소된 사용자의 요청은 거부된다. 그때 AuthProvider가 프로필을 다시 읽어 가드가 /welcome으로 보내게 한다.
+// play는 403 not_approved를, SQL 함수는 승인 사용자가 아니면 forbidden을 돌려준다.
+type DeniedListener = (code: string) => void
+const deniedListeners = new Set<DeniedListener>()
+
+export function onAccessDenied(fn: DeniedListener): () => void {
+  deniedListeners.add(fn)
+  return () => { deniedListeners.delete(fn) }
+}
+
+function notifyDenied(e: ApiError): ApiError {
+  if (e.code === 'not_approved' || e.code === 'forbidden') {
+    for (const fn of deniedListeners) {
+      try { fn(e.code) } catch { /* 알림 실패는 원래 오류를 가리지 않는다 */ }
+    }
+  }
+  return e
 }
 
 const NETWORK_RE = /Failed to fetch|NetworkError|Load failed|fetch failed/i
@@ -80,7 +101,7 @@ export async function rpc<T>(name: string, args?: Record<string, unknown>): Prom
   } catch {
     throw new ApiError('network', 0)
   }
-  if (res.error) throw rpcError(res.error)
+  if (res.error) throw notifyDenied(rpcError(res.error))
   return res.data as T
 }
 
@@ -109,7 +130,7 @@ export async function play(body: Record<string, unknown>): Promise<PlayView> {
   }
   if (!res.ok) {
     const code = (json as { error?: string } | null)?.error ?? 'unknown'
-    throw new ApiError(code, res.status, json)
+    throw notifyDenied(new ApiError(code, res.status, json))
   }
   return json as PlayView
 }

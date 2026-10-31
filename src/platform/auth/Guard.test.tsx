@@ -122,3 +122,23 @@ test('refresh_failure_keeps_previous_profile', async () => {
   fireEvent.click(screen.getByRole('button'))
   expect(await screen.findByText('r:kane:network')).toBeInTheDocument()
 })
+
+test('revoked_approval_on_not_approved_refreshes_profile_and_goes_to_welcome', async () => {
+  setAuth(approved)
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'not_approved' }), { status: 403 }))
+  vi.stubGlobal('fetch', fetchMock)
+  try {
+    setup('/')
+    expect(await screen.findByText('홈')).toBeInTheDocument()
+    const profileCalls = () => mocks.rpc.mock.calls.filter((c) => c[0] === 'my_profile').length
+    const before = profileCalls()
+    // 관리자가 승인을 취소했다
+    mocks.profile = { ...approved, status: 'rejected' }
+    const { play, ApiError } = await import('../../lib/api.ts')
+    await expect(play({ action: 'open', item_id: 'x' })).rejects.toBeInstanceOf(ApiError)
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/welcome?redirect=%2F'))
+    expect(profileCalls()).toBe(before + 1)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
