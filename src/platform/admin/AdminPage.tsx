@@ -271,7 +271,7 @@ function BankSection() {
                   <strong>{g.manifest.name}</strong>
                   <span className="muted">{n === undefined ? '불러오는 중…' : `남은 문제 ${n}개`}</span>
                   {n !== undefined && n < BANK_WARN_BELOW && (
-                    <p className="form-error">문제가 얼마 남지 않았어요. 새 문제를 올려 주세요</p>
+                    <p className="form-error" role="status">문제가 얼마 남지 않았어요. 새 문제를 올려 주세요</p>
                   )}
                 </li>
               )

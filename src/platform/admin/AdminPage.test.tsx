@@ -126,19 +126,24 @@ test('upload_json_file_reports_added_and_skipped', async () => {
 test('invalid_json_shows_error_without_calling_rpc', async () => {
   renderPage()
   await screen.findByText('alice')
-  upload('{ not json')
-  expect((await screen.findByText(/JSON/)).textContent).toBeTruthy()
-  upload(JSON.stringify([{ puzzle_key: '', puzzle: {} }]))
-  await waitFor(() => expect(screen.getAllByText(/형식/).length).toBeGreaterThan(0))
-  upload(JSON.stringify([{ puzzle_key: 'x', puzzle: 5 }]))
-  await waitFor(() => expect(screen.getAllByText(/형식/).length).toBeGreaterThan(0))
-  expect(rpcMock.mock.calls.some((c) => c[0] === 'admin_upload_puzzles')).toBe(false)
+  const cases: [string, string][] = [
+    ['{ not json', 'JSON 형식이 올바르지 않아요'],
+    [JSON.stringify([{ puzzle: {} }]), '1번째 문제의 형식이 올바르지 않아요'],
+    [JSON.stringify([{ puzzle_key: 'ok', puzzle: {} }, { puzzle_key: 'x', puzzle: 5 }]), '2번째 문제의 형식이 올바르지 않아요'],
+  ]
+  for (const [content, message] of cases) {
+    upload(content)
+    const alert = await screen.findByRole('alert')
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message))
+    expect(alert).toBeTruthy()
+    expect(rpcMock.mock.calls.some((c) => c[0] === 'admin_upload_puzzles')).toBe(false)
+  }
 })
 
 test('bank_under_30_shows_warning', async () => {
   bank = [{ game_id: 'players', remaining: 29 }]
   renderPage()
-  expect(await screen.findByText(/문제가 얼마 남지 않았어요/)).toBeTruthy()
+  expect((await screen.findByText(/문제가 얼마 남지 않았어요/)).getAttribute('role')).toBe('status')
 })
 
 test('bank_30_or_more_has_no_warning', async () => {
