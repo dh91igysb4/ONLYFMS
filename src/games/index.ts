@@ -1,4 +1,4 @@
-import type { GameModule } from './types.ts'
+import type { DuelModule, GameModule } from './types.ts'
 import { manifest as numberGuessManifest } from './number-guess/manifest.ts'
 import { logic as numberGuessLogic } from './number-guess/logic.ts'
 import { manifest as whoAreYaManifest } from './who-are-ya/manifest.ts'
@@ -12,4 +12,11 @@ export const games: GameModule[] = [
 
 export function getGame(id: string): GameModule | undefined {
   return games.find((g) => g.manifest.id === id)
+}
+
+/** 대전 게임 등록부. 솔로 `games`와 분리한다 (play Edge Function은 games만 본다). */
+export const duels: DuelModule[] = []
+
+export function getDuel(id: string): DuelModule | undefined {
+  return duels.find((d) => d.manifest.id === id)
 }
