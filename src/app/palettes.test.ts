@@ -56,6 +56,34 @@ describe('palettes', () => {
     }
   });
 
+  it('light_surfaces_have_visible_edges', () => {
+    for (const id of PALETTE_IDS) {
+      const t = PALETTES[id].light;
+      for (const bgName of ['bg', 'panel'] as const) {
+        const v = contrast(t.line, t[bgName]);
+        expect(v, `${id}/light/line on ${bgName}: ${v.toFixed(2)}`).toBeGreaterThanOrEqual(1.5);
+      }
+      expect(t.edge, `${id}/light/edge`).toBe(t.line);
+      // 강조 채움 버튼은 채움색이나 테두리 중 하나가 배경과 3:1 이상 구분돼야 한다
+      const fill = Math.max(contrast(t.lime, t.bg), contrast(t.accentEdge, t.bg));
+      expect(fill, `${id}/light/accent fill or edge on bg: ${fill.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+      // 등번호 셔츠가 결과 타일 위에서 보여야 한다
+      expect(contrast(t.shirtHit, t.hit), `${id}/light/shirtHit on hit`).toBeGreaterThanOrEqual(2);
+      expect(contrast(t.shirtMiss, t.miss), `${id}/light/shirtMiss on miss`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('dark_edges_are_invisible', () => {
+    // 다크는 기존 화면과 픽셀 동일: inset 테두리 색이 자기 채움색과 같고 구분선은 패널색 그대로
+    for (const id of PALETTE_IDS) {
+      const t = PALETTES[id].dark;
+      expect(t.edge, `${id}/dark/edge`).toBe(t.panel);
+      expect(t.line, `${id}/dark/line`).toBe(t.panel);
+      expect(t.accentEdge, `${id}/dark/accentEdge`).toBe(t.lime);
+      expect([t.shirtHit, t.shirtMiss]).toEqual(['#3f9a4c', '#6b7689']);
+    }
+  });
+
   it('classic_dark_matches_theme_css', () => {
     const root = /:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
     const vars: Record<string, string> = {};
