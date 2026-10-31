@@ -143,6 +143,7 @@ body {
 .reveal { margin: 0; font-size: 12px; color: var(--muted); white-space: pre-wrap; }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--panel); }
+.list-row.me { outline: 1px solid var(--lime); color: var(--lime); font-weight: 700; }
 .table tr.me td { color: var(--lime); font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 4px; border: 0; padding: 0; margin: 0; }
 .field legend { padding: 0; margin-bottom: 4px; }

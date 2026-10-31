@@ -3,23 +3,25 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { duels } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
-import { normalizeHandle } from '../auth/WelcomePage.tsx'
+import { normalizeHandle } from '../../shared/handle.ts'
 import { duelRate } from '../leaderboard/duelFormat.ts'
 
 type Wdl = { w: number; d: number; l: number; rate: number | null }
 type Recent = {
   id: string; opponent_handle: string | null; result: 'win' | 'draw' | 'loss'
-  rated: boolean; ended_at: string; my_score: number; opp_score: number
+  rated: boolean; ended_at: string; my_score: number | null; opp_score: number | null
 }
 type GameStat = { game_id: string; rating: number; rated: Wdl; all: Wdl; recent: Recent[] }
 type H2h = {
   games: { game_id: string; a_wins: number; draws: number; b_wins: number }[]
-  recent: { id: string; game_id: string; result: 'win' | 'draw' | 'loss'; rated: boolean; ended_at: string; a_score: number; b_score: number }[]
+  recent: { id: string; game_id: string; result: 'win' | 'draw' | 'loss'; rated: boolean; ended_at: string; a_score: number | null; b_score: number | null }[]
 }
 
 const gameName = (id: string) => duels.find((d) => d.manifest.id === id)?.manifest.name ?? id
 const RESULT = { win: '승', draw: '무', loss: '패' }
 const wdlText = (w: number, d: number, l: number) => `${w}승 ${d}무 ${l}패`
+/** 점수가 둘 다 있을 때만 (기권 등은 점수 없음) */
+const scoreText = (x: number | null, y: number | null) => (x !== null && y !== null ? ` · ${x} : ${y}` : '')
 const day = (iso: string) => kstDate(Date.parse(iso))
 
 export function DuelSection({ handle }: { handle: string }) {
@@ -117,7 +119,7 @@ export function DuelSection({ handle }: { handle: string }) {
             <ul className="list" aria-label="최근 대국">
               {recent.map((r) => (
                 <li key={r.id} className="list-row">
-                  <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} · {r.my_score} : {r.opp_score} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
+                  <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} {scoreText(r.my_score, r.opp_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
                 </li>
               ))}
             </ul>
@@ -149,7 +151,7 @@ export function DuelSection({ handle }: { handle: string }) {
                 <ul className="list" aria-label="최근 상대 대국">
                   {h2hData.recent.map((r) => (
                     <li key={r.id} className="list-row">
-                      <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · {r.a_score} : {r.b_score} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
+                      <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} {scoreText(r.a_score, r.b_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
                     </li>
                   ))}
                 </ul>

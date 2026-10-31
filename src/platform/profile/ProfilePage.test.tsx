@@ -103,6 +103,18 @@ test('profile_duel_recent_filters_by_toggle', async () => {
   expect(within(recent()).getAllByRole('listitem')).toHaveLength(3)
 })
 
+test('profile_duel_resign_without_scores_hides_colon', async () => {
+  setup({
+    user_stats: emptyStats,
+    duel_stats: [{ ...duelStat, recent: [{ id: 'r1', opponent_handle: 'messi', result: 'win', rated: true, ended_at: '2026-10-31T10:00:00Z', my_score: null, opp_score: null }] }],
+  })
+  renderAt('kane')
+  await screen.findByText('1075')
+  const row = within(screen.getByRole('list', { name: '최근 대국' })).getByRole('listitem')
+  expect(row.textContent).toContain('vs messi')
+  expect(row.textContent).not.toContain(' : ')
+})
+
 test('profile_h2h_default_me_vs_them', async () => {
   setup({
     user_stats: emptyStats,

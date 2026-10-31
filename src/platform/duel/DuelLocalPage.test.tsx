@@ -16,6 +16,32 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
 
+// 옵션이 있는 가짜 대전 게임 (옵션 기본값이 init에 전달되는지 확인)
+const initSpy = vi.hoisted(() => vi.fn())
+vi.mock('../../games/index.ts', async (orig) => {
+  const real = await orig<typeof import('../../games/index.ts')>()
+  const fake = {
+    manifest: {
+      id: 'opt-fake', name: '옵션 게임', hidden: false,
+      options: [{ key: 'size', label: '크기', choices: [{ value: 's', label: 'S' }, { value: 'l', label: 'L' }], default: 'l' }],
+      duel: { turnSeconds: { choices: [60], default: 60 }, sameScreen: true },
+    },
+    logic: {
+      version: 1,
+      init: (_r: unknown, o: unknown) => { initSpy(o); return {} },
+      toMove: () => 0,
+      view: () => ({}),
+      turnNo: () => 0,
+      result: () => ({ over: false }),
+    },
+  }
+  return { ...real, getDuel: (id: string) => (id === 'opt-fake' ? fake : real.getDuel(id)) }
+})
+vi.mock('../../games/ui.ts', async (orig) => {
+  const real = await orig<typeof import('../../games/ui.ts')>()
+  return { ...real, getDuelComponent: (id: string) => (id === 'opt-fake' ? () => null : real.getDuelComponent(id)) }
+})
+
 import { DuelLocalPage } from './DuelLocalPage.tsx'
 
 beforeEach(() => { duelMock.mockReset(); rpcMock.mockReset(); admin = true })
@@ -31,6 +57,12 @@ function renderLocal(game: string, rng?: () => number) {
 }
 
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }))
+
+test('local_init_uses_manifest_option_defaults', () => {
+  initSpy.mockClear()
+  renderLocal('opt-fake')
+  expect(initSpy).toHaveBeenCalledWith({ size: 'l' })
+})
 
 test('unknown_game', () => {
   renderLocal('nope')

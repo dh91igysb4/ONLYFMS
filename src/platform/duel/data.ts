@@ -142,11 +142,8 @@ export function useDuelMatch(id: string): DuelMatch {
           apply(v)
           if (e instanceof ApiError && e.code === 'version_changed') setError(duelErrorMessage(e.code))
         } else if (e instanceof ApiError) {
-          if (e.code === 'invalid_action') {
-            setError((e.body as { message?: string } | undefined)?.message ?? duelErrorMessage(e.code))
-          } else {
-            setError(duelErrorMessage(e.status >= 500 ? 'network' : e.code))
-          }
+          // 서버가 준 message는 로직 코드일 수 있어 보이지 않는다
+          setError(duelErrorMessage(e.status >= 500 ? 'network' : e.code))
           // 응답을 놓쳤거나 화면이 어긋났을 수 있으니 서버 상태로 맞춘다
           void refresh()
         } else {
@@ -180,9 +177,14 @@ export function useDuelMatch(id: string): DuelMatch {
         if (!current(g, forId)) return
         const fresh = bodyView(e)
         if (fresh) {
-          // not_due·finished 등: 받은 화면으로 맞추고, 같은 마감에는 다시 보내지 않는다
+          // not_due·finished 등: 받은 화면으로 맞춘다
           apply(fresh)
           if (e instanceof ApiError && e.code === 'version_changed') setError(duelErrorMessage(e.code))
+          if (e instanceof ApiError && e.code === 'not_due' && tickedFor.current === deadline) {
+            // 서버 시계로는 아직 마감 전: 잠시 뒤 한 번 더 (재시도 간격 안에서는 다시 보내지 않는다)
+            tickedFor.current = null
+            tickRetryAt.current = Date.now() + TICK_RETRY_MS
+          }
         } else if (tickedFor.current === deadline) {
           // 보내지 못했다(네트워크 등): 잠시 뒤 다시 보낸다
           tickedFor.current = null

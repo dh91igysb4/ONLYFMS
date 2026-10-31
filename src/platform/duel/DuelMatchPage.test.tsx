@@ -40,8 +40,9 @@ vi.mock('../../games/ui.ts', () => ({
   getDuelComponent: () =>
     boardMissing
       ? undefined
-      : (p: { onAction(a: unknown): void; toMove: number | null }) => (
+      : (p: { onAction(a: unknown): void; toMove: number | null; error?: string | null }) => (
           <div>
+            {p.error && <p role="alert">{p.error}</p>}
             <p>보드 {String(p.toMove)}</p>
             <button onClick={() => p.onAction({ type: 'roll', keep: [] })}>둔다</button>
           </div>
@@ -156,7 +157,7 @@ test('match_tick_once_per_deadline', async () => {
   expect(calls('tick')).toHaveLength(1)
 })
 
-test('match_tick: 409 not_due waits for a new deadline, silently', async () => {
+test('match_tick: 409 not_due retries once per retry window, silently', async () => {
   const deadline = new Date(Date.now() + 1000).toISOString()
   current = dv({ turn_deadline: deadline, to_move: 1 })
   duelMock.mockImplementation(async (b: { action: string }) => {
@@ -168,15 +169,27 @@ test('match_tick: 409 not_due waits for a new deadline, silently', async () => {
   await flush()
   await advance(2000)
   expect(calls('tick')).toHaveLength(1)
-  await advance(20_000)
-  expect(calls('tick')).toHaveLength(1)
-  expect(screen.queryByRole('alert')).toBeNull()
-
-  // 마감이 바뀌고 그 마감도 지나면 다시 한 번
-  current = dv({ turn_deadline: new Date(Date.now() + 3000).toISOString(), to_move: 1, action_no: 2 })
-  await advance(5000)
+  // 재시도 간격(5초) 안에서는 더 보내지 않는다
   await advance(3000)
+  expect(calls('tick')).toHaveLength(1)
+  // 간격이 지나면 정확히 한 번 더
+  await advance(2500)
   expect(calls('tick')).toHaveLength(2)
+  await advance(2000)
+  expect(calls('tick')).toHaveLength(2)
+  expect(screen.queryByRole('alert')).toBeNull()
+})
+
+test('move: invalid_action shows the Korean message, never the raw logic code', async () => {
+  renderAt()
+  await flush()
+  duelMock.mockImplementationOnce(async () => {
+    throw new ApiError('invalid_action', 400, { error: 'invalid_action', message: 'bad_pick' })
+  })
+  fireEvent.click(screen.getByRole('button', { name: '둔다' }))
+  await flush()
+  expect(screen.getByRole('alert').textContent).toBe('할 수 없는 행동이에요')
+  expect(screen.queryByText(/bad_pick/)).toBeNull()
 })
 
 test('match_polls_without_realtime', async () => {

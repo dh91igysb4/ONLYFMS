@@ -412,6 +412,7 @@ async function runTimeouts(tx: Tx, deps: DuelDeps, m: MatchRow, logic: Logic, no
     m.turn_no = turnNo
     m.timeouts = [...m.timeouts]
     m.timeouts[t.seat] += 1
+    // 연속 두 번째 시간 초과는 마지막 턴이어도 기권패로 끝낸다 (설계 §4.4 순서: 시간 초과 누적 판정이 정상 종료보다 먼저)
     if (m.timeouts[t.seat] >= 2) {
       finish(m, t.seat === 0 ? 1 : 0, 'timeout', now)
     } else if (t.over) {
@@ -575,7 +576,7 @@ async function move(
     return { out: err(409, code, { view: await buildView(tx, m, me, logic, now) }), signal: signalOf(m) }
   }
   const seat = seatOf(m, me.id)
-  if (seat === null || logic.toMove(m.state) !== seat) {
+  if (seat === null || safe('toMove', () => logic.toMove(m.state), null) !== seat) {
     return { out: err(409, 'not_your_turn', { view: await buildView(tx, m, me, logic, now) }) }
   }
   if (expected !== m.action_no) {

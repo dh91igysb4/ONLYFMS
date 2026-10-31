@@ -21,7 +21,8 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   const mod = found && (!found.manifest.hidden || !!profile?.is_admin) ? found : undefined
   const Board = getDuelComponent(game)
   const random = useRef(rng ?? Math.random)
-  const [state, setState] = useState<unknown>(() => (mod ? mod.logic.init(random.current, {}) : null))
+  const defaults = () => Object.fromEntries((mod?.manifest.options ?? []).map((o) => [o.key, o.default]))
+  const [state, setState] = useState<unknown>(() => (mod ? mod.logic.init(random.current, defaults()) : null))
   const [passed, setPassed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [round, setRound] = useState(0)
@@ -53,7 +54,7 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   }
 
   function restart() {
-    setState(logic.init(random.current, {}))
+    setState(logic.init(random.current, defaults()))
     setPassed(false)
     setError(null)
     setRound((n) => n + 1)

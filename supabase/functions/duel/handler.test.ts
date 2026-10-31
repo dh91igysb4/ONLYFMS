@@ -73,6 +73,11 @@ const brokenLogics: Record<string, DuelLogic<CoinState, CoinAction, CoinState>> 
     apply: (s, seat, a, rng) => (a.type === 'pick' && a.n === 0 ? { state: s } : base.apply(s, seat, a, rng)),
   },
 }
+// 행동 처리 중에만 toMove가 던지는 게임 (기본 수 검사 대상이 아님)
+extra.set('coin-tomove-throws', {
+  manifest: coinManifest('coin-tomove-throws', false),
+  logic: { ...base, toMove: (s) => (s.picks[0] === 7 ? (() => { throw new Error('toMove boom') })() : base.toMove(s)) },
+})
 for (const [id, logic] of Object.entries(brokenLogics)) extra.set(id, { manifest: coinManifest(id, false), logic })
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }
 
@@ -491,6 +496,15 @@ t('invalid_payloads_400', async () => {
   const m = await row(s.id)
   assert.equal(m.action_no, 0)
   assert.deepEqual(m.moved, [false, false])
+})
+
+t('move_logic_tomove_throws_is_handled_not_500', async () => {
+  const s = await started({ game: 'coin-tomove-throws' })
+  const r1 = await move(s.first, s.id, 0, { type: 'pick', n: 7 }, T0 + 5 * SEC)
+  assert.equal(r1.status, 200, JSON.stringify(r1.body))
+  const r2 = await move(s.second, s.id, 1, { type: 'pick', n: 1 }, T0 + 6 * SEC)
+  assert.ok(r2.status >= 400 && r2.status < 500, `status ${r2.status}`)
+  assert.equal(r2.body.error, 'not_your_turn')
 })
 
 // ---------------------------------------------------------------- timeouts
