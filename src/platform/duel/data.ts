@@ -7,7 +7,7 @@ import { ApiError, duel, duelErrorMessage, type DuelView } from '../../lib/api.t
 import { supabase } from '../../lib/supabase.ts'
 import { now, syncFromView } from '../../lib/serverTime.ts'
 
-/** duel_list()의 대국 한 줄 (0012_duel.sql `_duel_item`) */
+/** duel_list()의 대국 한 줄 (20261101020100_duel.sql `_duel_item`) */
 export type DuelListItem = {
   id: string
   game_id: string

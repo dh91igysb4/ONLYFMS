@@ -17,7 +17,7 @@
 1. `src/games/<game-id>/` 폴더 생성 (id는 영문 소문자·숫자·`-`)
 2. `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx` 작성 (테스트 먼저)
 3. `src/games/index.ts` 등록부에 한 줄 추가, 화면 컴포넌트는 `src/games/ui.ts`(`getGameComponent`)에 등록 (`index.ts`에 넣지 않는다)
-4. 새 마이그레이션으로 `game_modes` 행과, 숨김 게임이면 `hidden_games` 행을 추가 (등록부 테스트 `registry.test.ts`와 일치해야 한다)
+4. 새 마이그레이션(`npx supabase@2 migration new`)으로 `game_modes` 행과, 숨김 게임이면 `hidden_games` 행을 추가 (등록부 테스트 `registry.test.ts`와 일치해야 한다)
 5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
 6. 문제없으면 `hidden`을 풀어 공개
 
@@ -56,6 +56,7 @@
 - 커밋 메시지는 `type: 내용` 형식(`feat`, `fix`, `chore`, `docs`, `test`), 한국어 가능.
 - 푸시 전에 `npm test && npm run typecheck && npm run build`.
 - DB 변경은 `supabase/migrations/` 마이그레이션 파일로만. 대시보드에서 스키마를 직접 바꾸지 않는다.
+- 새 마이그레이션은 `npx supabase@2 migration new <이름>`으로 만든다(파일 이름이 `YYYYMMDDHHMMSS_<이름>.sql` 타임스탬프). 번호(`0011_…`)를 직접 붙이지 않는다 — 두 사람이 동시에 만들어도 겹치지 않게. 이미 운영에 적용된 `0001`~`0010`은 이름을 바꾸지 않는다(이름순 정렬에서 타임스탬프보다 앞).
 
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
