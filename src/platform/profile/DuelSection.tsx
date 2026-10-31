@@ -24,7 +24,7 @@ const day = (iso: string) => kstDate(Date.parse(iso))
 export function DuelSection({ handle }: { handle: string }) {
   const { profile } = useAuth()
   const me = profile?.handle ?? ''
-  const mine = me === handle
+  const mine = !!me && me.toLowerCase() === handle.toLowerCase()
   const [stats, setStats] = useState<GameStat[] | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -124,7 +124,7 @@ export function DuelSection({ handle }: { handle: string }) {
         </>
       )}
 
-      {!error && stats && (pair || (stats.length > 0 && !meVsThem)) && (
+      {!error && stats && (pair || (opponents.length > 0 && !meVsThem)) && (
         <>
           <h4 className="section-title">상대 전적</h4>
           <label className="field">
