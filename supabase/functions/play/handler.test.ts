@@ -179,6 +179,14 @@ t('unknown_game_404', async () => {
   assert.equal(r3.body.error, 'unknown_game')
 })
 
+// 대전 게임(duels 등록부)은 솔로 play 함수가 다루지 않는다 (대전 설계 §3.1)
+t('play_rejects_duel_game', async () => {
+  const admin = await user('approved', true)
+  const r = await call(admin, { action: 'daily', game_id: 'yacht' }, T0)
+  assert.equal(r.status, 404)
+  assert.equal(r.body.error, 'unknown_game')
+})
+
 t('hidden_game_forbidden_for_non_admin', async () => {
   const u = await user()
   const admin = await user('approved', true)
