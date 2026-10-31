@@ -221,7 +221,10 @@ function view(game: GameModule, item: ItemRow, attempt: AttemptRow | undefined, 
     contest_id: item.contest_id,
     game_id: item.game_id,
     options: item.options,
-    public_state: attempt ? game.logic.publicState(attempt.state) : null,
+    // 다른 버전의 상태는 지금 로직의 publicState에 넘기지 않는다 (§4.5)
+    public_state: attempt && attempt.logic_version === game.logic.version
+      ? game.logic.publicState(attempt.state)
+      : null,
     finished: attempt?.finished ?? false,
     score: attempt ? Number(attempt.score) : null,
     action_count: attempt?.action_count ?? 0,
@@ -240,28 +243,14 @@ async function lockAttempt(tx: Tx, itemId: string, uid: string): Promise<Attempt
   return a
 }
 
-/** §4.5: 버전이 다른 진행 중 기록을 그 시점 점수로 확정(가능하면 give_up 적용) */
-async function finalizeForVersion(
-  tx: Tx,
-  game: GameModule,
-  item: ItemRow,
-  uid: string,
-  a: AttemptRow,
-  now: number,
-): Promise<AttemptRow> {
-  const ctx = ctxFor(now, item, a.started_at.getTime())
-  let state = a.state
-  let score = Number(a.score)
-  try {
-    const r = game.logic.apply(item.puzzle, structuredClone(a.state), { type: 'give_up' }, ctx)
-    if ('state' in r) state = r.state
-  } catch { /* 옛 상태를 새 로직이 못 읽으면 상태를 그대로 둔다 */ }
-  try {
-    score = normalizeScore(game.logic.score(state, ctx))
-  } catch { /* 저장된 점수 유지 */ }
+/**
+ * §4.5: 버전이 다른 진행 중 기록을 "그 시점 점수"로 확정한다. 저장된 score는 마지막 행동 때의 로직이 매긴
+ * "지금 포기했다면 받을 점수"(§4.2, §5.3)이므로 그대로 둔다. 새 버전 로직은 옛 상태에 전혀 호출하지 않는다.
+ */
+async function finalizeForVersion(tx: Tx, item: ItemRow, uid: string, now: number): Promise<AttemptRow> {
   const [row] = await tx<AttemptRow[]>`
     update public.attempts
-       set state = ${tx.json(state as never)}, score = ${score}, finished = true, finished_at = ${new Date(now)}
+       set finished = true, finished_at = ${new Date(now)}
      where item_id = ${item.id} and user_id = ${uid}
      returning state, logic_version, finished, score, action_count, started_at`
   return row
@@ -367,7 +356,7 @@ async function open(deps: Deps, reg: Registry, me: Me, itemId: string): Promise<
       attempt = await lockAttempt(tx, it.id, me.id)
     }
     if (attempt && live && !attempt.finished && attempt.logic_version !== game.logic.version) {
-      attempt = await finalizeForVersion(tx, game, it, me.id, attempt, now)
+      attempt = await finalizeForVersion(tx, it, me.id, now)
       return err(409, 'version_changed', { view: view(game, it, attempt, now) })
     }
     return out(200, view(game, it, attempt, now))
@@ -397,7 +386,7 @@ async function act(
     if (now >= it.ends_at.getTime()) return err(409, 'ended', { view: view(game, it, attempt, now) })
     if (attempt.finished) return err(409, 'finished', { view: view(game, it, attempt, now) })
     if (attempt.logic_version !== game.logic.version) {
-      const done = await finalizeForVersion(tx, game, it, me.id, attempt, now)
+      const done = await finalizeForVersion(tx, it, me.id, now)
       return err(409, 'version_changed', { view: view(game, it, done, now) })
     }
     if (expectedCount !== attempt.action_count) {

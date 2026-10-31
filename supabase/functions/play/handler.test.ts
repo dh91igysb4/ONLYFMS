@@ -36,7 +36,20 @@ const fakeHidden: GameModule = {
   manifest: { ...ngManifest, id: 'fake-hidden', name: '가짜 숨김', hidden: true },
   logic: ng,
 }
-const extra = new Map([fakeGen, fakeBank, fakeHidden].map((g) => [g.manifest.id, g]))
+// fake-ver: 버전마다 score가 다른 게임. v1은 미완료 점수 3, v2는 7이고 v2는 옛 상태를 읽으면 던진다
+const verManifest = { ...ngManifest, id: 'fake-ver', name: '가짜 버전', hidden: false }
+const fakeVerV1: GameModule = {
+  manifest: verManifest,
+  logic: { ...ng, version: 1, score: () => 3 } as GameLogic<unknown, unknown, unknown, unknown>,
+}
+const boom = () => { throw new Error('v2 logic must not touch v1 state') }
+const fakeVerV2: GameModule = {
+  manifest: verManifest,
+  logic: {
+    ...ng, version: 2, score: () => 7, apply: boom, publicState: boom, isFinished: boom, actionCount: boom,
+  } as GameLogic<unknown, unknown, unknown, unknown>,
+}
+const extra = new Map([fakeGen, fakeBank, fakeHidden, fakeVerV1].map((g) => [g.manifest.id, g]))
 const registry = { getGame: (id: string) => extra.get(id) ?? getGame(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -117,7 +130,8 @@ function t(name: string, fn: () => Promise<void>) {
 // 테스트 DB 준비: 가짜 게임 모드, 숫자 맞히기는 숨김에서 뺀다(숨김 검사는 fake-hidden으로)
 t('setup', async () => {
   await sql`insert into public.game_modes (game_id, daily, contest, free) values
-    ('fake-gen', true, true, true), ('fake-bank', false, true, true), ('fake-hidden', true, true, true)
+    ('fake-gen', true, true, true), ('fake-bank', false, true, true), ('fake-hidden', true, true, true),
+    ('fake-ver', true, true, true)
     on conflict do nothing`
   await sql`delete from public.hidden_games where game_id = 'number-guess'`
   await sql`insert into public.hidden_games (game_id) values ('fake-hidden') on conflict do nothing`
@@ -422,6 +436,42 @@ t('version_mismatch_finalizes_and_409', async () => {
   const again = await call(u, { action: 'act', item_id: c.items[0], expected_count: 1, payload: { type: 'give_up' } }, T0 + 3000)
   assert.equal(again.status, 409)
   assert.equal(again.body.error, 'finished')
+})
+
+t('version_change_keeps_stored_score_and_hides_old_state', async () => {
+  const u = await user()
+  extra.set('fake-ver', fakeVerV1)
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['fake-ver'], join: [u] })
+  const o = await call(u, { action: 'open', item_id: c.items[0] }, T0)
+  assert.equal(o.status, 200)
+  const ans = await answerOf(c.items[0])
+  const a1 = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, T0 + 1000)
+  assert.equal(a1.status, 200)
+  assert.equal(a1.body.score, 3)
+  const [before] = await sql`select state from public.attempts where item_id = ${c.items[0]} and user_id = ${u}`
+  try {
+    extra.set('fake-ver', fakeVerV2) // 규칙 변경 배포
+    const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 1, payload: { type: 'guess', value: ans } }, T0 + 2000)
+    assert.equal(r.status, 409, JSON.stringify(r.body))
+    assert.equal(r.body.error, 'version_changed')
+    const view = r.body.view as Record<string, unknown>
+    assert.equal(view.public_state, null)
+    assert.equal(view.finished, true)
+    assert.equal(view.score, 3)
+    assert.deepEqual(view.reveal, { answer: ans })
+    const [at] = await sql`select * from public.attempts where item_id = ${c.items[0]} and user_id = ${u}`
+    assert.equal(Number(at.score), 3)
+    assert.equal(at.finished, true)
+    assert.equal((at.finished_at as Date).getTime(), T0 + 2000)
+    assert.deepEqual(at.state, before.state)
+    // 이후 open도 옛 상태를 새 로직에 넘기지 않는다
+    const o2 = await call(u, { action: 'open', item_id: c.items[0] }, T0 + 3000)
+    assert.equal(o2.status, 200, JSON.stringify(o2.body))
+    assert.equal(o2.body.public_state, null)
+    assert.equal(o2.body.score, 3)
+  } finally {
+    extra.set('fake-ver', fakeVerV1)
+  }
 })
 
 t('reveal_only_when_finished_or_ended', async () => {
