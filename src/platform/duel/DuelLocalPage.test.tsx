@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -11,9 +11,14 @@ vi.mock('../../lib/api.ts', async (orig) => ({
   rpc: (...a: unknown[]) => rpcMock(...a),
 }))
 
+let admin = true
+vi.mock('../auth/AuthProvider.tsx', () => ({
+  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
+}))
+
 import { DuelLocalPage } from './DuelLocalPage.tsx'
 
-beforeEach(() => { duelMock.mockReset(); rpcMock.mockReset() })
+beforeEach(() => { duelMock.mockReset(); rpcMock.mockReset(); admin = true })
 
 function renderLocal(game: string, rng?: () => number) {
   return render(
@@ -30,6 +35,13 @@ const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('butto
 test('unknown_game', () => {
   renderLocal('nope')
   expect(screen.getByText('없는 게임이에요')).toBeTruthy()
+})
+
+test('hidden_game_admin_only', () => {
+  admin = false
+  renderLocal('yacht')
+  expect(screen.getByText('없는 게임이에요')).toBeTruthy()
+  expect(screen.queryByTestId('turn')).toBeNull()
 })
 
 test('turn_label_and_pass_hint', () => {
@@ -55,11 +67,26 @@ test('local_full_game', () => {
     fireEvent.click(cell!)
   }
   expect(screen.getByRole('region', { name: '결과' })).toBeTruthy()
-  expect(screen.getAllByText(/플레이어 1/).length).toBeGreaterThan(0)
+  expect(within(screen.getByRole('region', { name: '결과' })).getByText(/승리|무승부/)).toBeTruthy()
   expect(duelMock).not.toHaveBeenCalled()
   expect(rpcMock).not.toHaveBeenCalled()
   // 다시 하기
   click('다시 하기')
   expect(screen.queryByRole('region', { name: '결과' })).toBeNull()
   expect(screen.getByTestId('turn').textContent).toContain('플레이어 1 차례')
+})
+
+test('restart_first_roll_has_no_stale_keep', () => {
+  renderLocal('yacht', () => 0)
+  click(/^굴리기/)
+  fireEvent.click(screen.getAllByRole('button', { name: /^주사위 1/ })[0])
+  fireEvent.click(screen.getAllByRole('button').find((b) => /기록/.test(b.getAttribute('aria-label') ?? ''))!)
+  for (let turn = 1; turn < 26; turn++) {
+    click(/^굴리기/)
+    fireEvent.click(screen.getAllByRole('button').find((b) => /기록/.test(b.getAttribute('aria-label') ?? ''))!)
+  }
+  click('다시 하기')
+  click(/^굴리기/)
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(screen.getAllByRole('button', { name: /^주사위/ }).every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true)
 })

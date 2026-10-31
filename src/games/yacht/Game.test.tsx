@@ -72,6 +72,18 @@ describe('yacht Game', () => {
     for (const b of screen.getAllByRole('button', { name: /^주사위/ })) expect((b as HTMLButtonElement).disabled).toBe(true)
   })
 
+  test('first_roll_sends_empty_keep', () => {
+    const p = props(base)
+    render(<Game {...p} />)
+    fireEvent.click(screen.getByRole('button', { name: '굴리기 (0/3)' }))
+    expect(p.onAction).toHaveBeenCalledWith({ type: 'roll', keep: [] })
+  })
+
+  test('hint_shown_after_third_roll', () => {
+    render(<Game {...props({ ...base, dice: [1, 1, 2, 3, 4], rolls: 3 })} />)
+    expect(screen.getByText(/칸을 골라 기록하세요/)).toBeTruthy()
+  })
+
   test('no_rolls_left_disables_roll', () => {
     render(<Game {...props({ ...base, dice: [1, 1, 2, 3, 4], rolls: 3 })} />)
     expect((screen.getByRole('button', { name: '굴리기 (3/3)' }) as HTMLButtonElement).disabled).toBe(true)

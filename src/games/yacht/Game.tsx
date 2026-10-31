@@ -47,7 +47,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
   const v = view as YState
   const turnKey = v.sheets.reduce((n, s) => n + Object.keys(s).length, 0)
   const [keptState, setKept] = useState<{ k: number; idx: number[] }>({ k: turnKey, idx: [] })
-  const kept = keptState.k === turnKey ? keptState.idx : []
+  const kept = keptState.k === turnKey && v.rolls > 0 ? keptState.idx : []
 
   const mine = !finished && !busy && mySeat !== null && toMove === mySeat && v.seat === mySeat
   const rolled = v.rolls > 0
@@ -58,10 +58,6 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
   function toggle(i: number) {
     if (!canKeep) return
     setKept({ k: turnKey, idx: kept.includes(i) ? kept.filter((x) => x !== i) : [...kept, i].sort((a, b) => a - b) })
-  }
-
-  function send(a: YAction) {
-    onAction(a)
   }
 
   const slots = [0, 1, 2, 3, 4]
@@ -90,11 +86,11 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
         type="button"
         className="btn btn-primary yacht-roll"
         disabled={!canRoll}
-        onClick={() => send({ type: 'roll', keep: kept })}
+        onClick={() => onAction({ type: 'roll', keep: v.rolls === 0 ? [] : kept } satisfies YAction)}
       >
         굴리기 ({v.rolls}/3)
       </button>
-      {canKeep && <p className="muted yacht-hint">고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요</p>}
+      {mine && rolled && <p className="muted yacht-hint">고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <table className="yacht-sheet">
@@ -123,7 +119,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
                           className="yacht-cell"
                           aria-label={`${LABEL[c]} 칸에 ${pts}점 기록`}
                           disabled={!mine}
-                          onClick={() => send({ type: 'score', category: c })}
+                          onClick={() => onAction({ type: 'score', category: c } satisfies YAction)}
                         >
                           {pts}
                         </button>
