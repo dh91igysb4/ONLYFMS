@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { games } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
+import { DuelSection } from './DuelSection.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
 
 type Stats = {
@@ -106,6 +107,8 @@ export function ProfilePage() {
           ))}
         </ul>
       )}
+
+      <DuelSection key={handle} handle={handle} />
     </div>
   )
 }
