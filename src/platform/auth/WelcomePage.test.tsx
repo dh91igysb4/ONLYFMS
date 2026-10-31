@@ -32,7 +32,7 @@ test('client_validation_matches_regex', async () => {
   setup()
   const input = await screen.findByLabelText('아이디')
   const btn = screen.getByRole('button', { name: '아이디 정하기' })
-  fireEvent.change(input, { target: { value: 'ab' } })
+  fireEvent.change(input, { target: { value: 'a' } })
   expect(btn).toBeDisabled()
   fireEvent.change(input, { target: { value: '' } })
   fireEvent.change(input, { target: { value: ' Kane ' } })
@@ -74,4 +74,29 @@ test('rejected_message', async () => {
   setAuth({ ...noHandle, handle: 'kane', status: 'rejected' })
   setup()
   expect(await screen.findByText(/승인되지 않았어요/)).toBeInTheDocument()
+})
+
+test('hangul_handle_validation', async () => {
+  setAuth(noHandle)
+  setup()
+  const input = await screen.findByLabelText('아이디')
+  const btn = screen.getByRole('button', { name: '아이디 정하기' })
+  for (const ok of ['손흥민', '승주', 'kane_케인9']) {
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.change(input, { target: { value: ok } })
+    expect(btn).toBeEnabled()
+  }
+  for (const bad of ['ㅋㅋㅋ', '손', '손 흥민', '가나다라마바사아자차카타파하가나다']) {
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.change(input, { target: { value: bad } })
+    expect(btn).toBeDisabled()
+  }
+})
+
+test('submits_nfc_normalized_hangul', async () => {
+  setAuth(noHandle)
+  setup()
+  fireEvent.change(await screen.findByLabelText('아이디'), { target: { value: ' 손흥민'.normalize('NFD') } })
+  fireEvent.click(screen.getByRole('button', { name: '아이디 정하기' }))
+  await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith('set_handle', { new_handle: '손흥민' }))
 })

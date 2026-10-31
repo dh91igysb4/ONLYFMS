@@ -7,8 +7,9 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
 import { Brand } from '../layout/Brand.tsx'
 
-export const HANDLE_RE = /^[a-z0-9_]{3,16}$/
-export const normalizeHandle = (s: string) => s.trim().toLowerCase()
+// 서버(0009_hangul_handle)와 같은 규칙: 영문 소문자·숫자·_·완성형 한글, 2~16자, NFC로 저장
+export const HANDLE_RE = /^[a-z0-9_가-힣]{2,16}$/
+export const normalizeHandle = (s: string) => s.trim().normalize('NFC').toLowerCase()
 
 export function WelcomePage() {
   const { session, profile, loading, error: loadError, refresh } = useAuth()
@@ -67,7 +68,7 @@ export function WelcomePage() {
             maxLength={40}
           />
           {input.trim() !== '' && <p className="muted">저장될 아이디: {normalized}</p>}
-          <p className="muted">영문 소문자, 숫자, _ 로 3~16자 (한 번 정하면 바꿀 수 없어요)</p>
+          <p className="muted">한글, 영문 소문자, 숫자, _ 로 2~16자 (한 번 정하면 바꿀 수 없어요)</p>
           <button className="btn btn-primary" type="submit" disabled={!valid || busy}>아이디 정하기</button>
           {error && <p role="alert" className="form-error">{error}</p>}
         </form>
