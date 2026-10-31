@@ -40,6 +40,8 @@ describe('palettes', () => {
         }
         const v = contrast(t.onAccent, t.lime);
         expect(v, `${id}/${mode}/onAccent on lime: ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+        const live = contrast(t.onLive, t.liveBg);
+        expect(live, `${id}/${mode}/onLive on liveBg: ${live.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
