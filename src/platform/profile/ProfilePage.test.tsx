@@ -62,3 +62,15 @@ test('settings_only_on_own_profile', async () => {
   await other.findByRole('heading', { name: 'other' })
   expect(other.queryByRole('heading', { name: '화면 설정' })).toBeNull()
 })
+
+test('hangul_handle_in_url', async () => {
+  rpcMock.mockResolvedValue(null)
+  renderAt('손흥민')
+  await screen.findByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+  rpcMock.mockReset()
+  rpcMock.mockResolvedValue(null)
+  renderAt(encodeURIComponent('손흥민'))
+  await screen.findAllByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+})
