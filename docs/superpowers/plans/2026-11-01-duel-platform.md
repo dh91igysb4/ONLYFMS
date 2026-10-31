@@ -21,7 +21,7 @@
 - 시각은 서버 시계만 쓴다. 브라우저 시각은 남은 시간 표시에만 쓰고, `src/lib/serverTime.ts`로 보정한다.
 - `duel_matches.state`는 브라우저가 어떤 경로로도 읽을 수 없다. 브라우저에는 `logic.view` 결과만 간다.
 - Elo: 시작 1000, `E = 1/(1+10^((Rb−Ra)/400))`, `Δ = round(K × (S − E))`, K = `rated_games < 10`이면 40 아니면 20. 랭크 5판 미만은 순위에서 빼고 "배치 중".
-- 시간 초과: 게임의 `timeoutActions`를 서버가 적용, 좌석별 연속 초과 2회면 상대 승(`end_reason = 'timeout'`). 시간 초과로 넘어간 턴의 새 마감 = 이전 마감 + `turn_seconds`.
+- 시간 초과: 게임의 `timeoutAction`을 턴이 넘어갈 때까지 서버가 반복 적용, 좌석별 연속 초과 2회면 상대 승(`end_reason = 'timeout'`). 시간 초과로 넘어간 턴의 새 마감 = 이전 마감 + `turn_seconds`.
 - 무효: 어느 한쪽이라도 첫 행동 전에 대국이 끝나거나, 진행 중 대국의 `logic_version`이 현재와 다르면 `status = 'void'`, Elo·전적 미반영.
 - 대기 대국: 1인당 동시 3개, 10분 무참가 시 자동 무효.
 - 요트 턴 시간 선택지 [30, 60, 90], 기본 60.
@@ -50,7 +50,7 @@
 - Produces (in `src/games/types.ts`):
   - `type Seat = 0 | 1`
   - `type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number] }`
-  - `interface DuelLogic<State, Action, View> { version: number; init(rng: () => number, options: Record<string, string>): State; toMove(state: State): Seat; apply(state: State, seat: Seat, action: Action, rng: () => number): { state: State } | { error: string }; timeoutActions(state: State, rng: () => number): Action[]; turnNo(state: State): number; result(state: State): DuelResult; view(state: State, viewer: Seat | null): View }`
+  - `interface DuelLogic<State, Action, View> { version: number; init(rng: () => number, options: Record<string, string>): State; toMove(state: State): Seat; apply(state: State, seat: Seat, action: Action, rng: () => number): { state: State } | { error: string }; timeoutAction(state: State): Action; turnNo(state: State): number; result(state: State): DuelResult; view(state: State, viewer: Seat | null): View }`
   - `Manifest`에 선택 필드 `category?: 'solo' | 'duel'`, `duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }`
   - `type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }`
 - Produces (in `src/games/index.ts`): `export const duels: DuelModule[]` (이 Task에서는 빈 배열), `export function getDuel(id: string): DuelModule | undefined`
@@ -106,7 +106,7 @@
   - `turn_flow`: `score` 뒤 `seat`가 바뀌고 `dice=[]`, `rolls=0`; 차례 아닌 좌석의 행동은 오류; 이미 찬 칸·`allowed`에 없는 칸 오류.
   - `same_seed_same_dice`: 같은 시드·같은 행동열 → 같은 주사위.
   - `game_end`: 26번 `score` 뒤 `result.over`; 총점 큰 쪽 승, 같으면 `winner: null`; `scores`가 `total` 값과 같음; 끝난 뒤 행동 오류.
-  - `timeout_actions`: 안 굴린 상태 → `[{roll, keep: []}, {score: 최고점 칸}]`; 굴린 상태 → `[{score: 최고점 칸}]`; 동점이면 `CATEGORIES` 순서상 앞 칸; 조커 상황에서는 `allowed` 안에서만 고름; 반환 행동을 차례로 `apply`하면 턴이 넘어감.
+  - `timeout_action`: 안 굴린 상태 → `{roll, keep: []}`; 굴린 상태 → `{score: 최고점 칸}`; 동점이면 `CATEGORIES` 순서상 앞 칸; 조커 상황에서는 `allowed` 안에서만 고름; `timeoutAction`을 적용하고 다시 부르기를 반복하면 2번 안에 턴이 넘어감(rng를 매번 새로 줘도 항상 합법).
   - `turn_no`: 시작 0, 칸 하나 채우면 1.
 - [ ] **Step 5: 실패 확인 → `logic.ts`, `manifest.ts` 구현, `index.ts`의 `duels`에 등록 → 통과 확인** — `npx vitest run src/games && npm run typecheck`.
 - [ ] **Step 6: 커밋** — `feat: 요트 다이스 규칙과 점수`
@@ -173,7 +173,7 @@
 - 핵심 규칙:
   - 난수: `rngFromSeed(await hmacSeed(secret, \`duel:${matchId}:${actionNo}\`))`, `actionNo`는 적용 직전 `action_no`. 선공 결정은 `actionNo = -1` 시드의 첫 값 < 0.5면 참가자가 선공.
   - `move`: 잠금 → 상태 `active` 아니면 409 `finished`/`not_waiting` → 로직 버전 다르면 void 처리 후 409 `version_changed` → 마감 지났으면 먼저 시간 초과 처리(아래)를 하고 409 `stale` → 좌석 확인 409 `not_your_turn` → `expected_action_no` 불일치 409 `stale` → `apply`(예외는 로그 후 400) → `duel_moves` 기록, `moved[seat] = true`, `turnNo`가 바뀌었으면 `timeouts[seat] = 0`, 새 마감 = now + turn_seconds → `result.over`면 `finished`/`normal`, `final_scores`, `_duel_apply_elo` → 커밋 → `broadcast`.
-  - `tick`: 잠금 → 마감 안 지났으면 409 `not_due` + view → 지난 턴마다: `timeoutActions` 적용(`auto = true`), `timeouts[seat] += 1`, 2면 상대 승 `timeout` 종료, 아니면 새 마감 = 이전 마감 + turn_seconds; 새 마감도 지났으면 반복.
+  - `tick`: 잠금 → 마감 안 지났으면 409 `not_due` + view → 지난 턴마다: `timeoutAction` 적용 후 다시 부르기를 `turnNo`가 바뀔 때까지(최대 8회, 매번 `rng(action_no)`) 반복(`auto = true`), `timeouts[seat] += 1`, 2면 상대 승 `timeout` 종료, 아니면 새 마감 = 이전 마감 + turn_seconds; 새 마감도 지났으면 반복.
   - 종료 시 무효 판정: `moved`에 false가 있으면 `void`(Elo 안 부름). 기권(`resign`)·시간 초과 종료 모두 적용.
   - 브로드캐스트 실패는 로그만, 응답은 정상.
   - `index.ts`: `broadcast`는 `fetch(\`${SUPABASE_URL}/realtime/v1/api/broadcast\`, { method: 'POST', headers: { apikey: KEY, authorization: \`Bearer ${KEY}\`, 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ topic: \`duel:${id}\`, event: 'update', payload }] }) })`. `KEY`는 `SUPABASE_SERVICE_ROLE_KEY`, 없으면 `SUPABASE_SECRET_KEYS`(JSON 사전의 `default` 또는 첫 값). 어느 키가 받아들여지는지는 배포 체크리스트에서 원격 확인(Task 8).
