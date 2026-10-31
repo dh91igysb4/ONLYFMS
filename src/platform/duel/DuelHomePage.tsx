@@ -182,6 +182,18 @@ export function DuelHomePage() {
       {/* 관리자 프로필이 늦게 오면 보이는 게임이 바뀌므로 기본값을 다시 잡는다 */}
       <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
 
+      {visible.some((m) => m.duel?.sameScreen) && (
+        <section className="card" aria-label="같은 화면">
+          <h3 className="card-title">같은 화면으로 둘이서</h3>
+          <p className="muted">한 기기를 번갈아 쓰는 대결이에요. 기록과 레이팅은 남지 않아요</p>
+          <div className="card-actions">
+            {visible.filter((m) => m.duel?.sameScreen).map((m) => (
+              <Link key={m.id} className="btn btn-ghost" to={`/duel/local/${m.id}`}>{m.name} 시작</Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {error && <p className="form-error" role="alert">{error}</p>}
       {!error && list === null && <p className="page-note" role="status">불러오는 중…</p>}
       {list && (

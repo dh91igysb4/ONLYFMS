@@ -3,6 +3,7 @@
 import type { ComponentType } from 'react'
 import { Game as NumberGuessGame } from './number-guess/Game.tsx'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
+import { Game as YachtGame } from './yacht/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
 export type GameProps = {
@@ -42,7 +43,9 @@ export type DuelGameProps = {
 }
 
 /** 대전 게임 화면 등록부. 새 대전 게임 화면을 여기에 한 줄씩 등록한다. */
-const duelComponents: Record<string, ComponentType<DuelGameProps>> = {}
+const duelComponents: Record<string, ComponentType<DuelGameProps>> = {
+  yacht: YachtGame,
+}
 
 export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
   return duelComponents[id]

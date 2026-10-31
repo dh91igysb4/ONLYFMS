@@ -86,6 +86,20 @@ test('home_create_form: hidden duel games are admin only', async () => {
   expect(screen.getByText('아직 열린 대전 게임이 없어요')).toBeInTheDocument()
 })
 
+test('home_local_start: sameScreen games only, hidden ones admin only', async () => {
+  renderHome()
+  await flush()
+  fireEvent.click(screen.getByRole('link', { name: /요트 다이스 시작/ }))
+  expect(screen.getByTestId('where')).toHaveTextContent('/duel/local/yacht')
+})
+
+test('home_local_start: hidden from non-admin', async () => {
+  admin = false
+  renderHome()
+  await flush()
+  expect(screen.queryByRole('link', { name: /시작/ })).toBeNull()
+})
+
 test('home_create_form: server error is shown', async () => {
   const { ApiError } = await import('../../lib/api.ts')
   duelMock.mockRejectedValue(new ApiError('too_many_waiting', 409, { error: 'too_many_waiting' }))
