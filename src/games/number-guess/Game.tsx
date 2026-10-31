@@ -30,8 +30,7 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
   return (
     <section className="ng">
       <div className="ng-meta">
-        <span className="muted">남은 기회</span>
-        <strong aria-label="시도 횟수">{s.guesses.length} / {MAX_GUESSES}</strong>
+        <strong>남은 기회 {MAX_GUESSES - s.guesses.length}</strong>
         {remainingMs !== null && !finished && <span className="muted ng-time">⏱ {formatTime(remainingMs)}</span>}
       </div>
 

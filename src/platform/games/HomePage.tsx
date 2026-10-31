@@ -4,7 +4,6 @@ import { rpc } from '../../lib/api.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { games } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
-import { flush, flushOnOnline } from './freeQueue.ts'
 import { UpcomingContests } from './UpcomingContests.tsx'
 
 type DailyRow = { user_id: string; score: number }
@@ -21,11 +20,6 @@ export function HomePage() {
   const { profile } = useAuth()
   const visible = games.filter((g) => !g.manifest.hidden || profile?.is_admin)
   const [status, setStatus] = useState<Record<string, Status>>({})
-
-  useEffect(() => {
-    void flush()
-    return flushOnOnline()
-  }, [])
 
   useEffect(() => {
     let alive = true

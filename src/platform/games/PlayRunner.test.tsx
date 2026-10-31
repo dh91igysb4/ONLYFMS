@@ -40,7 +40,7 @@ beforeEach(() => {
 test('server_mode_sends_expected_count', async () => {
   playMock.mockResolvedValueOnce(view({ action_count: 2, public_state: stateWith([10, 20], ['up', 'up']) }))
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('2 / 8')
+  await screen.findByText('남은 기회 6')
   expect(playMock).toHaveBeenCalledWith({ action: 'open', item_id: 'it1' })
   playMock.mockResolvedValueOnce(view({ action_count: 3, public_state: stateWith([10, 20, 30], ['up', 'up', 'down']) }))
   guess(30)
@@ -48,7 +48,7 @@ test('server_mode_sends_expected_count', async () => {
   expect(playMock).toHaveBeenLastCalledWith({
     action: 'act', item_id: 'it1', expected_count: 2, payload: { type: 'guess', value: 30 },
   })
-  await screen.findByText('3 / 8')
+  await screen.findByText('남은 기회 5')
 })
 
 test('double click sends only one act while busy', async () => {
@@ -68,25 +68,25 @@ test('double click sends only one act while busy', async () => {
 test('stale_409_replaces_state_with_server_view', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   const fresh = view({ action_count: 2, public_state: stateWith([40, 60], ['up', 'down']) })
   playMock.mockRejectedValueOnce(new ApiError('stale', 409, { error: 'stale', view: fresh }))
   guess(50)
-  await screen.findByText('2 / 8')
+  await screen.findByText('남은 기회 6')
   expect(screen.getByText('다른 화면에서 진행된 내용으로 갱신했어요')).toBeInTheDocument()
 })
 
 test('network_error_shows_retry_and_does_not_advance', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   playMock.mockRejectedValueOnce(new ApiError('network', 0))
   guess(50)
   const retry = await screen.findByRole('button', { name: '다시 시도' })
-  expect(screen.getByText('0 / 8')).toBeInTheDocument()
+  expect(screen.getByText('남은 기회 8')).toBeInTheDocument()
   playMock.mockResolvedValueOnce(view({ action_count: 1, public_state: stateWith([50], ['up']) }))
   fireEvent.click(retry)
-  await screen.findByText('1 / 8')
+  await screen.findByText('남은 기회 7')
   // 재시도는 같은 expected_count로 보낸다
   expect(playMock.mock.calls[2][0]).toMatchObject({ action: 'act', expected_count: 0, payload: { type: 'guess', value: 50 } })
   expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull()
@@ -96,7 +96,7 @@ test('ended_409_navigates_to_results', async () => {
   const onEnded = vi.fn()
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" onEnded={onEnded} />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   playMock.mockRejectedValueOnce(new ApiError('ended', 409, { error: 'ended' }))
   guess(50)
   await waitFor(() => expect(onEnded).toHaveBeenCalled())
@@ -105,7 +105,7 @@ test('ended_409_navigates_to_results', async () => {
 test('ended_409_without_handler_reopens_the_item', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   playMock.mockRejectedValueOnce(new ApiError('ended', 409, { error: 'ended' }))
   playMock.mockResolvedValueOnce(view({ finished: true, score: 0, reveal: { answer: 77 }, public_state: stateWith([1], ['up']) }))
   guess(50)
@@ -116,7 +116,7 @@ test('ended_409_without_handler_reopens_the_item', async () => {
 test('version_changed_409_shows_notice', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   const done = view({ finished: true, score: 3, public_state: null, action_count: 3 })
   playMock.mockRejectedValueOnce(new ApiError('version_changed', 409, { error: 'version_changed', view: done }))
   guess(50)
@@ -127,17 +127,17 @@ test('version_changed_409_shows_notice', async () => {
 test('invalid_action_shows_message_without_changing_state', async () => {
   playMock.mockResolvedValueOnce(view())
   render(<PlayRunner mode="server" itemId="it1" />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   playMock.mockRejectedValueOnce(new ApiError('invalid_action', 400, { error: 'invalid_action', message: '이미 낸 숫자예요' }))
   guess(50)
   await screen.findByText('이미 낸 숫자예요')
-  expect(screen.getByText('0 / 8')).toBeInTheDocument()
+  expect(screen.getByText('남은 기회 8')).toBeInTheDocument()
 })
 
 test('local_mode_submits_free_play_on_finish', async () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.49) // 정답 50
   render(<PlayRunner mode="local" gameId="number-guess" options={{ range: '100' }} />)
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   guess(50)
   await screen.findByText(/정답은 50/)
   expect(submitMock).toHaveBeenCalledTimes(1)

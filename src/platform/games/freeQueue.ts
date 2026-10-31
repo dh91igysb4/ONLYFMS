@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { supabase } from '../../lib/supabase.ts'
 
 // 자유 플레이 기록 대기열 (설계 §11). 저장에 실패하면 localStorage에 보관했다가 다시 보낸다.
@@ -72,12 +73,13 @@ async function doFlush(): Promise<void> {
 }
 
 export function flush(): Promise<void> {
-  if (!inFlight) {
-    inFlight = doFlush().finally(() => {
-      inFlight = null
-    })
-  }
-  return inFlight
+  // 이미 보내는 중이면 끝난 뒤 한 번 더 돈다. 그사이 쌓인 행이 다음 접속까지 남지 않게 한다.
+  if (inFlight) return inFlight.then(() => flush())
+  const p = doFlush().finally(() => {
+    if (inFlight === p) inFlight = null
+  })
+  inFlight = p
+  return p
 }
 
 export async function submit(row: FreePlayRow): Promise<void> {
@@ -91,6 +93,14 @@ export function flushOnOnline(): () => void {
   const h = () => void flush()
   window.addEventListener('online', h)
   return () => window.removeEventListener('online', h)
+}
+
+/** 앱 어디에 있든 시작할 때와 온라인 복귀 때 대기열을 비운다. 레이아웃에서 한 번 쓴다. */
+export function useFreeQueueFlush(): void {
+  useEffect(() => {
+    void flush()
+    return flushOnOnline()
+  }, [])
 }
 
 /** 테스트용 */

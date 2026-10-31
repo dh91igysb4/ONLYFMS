@@ -60,7 +60,7 @@ test('daily page asks for the daily item then opens it', async () => {
       <Routes><Route path="/play/:game/daily" element={<DailyPage />} /></Routes>
     </MemoryRouter>,
   )
-  await screen.findByText('0 / 8')
+  await screen.findByText('남은 기회 8')
   expect(playMock).toHaveBeenNthCalledWith(1, { action: 'daily', game_id: 'number-guess' })
   expect(playMock).toHaveBeenNthCalledWith(2, { action: 'open', item_id: 'it9' })
 })

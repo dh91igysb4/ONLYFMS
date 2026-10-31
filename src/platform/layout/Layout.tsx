@@ -1,9 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { supabase } from '../../lib/supabase.ts'
+import { useFreeQueueFlush } from '../games/freeQueue.ts'
 
 export function Layout() {
   const { profile } = useAuth()
+  useFreeQueueFlush()
   return (
     <div className="layout">
       <header className="app-header">
