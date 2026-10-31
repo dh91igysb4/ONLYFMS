@@ -53,6 +53,9 @@ const MESSAGES: Record<string, string> = {
   official_forbidden: '공식 대회는 관리자만 만들 수 있어요',
   not_editable: '지금은 고치거나 취소할 수 없어요',
   invite_required: '초대 링크로만 참가할 수 있어요',
+  user_not_found: '없는 사용자예요',
+  invalid_status: '잘못된 상태예요',
+  cannot_change_self: '자기 자신은 바꿀 수 없어요',
   contest_closed: '이미 끝났거나 취소된 대회예요',
 }
 
