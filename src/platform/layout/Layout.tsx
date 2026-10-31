@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useFreeQueueFlush } from '../games/freeQueue.ts'
+import { Brand } from './Brand.tsx'
 
 export function Layout() {
   const { profile } = useAuth()
@@ -10,7 +11,7 @@ export function Layout() {
     <div className="layout">
       <header className="app-header">
         <div className="header-row">
-          <h1 className="app-title">ONLYFMS</h1>
+          <Brand />
           <div className="header-user">
             <span className="muted">{profile?.handle}</span>
             <button className="btn btn-ghost" onClick={() => void supabase.auth.signOut()}>로그아웃</button>

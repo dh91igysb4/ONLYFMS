@@ -5,6 +5,7 @@ import { Loading, ProfileRetry } from './Guard.tsx'
 import { safeRedirect } from './redirect.ts'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
+import { Brand } from '../layout/Brand.tsx'
 
 export const HANDLE_RE = /^[a-z0-9_]{3,16}$/
 export const normalizeHandle = (s: string) => s.trim().toLowerCase()
@@ -52,7 +53,7 @@ export function WelcomePage() {
   if (!profile?.handle) {
     return (
       <main className="auth-page">
-        <h1 className="app-title">ONLYFMS</h1>
+        <Brand />
         <h2>아이디를 정해 주세요</h2>
         <form onSubmit={submit} className="stack">
           <label htmlFor="handle">아이디</label>
@@ -77,7 +78,7 @@ export function WelcomePage() {
 
   return (
     <main className="auth-page">
-      <h1 className="app-title">ONLYFMS</h1>
+      <Brand />
       {profile.status === 'rejected' ? (
         <p>가입이 승인되지 않았어요. 문의는 관리자에게 해 주세요.</p>
       ) : (
