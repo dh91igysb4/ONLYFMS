@@ -34,7 +34,7 @@
 2. `python3 scripts/build-wya-data.py` → `src/games/who-are-ya/data.ts` 재생성 (직접 고치지 않는다).
 3. 출제 풀·판정이 바뀌므로 `src/games/who-are-ya/logic.ts`의 `logic.version`을 올린다.
 4. `npm test && npm run typecheck && npm run build` 후 PR → 진행 중 데일리가 적은 새벽(KST)에 배포.
-5. `play` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy play`, `docs/deploy-checklist.md` §3). 함수가 data.ts를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다.
+5. `play` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy play --no-verify-jwt`, `docs/deploy-checklist.md` §3). 함수가 data.ts를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다.
 
 ## 배포
 - 원격 배포 절차(DB push, 함수, Vercel, 첫 관리자, 수동 확인, 머지)는 `docs/deploy-checklist.md`를 따른다.
