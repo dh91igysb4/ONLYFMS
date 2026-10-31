@@ -14,7 +14,7 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
 }))
 vi.mock('../../games/index.ts', () => ({
   games: [
-    { manifest: { id: 'number-guess', name: '숫자 맞추기', hidden: false } },
+    { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } },
     { manifest: { id: 'secret', name: '비밀 게임', hidden: true } },
   ],
 }))
@@ -60,8 +60,8 @@ test('game_filter_passes_game_id', async () => {
   setup()
   renderPage()
   await screen.findByText('아직 기록이 없어요')
-  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'number-guess' } })
-  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: today(), p_game: 'number-guess' }))
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'test-guess' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: today(), p_game: 'test-guess' }))
   expect(screen.queryByRole('option', { name: '비밀 게임' })).toBeNull()
 })
 
@@ -96,7 +96,7 @@ test('streak_hidden_in_total_view', async () => {
   expect(screen.queryByText('연속')).toBeNull()
   expect(screen.queryByText('최고 연속')).toBeNull()
   setup({ lb_free: [free('a', 'alpha', 10, 3, 0.3, 1, 4)] })
-  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'number-guess' } })
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'test-guess' } })
   await screen.findByText('최고 연속')
   expect(screen.getByText('연속')).toBeTruthy()
 })

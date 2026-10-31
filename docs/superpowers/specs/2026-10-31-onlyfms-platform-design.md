@@ -73,7 +73,7 @@ src/
     admin/             관리자 화면
   games/
     index.ts           게임 등록부 (게임 모듈 배열)
-    number-guess/      테스트용 게임
+    <game-id>/         게임 하나 (예: who-are-ya). 테스트 전용 숫자 맞히기는 src/test-fixtures/test-guess/ (운영 등록부·DB에 없음, 0008에서 제거)
       manifest.ts
       logic.ts         순수 함수만. 브라우저·Edge Function 공용
       logic.test.ts

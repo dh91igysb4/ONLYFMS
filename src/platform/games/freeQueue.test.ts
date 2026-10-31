@@ -8,7 +8,7 @@ vi.mock('../../lib/supabase.ts', () => ({
 import { flush, resetFreeQueue, submit, type FreePlayRow } from './freeQueue.ts'
 
 const row = (id: string): FreePlayRow => ({
-  client_id: id, user_id: 'u1', game_id: 'number-guess', options: { range: '100' },
+  client_id: id, user_id: 'u1', game_id: 'test-guess', options: { range: '100' },
   logic_version: 1, solved: true, score: 7, action_count: 4,
 })
 const stored = () => JSON.parse(localStorage.getItem('onlyfms:freeQueue') ?? '[]') as FreePlayRow[]

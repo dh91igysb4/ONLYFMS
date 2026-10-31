@@ -35,7 +35,7 @@ test('invalid form shows field errors and does not call the server', () => {
 })
 
 test('invite contest shows the join link after creation', async () => {
-  admin = true // number-guess는 숨김 게임이라 관리자만 고를 수 있다
+  admin = true // test-guess는 숨김 게임이라 관리자만 고를 수 있다
   rpcMock.mockResolvedValue([{ id: 'c9', invite_code: 'abcde12345' }])
   render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
   fireEvent.change(screen.getByLabelText('제목'), { target: { value: '테스트' } })

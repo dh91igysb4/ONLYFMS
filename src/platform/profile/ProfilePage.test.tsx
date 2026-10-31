@@ -9,7 +9,7 @@ vi.mock('../../lib/api.ts', async (orig) => ({
   rpc: (...a: unknown[]) => rpcMock(...a),
 }))
 vi.mock('../../games/index.ts', () => ({
-  games: [{ manifest: { id: 'number-guess', name: '숫자 맞추기', hidden: false } }],
+  games: [{ manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } }],
 }))
 
 import { ProfilePage } from './ProfilePage.tsx'
@@ -31,10 +31,10 @@ test('profile_not_found_message', async () => {
 
 test('profile_renders_sections', async () => {
   rpcMock.mockResolvedValue({
-    daily_by_game: [{ game_id: 'number-guess', days: 5, avg_score: 7.5 }],
+    daily_by_game: [{ game_id: 'test-guess', days: 5, avg_score: 7.5 }],
     contests: [{ contest_id: 'c1', title: '개막 대회', kind: 'official', ends_at: '2026-10-01T00:00:00Z', rank: 2, score: 18 }],
     free_by_game: [{ game_id: 'old-game', plays: 4, wins: 2, win_rate: 0.5, best_streak: 2 }],
-    recent: [{ type: 'free', game_id: 'number-guess', score: 9, at: '2026-10-30T10:00:00Z' }],
+    recent: [{ type: 'free', game_id: 'test-guess', score: 9, at: '2026-10-30T10:00:00Z' }],
   })
   renderAt('kane')
   expect(await screen.findByText('개막 대회')).toBeTruthy()

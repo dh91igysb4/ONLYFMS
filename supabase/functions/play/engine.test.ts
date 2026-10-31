@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { GameLogic } from '../../../src/games/types.ts'
-import { logic as numberGuess } from '../../../src/games/number-guess/logic.ts'
+import { logic as numberGuess } from '../../../src/test-fixtures/test-guess/logic.ts'
 import { pickFresh, step } from './engine.ts'
 
 type P = { n: number }

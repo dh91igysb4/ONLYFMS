@@ -11,7 +11,7 @@ function input(over: Partial<ContestInput> = {}): ContestInput {
     startsAt: new Date(NOW + 60 * MIN),
     durationMin: 30,
     visibility: 'public',
-    items: [{ game_id: 'number-guess', options: { range: '100' }, count: 3 }],
+    items: [{ game_id: 'test-guess', options: { range: '100' }, count: 3 }],
     official: false,
     ...over,
   }
@@ -51,7 +51,7 @@ describe('validateContest', () => {
   })
 
   test('items: total 1~10 questions, each count 1~10 integer', () => {
-    const g = (count: number) => ({ game_id: 'number-guess', options: {}, count })
+    const g = (count: number) => ({ game_id: 'test-guess', options: {}, count })
     expect(errs({ items: [] }).items).toBeTruthy()
     expect(errs({ items: [g(0)] }).items).toBeTruthy()
     expect(errs({ items: [g(1)] }).items).toBeUndefined()

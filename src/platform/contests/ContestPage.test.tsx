@@ -11,6 +11,10 @@ const dataMock = {
   getEntries: vi.fn(),
 }
 let admin = false
+vi.mock('../../games/index.ts', async (orig) =>
+  (await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
+vi.mock('../../games/ui.ts', async (orig) =>
+  (await import('../../test-fixtures/ui.ts')).withTestGameUi(await orig()))
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'x', supabaseKey: 'k' }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
@@ -43,7 +47,7 @@ function contest(over: Record<string, unknown> = {}) {
   }
 }
 const item = (position: number, over: Record<string, unknown> = {}) => ({
-  id: `it${position}`, contest_id: 'c1', position, game_id: 'number-guess', options: { range: '100' },
+  id: `it${position}`, contest_id: 'c1', position, game_id: 'test-guess', options: { range: '100' },
   puzzle: null, puzzle_key: null, logic_version: 1, generated_at: null, ...over,
 })
 
@@ -130,7 +134,7 @@ test('public_live_contest_autojoins_before_open', async () => {
   playMock.mockImplementation(async (body: { action: string }) => {
     calls.push(`play:${body.action}`)
     return {
-      item_id: 'it1', contest_id: 'c1', game_id: 'number-guess', options: { range: '100' },
+      item_id: 'it1', contest_id: 'c1', game_id: 'test-guess', options: { range: '100' },
       public_state: { guesses: [], feedback: [], hintUsed: false, parity: null, gaveUp: false },
       finished: false, score: null, action_count: 0, ends_at: iso(sNow() + 50 * MIN), server_now: sNow(),
     }
@@ -154,7 +158,7 @@ test('item page joins by itself when opened directly', async () => {
   playMock.mockImplementation(async (body: { action: string }) => {
     calls.push(`play:${body.action}`)
     return {
-      item_id: 'it2', contest_id: 'c1', game_id: 'number-guess', options: { range: '100' },
+      item_id: 'it2', contest_id: 'c1', game_id: 'test-guess', options: { range: '100' },
       public_state: { guesses: [], feedback: [], hintUsed: false, parity: null, gaveUp: false },
       finished: false, score: null, action_count: 0, ends_at: iso(sNow() + 50 * MIN), server_now: sNow(),
     }
