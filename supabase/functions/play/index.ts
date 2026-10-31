@@ -17,7 +17,20 @@ function env(name: string): string {
 
 const sql = createSql(env('SUPABASE_DB_URL'))
 const secret = env('PLAY_SECRET')
-const supabase = createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), {
+// 예전 anon 키가 꺼진 프로젝트에서는 SUPABASE_PUBLISHABLE_KEYS(JSON 사전)의 첫 키를 쓴다.
+function clientKey(): string {
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
+  if (anon) return anon
+  const raw = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS')
+  if (raw) {
+    const keys = JSON.parse(raw) as Record<string, string>
+    const first = keys.default ?? Object.values(keys)[0]
+    if (first) return first
+  }
+  throw new Error('SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEYS is not set')
+}
+
+const supabase = createClient(env('SUPABASE_URL'), clientKey(), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
