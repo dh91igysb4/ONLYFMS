@@ -1,1 +1,6 @@
+*.local
+.env
+.env.local
 .superpowers/
+dist/
+node_modules/
