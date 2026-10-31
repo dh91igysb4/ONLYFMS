@@ -130,3 +130,14 @@ body {
 .radio { display: flex; align-items: center; gap: 8px; min-height: 36px; }
 .item-card { margin-bottom: 8px; }
 select.input { padding-right: 8px; }
+
+/* 대전 화면 */
+.duel-players { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.duel-player { padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 2px solid transparent; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.duel-player strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duel-player.duel-turn { border-color: var(--muted); }
+.duel-player.duel-me.duel-turn { border-color: var(--lime); }
+.duel-status { margin: 0; color: var(--muted); font-weight: 700; }
+.duel-status-me { color: var(--lime); }
+.duel-headline { margin: 0; font-size: 24px; font-weight: 700; color: var(--lime); }
+.duel-score { margin: 0; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }

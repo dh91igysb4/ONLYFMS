@@ -14,6 +14,9 @@ import { ContestNewPage } from '../platform/contests/ContestNewPage.tsx'
 import { ContestPage } from '../platform/contests/ContestPage.tsx'
 import { ContestItemPage } from '../platform/contests/ContestItemPage.tsx'
 import { JoinPage } from '../platform/contests/JoinPage.tsx'
+import { DuelHomePage } from '../platform/duel/DuelHomePage.tsx'
+import { DuelMatchPage } from '../platform/duel/DuelMatchPage.tsx'
+import { DuelJoinPage } from '../platform/duel/DuelJoinPage.tsx'
 
 export function AppRoutes() {
   return (
@@ -29,6 +32,9 @@ export function AppRoutes() {
         <Route path="/contests/:id" element={<ContestPage />} />
         <Route path="/contests/:id/:position" element={<ContestItemPage />} />
         <Route path="/join/:code" element={<JoinPage />} />
+        <Route path="/duel" element={<DuelHomePage />} />
+        <Route path="/duel/join/:code" element={<DuelJoinPage />} />
+        <Route path="/duel/:id" element={<DuelMatchPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/u/:handle" element={<ProfilePage />} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />

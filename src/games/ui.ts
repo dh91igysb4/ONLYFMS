@@ -25,3 +25,25 @@ const components: Record<string, ComponentType<GameProps>> = {
 export function getGameComponent(id: string): ComponentType<GameProps> | undefined {
   return components[id]
 }
+
+/** 대전 게임 화면이 받는 props (대전 설계 §9). 플랫폼(DuelMatchPage)이 서버 상태·차례·요청을 쥔다. */
+export type DuelGameProps = {
+  /** 서버 logic.view 결과 */
+  view: unknown
+  mySeat: 0 | 1 | null
+  toMove: 0 | 1 | null
+  finished: boolean
+  busy: boolean
+  error: string | null
+  /** 내 차례가 아니면 플랫폼이 요청을 보내지 않는다 */
+  onAction(action: unknown): void
+  /** 좌석 순서의 아이디 */
+  names: [string, string]
+}
+
+/** 대전 게임 화면 등록부. 새 대전 게임 화면을 여기에 한 줄씩 등록한다. */
+const duelComponents: Record<string, ComponentType<DuelGameProps>> = {}
+
+export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
+  return duelComponents[id]
+}
