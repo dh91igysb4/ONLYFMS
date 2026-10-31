@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthProvider.tsx'
-import { Loading } from './Guard.tsx'
+import { Loading, ProfileRetry } from './Guard.tsx'
 import { safeRedirect } from './redirect.ts'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
@@ -10,7 +10,7 @@ export const HANDLE_RE = /^[a-z0-9_]{3,16}$/
 export const normalizeHandle = (s: string) => s.trim().toLowerCase()
 
 export function WelcomePage() {
-  const { session, profile, loading, refresh } = useAuth()
+  const { session, profile, loading, error: loadError, refresh } = useAuth()
   const [params] = useSearchParams()
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +26,7 @@ export function WelcomePage() {
 
   if (loading) return <Loading />
   if (!session) return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />
+  if (!profile && loadError) return <ProfileRetry />
   if (profile?.handle && profile.status === 'approved') return <Navigate to={redirect} replace />
 
   const normalized = normalizeHandle(input)

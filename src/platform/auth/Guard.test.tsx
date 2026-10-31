@@ -5,7 +5,7 @@ import { mocks, setAuth } from './testUtils.tsx'
 
 vi.mock('../../lib/supabase.ts', async () => (await import('./testUtils.tsx')).supabaseMock())
 
-import { AuthProvider, type Profile } from './AuthProvider.tsx'
+import { AuthProvider, useAuth, type Profile } from './AuthProvider.tsx'
 import { RequireAdmin, RequireApproved } from './Guard.tsx'
 import { LoginPage } from './LoginPage.tsx'
 import { WelcomePage } from './WelcomePage.tsx'
@@ -89,4 +89,36 @@ test('welcome_ignores_offsite_redirect', async () => {
   setAuth(approved)
   setup('/welcome?redirect=https%3A%2F%2Fevil.example')
   expect(await screen.findByText('홈')).toBeInTheDocument()
+})
+
+test('initial_profile_network_failure_shows_retry_not_welcome', async () => {
+  setAuth(approved)
+  let fail = true
+  mocks.rpc.mockImplementation(async () =>
+    fail ? { data: null, error: { message: 'TypeError: Failed to fetch', code: '' } } : { data: approved, error: null },
+  )
+  setup('/')
+  expect(await screen.findByText(/불러오지 못했어요/)).toBeInTheDocument()
+  expect(screen.getByTestId('where')).toHaveTextContent('/')
+  expect(screen.queryByLabelText('아이디')).toBeNull()
+  fail = false
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+  expect(await screen.findByText('홈')).toBeInTheDocument()
+})
+
+test('refresh_failure_keeps_previous_profile', async () => {
+  setAuth(approved)
+  let fail = false
+  mocks.rpc.mockImplementation(async () =>
+    fail ? { data: null, error: { message: 'TypeError: Failed to fetch', code: '' } } : { data: approved, error: null },
+  )
+  function R() {
+    const { refresh, profile, error } = useAuth()
+    return <button onClick={() => void refresh()}>r:{profile?.handle ?? 'none'}:{error ?? 'ok'}</button>
+  }
+  render(<MemoryRouter><AuthProvider><R /></AuthProvider></MemoryRouter>)
+  expect(await screen.findByText('r:kane:ok')).toBeInTheDocument()
+  fail = true
+  fireEvent.click(screen.getByRole('button'))
+  expect(await screen.findByText('r:kane:network')).toBeInTheDocument()
 })

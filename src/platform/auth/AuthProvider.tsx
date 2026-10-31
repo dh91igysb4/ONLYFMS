@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase.ts'
-import { rpc } from '../../lib/api.ts'
+import { ApiError, rpc } from '../../lib/api.ts'
 
 export type Profile = {
   id: string
@@ -14,17 +14,21 @@ type AuthValue = {
   session: Session | null
   profile: Profile | null
   loading: boolean
+  /** 프로필을 불러오지 못했을 때의 오류 코드. 프로필이 없는 것과 구분한다. */
+  error: string | null
   refresh(): Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
 
-async function loadProfile(): Promise<Profile | null> {
+type Loaded = { ok: true; profile: Profile | null } | { ok: false; code: string }
+
+async function loadProfile(): Promise<Loaded> {
   try {
     const row = await rpc<Profile | Profile[] | null>('my_profile')
-    return (Array.isArray(row) ? row[0] : row) ?? null
-  } catch {
-    return null
+    return { ok: true, profile: (Array.isArray(row) ? row[0] : row) ?? null }
+  } catch (e) {
+    return { ok: false, code: e instanceof ApiError ? e.code : 'unknown' }
   }
 }
 
@@ -32,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const sessionRef = useRef<Session | null>(null)
 
   const applySession = useCallback(async (next: Session | null) => {
@@ -39,12 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(next)
     if (!next) {
       setProfile(null)
+      setError(null)
       setLoading(false)
       return
     }
-    const p = await loadProfile()
+    setProfile(null)
+    const r = await loadProfile()
     if (sessionRef.current === next) {
-      setProfile(p)
+      if (r.ok) {
+        setProfile(r.profile)
+        setError(null)
+      } else {
+        setError(r.code)
+      }
       setLoading(false)
     }
   }, [])
@@ -74,10 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!sessionRef.current) return
-    setProfile(await loadProfile())
+    const r = await loadProfile()
+    if (r.ok) {
+      setProfile(r.profile)
+      setError(null)
+    } else {
+      setError(r.code) // 이전 프로필은 그대로 둔다
+    }
   }, [])
 
-  const value = useMemo(() => ({ session, profile, loading, refresh }), [session, profile, loading, refresh])
+  const value = useMemo(() => ({ session, profile, loading, error, refresh }), [session, profile, loading, error, refresh])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

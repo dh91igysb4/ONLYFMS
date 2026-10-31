@@ -39,14 +39,24 @@ export function errorMessage(code: string): string {
   return MESSAGES[code] ?? `문제가 생겼어요 (${code})`
 }
 
+const NETWORK_RE = /Failed to fetch|NetworkError|Load failed|fetch failed/i
+
+function rpcError(e: { message: string; code?: string; status?: number }): ApiError {
+  // supabase.rpc는 fetch 실패를 throw하지 않고 code 없는 error로 돌려준다.
+  if (!e.code || e.status === 0 || NETWORK_RE.test(e.message)) return new ApiError('network', 0)
+  if (e.code === 'P0001') return new ApiError(e.message, 400)
+  if (e.code === '42501') return new ApiError('forbidden', 403)
+  return new ApiError('unknown', 400)
+}
+
 export async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
-  let res: { data: unknown; error: { message: string } | null }
+  let res: { data: unknown; error: { message: string; code?: string } | null }
   try {
     res = (await supabase.rpc(name, args)) as typeof res
   } catch {
     throw new ApiError('network', 0)
   }
-  if (res.error) throw new ApiError(res.error.message, 400)
+  if (res.error) throw rpcError(res.error)
   return res.data as T
 }
 
