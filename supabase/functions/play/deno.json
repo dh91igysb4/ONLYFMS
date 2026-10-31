@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "postgres": "npm:postgres@3.4.4",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0"
+  },
+  "exclude": ["engine.test.ts"]
+}
