@@ -4,6 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1c1030" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('onlyfms.appearance.v1')
+          if (!raw) return
+          var c = JSON.parse(raw)
+          if (!c || typeof c !== 'object') return
+          var mode = c.appearance
+          if (mode === 'system') {
+            mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          }
+          var vars = c[mode]
+          if (!vars || typeof vars !== 'object') return
+          var style = document.documentElement.style
+          var re = /^#[0-9a-fA-F]{6}$/
+          for (var k in vars) {
+            if (Object.prototype.hasOwnProperty.call(vars, k) && k.slice(0, 2) === '--' && typeof vars[k] === 'string' && re.test(vars[k])) {
+              style.setProperty(k, vars[k])
+            }
+          }
+          var bg = vars['--bg']
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta && typeof bg === 'string' && re.test(bg)) meta.setAttribute('content', bg)
+        } catch (e) {}
+      })()
+    </script>
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <title>ONLYFMS</title>
