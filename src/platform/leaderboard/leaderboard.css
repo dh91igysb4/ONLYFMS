@@ -1,0 +1,93 @@
+/* 리더보드 화면. 색은 theme.css·palettes.ts 토큰만 쓴다. */
+
+/* 기간 탭: 한 줄 세그먼트, 좁으면 가로 스크롤 */
+.lb-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  overflow-x: auto;
+}
+.lb-tab {
+  flex: 1 0 auto;
+  font: inherit;
+  font-size: 15px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lb-tab[aria-selected='true'] {
+  background: var(--lime);
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--accent-edge);
+}
+.lb-tab:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+/* 게임·정렬: 겉모습만 알약, 실제는 기본 select (폰에서는 OS 선택 화면) */
+.lb-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.lb-pill { position: relative; display: inline-flex; }
+.lb-pill select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 15px;
+  min-height: 40px;
+  padding: 0 34px 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.lb-pill select option { background: var(--bg); color: var(--ink); }
+.lb-pill select:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.lb-pill::after {
+  content: '';
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* 표: 패널 한 장, 넓은 행, 1~3위 왼쪽 막대, 정렬 열 굵게 */
+.lb-panel {
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  border-radius: 14px;
+  overflow-x: auto;
+}
+.lb-caption { margin: 0; padding: 14px 16px 2px; font-size: 17px; }
+.lb-caption a { color: var(--ink); }
+.lb-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.lb-table th {
+  padding: 12px 12px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+}
+.lb-table th[aria-sort] { color: var(--ink); font-weight: 700; }
+.lb-table td { height: 56px; padding: 0 12px; border-top: 1px solid var(--line); white-space: nowrap; }
+.lb-table th:first-child, .lb-table td:first-child { padding-left: 16px; }
+.lb-table th:last-child, .lb-table td:last-child { padding-right: 16px; }
+.lb-table .num { text-align: right; }
+.lb-table td.rank { width: 1%; font-weight: 700; }
+.lb-table td.key { font-size: 17px; font-weight: 800; }
+.lb-table tr.top td:first-child { box-shadow: inset 4px 0 0 var(--accent-strong); }
+.lb-table a { color: var(--ink); font-weight: 700; text-decoration: none; }
+.lb-table a:hover { text-decoration: underline; }
+.lb-table tr.me td, .lb-table tr.me a { color: var(--accent-strong); }
