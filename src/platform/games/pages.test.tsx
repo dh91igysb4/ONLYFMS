@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -45,7 +45,8 @@ test('home says not played yet, and hides hidden games from non-admins', async (
   r.unmount()
   admin = false
   render(<MemoryRouter><HomePage /></MemoryRouter>)
-  await waitFor(() => expect(screen.getAllByText('아직 열린 게임이 없어요')).toHaveLength(1))
+  expect(await screen.findByText('후알야')).toBeInTheDocument()
+  expect(screen.queryByText('숫자 맞히기')).toBeNull()
 })
 
 test('daily page with unknown game', () => {

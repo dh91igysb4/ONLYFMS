@@ -4,7 +4,7 @@ export const manifest: Manifest = {
   id: 'who-are-ya',
   name: '후알야',
   description: '선수 한 명을 8번 안에 맞힌다',
-  hidden: true,
+  hidden: false,
   modes: { daily: true, contest: true, free: true },
   puzzleSource: 'generate',
   options: [
