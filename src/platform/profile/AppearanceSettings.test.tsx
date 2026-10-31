@@ -72,3 +72,13 @@ test('failure_reverts_and_alerts', async () => {
   expect(radio('미드나잇 네이비').checked).toBe(true)
   expect(refreshMock).not.toHaveBeenCalled()
 })
+
+test('error_shows_above_choices', async () => {
+  rpcMock.mockRejectedValue(new ApiError('appearance_invalid', 400))
+  const { container } = render(<AppearanceSettings />)
+  fireEvent.click(radio('인디고'))
+  const alert = await screen.findByRole('alert')
+  const firstFieldset = container.querySelector('fieldset')!
+  // 오류 문구가 첫 선택지 묶음보다 앞에 있어야 누른 자리에서 보인다
+  expect(alert.compareDocumentPosition(firstFieldset) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
