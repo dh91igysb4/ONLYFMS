@@ -1,0 +1,146 @@
+/* 후알야 화면 (원본 단독판의 모양). 색은 theme.css 토큰을 쓰고, 타일 색(초록·노랑·회색)은 원본 그대로 --hit/--near/--miss. */
+.wya {
+  --wya-card-ink: #1c1030;
+  --wya-q: #6b7280;
+  --wya-strip: rgba(0, 0, 0, 0.14);
+  --wya-input: #2f6bd6;
+  --wya-display: 'Archivo', 'Arial Black', system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wya-meta { display: flex; align-items: baseline; gap: 8px; }
+.wya-meta strong { font-size: 20px; }
+.wya-time { margin-left: auto; }
+
+/* 미스터리 카드 */
+.wya-card {
+  background: var(--card);
+  color: var(--wya-card-ink);
+  border-radius: 14px;
+  padding: 14px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wya-stage { position: relative; display: grid; place-items: center; min-height: 130px; }
+.wya-q { font-family: var(--wya-display); font-weight: 900; font-size: 116px; line-height: 1; color: var(--wya-q); }
+.wya-rev { position: absolute; left: 0; top: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; max-width: 46%; }
+.wya-rev .wya-x { font-family: var(--wya-display); font-weight: 900; font-size: 20px; line-height: 1; }
+.wya-rev .wya-flag { width: 28px; height: 28px; }
+.wya-rev .wya-flag span { font-size: 22px; }
+.wya-rev .wya-shirt { width: 30px; height: 30px; display: block; }
+.wya-ans {
+  font-family: var(--wya-display); font-weight: 900; font-size: clamp(26px, 7vw, 40px); line-height: 1.05;
+  text-transform: uppercase; text-align: center; overflow-wrap: anywhere;
+}
+.wya-ans small { display: block; font-size: 14px; color: var(--wya-q); letter-spacing: 0.02em; margin-top: 6px; }
+
+/* 검색 */
+.wya-search { position: relative; }
+.wya-search input {
+  width: 100%;
+  font: inherit;
+  font-size: 17px; /* 16px 이상: iOS 확대 방지 */
+  font-weight: 500;
+  padding: 13px 14px;
+  border: 3px solid var(--wya-input);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--wya-card-ink);
+}
+.wya-search input:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(47, 107, 214, 0.25); }
+.wya-search input::placeholder { color: #9aa3b2; }
+.wya-sugg {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5;
+  margin: 0; padding: 0; list-style: none;
+  background: var(--card); border: 1px solid #d9dce3; border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  max-height: min(380px, 50vh); overflow-y: auto;
+}
+.wya-sugg li {
+  display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: center;
+  padding: 9px 14px; border-bottom: 1px solid #eceef2; color: var(--wya-card-ink); cursor: pointer;
+}
+.wya-sugg li:last-child { border-bottom: 0; }
+.wya-sugg li[aria-selected='true'], .wya-sugg li:hover { background: #eef3fd; }
+.wya-sugg .wya-flag { width: 28px; height: 28px; grid-row: 1 / 3; }
+.wya-sugg .wya-flag span { font-size: 22px; }
+.wya-n { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.wya-m { font-size: 12px; color: #6b7280; }
+.wya-hintline { margin: 0; font-size: 14px; text-align: center; }
+.wya-tools { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.wya-tools button {
+  font: inherit; background: none; border: 0; padding: 6px 0; min-height: 36px; cursor: pointer;
+  color: #4b5563; font-weight: 700; text-decoration: underline; text-underline-offset: 3px;
+}
+.wya-tools button:disabled { opacity: 0.45; text-decoration: none; cursor: default; }
+
+/* 결과 */
+.wya-result { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.wya-msg { margin: 0; font-family: var(--wya-display); font-weight: 900; font-size: 22px; text-transform: uppercase; }
+.wya-win { color: var(--hit); }
+.wya-lose { color: #ff8f7a; }
+.wya-score { margin: 0; font-size: 24px; font-weight: 700; color: var(--lime); }
+
+/* 범례 */
+.wya-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.wya-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.wya-legend span::before { content: ''; width: 14px; height: 14px; border-radius: 4px; background: var(--c); }
+
+/* 추측 줄 */
+.wya-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wya-row { border-radius: 16px; padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.wya-row.wya-latest { background: var(--panel); }
+.wya-row.wya-answer { padding: 0; }
+.wya-row.wya-answer .wya-l, .wya-row.wya-answer .wya-cl { color: var(--wya-q); }
+.wya-nm { font-family: var(--wya-display); font-weight: 900; font-size: clamp(20px, 5.4vw, 27px); line-height: 1.05; text-transform: uppercase; overflow-wrap: anywhere; }
+.wya-cl { font-family: var(--wya-display); font-weight: 800; font-size: clamp(13px, 3.4vw, 17px); color: var(--muted); text-transform: uppercase; margin-top: 3px; }
+.wya-answer .wya-nm { display: none; }
+.wya-answer .wya-cl { display: none; }
+.wya-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(6px, 3vw, 22px); }
+.wya-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.wya-b { width: 100%; aspect-ratio: 1.2; border-radius: 8px; display: flex; overflow: hidden; color: #fff; background: var(--miss); }
+.wya-b.wya-c { background: var(--hit); }
+.wya-b.wya-p { background: var(--near); }
+.wya-main {
+  flex: 1; display: grid; place-items: center; min-width: 0;
+  font-family: var(--wya-display); font-weight: 900; font-size: clamp(18px, 5.2vw, 32px); line-height: 1;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
+}
+.wya-strip { width: 30%; max-width: 26px; background: var(--wya-strip); display: grid; place-items: center; }
+.wya-strip svg { width: 70%; height: auto; }
+.wya-main .wya-shirt { width: 68%; height: auto; max-height: 82%; }
+.wya-l { font-weight: 800; font-size: clamp(11px, 3vw, 14px); color: var(--muted); white-space: nowrap; }
+.wya-flag {
+  display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden;
+  width: min(64%, 46px); aspect-ratio: 1; background: #fff; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+.wya-flag span { line-height: 1; transform: scale(1.55); }
+.wya-tile .wya-flag span { font-size: clamp(26px, 7.5vw, 44px); }
+.wya-numshirt { position: relative; width: 72%; max-height: 84%; display: grid; place-items: center; }
+.wya-numshirt svg { width: 100%; height: auto; display: block; }
+.wya-numshirt b { position: absolute; inset: 0; display: grid; place-items: center; padding-top: 14%; font-size: clamp(13px, 3.8vw, 23px); }
+.wya-foot { margin: 0; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .wya-latest .wya-b { animation: wya-flip 0.45s ease both; }
+  .wya-latest .wya-tile:nth-child(2) .wya-b { animation-delay: 0.08s; }
+  .wya-latest .wya-tile:nth-child(3) .wya-b { animation-delay: 0.16s; }
+  .wya-latest .wya-tile:nth-child(4) .wya-b { animation-delay: 0.24s; }
+  .wya-latest .wya-tile:nth-child(5) .wya-b { animation-delay: 0.32s; }
+  @keyframes wya-flip { from { transform: rotateX(90deg); } to { transform: none; } }
+}
+
+@media (min-width: 481px) {
+  .wya-card { padding: 18px 20px 22px; gap: 16px; }
+  .wya-stage { min-height: 170px; }
+  .wya-q { font-size: 150px; }
+  .wya-rev .wya-x { font-size: 26px; }
+  .wya-rev .wya-shirt { width: 38px; height: 38px; }
+  .wya-rev .wya-flag { width: 34px; height: 34px; }
+  .wya-search input { font-size: 20px; padding: 16px 20px; }
+  .wya-row { padding: 16px 20px 18px; gap: 12px; }
+  .wya-b { border-radius: 10px; }
+  .wya-legend { font-size: 14px; gap: 6px 22px; }
+}
