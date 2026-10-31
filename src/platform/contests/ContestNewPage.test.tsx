@@ -1,4 +1,4 @@
-process.env.TZ = 'America/New_York' // 한국 시간이 아닌 브라우저를 흉내낸다
+;(globalThis as unknown as { process: { env: Record<string, string> } }).process.env.TZ = 'America/New_York' // 한국 시간이 아닌 브라우저를 흉내낸다
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
