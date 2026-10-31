@@ -19,10 +19,12 @@ update public.profiles set status = 'approved', handle = 'aone' where id = '0000
 update public.profiles set status = 'approved', handle = 'atwo' where id = '00000000-0000-0000-0000-0000000000a2';
 update public.profiles set status = 'approved', handle = 'boss', is_admin = true where id = '00000000-0000-0000-0000-0000000000ad';
 
--- 테스트 전용 게임 (트랜잭션 끝에 롤백): open-game 대회 가능·숨김 아님, free-only 대회 불가
+-- 테스트 전용 게임 (트랜잭션 끝에 롤백): test-guess 숨김·전 모드, open-game 대회 가능·숨김 아님, free-only 대회 불가
 insert into public.game_modes (game_id, daily, contest, free) values
+  ('test-guess', true, true, true),
   ('open-game', false, true, true),
   ('free-only', false, false, true);
+insert into public.hidden_games (game_id) values ('test-guess');
 
 -- 이미 만들어진 대회 (a1 개설)
 --   e1 진행 중 공개   e2 종료된 공개   e3 취소된 미래 공개   e4 숨김 게임만 든 미래 공개(관리자 개설)
@@ -43,7 +45,7 @@ insert into public.contest_items (contest_id, position, game_id, options) values
   ('e0000000-0000-0000-0000-000000000001', 1, 'open-game', '{}'),
   ('e0000000-0000-0000-0000-000000000002', 1, 'open-game', '{}'),
   ('e0000000-0000-0000-0000-000000000003', 1, 'open-game', '{}'),
-  ('e0000000-0000-0000-0000-000000000004', 1, 'number-guess', '{}');
+  ('e0000000-0000-0000-0000-000000000004', 1, 'test-guess', '{}');
 
 -- 문제 은행: open-game에 이미 k1이 있고, 하나(used)는 출제됨
 insert into public.puzzle_bank (game_id, puzzle, puzzle_key, used_item_id)
@@ -53,8 +55,8 @@ insert into public.puzzle_bank (game_id, puzzle, puzzle_key, used_item_id)
 
 -- ---------------------------------------------------------------- schema
 select has_table('public', 'game_modes', 'game_modes table exists');
-select results_eq($$select daily, contest, free from public.game_modes where game_id = 'number-guess'$$,
-  $$values (true, true, true)$$, 'game_modes is seeded with number-guess (daily, contest, free)');
+select is((select count(*)::int from public.game_modes where game_id = 'number-guess'), 0,
+  'number-guess is removed from game_modes (0008)');
 
 -- ---------------------------------------------------------------- pending
 set local role authenticated;
@@ -148,7 +150,7 @@ select throws_ok($$select * from public.create_contest('t', now() + interval '1 
   '[{"game_id":"open-game","options":{},"count":1},{"game_id":"no-such-game","options":{},"count":1}]', false)$$,
   'P0001', 'game_not_allowed', 'create_validations: unknown game');
 select throws_ok($$select * from public.create_contest('t', now() + interval '1 hour', 30, 'public',
-  '[{"game_id":"number-guess","options":{},"count":1}]', false)$$,
+  '[{"game_id":"test-guess","options":{},"count":1}]', false)$$,
   'P0001', 'game_not_allowed', 'create_validations: non-admin cannot use a hidden game');
 
 -- official_by_non_admin_forbidden
@@ -193,7 +195,7 @@ set local role authenticated;
 -- ---------------------------------------------------------------- admin: official
 set local request.jwt.claims = :'ADM';
 select id as c_off from public.create_contest('공식전', now() + interval '1 hour', 60, 'public',
-  '[{"game_id":"number-guess","options":{"range":"100"},"count":1}]', true) \gset
+  '[{"game_id":"test-guess","options":{"range":"100"},"count":1}]', true) \gset
 select is((select kind::text from public.contests where id = :'c_off'), 'official',
   'official_by_admin_ok: kind official, admin may use a hidden game');
 select id as c_adm_f from public.create_contest('관리자 친선', now() + interval '1 hour', 60, 'public', :'OK1', false) \gset
@@ -228,7 +230,7 @@ select throws_ok(format($$select public.update_contest(%L, 'x', now() + interval
 select throws_ok(format($$select public.update_contest(%L, 'x', now() + interval '1 hour', 30, 'public', '[]')$$, :'c_pub'),
   'P0001', 'items_invalid', 'update: items validation');
 select throws_ok(format($$select public.update_contest(%L, 'x', now() + interval '1 hour', 30, 'public',
-  '[{"game_id":"number-guess","options":{},"count":1}]')$$, :'c_pub'),
+  '[{"game_id":"test-guess","options":{},"count":1}]')$$, :'c_pub'),
   'P0001', 'game_not_allowed', 'update: non-admin cannot switch to a hidden game');
 
 -- public → invite → public
@@ -288,9 +290,9 @@ select is((select kind::text from public.contests where id = :'c_pub'), 'friendl
 reset role;
 insert into public.contests (id, kind, title, visibility, starts_at, ends_at, daily_key) values
   ('e0000000-0000-0000-0000-0000000000d1', 'daily', 'daily live', 'public',
-   now() - interval '1 hour', now() + interval '1 hour', 'number-guess:test-live'),
+   now() - interval '1 hour', now() + interval '1 hour', 'test-guess:test-live'),
   ('e0000000-0000-0000-0000-0000000000d2', 'daily', 'daily next', 'public',
-   now() + interval '1 hour', now() + interval '25 hours', 'number-guess:test-next');
+   now() + interval '1 hour', now() + interval '25 hours', 'test-guess:test-next');
 set local role authenticated;
 select throws_ok($$select public.cancel_contest('e0000000-0000-0000-0000-0000000000d1')$$,
   'P0001', 'not_editable', 'cancel_daily_not_editable: admin cannot cancel a live daily');
@@ -388,7 +390,7 @@ set local role authenticated;
 
 -- bank_status_counts_unused: open-game = k1,k2,k3 (used 제외), 나머지 0
 select results_eq($$select game_id, remaining from public.admin_bank_status() order by game_id$$,
-  $$values ('free-only', 0), ('number-guess', 0), ('open-game', 3), ('who-are-ya', 0)$$,
+  $$values ('free-only', 0), ('open-game', 3), ('test-guess', 0), ('who-are-ya', 0)$$,
   'bank_status_counts_unused: per game_modes game, unused rows only');
 
 -- ---------------------------------------------------------------- anon

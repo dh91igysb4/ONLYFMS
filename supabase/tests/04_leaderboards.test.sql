@@ -4,6 +4,10 @@
 begin;
 select plan(74);
 
+-- 테스트 전용 숨김 게임 test-guess (운영 숫자 맞히기는 0008에서 제거됨). 트랜잭션 끝에 롤백
+insert into public.game_modes (game_id, daily, contest, free) values ('test-guess', true, true, true);
+insert into public.hidden_games (game_id) values ('test-guess');
+
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000b0","role":"authenticated"}'
 \set U1  '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}'
 \set U2  '{"sub":"00000000-0000-0000-0000-0000000000b2","role":"authenticated"}'
@@ -25,7 +29,7 @@ update public.profiles set status = 'approved', handle = 'bravo'   where id = '0
 update public.profiles set status = 'approved', handle = 'charlie' where id = '00000000-0000-0000-0000-0000000000b3';
 update public.profiles set status = 'approved', handle = 'boss', is_admin = true where id = '00000000-0000-0000-0000-0000000000bd';
 
--- 대회 (open-game = 공개 게임, number-guess = 숨김 게임)
+-- 대회 (open-game = 공개 게임, test-guess = 숨김 게임)
 --   01 D0 데일리 일 03-09   02 D1 데일리 월 03-10   03 DH 숨김 게임 데일리 월 03-10
 --   04 O1 공식, 월 00:30 KST 종료(UTC로는 일요일) 2문제   05 O0 공식, 일 23:30 KST 종료
 --   06 F1 친선 월 종료   07 X1 취소된 공식 월 종료   08 OI 초대 공식 화 종료(charlie만 참가)
@@ -37,7 +41,7 @@ insert into public.contests (id, kind, title, created_by, visibility, invite_cod
   ('c0000000-0000-0000-0000-000000000002', 'daily', 'D1', null, 'public', null,
      '2025-03-10 00:00+09', '2025-03-11 00:00+09', null, 'open-game:2025-03-10'),
   ('c0000000-0000-0000-0000-000000000003', 'daily', 'DH', null, 'public', null,
-     '2025-03-10 00:00+09', '2025-03-11 00:00+09', null, 'number-guess:2025-03-10'),
+     '2025-03-10 00:00+09', '2025-03-11 00:00+09', null, 'test-guess:2025-03-10'),
   ('c0000000-0000-0000-0000-000000000004', 'official', 'O1', '00000000-0000-0000-0000-0000000000bd', 'public', null,
      '2025-03-09 23:30+09', '2025-03-10 00:30+09', null, null),
   ('c0000000-0000-0000-0000-000000000005', 'official', 'O0', '00000000-0000-0000-0000-0000000000bd', 'public', null,
@@ -63,7 +67,7 @@ insert into public.contests (id, kind, title, created_by, visibility, invite_cod
 insert into public.contest_items (id, contest_id, position, game_id) values
   ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 1, 'open-game'),
   ('d0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 1, 'open-game'),
-  ('d0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 1, 'number-guess'),
+  ('d0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 1, 'test-guess'),
   ('d0000000-0000-0000-0000-000000000041', 'c0000000-0000-0000-0000-000000000004', 1, 'open-game'),
   ('d0000000-0000-0000-0000-000000000042', 'c0000000-0000-0000-0000-000000000004', 2, 'open-game'),
   ('d0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', 1, 'open-game'),
@@ -75,7 +79,7 @@ insert into public.contest_items (id, contest_id, position, game_id) values
   ('d0000000-0000-0000-0000-0000000000b1', 'c0000000-0000-0000-0000-000000000011', 1, 'open-game'),
   ('d0000000-0000-0000-0000-0000000000b2', 'c0000000-0000-0000-0000-000000000011', 2, 'open-game'),
   ('d0000000-0000-0000-0000-000000000012', 'c0000000-0000-0000-0000-000000000012', 1, 'open-game'),
-  ('d0000000-0000-0000-0000-000000000013', 'c0000000-0000-0000-0000-000000000013', 1, 'number-guess');
+  ('d0000000-0000-0000-0000-000000000013', 'c0000000-0000-0000-0000-000000000013', 1, 'test-guess');
 
 insert into public.contest_entries (contest_id, user_id) values
   ('c0000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-0000000000b3'),
@@ -124,7 +128,7 @@ select gen_random_uuid(), '00000000-0000-0000-0000-0000000000b2', 'open-game', 1
        '2025-03-01 10:00+09'::timestamptz + n * interval '1 minute'
   from unnest(array[true, true, true, false, true]) with ordinality as t(s, n);
 insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count, played_at) values
-  (gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1', 'number-guess', 1, true, 10.0, 1, '2025-03-01 12:00+09');
+  (gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1', 'test-guess', 1, true, 10.0, 1, '2025-03-01 12:00+09');
 
 -- ---------------------------------------------------------------- schema / grants
 select has_function('public', 'lb_daily',    array['date', 'text'], 'lb_daily exists');
@@ -207,13 +211,13 @@ select results_eq(
   'lb_range all-time (from 2000-01-01)');
 
 -- hidden_game_excluded_for_non_admin
-select is((select count(*)::int from public.lb_daily('2025-03-10', 'number-guess')), 0,
+select is((select count(*)::int from public.lb_daily('2025-03-10', 'test-guess')), 0,
   'hidden_game_excluded_for_non_admin: lb_daily(hidden game) is empty');
-select is((select count(*)::int from public.lb_range('2025-03-01', '2025-03-31', 'number-guess')), 0,
+select is((select count(*)::int from public.lb_range('2025-03-01', '2025-03-31', 'test-guess')), 0,
   'hidden_game_excluded_for_non_admin: lb_range(hidden game) is empty');
 select is((select score from public.lb_range('2025-03-01', '2025-03-31') where handle = 'alpha'), 23.0,
   'hidden_game_excluded_for_non_admin: lb_range sum excludes hidden daily and hidden-only official');
-select is((select count(*)::int from public.lb_free('number-guess')), 0,
+select is((select count(*)::int from public.lb_free('test-guess')), 0,
   'hidden_game_excluded_for_non_admin: lb_free(hidden game) is empty');
 select is((select plays from public.lb_free() where handle = 'alpha'), 6,
   'hidden_game_excluded_for_non_admin: lb_free totals exclude hidden plays');
@@ -323,14 +327,14 @@ select results_eq(
   $$values (1, 'alpha', 18.0, 6), (2, 'charlie', 8.0, 4), (3, 'bravo', 8.0, 4)$$,
   'hidden_game_excluded_for_non_admin: admin sees hidden game daily summed');
 select results_eq(
-  $$select handle::text, score from public.lb_daily('2025-03-10', 'number-guess')$$,
+  $$select handle::text, score from public.lb_daily('2025-03-10', 'test-guess')$$,
   $$values ('alpha', 10.0)$$,
   'admin: lb_daily(hidden game)');
 select is((select score from public.lb_range('2025-03-01', '2025-03-31') where handle = 'alpha'), 35.0,
   'admin: lb_range includes hidden daily and hidden-only official');
 select is((select plays from public.lb_free() where handle = 'alpha'), 7, 'admin: lb_free includes hidden plays');
 select results_eq(
-  $$select handle::text, plays, wins, current_streak, best_streak from public.lb_free('number-guess')$$,
+  $$select handle::text, plays, wins, current_streak, best_streak from public.lb_free('test-guess')$$,
   $$values ('alpha', 1, 1, 1, 1)$$,
   'admin: lb_free(hidden game)');
 select results_eq(

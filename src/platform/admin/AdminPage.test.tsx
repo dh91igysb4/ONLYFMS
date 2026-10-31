@@ -17,7 +17,7 @@ vi.mock('../contests/data.ts', async (orig) => ({
 }))
 vi.mock('../../games/index.ts', () => ({
   games: [
-    { manifest: { id: 'number-guess', name: '숫자 맞추기', hidden: false, puzzleSource: 'generate' } },
+    { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false, puzzleSource: 'generate' } },
     { manifest: { id: 'players', name: '선수 맞추기', hidden: false, puzzleSource: 'bank' } },
   ],
 }))

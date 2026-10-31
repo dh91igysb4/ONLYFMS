@@ -14,7 +14,7 @@ import { Layout } from './Layout.tsx'
 import { resetFreeQueue } from '../games/freeQueue.ts'
 
 const row = {
-  client_id: 'q1', user_id: 'u1', game_id: 'number-guess', options: {},
+  client_id: 'q1', user_id: 'u1', game_id: 'test-guess', options: {},
   logic_version: 1, solved: true, score: 5, action_count: 3,
 }
 

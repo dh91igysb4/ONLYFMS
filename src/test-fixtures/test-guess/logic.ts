@@ -1,4 +1,5 @@
-import type { Ctx, GameLogic, PlatformAction } from '../types.ts'
+// 테스트 전용 게임(운영 등록부에 없음). 플랫폼 테스트가 게임 하나를 끝까지 돌려 보는 데 쓴다.
+import type { Ctx, GameLogic, PlatformAction } from '../../games/types.ts'
 
 export type Puzzle = { range: 100 | 1000; answer: number }
 export type Action = { type: 'guess'; value: number } | { type: 'hint' }

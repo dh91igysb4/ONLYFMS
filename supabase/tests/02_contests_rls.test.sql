@@ -3,6 +3,10 @@
 begin;
 select plan(65);
 
+-- 테스트 전용 숨김 게임 test-guess (운영 숫자 맞히기는 0008에서 제거됨). 트랜잭션 끝에 롤백
+insert into public.game_modes (game_id, daily, contest, free) values ('test-guess', true, true, true);
+insert into public.hidden_games (game_id) values ('test-guess');
+
 -- ---------------------------------------------------------------- fixture (superuser)
 -- pu pending, a1·a2·a3 approved, adm admin
 insert into auth.users (id, email) values
@@ -35,7 +39,7 @@ insert into public.contest_items (id, contest_id, position, game_id, options, pu
   ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 1, 'open-game', '{}', '{"answer":42}', 'k42', 1, now()),
   ('d0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 1, 'open-game', '{}', '{"answer":7}',  'k7',  1, now()),
   ('d0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 1, 'open-game', '{}', '{"answer":9}',  'k9',  1, now()),
-  ('d0000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', 1, 'number-guess', '{"range":"100"}', '{"answer":5}', '100:5', 1, now()),
+  ('d0000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', 1, 'test-guess', '{"range":"100"}', '{"answer":5}', '100:5', 1, now()),
   ('d0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', 1, 'open-game', '{}', '{"answer":3}',  'k3',  1, now());
 
 insert into public.contest_entries (contest_id, user_id) values
@@ -62,13 +66,13 @@ insert into public.puzzle_bank (game_id, puzzle, puzzle_key) values ('open-game'
 
 -- a2의 자유 플레이: 숨김 게임 1건, 일반 게임 1건
 insert into public.free_plays (client_id, user_id, game_id, options, logic_version, solved, score, action_count) values
-  ('f0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2', 'number-guess', '{}', 1, true, 9.0, 2),
+  ('f0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2', 'test-guess', '{}', 1, true, 9.0, 2),
   ('f0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000a2', 'open-game',   '{}', 1, false, 0.0, 8);
 
 -- schema sanity
 select has_view('public', 'contest_items_public', 'contest_items_public view exists');
-select is((select 'number-guess' in (select game_id from public.hidden_games)), true,
-  'hidden_games is seeded with number-guess');
+select is((select 'number-guess' in (select game_id from public.hidden_games)), false,
+  'number-guess is removed from hidden_games (0008)');
 
 -- ---------------------------------------------------------------- pu (pending)
 set local role authenticated;
@@ -214,7 +218,7 @@ select is(public.can_see_contest('c0000000-0000-0000-0000-000000000004'), false,
   'hidden_game_rows_admin_only: hidden-only contest invisible to non-admin');
 select is((select count(*)::int from public.attempts where item_id = 'd0000000-0000-0000-0000-000000000004'), 0,
   'hidden_game_rows_admin_only: hidden-game attempts invisible to non-admin');
-select is((select count(*)::int from public.free_plays where game_id = 'number-guess'), 0,
+select is((select count(*)::int from public.free_plays where game_id = 'test-guess'), 0,
   'hidden_game_rows_admin_only: hidden-game free_plays invisible to non-admin');
 select is((select count(*)::int from public.free_plays where game_id = 'open-game'), 3,
   'approved users read everyone''s non-hidden free_plays');
@@ -238,7 +242,7 @@ set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000ad","r
 select is(public.can_see_contest('c0000000-0000-0000-0000-000000000004'), true, 'hidden_game_rows_admin_only: admin sees hidden-only contest');
 select is((select count(*)::int from public.attempts where item_id = 'd0000000-0000-0000-0000-000000000004'), 1,
   'hidden_game_rows_admin_only: admin reads hidden-game attempts');
-select is((select count(*)::int from public.free_plays where game_id = 'number-guess'), 1,
+select is((select count(*)::int from public.free_plays where game_id = 'test-guess'), 1,
   'hidden_game_rows_admin_only: admin reads hidden-game free_plays');
 select is(public.contest_invite_code('c0000000-0000-0000-0000-000000000003'), 'ABCDEFGHIJ', 'admin reads invite code');
 select is((select count(*)::int from public.puzzle_bank), 1, 'puzzle_bank_admin_only: admin reads puzzle_bank');
