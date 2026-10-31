@@ -49,6 +49,7 @@ export function AppearanceSettings() {
   return (
     <section className="stack" aria-labelledby={titleId}>
       <h3 className="section-title" id={titleId}>화면 설정</h3>
+      {error && <p className="form-error" role="alert">{error}</p>}
 
       <fieldset className="field">
         <legend>화면 모드</legend>
@@ -74,7 +75,6 @@ export function AppearanceSettings() {
         })}
       </fieldset>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
     </section>
   )
 }

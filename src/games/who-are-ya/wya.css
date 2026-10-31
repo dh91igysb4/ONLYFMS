@@ -91,7 +91,7 @@
 /* 추측 줄 */
 .wya-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .wya-row { border-radius: 16px; padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.wya-row.wya-latest { background: var(--panel); }
+.wya-row.wya-latest { background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); }
 .wya-row.wya-answer { padding: 0; }
 .wya-row.wya-answer .wya-l, .wya-row.wya-answer .wya-cl { color: var(--wya-q); }
 .wya-nm { font-family: var(--wya-display); font-weight: 900; font-size: clamp(20px, 5.4vw, 27px); line-height: 1.05; text-transform: uppercase; overflow-wrap: anywhere; }

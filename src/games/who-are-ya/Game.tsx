@@ -36,7 +36,7 @@ function KitShirt({ code }: { code: string }) {
 function NumShirt({ n, fill }: { n: number | null; fill: string }) {
   return (
     <span className="wya-numshirt">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><path d={SHIRT} fill={fill} /></svg>
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d={SHIRT} style={{ fill }} /></svg>
       <b>{n ?? '–'}</b>
     </span>
   )
@@ -89,7 +89,7 @@ function GuessRowView({ g, fb, className }: { g: Snapshot; fb: Feedback; classNa
         <TileBox label="포지션" k={fb.pos}>{g.grp}</TileBox>
         <TileBox label="나이" k={fb.age} arrow={fb.ageArrow}>{g.age ?? '–'}</TileBox>
         <TileBox label="등번호" k={fb.shirt} arrow={fb.shirtArrow}>
-          <NumShirt n={g.shirt} fill={fb.shirt === 'c' ? '#3f9a4c' : '#6b7689'} />
+          <NumShirt n={g.shirt} fill={fb.shirt === 'c' ? 'var(--shirt-hit)' : 'var(--shirt-miss)'} />
         </TileBox>
       </div>
     </li>

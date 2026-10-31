@@ -16,6 +16,12 @@
   --lose-text: #ff8f7a;
   --live-bg: #5cc169;
   --on-live: #1c1030;
+  /* 라이트 모드 경계선. 다크는 자기 채움색과 같아 보이지 않는다 (기존 화면과 동일) */
+  --line: #2d2140;
+  --edge: #2d2140;
+  --accent-edge: #c9f25c;
+  --shirt-hit: #3f9a4c;
+  --shirt-miss: #6b7689;
   --sky: #008fdb; /* 로고 하늘색 */
 }
 
@@ -92,7 +98,7 @@ body {
   border: 0;
   cursor: pointer;
 }
-.btn-primary { background: var(--lime); color: var(--on-accent); font-weight: 700; }
+.btn-primary { background: var(--lime); color: var(--on-accent); font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent-edge); }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--muted); min-height: 36px; }
 
@@ -107,12 +113,12 @@ body {
 }
 .form-error { color: var(--warn-text); margin: 0; }
 
-.card { background: var(--panel); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .card-title { margin: 0; font-size: 18px; }
 .card-status { margin: 0; color: var(--accent-strong); }
 .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .card-actions .btn { display: inline-flex; align-items: center; text-decoration: none; }
-.notice { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--panel); color: var(--warn-text); }
+.notice { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--warn-text); }
 .free-options { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 .free-option { display: flex; flex-direction: column; gap: 4px; }
 
@@ -122,14 +128,14 @@ body {
 .ng-time { margin-left: auto; }
 .ng-hint { margin: 0; color: var(--warn-text); }
 .ng-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.ng-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--panel); border-left: 4px solid var(--miss); }
+.ng-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-left: 4px solid var(--miss); }
 .ng-row.ng-hit { border-left-color: var(--hit); }
 .ng-row.ng-up, .ng-row.ng-down { border-left-color: var(--near); }
 .ng-num { font-weight: 700; min-width: 3ch; font-variant-numeric: tabular-nums; }
 .ng-input { display: flex; gap: 8px; }
 .ng-input .input { flex: 1; min-width: 0; font-size: 18px; }
 .ng-actions { display: flex; gap: 8px; }
-.ng-result { padding: 12px; border-radius: 10px; background: var(--panel); }
+.ng-result { padding: 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); }
 .ng-result p { margin: 0 0 4px; }
 .ng-score { font-size: 24px; font-weight: 700; color: var(--accent-strong); }
 
@@ -140,18 +146,18 @@ body {
 .row.between { justify-content: space-between; }
 .grow { flex: 1; min-width: 0; }
 .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--muted); color: var(--muted); font-size: 13px; }
-.badge-official { background: var(--lime); border-color: var(--lime); color: var(--on-accent); font-weight: 700; }
+.badge-official { background: var(--lime); border-color: var(--accent-edge); color: var(--on-accent); font-weight: 700; }
 /* 초록 배지 위 글자는 고정색 */
 .badge-live { background: var(--live-bg); border-color: var(--live-bg); color: var(--on-live); font-weight: 700; }
 .card-link { color: inherit; text-decoration: none; }
 .btn-link { display: inline-flex; align-items: center; text-decoration: none; }
 .countdown { margin: 0; font-size: 20px; font-weight: 700; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.list-row { padding: 12px; border-radius: 10px; background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
+.list-row { padding: 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); display: flex; flex-direction: column; gap: 6px; }
 .list-row a { color: var(--accent-strong); font-weight: 700; }
 .reveal { margin: 0; font-size: 12px; color: var(--muted); white-space: pre-wrap; }
 .table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--panel); }
+.table th, .table td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--line); }
 .table tr.me td { color: var(--accent-strong); font-weight: 700; }
 .field { display: flex; flex-direction: column; gap: 4px; border: 0; padding: 0; margin: 0; }
 .field legend { padding: 0; margin-bottom: 4px; }
