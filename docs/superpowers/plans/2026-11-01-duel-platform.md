@@ -16,7 +16,7 @@
 - 플랫폼 코드에 게임 id 분기 금지. 대전/솔로는 `manifest.category`와 등록부(`games` / `duels`)로만 나눈다.
 - `logic.ts`·`types.ts`·`src/shared/*`는 순수 함수, 외부 의존 없음, 상대 import는 `.ts` 확장자. React·DOM을 import하지 않는다(Deno가 가져감).
 - Edge Function import는 상대 경로 또는 `npm:` 지정자만(jsr, deno.land 금지).
-- DB 변경은 새 마이그레이션 파일로만. 0001~0007은 운영에 적용됨 — 고치지 않는다. 대전 마이그레이션 번호는 실행 시점의 **다음 빈 번호**(이 문서에서는 `NNNN`으로 표기, 현재 기준 0008).
+- DB 변경은 새 마이그레이션 파일로만. 0001~0007은 운영에 적용됨 — 고치지 않는다. 대전 마이그레이션 번호는 실행 시점의 **다음 빈 번호**(이 문서에서는 `NNNN`으로 표기, 작성 당시 0008. main 병합 후 실제 번호는 `0010_yacht.sql`·`0011_duel.sql`).
 - 정의자 함수는 `security definer set search_path = public`, 오류는 `raise exception using errcode = 'P0001', message = '<code>'`, 새 테이블·함수는 기본 권한 회수 후 필요한 것만 grant(0001~0005 패턴).
 - 시각은 서버 시계만 쓴다. 브라우저 시각은 남은 시간 표시에만 쓰고, `src/lib/serverTime.ts`로 보정한다.
 - `duel_matches.state`는 브라우저가 어떤 경로로도 읽을 수 없다. 브라우저에는 `logic.view` 결과만 간다.
@@ -117,7 +117,7 @@
 
 **Files:**
 - Create: `supabase/migrations/NNNN_duel.sql`
-- Test: `supabase/tests/06_duel.test.sql` (pgTAP, 기존 테스트 형식·`shim.sql` 사용)
+- Test: `supabase/tests/07_duel.test.sql` (pgTAP, 기존 테스트 형식·`shim.sql` 사용)
 
 **Interfaces:**
 - Consumes: `profiles`, `is_approved()`, `is_admin()`, `_new_invite_code()`(0003), `hidden_games`, `game_modes`.
@@ -132,7 +132,7 @@
 - `game_modes`에 `('yacht', false, false, false)`, `hidden_games`에 `'yacht'`.
 - 권한: `duel_matches`는 `state` 제외 컬럼만 `select` grant, RLS는 "참가자, 만든 사람, 또는 공개 waiting"만. `duel_moves`는 RLS "대국 종료 후 참가자". 쓰기는 브라우저에 모두 불허(Edge Function은 DB 직접 연결로 씀). `duel_ratings`·`duel_rating_changes`는 승인 사용자 읽기.
 
-- [ ] **Step 1: `06_duel.test.sql` 작성** — 케이스(이름 그대로 `is`/`throws_ok`/`ok` 메시지에 사용):
+- [ ] **Step 1: `07_duel.test.sql` 작성** — 케이스(이름 그대로 `is`/`throws_ok`/`ok` 메시지에 사용):
   - `state_not_readable`: authenticated로 `select state from duel_matches` → 권한 오류.
   - `rls_hides_others_invite_match`: 남의 invite 대국은 안 보임, 공개 waiting은 보임.
   - `moves_hidden_until_finished`: 진행 중 대국의 `duel_moves`는 참가자도 0행, 종료 후 참가자 보임, 제3자 0행.

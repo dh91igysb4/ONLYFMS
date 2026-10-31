@@ -5,9 +5,11 @@ import { Loading, ProfileRetry } from './Guard.tsx'
 import { safeRedirect } from './redirect.ts'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
+import { Brand } from '../layout/Brand.tsx'
 
-export const HANDLE_RE = /^[a-z0-9_]{3,16}$/
-export const normalizeHandle = (s: string) => s.trim().toLowerCase()
+// 서버(0009_hangul_handle)와 같은 규칙: 영문 소문자·숫자·_·완성형 한글, 2~16자, NFC로 저장
+export const HANDLE_RE = /^[a-z0-9_가-힣]{2,16}$/
+export const normalizeHandle = (s: string) => s.trim().normalize('NFC').toLowerCase()
 
 export function WelcomePage() {
   const { session, profile, loading, error: loadError, refresh } = useAuth()
@@ -52,7 +54,7 @@ export function WelcomePage() {
   if (!profile?.handle) {
     return (
       <main className="auth-page">
-        <h1 className="app-title">ONLYFMS</h1>
+        <Brand />
         <h2>아이디를 정해 주세요</h2>
         <form onSubmit={submit} className="stack">
           <label htmlFor="handle">아이디</label>
@@ -66,7 +68,7 @@ export function WelcomePage() {
             maxLength={40}
           />
           {input.trim() !== '' && <p className="muted">저장될 아이디: {normalized}</p>}
-          <p className="muted">영문 소문자, 숫자, _ 로 3~16자 (한 번 정하면 바꿀 수 없어요)</p>
+          <p className="muted">한글, 영문 소문자, 숫자, _ 로 2~16자 (한 번 정하면 바꿀 수 없어요)</p>
           <button className="btn btn-primary" type="submit" disabled={!valid || busy}>아이디 정하기</button>
           {error && <p role="alert" className="form-error">{error}</p>}
         </form>
@@ -77,7 +79,7 @@ export function WelcomePage() {
 
   return (
     <main className="auth-page">
-      <h1 className="app-title">ONLYFMS</h1>
+      <Brand />
       {profile.status === 'rejected' ? (
         <p>가입이 승인되지 않았어요. 문의는 관리자에게 해 주세요.</p>
       ) : (

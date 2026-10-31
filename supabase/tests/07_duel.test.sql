@@ -2,7 +2,7 @@
 -- 한 트랜잭션 안에서 now()는 고정이다. 대국 행은 슈퍼유저(= Edge Function의 소유자 연결)로 직접 넣는다.
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-*)을 쓰고, 숨김 게임 확인에만 yacht를 쓴다.
 begin;
-select plan(96);
+select plan(101);
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000c0","role":"authenticated"}'
 \set C1  '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}'
@@ -252,6 +252,24 @@ select ok(jsonb_typeof(public.duel_stats('duela', null)) = 'array'
                 where e ->> 'game_id' in ('g-win', 'g-h2h', 'g-fr')) = 3,
   'duel_stats: p_game null → per-game array');
 select is(public.duel_stats('nobody', 'g-win'), null::jsonb, 'duel_stats: unknown handle → null');
+select is(public.duel_stats('손 흥민', null), null::jsonb, 'duel_stats: invalid handle → null (no error)');
+select is(public.duel_h2h('ㅋ', 'duelb', null), null::jsonb, 'duel_h2h: invalid handle → null (no error)');
+
+-- 한글 아이디: NFC로 저장된 사용자를 NFD·대소문자·공백이 섞인 입력으로도 찾는다 (0009_hangul_handle)
+reset role;
+update public.profiles set handle = '손흥민' where id = '00000000-0000-0000-0000-0000000000c1';
+set local role authenticated;
+set local request.jwt.claims = :'C5';
+select ok(normalize('손흥민', NFD) <> '손흥민', 'hangul_handle: NFD input differs from stored NFC bytes');
+select ok(public.duel_stats(' ' || normalize('손흥민', NFD) || ' ', 'g-win') is not null
+          and public.duel_stats(' ' || normalize('손흥민', NFD) || ' ', 'g-win') = public.duel_stats('손흥민', 'g-win'),
+  'hangul_handle: duel_stats finds NFC-stored user from NFD input');
+select is(public.duel_h2h(normalize('손흥민', NFD), 'DUELB', 'g-h2h') -> 'games',
+  '[{"game_id":"g-h2h","a_wins":2,"draws":1,"b_wins":1}]'::jsonb, 'hangul_handle: duel_h2h finds NFC-stored user from NFD input');
+reset role;
+update public.profiles set handle = 'duela' where id = '00000000-0000-0000-0000-0000000000c1';
+set local role authenticated;
+set local request.jwt.claims = :'C5';
 
 -- ---------------------------------------------------------------- duel_h2h
 select is(public.duel_h2h('duela', 'duelb', 'g-h2h') -> 'games',

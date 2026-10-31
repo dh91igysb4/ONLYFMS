@@ -3,6 +3,7 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { duels } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { normalizeHandle } from '../auth/WelcomePage.tsx'
 import { duelRate } from '../leaderboard/duelFormat.ts'
 
 type Wdl = { w: number; d: number; l: number; rate: number | null }
@@ -24,7 +25,7 @@ const day = (iso: string) => kstDate(Date.parse(iso))
 export function DuelSection({ handle }: { handle: string }) {
   const { profile } = useAuth()
   const me = profile?.handle ?? ''
-  const mine = !!me && me.toLowerCase() === handle.toLowerCase()
+  const mine = !!me && normalizeHandle(me) === normalizeHandle(handle)
   const [stats, setStats] = useState<GameStat[] | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)

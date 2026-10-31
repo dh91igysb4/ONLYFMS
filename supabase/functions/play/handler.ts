@@ -210,12 +210,24 @@ function checkAccess(
   return { game }
 }
 
-function ctxFor(now: number, item: ItemRow, startedAt: number): Ctx {
-  return { now, startedAt, deadline: item.ends_at.getTime() }
+/**
+ * 이 기록의 마감 시각(ms). 데일리이고 게임에 제한 시간이 있으면 처음 연 시각부터 그만큼, 단 그날 자정을 넘지 않는다.
+ * 대회와 제한 시간이 없는 게임은 대회 종료 시각.
+ */
+function deadlineOf(game: GameModule, item: ItemRow, startedAt: number | undefined): number {
+  const end = item.ends_at.getTime()
+  const limit = item.kind === 'daily' ? game.manifest.dailyTimeLimitSec : null
+  if (!limit || startedAt === undefined) return end
+  return Math.min(end, startedAt + limit * 1000)
+}
+
+function ctxFor(now: number, game: GameModule, item: ItemRow, startedAt: number): Ctx {
+  return { now, startedAt, deadline: deadlineOf(game, item, startedAt) }
 }
 
 function view(game: GameModule, item: ItemRow, attempt: AttemptRow | undefined, now: number): PlayView {
-  const ended = now >= item.ends_at.getTime()
+  const deadline = deadlineOf(game, item, attempt?.started_at.getTime())
+  const ended = now >= deadline
   const v: PlayView = {
     item_id: item.id,
     contest_id: item.contest_id,
@@ -229,7 +241,7 @@ function view(game: GameModule, item: ItemRow, attempt: AttemptRow | undefined, 
     finished: (attempt?.finished ?? false) || ended,
     score: attempt ? Number(attempt.score) : null,
     action_count: attempt?.action_count ?? 0,
-    ends_at: item.ends_at.toISOString(),
+    ends_at: new Date(deadline).toISOString(),
     server_now: now,
   }
   if ((attempt?.finished || ended) && item.puzzle != null) v.reveal = game.logic.reveal(item.puzzle)
@@ -249,9 +261,14 @@ async function lockAttempt(tx: Tx, itemId: string, uid: string): Promise<Attempt
  * "지금 포기했다면 받을 점수"(§4.2, §5.3)이므로 그대로 둔다. 새 버전 로직은 옛 상태에 전혀 호출하지 않는다.
  */
 async function finalizeForVersion(tx: Tx, item: ItemRow, uid: string, now: number): Promise<AttemptRow> {
+  return await finalizeAt(tx, item, uid, now)
+}
+
+/** 진행 중 기록을 저장된 점수 그대로 at 시각에 끝낸다 (버전 변경·데일리 제한 시간 초과) */
+async function finalizeAt(tx: Tx, item: ItemRow, uid: string, at: number): Promise<AttemptRow> {
   const [row] = await tx<AttemptRow[]>`
     update public.attempts
-       set finished = true, finished_at = ${new Date(now)}
+       set finished = true, finished_at = ${new Date(at)}
      where item_id = ${item.id} and user_id = ${uid}
      returning state, logic_version, finished, score, action_count, started_at`
   return row
@@ -346,7 +363,7 @@ async function open(deps: Deps, reg: Registry, me: Me, itemId: string): Promise<
 
     let attempt = await lockAttempt(tx, it.id, me.id)
     if (!attempt && live) {
-      const ctx = ctxFor(now, it, now)
+      const ctx = ctxFor(now, game, it, now)
       const state = game.logic.initState(it.puzzle, ctx)
       const score = normalizeScore(game.logic.score(state, ctx))
       await tx`
@@ -359,6 +376,11 @@ async function open(deps: Deps, reg: Registry, me: Me, itemId: string): Promise<
     if (attempt && live && !attempt.finished && attempt.logic_version !== game.logic.version) {
       attempt = await finalizeForVersion(tx, it, me.id, now)
       return err(409, 'version_changed', { view: view(game, it, attempt, now) })
+    }
+    // 데일리 제한 시간이 지났으면 마감 시각에 그 시점 점수로 확정한다
+    if (attempt && live && !attempt.finished) {
+      const deadline = deadlineOf(game, it, attempt.started_at.getTime())
+      if (now >= deadline) attempt = await finalizeAt(tx, it, me.id, deadline)
     }
     return out(200, view(game, it, attempt, now))
   })
@@ -390,11 +412,16 @@ async function act(
       const done = await finalizeForVersion(tx, it, me.id, now)
       return err(409, 'version_changed', { view: view(game, it, done, now) })
     }
+    const deadline = deadlineOf(game, it, attempt.started_at.getTime())
+    if (now >= deadline) {
+      const done = await finalizeAt(tx, it, me.id, deadline)
+      return err(409, 'timeout', { view: view(game, it, done, now) })
+    }
     if (expectedCount !== attempt.action_count) {
       return err(409, 'stale', { view: view(game, it, attempt, now) })
     }
 
-    const r = step(game.logic, it.puzzle, attempt.state, payload, ctxFor(now, it, attempt.started_at.getTime()))
+    const r = step(game.logic, it.puzzle, attempt.state, payload, ctxFor(now, game, it, attempt.started_at.getTime()))
     if (!r.ok) return err(400, 'invalid_action', r.error === undefined ? {} : { message: r.error })
 
     const at = new Date(now)

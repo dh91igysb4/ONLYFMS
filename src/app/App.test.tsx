@@ -11,7 +11,7 @@ beforeEach(() => window.history.pushState({}, '', '/'))
 test('renders app shell title', async () => {
   setAuth(null, false) // 로그아웃 상태 → 로그인 화면
   render(<App />)
-  expect(await screen.findByText('ONLYFMS')).toBeInTheDocument()
+  expect(await screen.findByText('playONLYFMS')).toBeInTheDocument()
 })
 
 test('approved user sees layout nav and placeholder home', async () => {

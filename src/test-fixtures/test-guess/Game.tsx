@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GameProps } from '../ui.ts'
+import type { GameProps } from '../../games/ui.ts'
 import { MAX_GUESSES, type State } from './logic.ts'
 
 const FEEDBACK = {

@@ -1,4 +1,4 @@
--- 0009_duel: 1대1 대전 테이블·권한·Elo·목록·순위·전적 함수 (대전 설계 §4~§7)
+-- 0011_duel: 1대1 대전 테이블·권한·Elo·목록·순위·전적 함수 (대전 설계 §4~§7)
 --
 -- 원칙
 --   * 쓰기는 브라우저에 모두 열지 않는다. duel Edge Function이 DB 소유자 연결로 직접 쓰고
@@ -301,10 +301,12 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- 승인 사용자의 아이디 → id. 없거나 승인 상태가 아니면 null.
+-- 정규화는 _normalize_handle(0009)과 같다(앞뒤 공백 제거 → NFC → 소문자). 단, 형식이 틀린 입력도
+-- 예외 없이 null(없는 사용자)로 돌려준다 — 조회 함수라서.
 create function public._duel_user_by_handle(p_handle text) returns uuid
 language sql stable security definer set search_path = public as $$
   select p.id from public.profiles p
-   where p.handle::text = lower(btrim(p_handle)) and p.status = 'approved'
+   where p.handle::text = lower(normalize(btrim(p_handle), NFC)) and p.status = 'approved'
 $$;
 
 -- ------------------------------------------------------------------ public RPCs

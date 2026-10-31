@@ -12,7 +12,7 @@ function ok(r: { state: State } | { error: string }): State {
 const guess = (s: State, value: number) => logic.apply(P, s, { type: 'guess', value }, ctx)
 const init = () => logic.initState(P, ctx)
 
-describe('number-guess logic', () => {
+describe('test-guess logic', () => {
   test('version and puzzleKey', () => {
     expect(logic.version).toBe(1)
     expect(logic.puzzleKey(P)).toBe('100:42')

@@ -3,6 +3,10 @@ import { beforeEach, expect, test, vi } from 'vitest'
 
 const playMock = vi.fn()
 const submitMock = vi.fn(async () => {})
+vi.mock('../../games/index.ts', async (orig) =>
+  (await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
+vi.mock('../../games/ui.ts', async (orig) =>
+  (await import('../../test-fixtures/ui.ts')).withTestGameUi(await orig()))
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'http://x', supabaseKey: 'k' }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
@@ -15,12 +19,12 @@ vi.mock('./freeQueue.ts', () => ({ submit: (...a: unknown[]) => (submitMock as (
 
 import { ApiError, type PlayView } from '../../lib/api.ts'
 import { PlayRunner } from './PlayRunner.tsx'
-import { logic } from '../../games/number-guess/logic.ts'
+import { logic } from '../../test-fixtures/test-guess/logic.ts'
 
 const emptyState = { guesses: [], feedback: [], hintUsed: false, parity: null, gaveUp: false }
 function view(over: Partial<PlayView> = {}): PlayView {
   return {
-    item_id: 'it1', contest_id: 'c1', game_id: 'number-guess', options: { range: '100' },
+    item_id: 'it1', contest_id: 'c1', game_id: 'test-guess', options: { range: '100' },
     public_state: emptyState, finished: false, score: null, action_count: 0,
     ends_at: new Date(Date.now() + 3_600_000).toISOString(), server_now: Date.now(), ...over,
   }
@@ -172,16 +176,36 @@ test('invalid_action_shows_message_and_refreshes_view', async () => {
 
 test('local_mode_submits_free_play_on_finish', async () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.49) // 정답 50
-  render(<PlayRunner mode="local" gameId="number-guess" options={{ range: '100' }} />)
+  render(<PlayRunner mode="local" gameId="test-guess" options={{ range: '100' }} />)
   await screen.findByText('남은 기회 8')
   guess(50)
   await screen.findByText(/정답은 50/)
   expect(submitMock).toHaveBeenCalledTimes(1)
   expect(submitMock).toHaveBeenCalledWith(expect.objectContaining({
-    user_id: 'u1', game_id: 'number-guess', options: { range: '100' },
+    user_id: 'u1', game_id: 'test-guess', options: { range: '100' },
     logic_version: logic.version, solved: true, score: 10, action_count: 1,
     client_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
   }))
   expect(submitMock.mock.calls[0]).not.toContain('played_at')
   vi.restoreAllMocks()
+})
+
+test('timeout_409_shows_result_and_notice', async () => {
+  playMock.mockResolvedValueOnce(view())
+  render(<PlayRunner mode="server" itemId="it1" />)
+  await screen.findByText('남은 기회 8')
+  const done = view({ finished: true, score: 0, reveal: { answer: 42 } })
+  playMock.mockRejectedValueOnce(new ApiError('timeout', 409, { error: 'timeout', view: done }))
+  guess(50)
+  await screen.findByText('제한 시간이 끝났어요')
+})
+
+test('timer_reaching_zero_reopens_once_and_shows_notice', async () => {
+  playMock.mockResolvedValueOnce(view({ ends_at: new Date(Date.now() + 1500).toISOString() }))
+  render(<PlayRunner mode="server" itemId="it1" />)
+  await screen.findByText('남은 기회 8')
+  playMock.mockResolvedValue(view({ finished: true, score: 0, reveal: { answer: 42 }, ends_at: new Date(Date.now()).toISOString() }))
+  await screen.findByText('제한 시간이 끝났어요', {}, { timeout: 4000 })
+  expect(playMock).toHaveBeenCalledTimes(2)
+  expect(playMock).toHaveBeenLastCalledWith({ action: 'open', item_id: 'it1' })
 })

@@ -48,6 +48,7 @@ const coinManifest = (id: string, hidden: boolean): Manifest => ({
   category: 'duel',
   modes: { daily: false, contest: false, free: false },
   puzzleSource: 'generate',
+  dailyTimeLimitSec: null,
   options: [{ key: 'mode', label: '모드', choices: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], default: 'a' }],
   duel: { turnSeconds: { choices: [30, 60, 90], default: 60 }, sameScreen: true },
 })
@@ -203,7 +204,7 @@ t('unknown_game_404', async () => {
   assert.equal(r.status, 404)
   assert.equal(r.body.error, 'unknown_game')
   // 솔로 게임은 대전 등록부에 없다
-  const r2 = await create(u, T0, { game: 'number-guess' })
+  const r2 = await create(u, T0, { game: 'who-are-ya' })
   assert.equal(r2.status, 404)
   assert.equal(r2.body.error, 'unknown_game')
 })

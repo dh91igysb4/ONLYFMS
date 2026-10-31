@@ -8,11 +8,12 @@ vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
   rpc: (...a: unknown[]) => rpcMock(...a),
 }))
+const auth = vi.hoisted(() => ({ handle: 'kane' }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
-  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: false } }),
+  useAuth: () => ({ profile: { id: 'u1', handle: auth.handle, status: 'approved', is_admin: false } }),
 }))
 vi.mock('../../games/index.ts', () => ({
-  games: [{ manifest: { id: 'number-guess', name: '숫자 맞추기', hidden: false } }],
+  games: [{ manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } }],
   duels: [{ manifest: { id: 'yacht', name: '요트 다이스', hidden: false } }],
 }))
 
@@ -24,7 +25,7 @@ const renderAt = (h: string) => render(
   </MemoryRouter>,
 )
 
-beforeEach(() => rpcMock.mockReset())
+beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane' })
 
 function setup(over: Record<string, unknown>) {
   rpcMock.mockImplementation(async (name: string) => (name in over ? over[name] : name === 'duel_stats' ? [] : null))
@@ -52,10 +53,10 @@ test('profile_not_found_message', async () => {
 
 test('profile_renders_sections', async () => {
   setup({ user_stats: {
-    daily_by_game: [{ game_id: 'number-guess', days: 5, avg_score: 7.5 }],
+    daily_by_game: [{ game_id: 'test-guess', days: 5, avg_score: 7.5 }],
     contests: [{ contest_id: 'c1', title: '개막 대회', kind: 'official', ends_at: '2026-10-01T00:00:00Z', rank: 2, score: 18 }],
     free_by_game: [{ game_id: 'old-game', plays: 4, wins: 2, win_rate: 0.5, best_streak: 2 }],
-    recent: [{ type: 'free', game_id: 'number-guess', score: 9, at: '2026-10-30T10:00:00Z' }],
+    recent: [{ type: 'free', game_id: 'test-guess', score: 9, at: '2026-10-30T10:00:00Z' }],
   } })
   renderAt('kane')
   expect(await screen.findByText('개막 대회')).toBeTruthy()
@@ -134,4 +135,24 @@ test('profile_own_without_duels_shows_empty', async () => {
   renderAt('kane')
   expect(await screen.findByText('아직 대전 기록이 없어요')).toBeTruthy()
   expect(rpcMock).not.toHaveBeenCalledWith('duel_h2h', expect.anything() as never)
+})
+
+test('hangul_handle_in_url', async () => {
+  rpcMock.mockResolvedValue(null)
+  renderAt('손흥민')
+  await screen.findByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+  rpcMock.mockReset()
+  rpcMock.mockResolvedValue(null)
+  renderAt(encodeURIComponent('손흥민'))
+  await screen.findAllByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+})
+
+test('profile_own_hangul_handle_nfd_url_is_mine', async () => {
+  auth.handle = '손흥민'
+  setup({ user_stats: emptyStats, duel_stats: [duelStat], duel_h2h: { games: [], recent: [] } })
+  renderAt(encodeURIComponent('손흥민'.normalize('NFD')))
+  // 내 프로필로 판별 → 기본 상대는 첫 상대(messi)
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('duel_h2h', { p_handle_a: '손흥민', p_handle_b: 'messi', p_game: null }))
 })

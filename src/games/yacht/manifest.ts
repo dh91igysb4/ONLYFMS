@@ -8,6 +8,7 @@ export const manifest: Manifest = {
   category: 'duel',
   modes: { daily: false, contest: false, free: false },
   puzzleSource: 'generate',
+  dailyTimeLimitSec: null,
   options: [],
   duel: { turnSeconds: { choices: [30, 60, 90], default: 60 }, sameScreen: true },
 }

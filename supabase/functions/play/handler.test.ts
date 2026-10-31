@@ -5,8 +5,8 @@ import postgres from 'postgres'
 import { handle, type Deps } from './handler.ts'
 import type { GameLogic, GameModule } from '../../../src/games/types.ts'
 import { getGame } from '../../../src/games/index.ts'
-import { logic as ng } from '../../../src/games/number-guess/logic.ts'
-import { manifest as ngManifest } from '../../../src/games/number-guess/manifest.ts'
+import { logic as ng } from '../../../src/test-fixtures/test-guess/logic.ts'
+import { manifest as ngManifest } from '../../../src/test-fixtures/test-guess/manifest.ts'
 import { PLAYERS } from '../../../src/games/who-are-ya/data.ts'
 
 const url = Deno.env.get('TEST_DB_URL')
@@ -14,7 +14,7 @@ if (!url) throw new Error('TEST_DB_URL is required (npm run fn:test)')
 const sql = postgres(url, { max: 20, onnotice: () => {} })
 
 // ---------------------------------------------------------------- fake games
-// fake-gen: number-guess와 같은 규칙, pickPuzzle 호출 수를 센다(키는 호출마다 달라 재시도가 없다)
+// fake-gen: test-guess와 같은 규칙, pickPuzzle 호출 수를 센다(키는 호출마다 달라 재시도가 없다)
 let genCalls = 0
 const fakeGen: GameModule = {
   manifest: { ...ngManifest, id: 'fake-gen', name: '가짜 생성', hidden: false },
@@ -50,7 +50,14 @@ const fakeVerV2: GameModule = {
     ...ng, version: 2, score: () => 7, apply: boom, publicState: boom, isFinished: boom, actionCount: boom,
   } as GameLogic<unknown, unknown, unknown, unknown>,
 }
-const extra = new Map([fakeGen, fakeBank, fakeHidden, fakeVerV1].map((g) => [g.manifest.id, g]))
+// fake-timed: 데일리 제한 시간 10분인 숫자 맞히기
+const fakeTimed: GameModule = {
+  manifest: { ...ngManifest, id: 'fake-timed', name: '가짜 시간제한', hidden: false, dailyTimeLimitSec: 600 },
+  logic: ng,
+}
+// test-guess: 테스트 전용 숫자 맞히기(숨김)
+const testGuess: GameModule = { manifest: ngManifest, logic: ng }
+const extra = new Map([testGuess, fakeGen, fakeBank, fakeHidden, fakeVerV1, fakeTimed].map((g) => [g.manifest.id, g]))
 const registry = { getGame: (id: string) => extra.get(id) ?? getGame(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -128,26 +135,26 @@ function t(name: string, fn: () => Promise<void>) {
   Deno.test({ name, fn, sanitizeOps: false, sanitizeResources: false })
 }
 
-// 테스트 DB 준비: 가짜 게임 모드, 숫자 맞히기는 숨김에서 뺀다(숨김 검사는 fake-hidden으로)
+// 테스트 DB 준비: 가짜 게임 모드, test-guess(숫자 맞히기)는 숨기지 않는다(숨김 검사는 fake-hidden으로)
 t('setup', async () => {
   await sql`insert into public.game_modes (game_id, daily, contest, free) values
     ('fake-gen', true, true, true), ('fake-bank', false, true, true), ('fake-hidden', true, true, true),
-    ('fake-ver', true, true, true)
+    ('fake-ver', true, true, true), ('fake-timed', true, true, true), ('test-guess', true, true, true)
     on conflict do nothing`
-  await sql`delete from public.hidden_games where game_id = 'number-guess'`
+  await sql`delete from public.hidden_games where game_id = 'test-guess'`
   await sql`insert into public.hidden_games (game_id) values ('fake-hidden') on conflict do nothing`
 })
 
 // ---------------------------------------------------------------- auth / errors
 t('unauthenticated_401', async () => {
-  const r = await call(null, { action: 'daily', game_id: 'number-guess' }, T0)
+  const r = await call(null, { action: 'daily', game_id: 'test-guess' }, T0)
   assert.equal(r.status, 401)
   assert.equal(r.body.error, 'unauthorized')
 })
 
 t('pending_user_403', async () => {
   const u = await user('pending')
-  const r = await call(u, { action: 'daily', game_id: 'number-guess' }, T0)
+  const r = await call(u, { action: 'daily', game_id: 'test-guess' }, T0)
   assert.equal(r.status, 403)
   assert.equal(r.body.error, 'not_approved')
 })
@@ -203,7 +210,7 @@ t('hidden_game_forbidden_for_non_admin', async () => {
 
 t('not_joined_403', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'] })
   const r = await call(u, { action: 'open', item_id: c.items[0] }, T0)
   assert.equal(r.status, 403)
   assert.equal(r.body.error, 'not_joined')
@@ -215,15 +222,15 @@ t('not_joined_403', async () => {
 t('daily_creates_once_concurrently', async () => {
   const users = await Promise.all([1, 2, 3, 4, 5].map(() => user()))
   const now = Date.parse('2026-11-01T20:00:00Z') // 2026-11-02 05:00 KST
-  const rs = await Promise.all(users.map((u) => call(u, { action: 'daily', game_id: 'number-guess' }, now)))
+  const rs = await Promise.all(users.map((u) => call(u, { action: 'daily', game_id: 'test-guess' }, now)))
   for (const r of rs) assert.equal(r.status, 200, JSON.stringify(r.body))
   assert.equal(new Set(rs.map((r) => r.body.contest_id)).size, 1)
   assert.equal(new Set(rs.map((r) => r.body.item_id)).size, 1)
-  const [c] = await sql`select * from public.contests where daily_key = 'number-guess:2026-11-02'`
+  const [c] = await sql`select * from public.contests where daily_key = 'test-guess:2026-11-02'`
   assert.equal(c.id, rs[0].body.contest_id)
   assert.equal(c.kind, 'daily')
   assert.equal(c.visibility, 'public')
-  assert.equal(c.title, '숫자 맞히기 · 2026-11-02')
+  assert.equal(c.title, '테스트 숫자 맞히기 · 2026-11-02')
   assert.equal((c.starts_at as Date).toISOString(), '2026-11-01T15:00:00.000Z')
   assert.equal((c.ends_at as Date).toISOString(), '2026-11-02T15:00:00.000Z')
   const items = await sql`select * from public.contest_items where contest_id = ${c.id as string}`
@@ -267,7 +274,7 @@ t('open_generates_puzzle_once_concurrently', async () => {
 t('open_seed_is_deterministic_from_secret', async () => {
   // 같은 대회id·위치·재시도 → 같은 문제 (HMAC 시드)
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c.items[0] }, T0)
   const [it] = await sql`select puzzle, puzzle_key from public.contest_items where id = ${c.items[0]}`
   const { hmacSeed, rngFromSeed } = await import('../../../src/shared/rng.ts')
@@ -281,7 +288,7 @@ t('open_seed_is_deterministic_from_secret', async () => {
 
 t('open_before_start_is_409_not_started', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 + 10 * MIN, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 + 10 * MIN, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   const r = await call(u, { action: 'open', item_id: c.items[0] }, T0)
   assert.equal(r.status, 409)
   assert.equal(r.body.error, 'not_started')
@@ -293,7 +300,7 @@ t('open_before_start_is_409_not_started', async () => {
 
 t('open_cancelled_is_409_ended', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await sql`update public.contests set cancelled_at = ${new Date(T0 - MIN)} where id = ${c.id}`
   const r = await call(u, { action: 'open', item_id: c.items[0] }, T0)
   assert.equal(r.status, 409)
@@ -303,7 +310,7 @@ t('open_cancelled_is_409_ended', async () => {
 // ---------------------------------------------------------------- act
 t('act_flow_to_finish_then_409_finished', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   const o = await call(u, { action: 'open', item_id: c.items[0] }, T0)
   assert.equal(o.status, 200)
   assert.equal(o.body.action_count, 0)
@@ -311,7 +318,7 @@ t('act_flow_to_finish_then_409_finished', async () => {
   assert.equal(o.body.score, 0)
   assert.equal(o.body.server_now, T0)
   assert.equal(o.body.ends_at, new Date(T0 + HOUR).toISOString())
-  assert.equal(o.body.game_id, 'number-guess')
+  assert.equal(o.body.game_id, 'test-guess')
   assert.equal(o.body.contest_id, c.id)
   assert.deepEqual(o.body.options, { range: '100' })
   const ans = await answerOf(c.items[0])
@@ -348,7 +355,7 @@ t('act_flow_to_finish_then_409_finished', async () => {
 
 t('act_without_open_is_409_not_opened', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'give_up' } }, T0)
   assert.equal(r.status, 409)
   assert.equal(r.body.error, 'not_opened')
@@ -356,7 +363,7 @@ t('act_without_open_is_409_not_opened', async () => {
 
 t('duplicate_act_is_rejected_as_stale', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c.items[0] }, T0)
   const ans = await answerOf(c.items[0])
   const body = { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: miss(ans) } }
@@ -384,7 +391,7 @@ t('duplicate_act_is_rejected_as_stale', async () => {
 t('act_after_daily_end_is_409', async () => {
   const u = await user()
   const noon = Date.parse('2026-11-05T03:00:00Z') // 2026-11-05 12:00 KST
-  const d = await call(u, { action: 'daily', game_id: 'number-guess' }, noon)
+  const d = await call(u, { action: 'daily', game_id: 'test-guess' }, noon)
   assert.equal(d.status, 200)
   const item = d.body.item_id as string
   const o = await call(u, { action: 'open', item_id: item }, noon)
@@ -401,13 +408,13 @@ t('act_after_daily_end_is_409', async () => {
   assert.equal(at.action_count, 1)
   assert.equal(at.finished, false)
   // 자정을 넘긴 daily는 새 날짜의 대회
-  const d2 = await call(u, { action: 'daily', game_id: 'number-guess' }, afterMidnight)
+  const d2 = await call(u, { action: 'daily', game_id: 'test-guess' }, afterMidnight)
   assert.notEqual(d2.body.contest_id, d.body.contest_id)
 })
 
 t('act_after_contest_end_is_409_ended', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c.items[0] }, T0)
   const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'give_up' } }, T0 + HOUR)
   assert.equal(r.status, 409)
@@ -416,7 +423,7 @@ t('act_after_contest_end_is_409_ended', async () => {
   assert.equal(r2.status, 409)
   assert.equal(r2.body.error, 'ended')
   // 취소된 대회도 ended
-  const c2 = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c2 = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c2.items[0] }, T0)
   await sql`update public.contests set cancelled_at = ${new Date(T0)} where id = ${c2.id}`
   const r3 = await call(u, { action: 'act', item_id: c2.items[0], expected_count: 0, payload: { type: 'give_up' } }, T0 + 1)
@@ -426,7 +433,7 @@ t('act_after_contest_end_is_409_ended', async () => {
 
 t('version_mismatch_finalizes_and_409', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c.items[0] }, T0)
   const ans = await answerOf(c.items[0])
   await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, T0 + 1000)
@@ -485,7 +492,7 @@ t('version_change_keeps_stored_score_and_hides_old_state', async () => {
 
 t('reveal_only_when_finished_or_ended', async () => {
   const [a, b, never] = await Promise.all([user(), user(), user()])
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [a, b, never] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [a, b, never] })
   const oa = await call(a, { action: 'open', item_id: c.items[0] }, T0)
   assert.equal('reveal' in oa.body, false)
   const ob = await call(b, { action: 'open', item_id: c.items[0] }, T0)
@@ -517,7 +524,7 @@ t('reveal_only_when_finished_or_ended', async () => {
 
 t('open_after_end_on_unfinished_attempt_is_finished_with_reveal', async () => {
   const u = await user()
-  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['number-guess'], join: [u] })
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['test-guess'], join: [u] })
   await call(u, { action: 'open', item_id: c.items[0] }, T0)
   const ans = await answerOf(c.items[0])
   const a1 = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, T0 + 1000)
@@ -648,6 +655,77 @@ t('who_are_ya_daily_plays_through_handler', async () => {
   const f = await call(other, { action: 'open', item_id: itemId }, now + 8000)
   assert.equal(f.status, 200, JSON.stringify(f.body))
   assert.equal(f.body.finished, false)
+})
+
+// ---------------------------------------------------------------- daily time limit
+t('daily_time_limit_counts_from_first_open', async () => {
+  const u = await user()
+  const t0 = Date.parse('2026-11-12T03:00:00Z') // 12:00 KST
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, t0)
+  assert.equal(d.status, 200, JSON.stringify(d.body))
+  const item = d.body.item_id as string
+  const o = await call(u, { action: 'open', item_id: item }, t0)
+  assert.equal(o.status, 200)
+  assert.equal(o.body.ends_at, new Date(t0 + 10 * MIN).toISOString())
+  // 다시 열어도 처음 연 시각 기준이다
+  const o2 = await call(u, { action: 'open', item_id: item }, t0 + 5 * MIN)
+  assert.equal(o2.body.ends_at, new Date(t0 + 10 * MIN).toISOString())
+  const ans = await answerOf(item)
+  const a1 = await call(u, { action: 'act', item_id: item, expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, t0 + 10 * MIN - 1)
+  assert.equal(a1.status, 200, JSON.stringify(a1.body))
+  const stored = Number(a1.body.score)
+  const a2 = await call(u, { action: 'act', item_id: item, expected_count: 1, payload: { type: 'guess', value: ans } }, t0 + 10 * MIN)
+  assert.equal(a2.status, 409)
+  assert.equal(a2.body.error, 'timeout')
+  const view = a2.body.view as Record<string, unknown>
+  assert.equal(view.finished, true)
+  assert.equal(view.score, stored)
+  assert.deepEqual(view.reveal, { answer: ans })
+  const [at] = await sql`select * from public.attempts where item_id = ${item} and user_id = ${u}`
+  assert.equal(at.finished, true)
+  assert.equal(at.action_count, 1)
+  assert.equal(Number(at.score), stored)
+  // 확정 시각은 마감 시각
+  assert.equal((at.finished_at as Date).getTime(), t0 + 10 * MIN)
+  const again = await call(u, { action: 'act', item_id: item, expected_count: 1, payload: { type: 'give_up' } }, t0 + 11 * MIN)
+  assert.equal(again.body.error, 'finished')
+})
+
+t('daily_time_limit_open_after_deadline_finalizes', async () => {
+  const u = await user()
+  const t0 = Date.parse('2026-11-13T03:00:00Z')
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, t0)
+  const item = d.body.item_id as string
+  await call(u, { action: 'open', item_id: item }, t0)
+  const o = await call(u, { action: 'open', item_id: item }, t0 + 30 * MIN)
+  assert.equal(o.status, 200, JSON.stringify(o.body))
+  assert.equal(o.body.finished, true)
+  assert.ok(o.body.reveal !== undefined)
+  const [at] = await sql`select finished, finished_at from public.attempts where item_id = ${item} and user_id = ${u}`
+  assert.equal(at.finished, true)
+  assert.equal((at.finished_at as Date).getTime(), t0 + 10 * MIN)
+  // 다른 사람은 자기 10분을 새로 받는다
+  const other = await user()
+  const f = await call(other, { action: 'open', item_id: item }, t0 + 30 * MIN)
+  assert.equal(f.body.finished, false)
+  assert.equal(f.body.ends_at, new Date(t0 + 40 * MIN).toISOString())
+})
+
+t('daily_time_limit_capped_at_midnight', async () => {
+  const u = await user()
+  const late = Date.parse('2026-11-14T14:55:00Z') // 23:55 KST
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, late)
+  const o = await call(u, { action: 'open', item_id: d.body.item_id }, late)
+  assert.equal(o.body.ends_at, '2026-11-14T15:00:00.000Z')
+})
+
+t('time_limit_does_not_apply_to_contests', async () => {
+  const u = await user()
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['fake-timed'], join: [u] })
+  const o = await call(u, { action: 'open', item_id: c.items[0] }, T0)
+  assert.equal(o.body.ends_at, new Date(T0 + HOUR).toISOString())
+  const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'give_up' } }, T0 + 30 * MIN)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
 })
 
 t('teardown', async () => {

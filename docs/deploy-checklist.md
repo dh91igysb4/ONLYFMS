@@ -66,7 +66,7 @@ update profiles set is_admin = true, status = 'approved', approved_at = now() wh
 
 ## 6. 수동 확인 (미리보기 주소, 폰과 PC 모두)
 - [ ] 1. 두 번째 구글 계정 가입 → 대기 화면 → 관리자 승인 → 게임 목록 보임
-- [ ] 2. 비관리자에게 숫자 맞히기가 안 보이고, 관리자에게는 보임
+- [ ] 2. 숨김 게임(`hidden: true`)이 있으면 비관리자에게 안 보이고, 관리자에게는 보임 (숫자 맞히기는 0008에서 제거됨)
 - [ ] 3. 데일리: 추측·힌트·포기·결과. 다른 기기에서 이어 풀기
 - [ ] 4. 오늘 탭에 두 계정 순위, 동점 처리
 - [ ] 5. 친선 대회(10분 뒤 시작, 5분) 개설 → 초대 링크로 두 번째 계정 참가 → 카운트다운 → 동시 풀이 → 5초 순위 갱신 → 종료 후 정답 공개, 누적 탭 미반영
@@ -84,7 +84,7 @@ update profiles set is_admin = true, status = 'approved', approved_at = now() wh
 ## 대전(1대1) 배포
 `feat/duel` 머지 전에, 미리보기에서 확인한다. 요트 다이스는 숨김(관리자만)으로 들어간다.
 
-- [ ] 마이그레이션: `npx -y supabase@2 db push` → `0008_yacht.sql`, `0009_duel.sql`
+- [ ] 마이그레이션: `npx -y supabase@2 db push` → `0010_yacht.sql`, `0011_duel.sql`
 - [ ] 함수 배포 (두 함수 모두. `_shared/db.ts`를 바꾸면 항상 둘 다 다시 배포)
 ```bash
 npx -y supabase@2 functions deploy duel --no-verify-jwt

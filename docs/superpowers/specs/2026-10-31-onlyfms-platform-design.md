@@ -73,7 +73,7 @@ src/
     admin/             관리자 화면
   games/
     index.ts           게임 등록부 (게임 모듈 배열)
-    number-guess/      테스트용 게임
+    <game-id>/         게임 하나 (예: who-are-ya). 테스트 전용 숫자 맞히기는 src/test-fixtures/test-guess/ (운영 등록부·DB에 없음, 0008에서 제거)
       manifest.ts
       logic.ts         순수 함수만. 브라우저·Edge Function 공용
       logic.test.ts
@@ -96,6 +96,7 @@ export const manifest = {
   hidden: true,                // true면 관리자에게만 보임
   modes: { daily: true, contest: true, free: true },
   puzzleSource: 'generate',    // 'generate' = 서버가 pickPuzzle로 출제, 'bank' = 문제 은행에서 출제 (4.4)
+  dailyTimeLimitSec: 600,      // 데일리 제한 시간(초). 처음 연 순간부터 센다. null이면 자정까지. 대회에는 적용 안 함
   options: [                   // 자유 플레이·대회에서 고를 수 있는 설정 (없으면 빈 배열)
     { key: 'range', label: '범위', choices: [{ value: '100', label: '1~100' }, { value: '1000', label: '1~1000' }], default: '100' },
   ],
@@ -222,7 +223,7 @@ Edge Function(Deno)이 `src/games/<게임>/logic.ts`를 상대 경로로 직접 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | id | uuid PK, FK auth.users | |
-| handle | citext UNIQUE NULL | 아이디. 정규식 `^[a-z0-9_]{3,16}$` (소문자로 저장) |
+| handle | citext UNIQUE NULL | 아이디. 정규식 `^[a-z0-9_가-힣]{2,16}$` (NFC·소문자로 저장, 0009에서 한글 허용) |
 | status | enum `pending`/`approved`/`rejected` | 기본값 pending |
 | is_admin | boolean | 기본값 false |
 | created_at, approved_at | timestamptz | |
@@ -347,7 +348,8 @@ POST 요청이며, Authorization 헤더의 사용자 JWT로 호출자를 확인�
 
 - 등록부에 없거나 해당 모드를 지원하지 않는 game_id는 404.
 - 같은 사용자의 동시 행동은 attempts 행 잠금(`SELECT … FOR UPDATE`)으로 순서를 보장한다.
-- `Ctx`의 now는 서버 시각, startedAt은 기록의 started_at, deadline은 대회 ends_at이다.
+- `Ctx`의 now는 서버 시각, startedAt은 기록의 started_at, deadline은 대회 ends_at이다. 단 데일리이고 manifest에 `dailyTimeLimitSec`이 있으면 deadline은 min(started_at + 제한 시간, ends_at)이고, 화면에 주는 `PlayView.ends_at`도 이 값이다.
+- 데일리 제한 시간이 지나면 다음 open/act에서 서버가 기록을 저장된 점수(그 시점 포기 점수)로 마감 시각(finished_at = deadline)에 확정한다. act는 409 `timeout`(화면 포함), open은 끝난 화면을 200으로 준다. 브라우저는 남은 시간이 0이 되면 한 번 다시 열어 결과를 받는다.
 
 ## 9. 리더보드와 통계
 

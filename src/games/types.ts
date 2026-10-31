@@ -46,6 +46,11 @@ export type Manifest = {
   hidden: boolean
   modes: { daily: boolean; contest: boolean; free: boolean }
   puzzleSource: 'generate' | 'bank'
+  /**
+   * 데일리 제한 시간(초). 처음 연 순간(attempts.started_at)부터 센다. null이면 그날 자정까지.
+   * 끝나면 서버가 그 시점 점수("지금 포기했다면 받을 점수")로 확정한다. 대회에는 적용하지 않는다.
+   */
+  dailyTimeLimitSec: number | null
   options: ManifestOption[]
   /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3) */
   category?: 'solo' | 'duel'
