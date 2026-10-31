@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -23,19 +23,26 @@ import { resetServerTime, syncFromView } from '../../lib/serverTime.ts'
 
 beforeEach(() => { rpcMock.mockReset(); playMock.mockReset(); admin = true; resetServerTime() })
 
+/** 홈 화면에서 숫자 맞히기 카드만 (등록부에 다른 게임이 있어도 이 카드로 검사한다) */
+async function ngCard() {
+  return within((await screen.findByRole('heading', { name: '숫자 맞히기' })).closest('article') as HTMLElement)
+}
+
 test('home shows own daily score for admin-visible hidden game', async () => {
   rpcMock.mockResolvedValue([{ user_id: 'u2', score: 3 }, { user_id: 'u1', score: 8.5 }])
   render(<MemoryRouter><HomePage /></MemoryRouter>)
-  expect(await screen.findByText('오늘 8.5점')).toBeInTheDocument()
+  const card = await ngCard()
+  expect(await card.findByText('오늘 8.5점')).toBeInTheDocument()
   expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), p_game: 'number-guess' })
-  expect(screen.getByRole('link', { name: '데일리' })).toHaveAttribute('href', '/play/number-guess/daily')
-  expect(screen.getByRole('link', { name: '자유 플레이' })).toHaveAttribute('href', '/play/number-guess/free')
+  expect(card.getByRole('link', { name: '데일리' })).toHaveAttribute('href', '/play/number-guess/daily')
+  expect(card.getByRole('link', { name: '자유 플레이' })).toHaveAttribute('href', '/play/number-guess/free')
 })
 
 test('home says not played yet, and hides hidden games from non-admins', async () => {
   rpcMock.mockResolvedValue([])
-  render(<MemoryRouter><HomePage /></MemoryRouter>)
-  expect(await screen.findByText('아직 안 풀었어요')).toBeInTheDocument()
+  const r = render(<MemoryRouter><HomePage /></MemoryRouter>)
+  expect(await (await ngCard()).findByText('아직 안 풀었어요')).toBeInTheDocument()
+  r.unmount()
   admin = false
   render(<MemoryRouter><HomePage /></MemoryRouter>)
   await waitFor(() => expect(screen.getAllByText('아직 열린 게임이 없어요')).toHaveLength(1))
@@ -104,7 +111,7 @@ test('home uses server-synced time for the KST day', async () => {
   // 서버 시각 2030-01-01 00:30 KST (브라우저 시계와 무관)
   syncFromView(Date.parse('2029-12-31T15:30:00Z'))
   render(<MemoryRouter><HomePage /></MemoryRouter>)
-  await screen.findByText('아직 안 풀었어요')
+  await (await ngCard()).findByText('아직 안 풀었어요')
   expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: '2030-01-01', p_game: 'number-guess' })
 })
 
