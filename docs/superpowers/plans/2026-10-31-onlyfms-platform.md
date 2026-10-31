@@ -214,14 +214,11 @@ test('actionCount counts guesses only', () => { /* hint는 세지 않음 */ })
 
 ```ts
 test('every game has unique id, valid id format, and options defaults in choices', () => { /* games 순회 */ })
-test('hidden games match hidden_games seed in migrations', () => {
-  // supabase/migrations/0002_contests.sql 안의 insert into hidden_games 값 집합 == games.filter(g=>g.manifest.hidden).map(id)
-})
 ```
 
 - [ ] **Step 2: 실패 확인** — `npm test -- src/games` → FAIL
 - [ ] **Step 3: 구현** — `types.ts`, `manifest.ts`(§4.1 값 그대로, `hidden: true`), `logic.ts`, `index.ts`. `logic.ts`의 import는 `../types.ts`처럼 확장자를 붙인다.
-- [ ] **Step 4: 통과 확인** — `npm test -- src/games/number-guess` → PASS. registry의 hidden 테스트는 Task 5 이후 PASS이므로 `test.todo`가 아니라 Task 5에서 활성화한다(이 Task에서는 첫 번째 registry 테스트만 작성).
+- [ ] **Step 4: 통과 확인** — `npm test -- src/games` → PASS
 - [ ] **Step 5: Commit** — `git commit -m "feat: 게임 약속 타입, 등록부, 숫자 맞히기 로직"`
 
 ### Task 4: DB — profiles, 승인제, 관리자 함수
@@ -255,7 +252,7 @@ test('hidden games match hidden_games seed in migrations', () => {
 - [ ] **Step 2: 실패 확인** — `supabase start && supabase test db` → FAIL
 - [ ] **Step 3: 마이그레이션 구현**
   - `create extension if not exists citext;`
-  - 공개 컬럼 제한은 RLS + 컬럼 권한(`revoke select on profiles from authenticated; grant select (id, handle, created_at, status) on profiles to authenticated`)으로 한다. 본인 전체 행 조회는 `my_profile()` 함수(반환: profiles 행)를 추가해 제공한다.
+  - 공개 컬럼 제한은 RLS + 컬럼 권한(`revoke select on profiles from authenticated; grant select (id, handle, created_at) on profiles to authenticated`, 다른 행의 승인 여부는 RLS 정책 안에서 security definer 함수로 확인)으로 한다. 본인 전체 행 조회는 `my_profile()` 함수(반환: profiles 행)를 추가해 제공한다.
 - [ ] **Step 4: 통과 확인** — `supabase test db` → PASS
 - [ ] **Step 5: Commit** — `git commit -m "feat(db): profiles, 승인제, 관리자 함수"`
 
@@ -263,7 +260,7 @@ test('hidden games match hidden_games seed in migrations', () => {
 
 **Files:**
 - Create: `supabase/migrations/0002_contests.sql`, `supabase/tests/02_contests_rls.test.sql`
-- Modify: `src/games/registry.test.ts` (hidden 일치 테스트 활성화)
+- Modify: `src/games/registry.test.ts` (hidden 일치 테스트 추가)
 
 **Interfaces:**
 - Consumes: `is_approved()`, `is_admin()` (Task 4)
@@ -288,7 +285,7 @@ test('hidden games match hidden_games seed in migrations', () => {
   - `puzzle_bank_admin_only`
 - [ ] **Step 2: 실패 확인** — `supabase test db` → FAIL
 - [ ] **Step 3: 마이그레이션 구현** — §7 표대로 정책을 작성한다. `contest_items` 원본 표는 authenticated에 select를 주지 않고, 뷰로만 노출한다.
-- [ ] **Step 4: registry hidden 일치 테스트 활성화**
+- [ ] **Step 4: registry 일치 테스트 추가** — `registry.test.ts`에 `hidden games match hidden_games seed in migrations`를 추가한다: `supabase/migrations/*.sql`에서 `insert into hidden_games` 값 집합 == `games.filter(g => g.manifest.hidden).map(g => g.manifest.id)`. (Task 6 이후 같은 방식으로 `game_modes` 일치도 검사)
 - [ ] **Step 5: 통과 확인** — `supabase test db && npm test` → PASS
 - [ ] **Step 6: Commit** — `git commit -m "feat(db): 대회·기록 테이블과 RLS"`
 
@@ -338,7 +335,7 @@ test('hidden games match hidden_games seed in migrations', () => {
   - `lb_daily(p_day date, p_game text default null) returns table(rank int, user_id uuid, handle citext, score numeric, action_count int, finished_at timestamptz)`
   - `lb_range(p_from date, p_to date, p_game text default null)`: 위와 같은 열. daily + 종료된 official 포함
   - `lb_contest(p_contest uuid) returns table(rank int, user_id uuid, handle citext, score numeric, solved_items int, action_count int, last_finished_at timestamptz)`
-  - `lb_contests(p_from date, p_to date) returns table(contest_id uuid, title text, ends_at timestamptz, podium jsonb, user_id uuid, handle citext, total numeric)`. 행 종류는 `kind text`('podium'|'total') 열로 구분하고, 해당 없는 열은 null로 둔다.
+  - `lb_contests(p_from date, p_to date) returns jsonb` — `{ "contests": [{ contest_id, title, ends_at, podium: [{ handle, score }] }], "totals": [{ user_id, handle, total }] }` (종료된 official만)
   - `lb_free(p_game text default null) returns table(user_id uuid, handle citext, plays int, wins int, win_rate numeric, current_streak int, best_streak int, avg_score numeric)`. p_game null이면 streak 열 null
   - `user_stats(p_handle text) returns jsonb`. 키: `daily_by_game`, `contests`, `free_by_game`, `recent`(30개)
   - 정렬: §9. win 판정은 `solved`
@@ -459,7 +456,7 @@ test('step stores give-up score while unfinished', () => { /* 미완료 상태 s
 
 **Files:**
 - Create: `src/lib/serverTime.ts`, `src/platform/games/HomePage.tsx`, `PlayRunner.tsx`, `DailyPage.tsx`, `FreePage.tsx`, `freeQueue.ts`, `freeQueue.test.ts`, `PlayRunner.test.tsx`, `src/games/number-guess/Game.tsx`
-- Modify: `src/games/types.ts` (`GameModule`에 `Game: React.ComponentType<GameProps>` 추가)
+- Modify: `src/games/types.ts` (`GameModule`에 `Game: React.ComponentType<GameProps>` 추가), `src/games/index.ts` (number-guess 모듈에 Game 연결)
 
 **Interfaces:**
 - Consumes: `games`, `getGame`, `api.play`, `rpc`
@@ -487,7 +484,7 @@ test('step stores give-up score while unfinished', () => { /* 미완료 상태 s
     - `local_mode_submits_free_play_on_finish`
 - [ ] **Step 2: 실패 확인** — `npm test -- src/platform/games` → FAIL
 - [ ] **Step 3: 구현**
-  - HomePage는 비숨김 게임(관리자는 전체) 카드에 오늘 데일리 상태를 표시한다(`lb_daily` 오늘 본인 행 또는 `daily`→`open` 호출 없이 상태만 조회하는 경우 `rpc('lb_daily')`의 본인 행 사용). 진행 중·곧 시작 대회 3개를 보여준다.
+  - HomePage는 비숨김 게임(관리자는 전체) 카드에 오늘 데일리 완료 여부·점수를 표시한다: `lb_daily(today, game)` 결과의 본인 행(없으면 "아직 안 풀었어요"). 진행 중·곧 시작 대회 3개를 보여준다.
   - FreePage는 manifest.options 선택 UI를 가진다.
   - number-guess `Game.tsx`: 숫자 입력(모바일 숫자 키패드 `inputMode="numeric"`), 힌트 버튼, 포기 버튼(두 번 눌러 확인), 추측 목록, 피드백.
 - [ ] **Step 4: 통과 확인** — `npm test` → PASS
