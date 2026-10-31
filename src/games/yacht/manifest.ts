@@ -4,7 +4,7 @@ export const manifest: Manifest = {
   id: 'yacht',
   name: '요트 다이스',
   description: '주사위 5개로 13칸을 채워 더 높은 점수를 낸다',
-  hidden: true,
+  hidden: false,
   category: 'duel',
   modes: { daily: false, contest: false, free: false },
   puzzleSource: 'generate',

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -35,11 +35,13 @@ vi.mock('../../games/index.ts', async (orig) => {
       result: () => ({ over: false }),
     },
   }
-  return { ...real, getDuel: (id: string) => (id === 'opt-fake' ? fake : real.getDuel(id)) }
+  const { withHiddenDuel } = await import('../../test-fixtures/duel.ts')
+  const withHidden = withHiddenDuel(real)
+  return { ...withHidden, getDuel: (id: string) => (id === 'opt-fake' ? fake : withHidden.getDuel(id)) }
 })
 vi.mock('../../games/ui.ts', async (orig) => {
   const real = await orig<typeof import('../../games/ui.ts')>()
-  return { ...real, getDuelComponent: (id: string) => (id === 'opt-fake' ? () => null : real.getDuelComponent(id)) }
+  return { ...real, getDuelComponent: (id: string) => (id === 'opt-fake' ? () => null : real.getDuelComponent(id === 'hidden-duel' ? 'yacht' : id)) }
 })
 
 import { DuelLocalPage } from './DuelLocalPage.tsx'
@@ -70,8 +72,11 @@ test('unknown_game', () => {
 })
 
 test('hidden_game_admin_only', () => {
+  renderLocal('hidden-duel')
+  expect(screen.getByTestId('turn')).toBeTruthy()
+  cleanup()
   admin = false
-  renderLocal('yacht')
+  renderLocal('hidden-duel')
   expect(screen.getByText('없는 게임이에요')).toBeTruthy()
   expect(screen.queryByTestId('turn')).toBeNull()
 })

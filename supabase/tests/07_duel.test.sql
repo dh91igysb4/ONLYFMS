@@ -3,6 +3,8 @@
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-*)을 쓰고, 숨김 게임 확인에만 yacht를 쓴다.
 begin;
 select plan(101);
+-- 요트는 공개됐지만(마이그레이션 yacht_public), 숨김 게임 규칙을 검사하려고 이 트랜잭션 안에서만 다시 숨긴다.
+insert into public.hidden_games (game_id) values ('yacht') on conflict do nothing;
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000c0","role":"authenticated"}'
 \set C1  '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}'
