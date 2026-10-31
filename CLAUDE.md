@@ -9,23 +9,28 @@
 - `src/app/` 라우팅·레이아웃·공통 스타일 토큰(`theme.css`)
 - `src/lib/supabase.ts` supabase 클라이언트
 - `src/platform/{auth,games,contests,leaderboard,profile,admin}/` 플랫폼 화면. 게임별 코드는 두지 않는다.
-- `src/games/index.ts` 게임 등록부. `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
+- `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function
 
 ## 게임 추가 절차
 1. `src/games/<game-id>/` 폴더 생성 (id는 영문 소문자·숫자·`-`)
 2. `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx` 작성 (테스트 먼저)
-3. `src/games/index.ts` 등록부에 한 줄 추가
-4. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
-5. 문제없으면 `hidden`을 풀어 공개
+3. `src/games/index.ts` 등록부에 한 줄 추가, 화면 컴포넌트는 `src/games/ui.ts`(`getGameComponent`)에 등록 (`index.ts`에 넣지 않는다)
+4. 새 마이그레이션으로 `game_modes` 행과, 숨김 게임이면 `hidden_games` 행을 추가 (등록부 테스트 `registry.test.ts`와 일치해야 한다)
+5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
+6. 문제없으면 `hidden`을 풀어 공개
 
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
 - 판정·채점·문제 선택 결과가 달라지는 변경은 `logic.version`을 올린다. 불확실하면 올린다.
 - 출제 당시 버전이 데일리·대회 기록(`contest_items`, `attempts`)과 `free_plays`에 저장된다.
 - 진행 중 기록의 버전이 현재와 다르면 서버가 그 기록을 그 시점 점수로 확정(포기 처리)하고 409 `version_changed`를 돌려준다. 화면에는 "규칙이 바뀌어 이 문제는 종료됐어요"가 뜬다.
-- 그래서 규칙 변경은 진행 중인 데일리가 적은 새벽(KST)에 배포한다.
+- 새 버전은 이전 버전이 출제한 퍼즐 형식도 읽을 수 있어야 한다 (출제 후 배포된 규칙으로 늦게 시작한 사람이 풀 수 있음). 설계 §4.2, §4.5.
+- 규칙 변경은 진행 중인 데일리가 적은 새벽(KST)에 배포하는 것을 권장한다.
 - `logic.ts`는 순수 함수만, 외부 의존 없음. 상대 import에는 `.ts` 확장자를 명시한다 (Deno 호환).
+
+## 배포
+- 원격 배포 절차(DB push, 함수, Vercel, 첫 관리자, 수동 확인, 머지)는 `docs/deploy-checklist.md`를 따른다.
 
 ## 커밋·PR 규칙
 - main은 보호 브랜치. 작업 브랜치 → PR → Vercel 미리보기 확인 → 머지.
