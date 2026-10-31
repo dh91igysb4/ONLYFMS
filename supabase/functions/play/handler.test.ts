@@ -50,7 +50,12 @@ const fakeVerV2: GameModule = {
     ...ng, version: 2, score: () => 7, apply: boom, publicState: boom, isFinished: boom, actionCount: boom,
   } as GameLogic<unknown, unknown, unknown, unknown>,
 }
-const extra = new Map([fakeGen, fakeBank, fakeHidden, fakeVerV1].map((g) => [g.manifest.id, g]))
+// fake-timed: 데일리 제한 시간 10분인 숫자 맞히기
+const fakeTimed: GameModule = {
+  manifest: { ...ngManifest, id: 'fake-timed', name: '가짜 시간제한', hidden: false, dailyTimeLimitSec: 600 },
+  logic: ng,
+}
+const extra = new Map([fakeGen, fakeBank, fakeHidden, fakeVerV1, fakeTimed].map((g) => [g.manifest.id, g]))
 const registry = { getGame: (id: string) => extra.get(id) ?? getGame(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -132,7 +137,7 @@ function t(name: string, fn: () => Promise<void>) {
 t('setup', async () => {
   await sql`insert into public.game_modes (game_id, daily, contest, free) values
     ('fake-gen', true, true, true), ('fake-bank', false, true, true), ('fake-hidden', true, true, true),
-    ('fake-ver', true, true, true)
+    ('fake-ver', true, true, true), ('fake-timed', true, true, true)
     on conflict do nothing`
   await sql`delete from public.hidden_games where game_id = 'number-guess'`
   await sql`insert into public.hidden_games (game_id) values ('fake-hidden') on conflict do nothing`
@@ -640,6 +645,77 @@ t('who_are_ya_daily_plays_through_handler', async () => {
   const f = await call(other, { action: 'open', item_id: itemId }, now + 8000)
   assert.equal(f.status, 200, JSON.stringify(f.body))
   assert.equal(f.body.finished, false)
+})
+
+// ---------------------------------------------------------------- daily time limit
+t('daily_time_limit_counts_from_first_open', async () => {
+  const u = await user()
+  const t0 = Date.parse('2026-11-12T03:00:00Z') // 12:00 KST
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, t0)
+  assert.equal(d.status, 200, JSON.stringify(d.body))
+  const item = d.body.item_id as string
+  const o = await call(u, { action: 'open', item_id: item }, t0)
+  assert.equal(o.status, 200)
+  assert.equal(o.body.ends_at, new Date(t0 + 10 * MIN).toISOString())
+  // 다시 열어도 처음 연 시각 기준이다
+  const o2 = await call(u, { action: 'open', item_id: item }, t0 + 5 * MIN)
+  assert.equal(o2.body.ends_at, new Date(t0 + 10 * MIN).toISOString())
+  const ans = await answerOf(item)
+  const a1 = await call(u, { action: 'act', item_id: item, expected_count: 0, payload: { type: 'guess', value: miss(ans) } }, t0 + 10 * MIN - 1)
+  assert.equal(a1.status, 200, JSON.stringify(a1.body))
+  const stored = Number(a1.body.score)
+  const a2 = await call(u, { action: 'act', item_id: item, expected_count: 1, payload: { type: 'guess', value: ans } }, t0 + 10 * MIN)
+  assert.equal(a2.status, 409)
+  assert.equal(a2.body.error, 'timeout')
+  const view = a2.body.view as Record<string, unknown>
+  assert.equal(view.finished, true)
+  assert.equal(view.score, stored)
+  assert.deepEqual(view.reveal, { answer: ans })
+  const [at] = await sql`select * from public.attempts where item_id = ${item} and user_id = ${u}`
+  assert.equal(at.finished, true)
+  assert.equal(at.action_count, 1)
+  assert.equal(Number(at.score), stored)
+  // 확정 시각은 마감 시각
+  assert.equal((at.finished_at as Date).getTime(), t0 + 10 * MIN)
+  const again = await call(u, { action: 'act', item_id: item, expected_count: 1, payload: { type: 'give_up' } }, t0 + 11 * MIN)
+  assert.equal(again.body.error, 'finished')
+})
+
+t('daily_time_limit_open_after_deadline_finalizes', async () => {
+  const u = await user()
+  const t0 = Date.parse('2026-11-13T03:00:00Z')
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, t0)
+  const item = d.body.item_id as string
+  await call(u, { action: 'open', item_id: item }, t0)
+  const o = await call(u, { action: 'open', item_id: item }, t0 + 30 * MIN)
+  assert.equal(o.status, 200, JSON.stringify(o.body))
+  assert.equal(o.body.finished, true)
+  assert.ok(o.body.reveal !== undefined)
+  const [at] = await sql`select finished, finished_at from public.attempts where item_id = ${item} and user_id = ${u}`
+  assert.equal(at.finished, true)
+  assert.equal((at.finished_at as Date).getTime(), t0 + 10 * MIN)
+  // 다른 사람은 자기 10분을 새로 받는다
+  const other = await user()
+  const f = await call(other, { action: 'open', item_id: item }, t0 + 30 * MIN)
+  assert.equal(f.body.finished, false)
+  assert.equal(f.body.ends_at, new Date(t0 + 40 * MIN).toISOString())
+})
+
+t('daily_time_limit_capped_at_midnight', async () => {
+  const u = await user()
+  const late = Date.parse('2026-11-14T14:55:00Z') // 23:55 KST
+  const d = await call(u, { action: 'daily', game_id: 'fake-timed' }, late)
+  const o = await call(u, { action: 'open', item_id: d.body.item_id }, late)
+  assert.equal(o.body.ends_at, '2026-11-14T15:00:00.000Z')
+})
+
+t('time_limit_does_not_apply_to_contests', async () => {
+  const u = await user()
+  const c = await contest({ starts: T0 - HOUR, ends: T0 + HOUR, games: ['fake-timed'], join: [u] })
+  const o = await call(u, { action: 'open', item_id: c.items[0] }, T0)
+  assert.equal(o.body.ends_at, new Date(T0 + HOUR).toISOString())
+  const r = await call(u, { action: 'act', item_id: c.items[0], expected_count: 0, payload: { type: 'give_up' } }, T0 + 30 * MIN)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
 })
 
 t('teardown', async () => {

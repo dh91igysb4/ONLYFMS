@@ -37,6 +37,7 @@ const MESSAGES: Record<string, string> = {
   finished: '이미 끝낸 문제예요',
   stale: '다른 화면에서 진행된 내용으로 갱신했어요',
   version_changed: '규칙이 바뀌어 이 문제는 종료됐어요',
+  timeout: '제한 시간이 끝났어요',
   not_joined: '참가한 대회가 아니에요',
   unknown_game: '없는 게임이에요',
   not_opened: '문제를 다시 열어 주세요',

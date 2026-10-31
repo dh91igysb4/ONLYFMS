@@ -7,6 +7,7 @@ export const manifest: Manifest = {
   hidden: false,
   modes: { daily: true, contest: true, free: true },
   puzzleSource: 'generate',
+  dailyTimeLimitSec: 600,
   options: [
     {
       key: 'tier',

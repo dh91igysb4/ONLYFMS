@@ -96,6 +96,7 @@ export const manifest = {
   hidden: true,                // true면 관리자에게만 보임
   modes: { daily: true, contest: true, free: true },
   puzzleSource: 'generate',    // 'generate' = 서버가 pickPuzzle로 출제, 'bank' = 문제 은행에서 출제 (4.4)
+  dailyTimeLimitSec: 600,      // 데일리 제한 시간(초). 처음 연 순간부터 센다. null이면 자정까지. 대회에는 적용 안 함
   options: [                   // 자유 플레이·대회에서 고를 수 있는 설정 (없으면 빈 배열)
     { key: 'range', label: '범위', choices: [{ value: '100', label: '1~100' }, { value: '1000', label: '1~1000' }], default: '100' },
   ],
@@ -347,7 +348,8 @@ POST 요청이며, Authorization 헤더의 사용자 JWT로 호출자를 확인�
 
 - 등록부에 없거나 해당 모드를 지원하지 않는 game_id는 404.
 - 같은 사용자의 동시 행동은 attempts 행 잠금(`SELECT … FOR UPDATE`)으로 순서를 보장한다.
-- `Ctx`의 now는 서버 시각, startedAt은 기록의 started_at, deadline은 대회 ends_at이다.
+- `Ctx`의 now는 서버 시각, startedAt은 기록의 started_at, deadline은 대회 ends_at이다. 단 데일리이고 manifest에 `dailyTimeLimitSec`이 있으면 deadline은 min(started_at + 제한 시간, ends_at)이고, 화면에 주는 `PlayView.ends_at`도 이 값이다.
+- 데일리 제한 시간이 지나면 다음 open/act에서 서버가 기록을 저장된 점수(그 시점 포기 점수)로 마감 시각(finished_at = deadline)에 확정한다. act는 409 `timeout`(화면 포함), open은 끝난 화면을 200으로 준다. 브라우저는 남은 시간이 0이 되면 한 번 다시 열어 결과를 받는다.
 
 ## 9. 리더보드와 통계
 
