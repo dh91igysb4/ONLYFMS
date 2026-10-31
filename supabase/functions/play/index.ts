@@ -1,6 +1,6 @@
 // Edge Function `play` 진입점: 실제 연결(SUPABASE_DB_URL), JWT 확인(supabase-js), PLAY_SECRET, CORS.
 import { createClient } from '@supabase/supabase-js'
-import { createSql } from './db.ts'
+import { createSql } from '../_shared/db.ts'
 import { handle } from './handler.ts'
 
 const CORS: Record<string, string> = {

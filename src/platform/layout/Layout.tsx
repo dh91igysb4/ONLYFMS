@@ -20,6 +20,7 @@ export function Layout() {
         <nav className="nav" aria-label="주 메뉴">
           <NavLink to="/" end>게임</NavLink>
           <NavLink to="/contests">대회</NavLink>
+          <NavLink to="/duel">대전</NavLink>
           <NavLink to="/leaderboard">리더보드</NavLink>
           {profile?.handle && <NavLink to={`/u/${profile.handle}`}>내 프로필</NavLink>}
           {profile?.is_admin && <NavLink to="/admin">관리자</NavLink>}

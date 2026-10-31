@@ -52,7 +52,41 @@ export type Manifest = {
    */
   dailyTimeLimitSec: number | null
   options: ManifestOption[]
+  /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3) */
+  category?: 'solo' | 'duel'
+  /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
+  duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type GameModule = { manifest: Manifest; logic: GameLogic<any, any, any, any> }
+
+// ---- 대전(1v1) 게임 계약 (대전 설계 §3) ----
+
+export type Seat = 0 | 1
+
+export type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number] }
+
+export interface DuelLogic<State, Action, View> {
+  /** 규칙을 바꿀 때마다 1씩 올린다 */
+  version: number
+  init(rng: () => number, options: Record<string, string>): State
+  /** 지금 행동할 좌석 */
+  toMove(state: State): Seat
+  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
+  apply(state: State, seat: Seat, action: Action, rng: () => number): { state: State } | { error: string }
+  /**
+   * 시간 초과 시 서버가 대신 적용할 "다음 행동" 하나. 아직 보이지 않는 난수(주사위)에 의존하지 않는다.
+   * 서버는 이를 apply하고 turnNo가 바뀌거나 게임이 끝날 때까지 다시 부른다(턴당 최대 8번).
+   * 행동마다 새 rng를 쓴다.
+   */
+  timeoutAction(state: State): Action
+  /** 진행도(채운 칸 수 등). 턴이 끝났는지와 연속 시간 초과를 판단하는 데 쓴다 (설계 §3.2) */
+  turnNo(state: State): number
+  result(state: State): DuelResult
+  /** 브라우저에 보낼 상태. viewer가 null이면 관전자 */
+  view(state: State, viewer: Seat | null): View
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }

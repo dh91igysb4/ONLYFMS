@@ -1,4 +1,4 @@
-// postgres.js 연결과 트랜잭션 헬퍼. Edge Function은 소유자(서비스) 연결이라 RLS를 우회한다.
+// postgres.js 연결과 트랜잭션 헬퍼 (play·duel 공용, Supabase `_shared` 관례). Edge Function은 소유자(서비스) 연결이라 RLS를 우회한다.
 import postgres from 'postgres'
 
 export type Sql = postgres.Sql

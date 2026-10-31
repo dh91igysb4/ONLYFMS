@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 
 /** 초대 링크 표시와 복사. 클립보드가 막히면 텍스트를 선택해 직접 복사하게 한다. */
-export function InviteLink({ code }: { code: string }) {
-  const url = `${location.origin}/join/${code}`
+export function InviteLink({ code, path = '/join/' }: { code: string; path?: string }) {
+  const url = `${location.origin}${path}${code}`
   const ref = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
 

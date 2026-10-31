@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { games } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
+import { DuelSection } from './DuelSection.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
@@ -109,6 +110,8 @@ export function ProfilePage() {
           ))}
         </ul>
       )}
+
+      <DuelSection key={handle} handle={handle} />
 
       {profile?.handle?.toLowerCase() === handle.toLowerCase() && <AppearanceSettings />}
     </div>

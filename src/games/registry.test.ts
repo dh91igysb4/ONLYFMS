@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { games, getGame } from './index.ts'
+import { duels, games, getDuel, getGame } from './index.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -56,8 +56,28 @@ test('hidden games match hidden_games seed in migrations', () => {
   expect(Object.keys(sqlFiles).length).toBeGreaterThan(0)
 
   const seeded = hiddenGamesFromMigrations(sqlFiles)
-  const hidden = games.filter((g) => g.manifest.hidden).map((g) => g.manifest.id)
+  const hidden = [...games, ...duels].filter((g) => g.manifest.hidden).map((g) => g.manifest.id)
   expect([...seeded].sort()).toEqual([...hidden].sort())
+})
+
+test('duel modules: category duel, all solo modes off, turnSeconds default in choices, ids unique across games and duels', () => {
+  for (const d of duels) {
+    expect(d.manifest.category).toBe('duel')
+    expect(d.manifest.id).toMatch(/^[a-z0-9-]+$/)
+    expect(getDuel(d.manifest.id)).toBe(d)
+    expect(d.manifest.modes).toEqual({ daily: false, contest: false, free: false })
+    const ts = d.manifest.duel?.turnSeconds
+    expect(ts).toBeDefined()
+    expect(ts!.choices).toContain(ts!.default)
+    expect(getGame(d.manifest.id)).toBeUndefined()
+  }
+  const ids = [...games, ...duels].map((g) => g.manifest.id)
+  expect(new Set(ids).size).toBe(ids.length)
+  expect(getDuel('nope')).toBeUndefined()
+})
+
+test('solo modules have no duel category', () => {
+  for (const g of games) expect(g.manifest.category ?? 'solo').toBe('solo')
 })
 
 type Modes = { daily: boolean; contest: boolean; free: boolean }
@@ -108,6 +128,6 @@ test('game_modes match registry manifests', () => {
     eager: true,
   }) as Record<string, string>
   const seeded = gameModesFromMigrations(sqlFiles)
-  const fromRegistry = new Map(games.map((g) => [g.manifest.id, { ...g.manifest.modes }]))
+  const fromRegistry = new Map([...games, ...duels].map((g) => [g.manifest.id, { ...g.manifest.modes }]))
   expect(Object.fromEntries(seeded)).toEqual(Object.fromEntries(fromRegistry))
 })

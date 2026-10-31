@@ -14,6 +14,31 @@ export type PlayView = {
   reveal?: unknown
 }
 
+/** duel Edge Function의 화면 상태 (supabase/functions/duel/handler.ts의 DuelView와 같다) */
+export type DuelView = {
+  match_id: string
+  game_id: string
+  options: Record<string, string>
+  rated: boolean
+  visibility: 'public' | 'invite'
+  status: 'waiting' | 'active' | 'finished' | 'void'
+  turn_seconds: number
+  players: { id: string; handle: string | null; rating: number }[]
+  my_seat: 0 | 1 | null
+  to_move: 0 | 1 | null
+  action_no: number
+  turn_deadline: string | null
+  server_now: number
+  view: unknown
+  winner: 0 | 1 | null
+  end_reason: string | null
+  final_scores: [number, number] | null
+  rating_change?: { before: number; after: number }
+}
+
+/** duel({action:'create'})의 응답 */
+export type DuelCreated = { match_id: string; invite_code: string }
+
 export class ApiError extends Error {
   code: string
   status: number
@@ -60,10 +85,29 @@ const MESSAGES: Record<string, string> = {
   cannot_change_self: '자기 자신은 바꿀 수 없어요',
   contest_closed: '이미 끝났거나 취소된 대회예요',
   invalid_action: '할 수 없는 행동이에요',
+  not_your_turn: '상대 차례예요',
+  full: '이미 시작된 대국이에요',
+  own_match: '내가 만든 대국이에요',
+  too_many_waiting: '기다리는 대국은 3개까지 만들 수 있어요',
+  not_waiting: '이미 끝났거나 취소된 대국이에요',
+  not_player: '참가한 대국이 아니에요',
+  not_found: '없는 대국이에요',
 }
 
 export function errorMessage(code: string): string {
   return MESSAGES[code] ?? `문제가 생겼어요 (${code})`
+}
+
+// 대전에서만 다른 문구 (같은 코드를 대회 문제 풀이도 쓴다). not_due는 화면에 띄우지 않는다.
+const DUEL_MESSAGES: Record<string, string> = {
+  stale: '화면을 새로 맞췄어요',
+  version_changed: '규칙이 바뀌어 이 대국은 무효가 됐어요',
+  finished: '이미 끝난 대국이에요',
+  not_due: '',
+}
+
+export function duelErrorMessage(code: string): string {
+  return DUEL_MESSAGES[code] ?? errorMessage(code)
 }
 
 // ------------------------------------------------------------------ 승인 취소 알림 (설계 §11)
@@ -107,12 +151,12 @@ export async function rpc<T>(name: string, args?: Record<string, unknown>): Prom
   return res.data as T
 }
 
-export async function play(body: Record<string, unknown>): Promise<PlayView> {
+async function callFunction(name: string, body: Record<string, unknown>): Promise<unknown> {
   let res: Response
   try {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
-    res = await fetch(`${supabaseUrl}/functions/v1/play`, {
+    res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -134,5 +178,14 @@ export async function play(body: Record<string, unknown>): Promise<PlayView> {
     const code = (json as { error?: string } | null)?.error ?? 'unknown'
     throw notifyDenied(new ApiError(code, res.status, json))
   }
-  return json as PlayView
+  return json
+}
+
+export async function play(body: Record<string, unknown>): Promise<PlayView> {
+  return (await callFunction('play', body)) as PlayView
+}
+
+/** 1대1 대전 요청. 409 본문(최신 `view` 포함)은 ApiError.body로 온다. create는 DuelCreated를 돌려준다. */
+export async function duel<T = DuelView>(body: Record<string, unknown>): Promise<T> {
+  return (await callFunction('duel', body)) as T
 }

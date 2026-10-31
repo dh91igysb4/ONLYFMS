@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { games } from '../../games/index.ts'
 import { now } from '../../lib/serverTime.ts'
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { DuelBoard } from './DuelBoard.tsx'
+import { LbTable } from './LbTable.tsx'
 import './leaderboard.css'
 
-type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free'
+type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free' | 'duel'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'daily', label: '오늘' },
   { id: 'week', label: '주간' },
   { id: 'all', label: '전체' },
   { id: 'contests', label: '대회' },
   { id: 'free', label: '자유 플레이' },
+  { id: 'duel', label: '대전' },
 ]
 
 type ScoreRow = { rank: number; user_id: string; handle: string; score: number; action_count: number; finished_at: string | null }
@@ -43,32 +46,6 @@ function Handle({ handle }: { handle: string }) {
 const SORTS: [Sort, string][] = [['wins', '정답 수'], ['rate', '정답률'], ['plays', '플레이 수']]
 const SORT_COLUMN: Record<Sort, string> = { wins: '정답', rate: '정답률', plays: '플레이' }
 
-type Col = { label: string; num?: boolean; sorted?: boolean; rank?: boolean }
-type Row = { id: string; top: boolean; me: boolean; cells: ReactNode[] }
-
-/** 리더보드 공통 표. 1~3위(top)는 왼쪽 막대, 정렬 기준 열(sorted)은 굵게 + aria-sort. */
-function LbTable({ cols, rows }: { cols: Col[]; rows: Row[] }) {
-  const cellCls = (c: Col) => [c.num && 'num', c.sorted && 'key', c.rank && 'rank'].filter(Boolean).join(' ') || undefined
-  return (
-    <table className="lb-table">
-      <thead>
-        <tr>
-          {cols.map((c) => (
-            <th key={c.label} scope="col" className={c.num ? 'num' : undefined} aria-sort={c.sorted ? 'descending' : undefined}>{c.label}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id} className={[r.top && 'top', r.me && 'me'].filter(Boolean).join(' ') || undefined}>
-            {r.cells.map((cell, i) => <td key={cols[i].label} className={cellCls(cols[i])}>{cell}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
 export function LeaderboardPage() {
   const { profile } = useAuth()
   const myId = profile?.id
@@ -82,6 +59,7 @@ export function LeaderboardPage() {
   const visible = games.filter((g) => !g.manifest.hidden || profile?.is_admin)
 
   useEffect(() => {
+    if (tab === 'duel') return
     let alive = true
     setError(null)
     setData(null)
@@ -115,7 +93,7 @@ export function LeaderboardPage() {
           </button>
         ))}
       </div>
-      {tab !== 'contests' && (
+      {tab !== 'contests' && tab !== 'duel' && (
         <div className="lb-filters">
           <span className="lb-pill">
             <select aria-label="게임" value={game} onChange={(e) => setGame(e.target.value)}>
@@ -132,14 +110,15 @@ export function LeaderboardPage() {
           )}
         </div>
       )}
-      {error && (
+      {tab === 'duel' && <DuelBoard />}
+      {tab !== 'duel' && error && (
         <div className="stack" role="alert">
           <p className="form-error">{error}</p>
           <button className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>다시 시도</button>
         </div>
       )}
-      {!error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
-      {!error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
+      {tab !== 'duel' && !error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
+      {tab !== 'duel' && !error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
         (ready as ScoreRow[]).length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
           <div className="lb-panel">
             <LbTable
