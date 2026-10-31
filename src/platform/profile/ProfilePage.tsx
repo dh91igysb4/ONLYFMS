@@ -110,7 +110,7 @@ export function ProfilePage() {
         </ul>
       )}
 
-      {profile?.handle === handle && <AppearanceSettings />}
+      {profile?.handle?.toLowerCase() === handle.toLowerCase() && <AppearanceSettings />}
     </div>
   )
 }

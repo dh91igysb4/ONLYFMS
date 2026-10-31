@@ -63,6 +63,13 @@ test('settings_only_on_own_profile', async () => {
   expect(other.queryByRole('heading', { name: '화면 설정' })).toBeNull()
 })
 
+test('settings_on_own_profile_case_insensitive', async () => {
+  authProfile = { handle: 'kane' }
+  rpcMock.mockResolvedValue({ daily_by_game: [], contests: [], free_by_game: [], recent: [] })
+  renderAt('Kane')
+  expect(await screen.findByRole('heading', { name: '화면 설정' })).toBeTruthy()
+})
+
 test('hangul_handle_in_url', async () => {
   rpcMock.mockResolvedValue(null)
   renderAt('손흥민')
