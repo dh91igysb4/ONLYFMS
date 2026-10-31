@@ -47,7 +47,10 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
   const v = view as YState
   const turnKey = v.sheets.reduce((n, s) => n + Object.keys(s).length, 0)
   const [keptState, setKept] = useState<{ k: number; idx: number[] }>({ k: turnKey, idx: [] })
-  const kept = keptState.k === turnKey && v.rolls > 0 ? keptState.idx : []
+  const myTurn = !finished && mySeat !== null && toMove === mySeat && v.seat === mySeat
+  // 내 차례에는 내가 고르는 값, 아니면(상대 차례·같은 화면의 상대 쪽) 서버가 알려 준 고정 자리
+  const kept = myTurn ? (keptState.k === turnKey && v.rolls > 0 ? keptState.idx : []) : (v.rolls > 0 ? v.kept ?? [] : [])
+  const last = v.last ?? null
 
   const mine = !finished && !busy && mySeat !== null && toMove === mySeat && v.seat === mySeat
   const rolled = v.rolls > 0
@@ -109,7 +112,15 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
                 <th scope="row">{LABEL[c]}</th>
                 {[0, 1].map((s) => {
                   const done = v.sheets[s][c]
-                  if (done !== undefined) return <td key={s} className="yacht-done">{done}</td>
+                  if (done !== undefined) {
+                    const isLast = last !== null && last.seat === s && last.category === c
+                    return (
+                      <td key={s} className={`yacht-done${isLast ? ' yacht-last' : ''}`} aria-current={isLast ? 'true' : undefined}>
+                        {done}
+                        {isLast && <span className="yacht-vh"> 방금 기록</span>}
+                      </td>
+                    )
+                  }
                   if (s === mySeat && can.includes(c)) {
                     const pts = scoreFor(v.dice, c, v.sheets[s])
                     return (
