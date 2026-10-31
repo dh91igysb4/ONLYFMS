@@ -22,11 +22,7 @@ select extname, extnamespace::regnamespace from pg_extension where extname in ('
 ```
   - `pgcrypto`가 스키마 `extensions`에 있어야 한다. 다르면 결과를 그대로 알려 준다(고치지 말고 보고).
   - `citext`가 어느 스키마인지도 함께 적어 둔다.
-- [ ] 가입 트리거 확인: 테스트용 구글 계정으로 (임시 주소든 미리보기든) 로그인한 뒤 SQL 편집기에서
-```sql
-select id, handle, status, is_admin from profiles order by created_at desc limit 5;
-```
-  - 방금 가입한 계정의 `profiles` 행이 있고 `status = 'pending'`이어야 한다. 행이 없으면 트리거가 Supabase의 auth 삽입에서 동작하지 않는 것이니 보고.
+- 가입 트리거 확인은 로그인할 주소(4번의 미리보기)가 있어야 하므로 5번에서 한다.
 
 ## 3. Edge Function `play`
 - [ ] 시크릿 설정과 배포
@@ -34,6 +30,8 @@ select id, handle, status, is_admin from profiles order by created_at desc limit
 npx supabase@2 secrets set PLAY_SECRET=$(openssl rand -hex 32)
 npx supabase@2 functions deploy play
 ```
+  - `supabase/config.toml`의 `[functions.play] verify_jwt = false`로 배포돼야 한다. 함수가 토큰을 직접 확인한다(`auth.getUser`). 플랫폼의 JWT 검사는 새 키 체계(publishable 키)의 요청을 막을 수 있어 끈다.
+  - 설정이 반영되지 않으면(대시보드 → Edge Functions → play에서 "Verify JWT"가 켜져 있으면) `npx supabase@2 functions deploy play --no-verify-jwt`로 다시 배포한다.
   - 배포가 `../../../src/games/...` import를 번들하지 못해 실패하면 **중단하고 에러 전문을 보고**한다. (대안: 설계 §4.7의 sync-logic 복사 스크립트 방식으로 전환)
 - [ ] 자동 제공 환경 변수 확인: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_DB_URL`은 Supabase가 함수에 자동으로 넣어 준다. 대시보드 → Edge Functions → play → Secrets/환경 변수에서 확인한다.
   - `SUPABASE_ANON_KEY`가 없으면(새 키 체계) publishable 키를 시크릿으로 직접 넣는다.
@@ -46,13 +44,20 @@ npx supabase@2 secrets set SUPABASE_ANON_KEY=<publishable key>
 - [ ] Project Settings → Environment Variables, **Production과 Preview 모두**:
   - `VITE_SUPABASE_URL` = `https://xhikfflklkrysmakaqoj.supabase.co`
   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `<publishable key>`
-- [ ] PR을 열어 첫 미리보기 배포를 만든다 (6번 참고). 환경 변수는 배포 시점에 반영되므로 변수 추가 후 재배포.
+- [ ] PR을 열어 첫 미리보기 배포를 만든다 (7번 참고). 환경 변수는 배포 시점에 반영되므로 변수 추가 후 재배포.
 - [ ] Supabase → Authentication → URL Configuration → Redirect URLs에 미리보기 주소 패턴 추가
   - 예: `https://onlyfms-*-<팀이름>.vercel.app/**`
   - 운영 주소 `https://onlyfms.vercel.app/**`도 있는지 확인.
+  - 로컬 개발 주소 `http://localhost:5173/**`도 추가한다 (설계 §13).
 
 ## 5. 첫 관리자
-- [ ] 미리보기에서 구글로 로그인하고 아이디(handle)를 정한다.
+- [ ] 미리보기(4번)에서 구글로 로그인한다.
+- [ ] 가입 트리거 확인: SQL 편집기에서
+```sql
+select id, handle, status, is_admin from profiles order by created_at desc limit 5;
+```
+  - 방금 가입한 계정의 `profiles` 행이 있고 `status = 'pending'`이어야 한다. 행이 없으면 트리거가 Supabase의 auth 삽입에서 동작하지 않는 것이니 보고.
+- [ ] 아이디(handle)를 정한다.
 - [ ] Supabase SQL 편집기에서 (두 값 모두 필요 — 관리자는 스스로를 승인할 수 없다)
 ```sql
 update profiles set is_admin = true, status = 'approved', approved_at = now() where handle = '<아이디>';
