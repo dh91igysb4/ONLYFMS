@@ -84,4 +84,14 @@ describe('appearance', () => {
     renderHook(() => useAppearance(undefined, undefined))
     expect(bg()).toBe('')
   })
+
+  it('legacy_media_listener_api', () => {
+    const addListener = vi.fn()
+    const removeListener = vi.fn()
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addListener, removeListener }))
+    expect(() => applyAppearance('classic', 'system')).not.toThrow()
+    expect(addListener).toHaveBeenCalledTimes(1)
+    expect(() => applyAppearance('classic', 'dark')).not.toThrow()
+    expect(removeListener).toHaveBeenCalledWith(addListener.mock.calls[0][0])
+  })
 })

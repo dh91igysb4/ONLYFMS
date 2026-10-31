@@ -24,8 +24,14 @@ let systemListener: { mq: MediaQueryList; fn: () => void } | null = null
 
 function clearSystemListener() {
   if (systemListener) {
-    systemListener.mq.removeEventListener('change', systemListener.fn)
+    const { mq, fn } = systemListener
     systemListener = null
+    try {
+      if (typeof mq.removeEventListener === 'function') mq.removeEventListener('change', fn)
+      else mq.removeListener?.(fn)
+    } catch {
+      // 구형 브라우저 API 실패가 앱을 멈추면 안 된다
+    }
   }
 }
 
@@ -57,11 +63,16 @@ export function applyAppearance(palette: string, appearance: string): void {
 
   clearSystemListener()
   if (app === 'system') {
-    const mq = window.matchMedia?.(QUERY)
-    if (mq) {
-      const fn = () => paint(pal, resolveMode('system'))
-      mq.addEventListener('change', fn)
-      systemListener = { mq, fn }
+    try {
+      const mq = window.matchMedia?.(QUERY)
+      if (mq) {
+        const fn = () => paint(pal, resolveMode('system'))
+        if (typeof mq.addEventListener === 'function') mq.addEventListener('change', fn)
+        else mq.addListener?.(fn)
+        systemListener = { mq, fn }
+      }
+    } catch {
+      // 리스너를 못 달아도 현재 화면 적용은 끝났다
     }
   }
 }
