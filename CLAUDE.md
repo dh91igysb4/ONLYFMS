@@ -30,6 +30,11 @@
 - 규칙 변경은 진행 중인 데일리가 적은 새벽(KST)에 배포하는 것을 권장한다.
 - `logic.ts`는 순수 함수만, 외부 의존 없음. 상대 import에는 `.ts` 확장자를 명시한다 (Deno 호환).
 
+## 팔레트 추가
+1. `src/app/palettes.ts`에 다크·라이트 묶음을 추가한다.
+2. 새 마이그레이션으로 `profiles_palette_check` 목록을 갱신한다.
+3. `npm test`의 대비·목록 테스트가 통과해야 한다.
+
 ## 데이터 갱신 (후알야 `who-are-ya`)
 1. FotMob 스쿼드를 다시 수집해 `data/fotmob_squads.json`을 바꾼다.
 2. `python3 scripts/build-wya-data.py` → `src/games/who-are-ya/data.ts` 재생성 (직접 고치지 않는다).
@@ -49,7 +54,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
-- 모든 화면 문구는 한국어, 모바일 우선, 짙은 보라 단일 테마.
+- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색 예외).
 
 ## 비밀값 위치
 - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)
