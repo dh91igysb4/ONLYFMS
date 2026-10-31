@@ -32,6 +32,17 @@ const MESSAGES: Record<string, string> = {
   handle_invalid: '아이디는 영문 소문자, 숫자, _ 로 3~16자예요',
   handle_already_set: '아이디는 이미 정해졌어요',
   forbidden: '권한이 없어요',
+  not_started: '아직 시작 전이에요',
+  ended: '이미 끝났어요',
+  finished: '이미 끝낸 문제예요',
+  stale: '다른 화면에서 진행된 내용으로 갱신했어요',
+  version_changed: '규칙이 바뀌어 이 문제는 종료됐어요',
+  not_joined: '참가한 대회가 아니에요',
+  unknown_game: '없는 게임이에요',
+  not_opened: '문제를 다시 열어 주세요',
+  bank_empty: '출제할 문제가 없어요',
+  unauthorized: '로그인이 필요해요',
+  not_approved: '승인된 사용자만 할 수 있어요',
   network: '연결이 불안정해요. 다시 시도해 주세요',
 }
 
