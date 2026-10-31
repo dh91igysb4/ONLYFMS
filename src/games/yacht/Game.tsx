@@ -90,7 +90,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
       >
         굴리기 ({v.rolls}/3)
       </button>
-      {mine && rolled && <p className="muted yacht-hint">고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요</p>}
+      {mine && rolled && <p className="muted yacht-hint">{v.rolls < 3 ? '고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요' : '칸을 골라 기록하세요'}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <table className="yacht-sheet">
