@@ -223,6 +223,16 @@ describe('who-are-ya logic', () => {
     expect(s.initials).toBe('R. L.')
     expect(logic.reveal(OLD)).toEqual(gone)
   })
+
+  test('winning row is all green even if the answer moved club or aged since the puzzle was made', () => {
+    const now = snapshotOf(others[0])!
+    const then = { ...now, team: 'Old Club', teamCode: 'OLD', age: (now.age ?? 20) - 1 }
+    const OLD: Puzzle = { answer: then, tier: 'easy', league: 'all' }
+    const s = ok(guess(logic.initState(OLD, ctx), now.id, OLD))
+    expect(s.won).toBe(true)
+    expect(s.guesses[0].fb).toEqual(compare(then, then))
+    expect(s.guesses[0].team).toBe('Old Club')
+  })
 })
 
 describe('who-are-ya data & manifest', () => {

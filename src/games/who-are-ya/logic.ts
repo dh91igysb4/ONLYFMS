@@ -138,7 +138,8 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
         const id = action.id
         if (typeof id !== 'number' || !Number.isInteger(id)) return { error: '선수를 목록에서 골라 주세요' }
         if (state.guesses.some((g) => g.id === id)) return { error: '이미 고른 선수예요' }
-        const g = snapshotOf(id)
+        // 정답 선수는 출제 당시 스냅숏으로 비교한다 (그사이 이적·생일로 정답 줄이 회색이 되지 않게).
+        const g = id === puzzle.answer.id ? puzzle.answer : snapshotOf(id)
         if (!g) return { error: '없는 선수예요' }
         const row: GuessRow = { ...g, fb: compare(g, puzzle.answer) }
         return { state: { ...state, guesses: [...state.guesses, row], won: id === puzzle.answer.id } }

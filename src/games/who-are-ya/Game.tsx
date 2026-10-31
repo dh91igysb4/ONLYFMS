@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import type { GameProps } from '../ui.ts'
 import { compare, HINT_AFTER, MAX_GUESSES, type Arrow, type Feedback, type Snapshot, type State, type Tile } from './logic.ts'
 import { FETCHED } from './data.ts'
@@ -149,7 +149,7 @@ function Search({ guessed, n, busy, onPick }: { guessed: ReadonlySet<number>; n:
         spellCheck={false}
         enterKeyHint="go"
         value={text}
-        disabled={busy}
+        readOnly={busy}
         onChange={(e) => { setText(e.target.value); setOpen(true); setSel(0) }}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
@@ -192,7 +192,14 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
   const s = publicState as State
   const answer = reveal as Snapshot | undefined
   const [confirmGiveUp, setConfirmGiveUp] = useState(false)
+  // 포기 확인은 3초 뒤나 추측이 늘면 풀린다.
+  useEffect(() => {
+    if (!confirmGiveUp) return
+    const t = setTimeout(() => setConfirmGiveUp(false), 3000)
+    return () => clearTimeout(t)
+  }, [confirmGiveUp])
   const n = s.guesses.length
+  useEffect(() => setConfirmGiveUp(false), [n])
   const guessed = useMemo(() => new Set(s.guesses.map((g) => g.id)), [s.guesses])
   const canHint = !busy && s.initials === null && n >= HINT_AFTER
   const rows = s.guesses.slice().reverse()
