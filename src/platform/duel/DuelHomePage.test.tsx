@@ -15,6 +15,9 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
 
+vi.mock('../../games/index.ts', async (orig) =>
+  (await import('../../test-fixtures/duel.ts')).withHiddenDuel(await orig<typeof import('../../games/index.ts')>()))
+
 import { DuelHomePage } from './DuelHomePage.tsx'
 
 function Where() {
@@ -59,8 +62,8 @@ test('home_create_form', async () => {
   renderHome()
   await flush()
   const game = screen.getByLabelText('게임') as HTMLSelectElement
-  // 대전 게임만 (솔로 게임은 없다)
-  expect(Array.from(game.options).map((o) => o.textContent)).toEqual(['요트 다이스'])
+  // 대전 게임만 (솔로 게임은 없다). 관리자라 숨김 대전도 보인다
+  expect(Array.from(game.options).map((o) => o.textContent)).toEqual(['요트 다이스', '숨김 대전'])
   const turn = screen.getByLabelText('턴 시간') as HTMLSelectElement
   expect(Array.from(turn.options).map((o) => o.value)).toEqual(['30', '60', '90'])
   expect(turn.value).toBe('60')
@@ -79,11 +82,16 @@ test('home_create_form', async () => {
 })
 
 test('home_create_form: hidden duel games are admin only', async () => {
+  const r = renderHome()
+  await flush()
+  expect(within(screen.getByLabelText('게임')).getByRole('option', { name: '숨김 대전' })).toBeInTheDocument()
+  r.unmount()
   admin = false
   renderHome()
   await flush()
-  expect(screen.queryByLabelText('게임')).toBeNull()
-  expect(screen.getByText('아직 열린 대전 게임이 없어요')).toBeInTheDocument()
+  const select = screen.getByLabelText('게임')
+  expect(within(select).getByRole('option', { name: '요트 다이스' })).toBeInTheDocument()
+  expect(within(select).queryByRole('option', { name: '숨김 대전' })).toBeNull()
 })
 
 test('home_local_start: sameScreen games only, hidden ones admin only', async () => {
@@ -97,7 +105,8 @@ test('home_local_start: hidden from non-admin', async () => {
   admin = false
   renderHome()
   await flush()
-  expect(screen.queryByRole('link', { name: /시작/ })).toBeNull()
+  expect(screen.getByRole('link', { name: /요트 다이스 시작/ })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /숨김 대전 시작/ })).toBeNull()
 })
 
 test('home_create_form: server error is shown', async () => {
