@@ -20,13 +20,16 @@ begin
   if not exists (select 1 from public.profiles where id = v_uid) then
     raise exception using errcode = 'P0001', message = 'forbidden';
   end if;
-  if p_palette is null or p_appearance is null
-     or p_palette not in ('classic', 'navy', 'claret', 'stadium', 'graphite', 'indigo', 'slate', 'mono', 'sand', 'ice')
-     or p_appearance not in ('dark', 'light', 'system') then
+  if p_palette is null or p_appearance is null then
     raise exception using errcode = 'P0001', message = 'appearance_invalid';
   end if;
 
-  update public.profiles set palette = p_palette, appearance = p_appearance where id = v_uid;
+  -- 허용 값 목록은 위 check 제약 하나만 둔다. 위반은 appearance_invalid로 바꿔 돌려준다.
+  begin
+    update public.profiles set palette = p_palette, appearance = p_appearance where id = v_uid;
+  exception when check_violation then
+    raise exception using errcode = 'P0001', message = 'appearance_invalid';
+  end;
 end
 $$;
 
