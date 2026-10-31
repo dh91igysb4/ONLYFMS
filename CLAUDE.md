@@ -10,7 +10,7 @@
 - `src/lib/supabase.ts` supabase 클라이언트
 - `src/platform/{auth,games,contests,leaderboard,profile,admin}/` 플랫폼 화면. 게임별 코드는 두지 않는다.
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
-- `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function
+- `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차
 1. `src/games/<game-id>/` 폴더 생성 (id는 영문 소문자·숫자·`-`)
@@ -19,6 +19,12 @@
 4. 새 마이그레이션으로 `game_modes` 행과, 숨김 게임이면 `hidden_games` 행을 추가 (등록부 테스트 `registry.test.ts`와 일치해야 한다)
 5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
 6. 문제없으면 `hidden`을 풀어 공개
+
+대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):
+- manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).
+- 등록은 `src/games/index.ts`의 `duels`, 화면은 `src/games/ui.ts`의 `getDuelComponent`(`DuelGameProps`).
+- 마이그레이션에 `game_modes` (false, false, false) 행과 숨김이면 `hidden_games` 행.
+- `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
 
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
@@ -57,6 +63,6 @@
 ## 개발 환경
 - `npm run dev`, `npm test`, `npm run typecheck`, `npm run build`
 - DB 테스트: `npm run db:test` (`scripts/db-test.sh`, 로컬 Postgres + Supabase shim). Docker가 있는 머신에서는 로컬 스택에 `npx supabase test db`가 동일한 역할이다.
-- Edge Function 테스트: `npm run fn:test` (`scripts/fn-test.sh`: `scripts/db-up.sh`로 임시 Postgres를 띄우고 `deno test`로 `supabase/functions/play/`를 돌린 뒤 `scripts/db-down.sh`). Deno 경로는 `DENO` 환경 변수로 바꿀 수 있다.
+- Edge Function 테스트: `npm run fn:test` (`scripts/fn-test.sh`: `scripts/db-up.sh`로 임시 Postgres를 띄우고 `deno test`로 `supabase/functions/play/`와 `supabase/functions/duel/`을 돌린 뒤 `scripts/db-down.sh`). Deno 경로는 `DENO` 환경 변수로 바꿀 수 있다.
 - 게임 로직 공유(설계 §4.7): Edge Function은 `../../../src/games/index.ts`를 상대 경로로 직접 import한다(로컬 `deno check`·실행 확인 완료). 원격 `supabase functions deploy` 번들은 배포 체크리스트 §3에서 확인한다(실패하면 sync-logic 방식으로 전환).
 - Deno는 이 클라우드 환경에서 npm으로만 쓸 수 있다 (`npx deno` 또는 로컬 설치). Deno 코드(Edge Function)의 import는 상대 경로 또는 `npm:` 지정자만 쓴다 (jsr, deno.land 금지).

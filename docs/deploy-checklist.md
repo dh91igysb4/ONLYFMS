@@ -81,6 +81,27 @@ update profiles set is_admin = true, status = 'approved', approved_at = now() wh
 - [ ] 머지한다. **머지하면 onlyfms.vercel.app의 현재 Who Are Ya 페이지가 새 플랫폼으로 바뀐다**(설계 §13).
 - [ ] 운영 주소에서 로그인과 게임 목록이 뜨는지 확인한다.
 
+## 대전(1대1) 배포
+`feat/duel` 머지 전에, 미리보기에서 확인한다. 요트 다이스는 숨김(관리자만)으로 들어간다.
+
+- [ ] 마이그레이션: `npx -y supabase@2 db push` → `0008_yacht.sql`, `0009_duel.sql`
+- [ ] 함수 배포 (두 함수 모두. `_shared/db.ts`를 바꾸면 항상 둘 다 다시 배포)
+```bash
+npx -y supabase@2 functions deploy duel --no-verify-jwt
+npx -y supabase@2 functions deploy play --no-verify-jwt
+```
+  - 업로드 목록에 `supabase/functions/_shared/db.ts`와 `src/games/yacht/...`가 보여야 한다. 번들 오류면 출력 전문을 보고.
+- [ ] 실시간 신호 확인: 관리자 두 계정(폰 두 대)으로 랭크 대국 → 한쪽이 굴리면 다른 쪽 화면이 1~2초 안에 바뀌는지. 5초 간격으로만 바뀌면 대시보드 → Edge Functions → duel → Logs에서 `broadcast` 오류를 찾아 전문을 보고(키 문제일 수 있음, 대국 진행에는 지장 없음).
+- [ ] 수동 확인
+  - [ ] 랭크 한 판 끝까지 → 결과 화면 레이팅 변화(처음 1000 → 1020/980), 리더보드 대전 탭은 5판 전까지 "배치 중"
+  - [ ] 친선 한 판 → 레이팅 그대로, 프로필 "전체" 전적에만 반영
+  - [ ] 한쪽 창을 닫고 두 번 시간 초과 → 기권패
+  - [ ] 참가 직후(첫 수 전) 기권 → 무효(레이팅·전적 미반영)
+  - [ ] 초대 링크로 참가, 대기실(공개)로 참가 각각
+  - [ ] 같은 화면 모드 한 판(서버 요청 없음)
+  - [ ] 프로필 상대 전적
+- [ ] 문제없으면 숨김 해제 PR(새 마이그레이션 `delete from hidden_games where game_id = 'yacht';` + manifest `hidden: false`)
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지
