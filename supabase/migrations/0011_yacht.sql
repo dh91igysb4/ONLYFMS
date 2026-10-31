@@ -1,4 +1,4 @@
--- 0010_yacht: 요트 다이스(yacht) 대전 게임 등록
+-- 0011_yacht: 요트 다이스(yacht) 대전 게임 등록
 --
 --   * game_modes: 솔로 모드는 모두 끔 (src/games/yacht/manifest.ts modes와 같다).
 --   * hidden_games: 처음에는 숨김. 관리자 확인 뒤 새 마이그레이션으로 hidden_games 행을 지워 공개한다.

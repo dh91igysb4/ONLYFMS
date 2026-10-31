@@ -4,6 +4,8 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { games } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { DuelSection } from './DuelSection.tsx'
+import { useAuth } from '../auth/AuthProvider.tsx'
+import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
 
 type Stats = {
@@ -18,6 +20,7 @@ const TYPE_LABEL = { daily: '데일리', contest: '대회', free: '자유 플레
 
 export function ProfilePage() {
   const { handle = '' } = useParams()
+  const { profile } = useAuth()
   const [stats, setStats] = useState<Stats | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -109,6 +112,8 @@ export function ProfilePage() {
       )}
 
       <DuelSection key={handle} handle={handle} />
+
+      {profile?.handle?.toLowerCase() === handle.toLowerCase() && <AppearanceSettings />}
     </div>
   )
 }

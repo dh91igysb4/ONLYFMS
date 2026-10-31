@@ -84,7 +84,7 @@ update profiles set is_admin = true, status = 'approved', approved_at = now() wh
 ## 대전(1대1) 배포
 `feat/duel` 머지 전에, 미리보기에서 확인한다. 요트 다이스는 숨김(관리자만)으로 들어간다.
 
-- [ ] 마이그레이션: `npx -y supabase@2 db push` → `0010_yacht.sql`, `0011_duel.sql`
+- [ ] 마이그레이션: `npx -y supabase@2 db push` → `0011_yacht.sql`, `0012_duel.sql`
 - [ ] 함수 배포 (두 함수 모두. `_shared/db.ts`를 바꾸면 항상 둘 다 다시 배포)
 ```bash
 npx -y supabase@2 functions deploy duel --no-verify-jwt

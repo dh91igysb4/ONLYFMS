@@ -10,7 +10,7 @@ vi.mock('../../lib/api.ts', async (orig) => ({
 }))
 const auth = vi.hoisted(() => ({ handle: 'kane' }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
-  useAuth: () => ({ profile: { id: 'u1', handle: auth.handle, status: 'approved', is_admin: false } }),
+  useAuth: () => ({ profile: { id: 'u1', handle: auth.handle, status: 'approved', is_admin: false }, refresh: async () => {} }),
 }))
 vi.mock('../../games/index.ts', () => ({
   games: [{ manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } }],
@@ -147,6 +147,22 @@ test('profile_own_without_duels_shows_empty', async () => {
   renderAt('kane')
   expect(await screen.findByText('아직 대전 기록이 없어요')).toBeTruthy()
   expect(rpcMock).not.toHaveBeenCalledWith('duel_h2h', expect.anything() as never)
+})
+
+test('settings_only_on_own_profile', async () => {
+  setup({ user_stats: emptyStats })
+  const own = renderAt('kane')
+  expect(await own.findByRole('heading', { name: '화면 설정' })).toBeTruthy()
+  own.unmount()
+  const other = renderAt('other')
+  await other.findByRole('heading', { name: 'other' })
+  expect(other.queryByRole('heading', { name: '화면 설정' })).toBeNull()
+})
+
+test('settings_on_own_profile_case_insensitive', async () => {
+  setup({ user_stats: emptyStats })
+  renderAt('Kane')
+  expect(await screen.findByRole('heading', { name: '화면 설정' })).toBeTruthy()
 })
 
 test('hangul_handle_in_url', async () => {
