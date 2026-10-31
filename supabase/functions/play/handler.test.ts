@@ -7,6 +7,7 @@ import type { GameLogic, GameModule } from '../../../src/games/types.ts'
 import { getGame } from '../../../src/games/index.ts'
 import { logic as ng } from '../../../src/games/number-guess/logic.ts'
 import { manifest as ngManifest } from '../../../src/games/number-guess/manifest.ts'
+import { PLAYERS } from '../../../src/games/who-are-ya/data.ts'
 
 const url = Deno.env.get('TEST_DB_URL')
 if (!url) throw new Error('TEST_DB_URL is required (npm run fn:test)')
@@ -584,6 +585,60 @@ t('bank_source_takes_unused_and_marks_used', async () => {
   assert.equal(again.status, 200)
   const [same] = await sql`select puzzle_key from public.contest_items where id = ${c.items[0]}`
   assert.equal(same.puzzle_key, items[0].puzzle_key)
+})
+
+// ---------------------------------------------------------------- who-are-ya (실제 게임, 숨김 → 관리자)
+t('who_are_ya_daily_plays_through_handler', async () => {
+  const u = await user('approved', true)
+  const now = Date.parse('2026-11-20T03:00:00Z')
+  const d = await call(u, { action: 'daily', game_id: 'who-are-ya' }, now)
+  assert.equal(d.status, 200, JSON.stringify(d.body))
+  const itemId = d.body.item_id as string
+  const o = await call(u, { action: 'open', item_id: itemId }, now)
+  assert.equal(o.status, 200, JSON.stringify(o.body))
+  assert.equal(o.body.game_id, 'who-are-ya')
+  assert.deepEqual(o.body.options, { tier: 'easy', league: 'all' })
+  assert.deepEqual(o.body.public_state, { guesses: [], won: false, gaveUp: false, initials: null })
+
+  const [it] = await sql`select puzzle, puzzle_key, logic_version from public.contest_items where id = ${itemId}`
+  const answer = (it.puzzle as { answer: { id: number; name: string } }).answer
+  assert.equal(it.puzzle_key, String(answer.id))
+  assert.equal(it.logic_version, 1)
+  // 기본 옵션(쉬움)이므로 티어 1 선수
+  assert.equal(PLAYERS.find((p) => p[0] === answer.id)?.[9], 1)
+
+  const wrong = PLAYERS.filter((p) => p[0] !== answer.id).slice(0, 3).map((p) => p[0])
+  let count = 0
+  for (const id of wrong) {
+    const r = await call(u, { action: 'act', item_id: itemId, expected_count: count, payload: { type: 'guess', id } }, now + 1000 * ++count)
+    assert.equal(r.status, 200, JSON.stringify(r.body))
+    assert.equal(r.body.finished, false)
+    assert.equal(r.body.reveal, undefined)
+    const ps = JSON.stringify(r.body.public_state)
+    assert.ok(!ps.includes(answer.name), 'public_state must not contain the answer name')
+    assert.ok(!ps.includes(`"id":${answer.id},`), 'public_state must not contain the answer id')
+  }
+  const dup = await call(u, { action: 'act', item_id: itemId, expected_count: 3, payload: { type: 'guess', id: wrong[0] } }, now + 5000)
+  assert.equal(dup.status, 400)
+  assert.equal(dup.body.message, '이미 고른 선수예요')
+
+  const h = await call(u, { action: 'act', item_id: itemId, expected_count: 3, payload: { type: 'hint' } }, now + 6000)
+  assert.equal(h.status, 200, JSON.stringify(h.body))
+  assert.equal(typeof (h.body.public_state as { initials: string }).initials, 'string')
+  // 힌트는 추측 수에 들어가지 않는다
+  assert.equal(h.body.action_count, 3)
+
+  const win = await call(u, { action: 'act', item_id: itemId, expected_count: 3, payload: { type: 'guess', id: answer.id } }, now + 7000)
+  assert.equal(win.status, 200, JSON.stringify(win.body))
+  assert.equal(win.body.finished, true)
+  assert.equal(win.body.score, 7) // 4번째에 정답(10) - 힌트(3)
+  assert.equal(win.body.action_count, 4)
+  assert.deepEqual(win.body.reveal, answer)
+
+  // 숨김 게임이라 일반 사용자는 못 연다
+  const other = await user()
+  const f = await call(other, { action: 'open', item_id: itemId }, now + 8000)
+  assert.equal(f.status, 403)
 })
 
 t('teardown', async () => {
