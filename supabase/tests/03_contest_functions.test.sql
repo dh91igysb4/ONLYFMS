@@ -1,7 +1,7 @@
 -- 대회 개설·수정·취소·참가, 문제 은행 함수 (Task 6)
 -- 한 트랜잭션 안에서 now()는 고정이므로 시작 전/진행 중/종료는 starts_at·ends_at을 now() 기준으로 잡아 흉내낸다.
 begin;
-select plan(113);
+select plan(119);
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000a0","role":"authenticated"}'
 \set A1  '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}'
@@ -240,6 +240,11 @@ select public.contest_invite_code(:'c_pub') as c_pub_code2 \gset
 select lives_ok(format($$select public.update_contest(%L, '다시', now() + interval '3 hours', 90, 'invite', %L)$$, :'c_pub', :'OK1'),
   'update: invite -> invite');
 select is(public.contest_invite_code(:'c_pub'), :'c_pub_code2'::text, 'update: invite -> invite keeps the code');
+select lives_ok(format($$select public.update_contest(%L, '다시', now() + interval '3 hours', 90, null, %L)$$, :'c_pub', :'OK1'),
+  'update_null_visibility_keeps_current: invite with null visibility');
+select is((select visibility::text from public.contests where id = :'c_pub'), 'invite',
+  'update_null_visibility_keeps_current: stays invite');
+select is(public.contest_invite_code(:'c_pub'), :'c_pub_code2'::text, 'update_null_visibility_keeps_current: code kept');
 select lives_ok(format($$select public.update_contest(%L, '다시', now() + interval '3 hours', 90, 'public', %L)$$, :'c_pub', :'OK1'),
   'update: invite -> public');
 select is(public.contest_invite_code(:'c_pub'), null::text, 'update: invite -> public clears the code');
@@ -278,6 +283,21 @@ select lives_ok($$select public.cancel_contest('e0000000-0000-0000-0000-00000000
 select isnt((select cancelled_at from public.contests where id = 'e0000000-0000-0000-0000-000000000001'), null,
   'admin_can_cancel_live: cancelled_at set');
 select is((select kind::text from public.contests where id = :'c_pub'), 'friendly', 'update keeps kind');
+
+-- cancel_daily_not_editable: 데일리는 관리자도 취소할 수 없다 (진행 중·시작 전 모두)
+reset role;
+insert into public.contests (id, kind, title, visibility, starts_at, ends_at, daily_key) values
+  ('e0000000-0000-0000-0000-0000000000d1', 'daily', 'daily live', 'public',
+   now() - interval '1 hour', now() + interval '1 hour', 'number-guess:test-live'),
+  ('e0000000-0000-0000-0000-0000000000d2', 'daily', 'daily next', 'public',
+   now() + interval '1 hour', now() + interval '25 hours', 'number-guess:test-next');
+set local role authenticated;
+select throws_ok($$select public.cancel_contest('e0000000-0000-0000-0000-0000000000d1')$$,
+  'P0001', 'not_editable', 'cancel_daily_not_editable: admin cannot cancel a live daily');
+select throws_ok($$select public.cancel_contest('e0000000-0000-0000-0000-0000000000d2')$$,
+  'P0001', 'not_editable', 'cancel_daily_not_editable: admin cannot cancel a future daily');
+select is((select count(*)::int from public.contests where kind = 'daily' and cancelled_at is not null), 0,
+  'cancel_daily_not_editable: dailies stay uncancelled');
 
 -- ---------------------------------------------------------------- join
 set local request.jwt.claims = :'A1';

@@ -1,6 +1,6 @@
 -- profiles, 승인제, 관리자 함수 (Task 4)
 begin;
-select plan(44);
+select plan(47);
 
 -- 테스트 사용자: u1·u2 pending, u3·u4 approved, u5 rejected, adm admin(approved)
 insert into auth.users (id, email) values
@@ -152,6 +152,20 @@ select is((select handle::text from public.profiles where id = '00000000-0000-00
   'admin_set_handle: stored lowercase and trimmed');
 select is((select status::text from public.profiles where id = '00000000-0000-0000-0000-000000000001'), 'pending',
   'profiles_direct_update_denied: own status unchanged');
+
+
+-- rejected_admin_loses_admin: is_admin=true라도 승인 상태가 아니면 관리자가 아니다
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000ae', 'exadmin@example.com');
+update public.profiles set status = 'rejected', is_admin = true, handle = 'exboss'
+  where id = '00000000-0000-0000-0000-0000000000ae';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000ae","role":"authenticated"}';
+select is(public.is_admin(), false, 'rejected_admin_loses_admin: is_admin() is false');
+select throws_ok($$select * from public.admin_list_users('pending')$$, 'P0001', 'forbidden',
+  'rejected_admin_loses_admin: admin_list_users forbidden');
+select throws_ok($$select public.admin_set_status('00000000-0000-0000-0000-000000000002', 'rejected')$$, 'P0001', 'forbidden',
+  'rejected_admin_loses_admin: admin_set_status forbidden');
+reset role;
 
 select * from finish();
 rollback;

@@ -31,10 +31,11 @@ language sql stable security definer set search_path = public as $$
   )
 $$;
 
+-- 승인 상태인 관리자만. 거절·대기로 바뀐 관리자는 관리자 권한도 잃는다.
 create function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
-    select 1 from public.profiles where id = auth.uid() and is_admin
+    select 1 from public.profiles where id = auth.uid() and is_admin and status = 'approved'
   )
 $$;
 

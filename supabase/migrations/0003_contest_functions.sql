@@ -170,7 +170,7 @@ declare
   v_uid   uuid := auth.uid();
   v_c     public.contests%rowtype;
   v_title text;
-  v_vis   public.contest_visibility := coalesce(p_visibility, 'public');
+  v_vis   public.contest_visibility;
   v_code  text;
 begin
   if v_uid is null or not public.is_approved() then
@@ -183,6 +183,8 @@ begin
   if v_c.kind = 'daily' or v_c.cancelled_at is not null or now() >= v_c.starts_at then
     raise exception using errcode = 'P0001', message = 'not_editable';
   end if;
+  -- 공개 범위를 넘기지 않으면 지금 값을 유지한다 (초대 대회가 실수로 공개되지 않게)
+  v_vis := coalesce(p_visibility, v_c.visibility);
   v_title := public._validate_contest_input(p_title, p_starts_at, p_duration_min, p_items);
 
   for attempt in 1 .. 10 loop
@@ -209,7 +211,7 @@ begin
 end
 $$;
 
--- 개설자: 시작 전. 관리자: 종료 전 언제든. 이미 취소된 대회는 not_editable.
+-- 개설자: 시작 전. 관리자: 종료 전 언제든. 데일리와 이미 취소된 대회는 not_editable.
 create function public.cancel_contest(p_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -223,7 +225,8 @@ begin
   if not found or not (v_c.created_by is not distinct from v_uid or public.is_admin()) then
     raise exception using errcode = 'P0001', message = 'forbidden';
   end if;
-  if v_c.cancelled_at is not null
+  if v_c.kind = 'daily'
+     or v_c.cancelled_at is not null
      or now() >= v_c.ends_at
      or (not public.is_admin() and now() >= v_c.starts_at) then
     raise exception using errcode = 'P0001', message = 'not_editable';
