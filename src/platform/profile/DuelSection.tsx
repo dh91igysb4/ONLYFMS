@@ -119,7 +119,8 @@ export function DuelSection({ handle }: { handle: string }) {
             <ul className="list" aria-label="최근 대국">
               {recent.map((r) => (
                 <li key={r.id} className="list-row">
-                  <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} {scoreText(r.my_score, r.opp_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
+                  {/* 한 덩어리로 감싸야 세로 flex 행에서 배지가 가로로 늘어나지 않는다 */}
+                  <span><span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} {scoreText(r.my_score, r.opp_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}</span>
                 </li>
               ))}
             </ul>
@@ -151,7 +152,7 @@ export function DuelSection({ handle }: { handle: string }) {
                 <ul className="list" aria-label="최근 상대 대국">
                   {h2hData.recent.map((r) => (
                     <li key={r.id} className="list-row">
-                      <span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} {scoreText(r.a_score, r.b_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}
+                      <span><span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} {scoreText(r.a_score, r.b_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}</span>
                     </li>
                   ))}
                 </ul>
