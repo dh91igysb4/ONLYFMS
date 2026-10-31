@@ -44,6 +44,16 @@ const MESSAGES: Record<string, string> = {
   unauthorized: '로그인이 필요해요',
   not_approved: '승인된 사용자만 할 수 있어요',
   network: '연결이 불안정해요. 다시 시도해 주세요',
+  title_invalid: '제목은 1~40자로 적어 주세요',
+  start_too_soon: '시작은 지금부터 5분 뒤 이후로 정해 주세요',
+  start_too_far: '시작은 30일 안으로 정해 주세요',
+  duration_invalid: '제한 시간은 5~180분이에요',
+  items_invalid: '문제는 모두 합쳐 1~10개로 구성해 주세요',
+  game_not_allowed: '대회에 쓸 수 없는 게임이 들어 있어요',
+  official_forbidden: '공식 대회는 관리자만 만들 수 있어요',
+  not_editable: '지금은 고치거나 취소할 수 없어요',
+  invite_required: '초대 링크로만 참가할 수 있어요',
+  contest_closed: '이미 끝났거나 취소된 대회예요',
 }
 
 export function errorMessage(code: string): string {
