@@ -46,3 +46,15 @@ test('profile_renders_sections', async () => {
   expect(screen.getByText('숫자 맞추기', { selector: 'td' })).toBeTruthy()
   expect(screen.getByText(/숫자 맞추기 · 9점/)).toBeTruthy()
 })
+
+test('hangul_handle_in_url', async () => {
+  rpcMock.mockResolvedValue(null)
+  renderAt('손흥민')
+  await screen.findByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+  rpcMock.mockReset()
+  rpcMock.mockResolvedValue(null)
+  renderAt(encodeURIComponent('손흥민'))
+  await screen.findAllByText('없는 사용자예요')
+  expect(rpcMock).toHaveBeenCalledWith('user_stats', { p_handle: '손흥민' })
+})

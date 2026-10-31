@@ -71,8 +71,8 @@ select throws_ok($$select public.set_handle('  kane')$$, 'P0001', 'handle_taken'
   'set_handle_normalizes_case_and_trim: padded kane collides with kane');
 
 -- set_handle_rejects_invalid
-select throws_ok($$select public.set_handle('ab')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: too short');
-select throws_ok($$select public.set_handle('한글')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: hangul');
+select throws_ok($$select public.set_handle('a')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: too short');
+select throws_ok($$select public.set_handle('ㅋㅋㅋ')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: hangul jamo');
 select throws_ok($$select public.set_handle('a b')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: inner space');
 select throws_ok($$select public.set_handle('abcdefghijklmnopq')$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: 17 chars');
 select throws_ok($$select public.set_handle(null)$$, 'P0001', 'handle_invalid', 'set_handle_rejects_invalid: null');

@@ -223,7 +223,7 @@ Edge Function(Deno)이 `src/games/<게임>/logic.ts`를 상대 경로로 직접 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | id | uuid PK, FK auth.users | |
-| handle | citext UNIQUE NULL | 아이디. 정규식 `^[a-z0-9_]{3,16}$` (소문자로 저장) |
+| handle | citext UNIQUE NULL | 아이디. 정규식 `^[a-z0-9_가-힣]{2,16}$` (NFC·소문자로 저장, 0009에서 한글 허용) |
 | status | enum `pending`/`approved`/`rejected` | 기본값 pending |
 | is_admin | boolean | 기본값 false |
 | created_at, approved_at | timestamptz | |

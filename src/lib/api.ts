@@ -29,7 +29,7 @@ export class ApiError extends Error {
 
 const MESSAGES: Record<string, string> = {
   handle_taken: '이미 쓰는 아이디예요',
-  handle_invalid: '아이디는 영문 소문자, 숫자, _ 로 3~16자예요',
+  handle_invalid: '아이디는 한글, 영문 소문자, 숫자, _ 로 2~16자예요',
   handle_already_set: '아이디는 이미 정해졌어요',
   forbidden: '권한이 없어요',
   not_started: '아직 시작 전이에요',
