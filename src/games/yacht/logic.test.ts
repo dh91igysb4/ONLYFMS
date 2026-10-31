@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { logic } from './logic.ts'
 import type { YAction, YState } from './logic.ts'
-import { allowed, CATEGORIES, scoreFor, total } from './scoring.ts'
+import { allowed, CATEGORIES, rawScore, scoreFor, total } from './scoring.ts'
 import type { Category } from './scoring.ts'
 import { manifest } from './manifest.ts'
 import { duels, getDuel, getGame } from '../index.ts'
@@ -25,7 +25,7 @@ function ok(r: { state: YState } | { error: string }): YState {
 const roll = (keep: number[] = []): YAction => ({ type: 'roll', keep })
 const score = (category: Category): YAction => ({ type: 'score', category })
 
-/** 한 턴: 한 번 굴리고 timeoutActions의 점수 행동 대신 첫 허용 칸에 적는다 */
+/** 한 턴: 한 번 굴리고 첫 허용 칸에 적는다 */
 function playTurn(s: YState, rng: () => number): YState {
   let st = ok(logic.apply(s, s.seat, roll(), rng))
   const cat = allowed(st.dice, st.sheets[st.seat])[0]
@@ -154,7 +154,7 @@ describe('game_end', () => {
   })
 })
 
-describe('timeout_actions', () => {
+describe('timeout_action', () => {
   const best = (dice: number[], sheet: YState['sheets'][0]): Category => {
     let top: Category | null = null
     let topScore = -1
@@ -168,62 +168,85 @@ describe('timeout_actions', () => {
     }
     return top!
   }
-  test('before rolling: roll then best score; applying passes the turn', () => {
-    const s = logic.init(seeded(20), {})
-    const acts = logic.timeoutActions(s, seeded(21))
-    expect(acts).toHaveLength(2)
-    expect(acts[0]).toEqual({ type: 'roll', keep: [] })
-    expect(acts[1].type).toBe('score')
-    const rng = seeded(21)
-    let st = s
-    for (const a of acts) st = ok(logic.apply(st, st.seat, a, rng))
-    expect(st.seat).toBe(1)
-    expect(st.dice).toEqual([])
-    expect(logic.turnNo(st)).toBe(1)
-    expect((acts[1] as { category: Category }).category).toBe(
-      best(
-        ok(logic.apply(s, 0, roll(), seeded(21))).dice,
-        s.sheets[0],
-      ),
-    )
+  test('unrolled -> roll', () => {
+    expect(logic.timeoutAction(logic.init(seeded(20), {}))).toEqual({ type: 'roll', keep: [] })
   })
-  test('after rolling: only the best score', () => {
+  test('rolled -> best score', () => {
     const rng = seeded(22)
     const s = ok(logic.apply(logic.init(rng, {}), 0, roll(), rng))
-    const acts = logic.timeoutActions(s, rng)
-    expect(acts).toEqual([score(best(s.dice, s.sheets[0]))])
-    expect(ok(logic.apply(s, 0, acts[0], rng)).seat).toBe(1)
+    expect(logic.timeoutAction(s)).toEqual(score(best(s.dice, s.sheets[0])))
   })
   test('tie goes to earlier category in CATEGORIES order', () => {
-    // [1,1,1,1,1]-like tie: choice(5)=aces(5)=threeKind(5)=fourKind(5) -> actually yacht 50 wins; use [1,2,3,3,6]
-    const s: YState = {
-      sheets: [{}, {}],
+    // choice 7 and threeKind 7 tie (fullHouse and yacht blocked) -> choice
+    const u: YState = {
+      sheets: [{ fullHouse: 0, yacht: 0 }, {}],
       bonus: [0, 0],
       seat: 0,
-      dice: [6, 6, 1, 2, 3],
+      dice: [2, 2, 1, 1, 1],
       rolls: 1,
     }
-    // sixes=12, choice=18 -> choice; make a real tie: [2,2,2,2,2] w/o yacht impossible; use [1,1,1,1,2]: aces=4
-    const t: YState = { ...s, dice: [2, 2, 1, 1, 1] }
-    // aces 3, twos 4, choice 7, threeKind 7, fullHouse 25 -> fullHouse; block it
-    const u: YState = { ...t, sheets: [{ fullHouse: 0, yacht: 0 }, {}] }
-    // choice 7 vs threeKind 7 tie -> choice (earlier)
-    expect(logic.timeoutActions(u, seeded(1))).toEqual([score('choice')])
+    expect(logic.timeoutAction(u)).toEqual(score('choice'))
   })
   test('joker: picks only within allowed', () => {
-    const s: YState = {
-      sheets: [{ yacht: 50 }, {}],
-      bonus: [0, 0],
-      seat: 0,
-      dice: [1, 1, 1, 1, 1],
-      rolls: 2,
-    }
-    expect(logic.timeoutActions(s, seeded(1))).toEqual([score('aces')])
+    const s: YState = { sheets: [{ yacht: 50 }, {}], bonus: [0, 0], seat: 0, dice: [1, 1, 1, 1, 1], rolls: 2 }
+    expect(logic.timeoutAction(s)).toEqual(score('aces'))
     const s2: YState = { ...s, sheets: [{ yacht: 50, aces: 5 }, {}] }
-    const a = logic.timeoutActions(s2, seeded(1))
-    expect(a).toEqual([score('largeStraight')])
+    expect(logic.timeoutAction(s2)).toEqual(score('largeStraight'))
     expect(allowed(s2.dice, s2.sheets[0])).toContain('largeStraight')
   })
+  test('loop with a different rng per action: always legal, turn ends within 2 applies', () => {
+    for (let i = 0; i < 200; i++) {
+      // half the runs start with yacht box filled so a rolled yacht triggers joker rules
+      const start: YState = {
+        ...logic.init(seeded(i), {}),
+        sheets: [i % 2 ? { yacht: 50, fives: 10 } : {}, {}],
+      }
+      let s = start
+      const before = logic.turnNo(s)
+      for (let k = 0; k < 2; k++) {
+        s = ok(logic.apply(s, s.seat, logic.timeoutAction(s), seeded(i * 7 + k + 1000)))
+      }
+      expect(logic.turnNo(s)).toBe(before + 1)
+      expect(s.seat).toBe(1)
+    }
+  })
+})
+
+test('extra scoring cases', () => {
+  expect(rawScore([1, 2, 2, 3, 4], 'smallStraight')).toBe(30)
+  expect(rawScore([1, 1, 2, 2, 2], 'fullHouse')).toBe(25)
+})
+
+test('apply on finished game is an error', () => {
+  const s = playAll(14)
+  for (const seat of [0, 1] as const) {
+    expect('error' in logic.apply(s, seat, roll(), seeded(1))).toBe(true)
+  }
+})
+
+test('apply never throws on malformed input', () => {
+  const rng = seeded(40)
+  const s = ok(logic.apply(logic.init(rng, {}), 0, roll(), rng))
+  const bad: unknown[] = [
+    null,
+    undefined,
+    42,
+    'roll',
+    {},
+    { type: 'dance' },
+    { type: 'roll' },
+    { type: 'roll', keep: 'abc' },
+    { type: 'roll', keep: null },
+    { type: 'roll', keep: [null] },
+    { type: 'score' },
+    { type: 'score', category: 7 },
+    { type: 'score', category: 'nope' },
+    { type: 'score', category: '__proto__' },
+  ]
+  for (const a of bad) {
+    const r = logic.apply(s, 0, a as YAction, rng)
+    expect('error' in r).toBe(true)
+  }
 })
 
 test('turn_no', () => {

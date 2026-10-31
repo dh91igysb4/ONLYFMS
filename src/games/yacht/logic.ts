@@ -21,6 +21,7 @@ const isOver = (s: YState) => filled(s.sheets[0]) === CATEGORIES.length && fille
 function apply(state: YState, seat: Seat, action: YAction, rng: () => number): { state: YState } | { error: string } {
   if (isOver(state)) return { error: 'game_over' }
   if (seat !== state.seat) return { error: 'not_your_turn' }
+  if (typeof action !== 'object' || action === null) return { error: 'invalid_action' }
   if (action.type === 'roll') {
     if (state.rolls >= 3) return { error: 'no_rolls_left' }
     const keep = action.keep
@@ -38,7 +39,7 @@ function apply(state: YState, seat: Seat, action: YAction, rng: () => number): {
   if (action.type === 'score') {
     if (state.rolls === 0) return { error: 'roll_first' }
     const sheet = state.sheets[seat]
-    if (!CATEGORIES.includes(action.category)) return { error: 'invalid_category' }
+    if (typeof action.category !== 'string' || !CATEGORIES.includes(action.category)) return { error: 'invalid_category' }
     if (sheet[action.category] !== undefined) return { error: 'category_filled' }
     if (!allowed(state.dice, sheet).includes(action.category)) return { error: 'category_not_allowed' }
     const points = scoreFor(state.dice, action.category, sheet)
@@ -70,22 +71,10 @@ export const logic: DuelLogic<YState, YAction, YState> = {
   init: () => ({ sheets: [{}, {}], bonus: [0, 0], seat: 0, dice: [], rolls: 0 }),
   toMove: (state) => state.seat,
   apply,
-  /**
-   * 굴리기 전이면 [굴리기, 최고점 칸]. 굴리기 전 주사위는 rng로 미리 굴려 보므로,
-   * 서버는 이 행동열을 timeoutActions에 준 것과 같은 난수열로 apply해야 한다.
-   */
-  timeoutActions(state, rng) {
-    if (isOver(state)) return []
-    const acts: YAction[] = []
-    let dice = state.dice
-    if (state.rolls === 0) {
-      const r = apply(state, state.seat, { type: 'roll', keep: [] }, rng)
-      if ('error' in r) return []
-      acts.push({ type: 'roll', keep: [] })
-      dice = r.state.dice
-    }
-    acts.push({ type: 'score', category: bestCategory(dice, state.sheets[state.seat]) })
-    return acts
+  /** 굴리기 전이면 굴리기, 굴렸으면 허용 칸 중 최고점 칸(동점이면 CATEGORIES 순서상 앞). 주사위를 미리 보지 않는다. */
+  timeoutAction(state) {
+    if (state.rolls === 0) return { type: 'roll', keep: [] }
+    return { type: 'score', category: bestCategory(state.dice, state.sheets[state.seat]) }
   },
   turnNo: (state) => filled(state.sheets[0]) + filled(state.sheets[1]),
   result(state): DuelResult {
