@@ -46,7 +46,7 @@ export function UpcomingContests() {
   if (rows.length === 0) return null
   const t = now()
   return (
-    <section className="stack" aria-label="진행 중·곧 시작 대회">
+    <section className="stack split-side" aria-label="진행 중·곧 시작 대회">
       <h3 className="section-title">진행 중·곧 시작 대회</h3>
       {rows.map((c) => (
         <Link key={c.id} to={`/contests/${c.id}`} className="card card-link">

@@ -84,7 +84,7 @@ export function LeaderboardPage() {
   const freeRows = useMemo(() => (tab === 'free' && Array.isArray(ready) ? sortFree(ready as FreeRow[], sort) : []), [tab, ready, sort])
 
   return (
-    <div className="stack">
+    <div className="stack lb-page">
       <h2 className="page-title">리더보드</h2>
       <div className="lb-tabs" role="tablist" aria-label="기간">
         {TABS.map((t) => (

@@ -43,7 +43,7 @@ function Face({ value }: { value: number | null }) {
   )
 }
 
-export function Game({ view, mySeat, toMove, finished, busy, error, onAction, names }: DuelGameProps) {
+export function Game({ view, mySeat, toMove, finished, busy, error, onAction, names, header, footer }: DuelGameProps) {
   const v = view as YState
   const turnKey = v.sheets.reduce((n, s) => n + Object.keys(s).length, 0)
   const [keptState, setKept] = useState<{ k: number; idx: number[] }>({ k: turnKey, idx: [] })
@@ -66,35 +66,39 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
   const slots = [0, 1, 2, 3, 4]
   return (
     <div className="yacht">
-      <div className="yacht-dice" role="group" aria-label="주사위">
-        {slots.map((i) => {
-          const val = rolled ? v.dice[i] : null
-          const on = kept.includes(i)
-          return (
-            <button
-              key={i}
-              type="button"
-              className={`yacht-die${on ? ' yacht-kept' : ''}`}
-              aria-pressed={on}
-              aria-label={val === null ? '주사위, 아직 굴리지 않음' : `주사위 ${val}${on ? ', 고정됨' : ''}`}
-              disabled={!canKeep}
-              onClick={() => toggle(i)}
-            >
-              <Face value={val} />
-            </button>
-          )
-        })}
+      {/* 넓은 화면: 왼쪽 조작 열(플랫폼 머리·주사위·굴리기), 오른쪽 점수표 */}
+      <div className="yacht-side">
+        {header && <div className="stack yacht-head">{header}</div>}
+        <div className="yacht-dice" role="group" aria-label="주사위">
+          {slots.map((i) => {
+            const val = rolled ? v.dice[i] : null
+            const on = kept.includes(i)
+            return (
+              <button
+                key={i}
+                type="button"
+                className={`yacht-die${on ? ' yacht-kept' : ''}`}
+                aria-pressed={on}
+                aria-label={val === null ? '주사위, 아직 굴리지 않음' : `주사위 ${val}${on ? ', 고정됨' : ''}`}
+                disabled={!canKeep}
+                onClick={() => toggle(i)}
+              >
+                <Face value={val} />
+              </button>
+            )
+          })}
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary yacht-roll"
+          disabled={!canRoll}
+          onClick={() => onAction({ type: 'roll', keep: v.rolls === 0 ? [] : kept } satisfies YAction)}
+        >
+          굴리기 ({v.rolls}/3)
+        </button>
+        {mine && rolled && <p className="muted yacht-hint">{v.rolls < 3 ? '고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요' : '칸을 골라 기록하세요'}</p>}
+        {error && <p className="form-error" role="alert">{error}</p>}
       </div>
-      <button
-        type="button"
-        className="btn btn-primary yacht-roll"
-        disabled={!canRoll}
-        onClick={() => onAction({ type: 'roll', keep: v.rolls === 0 ? [] : kept } satisfies YAction)}
-      >
-        굴리기 ({v.rolls}/3)
-      </button>
-      {mine && rolled && <p className="muted yacht-hint">{v.rolls < 3 ? '고정할 주사위를 눌러 두고 다시 굴리거나, 칸을 골라 기록하세요' : '칸을 골라 기록하세요'}</p>}
-      {error && <p className="form-error" role="alert">{error}</p>}
 
       <table className="yacht-sheet">
         <thead>
@@ -164,6 +168,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
           </tr>
         </tbody>
       </table>
+      {footer && <div className="stack yacht-foot">{footer}</div>}
     </div>
   )
 }

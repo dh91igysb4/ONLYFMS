@@ -95,36 +95,43 @@ export function DuelSection({ handle }: { handle: string }) {
       {!error && stats && stats.length === 0 && <p className="muted">아직 대전 기록이 없어요</p>}
       {!error && stats && stats.length > 0 && (
         <>
-          <div className="row" aria-label="집계 범위">
-            {([[true, '랭크만'], [false, '전체']] as [boolean, string][]).map(([v, label]) => (
-              <button key={label} className={`btn ${rankedOnly === v ? 'btn-primary' : 'btn-ghost'}`}
-                aria-pressed={rankedOnly === v} onClick={() => setRankedOnly(v)}>
-                {label}
-              </button>
-            ))}
+          {/* 넓은 화면: 왼쪽 레이팅·전적, 오른쪽 최근 대국 */}
+          <div className="split split-even">
+            <div className="stack">
+              <div className="row" aria-label="집계 범위">
+                {([[true, '랭크만'], [false, '전체']] as [boolean, string][]).map(([v, label]) => (
+                  <button key={label} className={`btn ${rankedOnly === v ? 'btn-primary' : 'btn-ghost'}`}
+                    aria-pressed={rankedOnly === v} onClick={() => setRankedOnly(v)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {stats.map((g) => {
+                const s = rankedOnly ? g.rated : g.all
+                return (
+                  <section key={g.game_id} className="card">
+                    <span className="card-title">{gameName(g.game_id)}</span>
+                    <p>레이팅 <strong>{g.rating}</strong></p>
+                    <p>{wdlText(s.w, s.d, s.l)}</p>
+                    <p>승률 <span>{duelRate(s.w, s.d, s.l)}</span></p>
+                  </section>
+                )
+              })}
+            </div>
+            <div className="stack">
+              <h4 className="section-title">최근 대국</h4>
+              {recent.length === 0 ? <p className="muted">아직 대국이 없어요</p> : (
+                <ul className="list" aria-label="최근 대국">
+                  {recent.map((r) => (
+                    <li key={r.id} className="list-row">
+                      {/* 한 덩어리로 감싸야 세로 flex 행에서 배지가 가로로 늘어나지 않는다 */}
+                      <span><span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} {scoreText(r.my_score, r.opp_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          {stats.map((g) => {
-            const s = rankedOnly ? g.rated : g.all
-            return (
-              <section key={g.game_id} className="card">
-                <span className="card-title">{gameName(g.game_id)}</span>
-                <p>레이팅 <strong>{g.rating}</strong></p>
-                <p>{wdlText(s.w, s.d, s.l)}</p>
-                <p>승률 <span>{duelRate(s.w, s.d, s.l)}</span></p>
-              </section>
-            )
-          })}
-          <h4 className="section-title">최근 대국</h4>
-          {recent.length === 0 ? <p className="muted">아직 대국이 없어요</p> : (
-            <ul className="list" aria-label="최근 대국">
-              {recent.map((r) => (
-                <li key={r.id} className="list-row">
-                  {/* 한 덩어리로 감싸야 세로 flex 행에서 배지가 가로로 늘어나지 않는다 */}
-                  <span><span className="badge">{RESULT[r.result]}</span> {gameName(r.game_id)} · vs {r.opponent_handle ?? '알 수 없음'} {scoreText(r.my_score, r.opp_score)} · {day(r.ended_at)}{r.rated ? '' : ' · 친선'}</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </>
       )}
 

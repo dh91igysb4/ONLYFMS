@@ -61,11 +61,11 @@ export function ContestListPage() {
       )}
       {!error && rows === null && <p className="page-note" role="status">불러오는 중…</p>}
       {rows && (
-        <>
+        <div className="split split-3">
           <Section title="진행 중" rows={live} empty="진행 중인 대회가 없어요" />
           <Section title="예정" rows={upcoming} empty="예정된 대회가 없어요" />
           <Section title="종료" rows={ended} empty="최근 30일 안에 끝난 대회가 없어요" />
-        </>
+        </div>
       )}
     </div>
   )

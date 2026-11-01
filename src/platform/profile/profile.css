@@ -46,3 +46,9 @@
   font-variant-numeric: tabular-nums;
 }
 .pf-recent-row > span:last-child { overflow-wrap: break-word; min-width: 0; }
+
+/* 데스크톱 (900px 이상): 최근 기록은 위에서 아래로 두 단 */
+@media (min-width: 900px) {
+  .pf-recent { columns: 2; column-gap: 0; column-rule: 1px solid var(--line); }
+  .pf-recent-row { break-inside: avoid; }
+}

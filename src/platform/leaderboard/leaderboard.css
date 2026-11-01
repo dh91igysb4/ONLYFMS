@@ -91,3 +91,10 @@
 .lb-table a { color: var(--ink); font-weight: 700; text-decoration: none; }
 .lb-table a:hover { text-decoration: underline; }
 .lb-table tr.me td, .lb-table tr.me a { color: var(--accent-strong); }
+
+/* 데스크톱 (900px 이상): 리더보드는 800px까지만, 표는 내용 폭에 맞춰 아이디와 점수 사이가 벌어지지 않게 */
+@media (min-width: 900px) {
+  .lb-page { max-width: 800px; }
+  .lb-page .lb-panel { width: fit-content; min-width: min(100%, 560px); max-width: 100%; }
+  .lb-page .lb-table { width: auto; min-width: 100%; }
+}

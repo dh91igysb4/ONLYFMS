@@ -179,73 +179,79 @@ export function DuelHomePage() {
   return (
     <div className="stack">
       <h2 className="page-title">대전</h2>
-      {/* 관리자 프로필이 늦게 오면 보이는 게임이 바뀌므로 기본값을 다시 잡는다 */}
-      <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
+      {/* 넓은 화면: 왼쪽 대국 만들기·같은 화면, 오른쪽 대기실·내 대국·최근 결과 */}
+      <div className="split">
+        <div className="stack">
+          {/* 관리자 프로필이 늦게 오면 보이는 게임이 바뀌므로 기본값을 다시 잡는다 */}
+          <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
 
-      {visible.some((m) => m.duel?.sameScreen) && (
-        <section className="card" aria-label="같은 화면">
-          <h3 className="card-title">같은 화면으로 둘이서</h3>
-          <p className="muted">한 기기를 번갈아 쓰는 대결이에요. 기록과 레이팅은 남지 않아요</p>
-          <div className="card-actions">
-            {visible.filter((m) => m.duel?.sameScreen).map((m) => (
-              <Link key={m.id} className="btn btn-ghost" to={`/duel/local/${m.id}`}>{m.name} 시작</Link>
-            ))}
-          </div>
-        </section>
-      )}
+          {visible.some((m) => m.duel?.sameScreen) && (
+            <section className="card" aria-label="같은 화면">
+              <h3 className="card-title">같은 화면으로 둘이서</h3>
+              <p className="muted">한 기기를 번갈아 쓰는 대결이에요. 기록과 레이팅은 남지 않아요</p>
+              <div className="card-actions">
+                {visible.filter((m) => m.duel?.sameScreen).map((m) => (
+                  <Link key={m.id} className="btn btn-ghost" to={`/duel/local/${m.id}`}>{m.name} 시작</Link>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+        <div className="stack">
+          {error && <p className="form-error" role="alert">{error}</p>}
+          {!error && list === null && <p className="page-note" role="status">불러오는 중…</p>}
+          {list && (
+            <>
+              <section className="stack" aria-label="대기실">
+                <h3 className="section-title">대기실</h3>
+                {joinError && <p className="form-error" role="alert">{joinError}</p>}
+                {list.lobby.length === 0 && <p className="muted">기다리는 공개 대국이 없어요</p>}
+                <ul className="list">
+                  {list.lobby.map((m) => (
+                    <li key={m.id} className="list-row">
+                      <div className="row between">
+                        <span>{m.created_by_handle ?? '알 수 없음'} <span className="muted">({m.players[0]?.rating ?? 1000})</span></span>
+                        <button type="button" className="btn btn-primary" disabled={joining !== null} onClick={() => void join(m.id)}>참가</button>
+                      </div>
+                      <span className="muted">{meta(m)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {!error && list === null && <p className="page-note" role="status">불러오는 중…</p>}
-      {list && (
-        <>
-          <section className="stack" aria-label="대기실">
-            <h3 className="section-title">대기실</h3>
-            {joinError && <p className="form-error" role="alert">{joinError}</p>}
-            {list.lobby.length === 0 && <p className="muted">기다리는 공개 대국이 없어요</p>}
-            <ul className="list">
-              {list.lobby.map((m) => (
-                <li key={m.id} className="list-row">
-                  <div className="row between">
-                    <span>{m.created_by_handle ?? '알 수 없음'} <span className="muted">({m.players[0]?.rating ?? 1000})</span></span>
-                    <button type="button" className="btn btn-primary" disabled={joining !== null} onClick={() => void join(m.id)}>참가</button>
-                  </div>
-                  <span className="muted">{meta(m)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+              <section className="stack" aria-label="내 대국">
+                <h3 className="section-title">내 대국</h3>
+                {list.mine.length === 0 && <p className="muted">진행 중인 대국이 없어요</p>}
+                <ul className="list">
+                  {list.mine.map((m) => {
+                    const opp = m.players.find((p) => p.id !== myId)
+                    const label = m.status === 'waiting' ? '상대를 기다리는 중' : `vs ${opp?.handle ?? '알 수 없음'}`
+                    return (
+                      <li key={m.id} className="list-row">
+                        <Link to={`/duel/${m.id}`}>{label}</Link>
+                        <span className="muted">{meta(m)}{m.visibility === 'invite' ? ' · 초대' : ''}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
 
-          <section className="stack" aria-label="내 대국">
-            <h3 className="section-title">내 대국</h3>
-            {list.mine.length === 0 && <p className="muted">진행 중인 대국이 없어요</p>}
-            <ul className="list">
-              {list.mine.map((m) => {
-                const opp = m.players.find((p) => p.id !== myId)
-                const label = m.status === 'waiting' ? '상대를 기다리는 중' : `vs ${opp?.handle ?? '알 수 없음'}`
-                return (
-                  <li key={m.id} className="list-row">
-                    <Link to={`/duel/${m.id}`}>{label}</Link>
-                    <span className="muted">{meta(m)}{m.visibility === 'invite' ? ' · 초대' : ''}</span>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-
-          <section className="stack" aria-label="최근 결과">
-            <h3 className="section-title">최근 결과</h3>
-            {list.recent.length === 0 && <p className="muted">아직 끝난 대국이 없어요</p>}
-            <ul className="list">
-              {list.recent.map((m) => (
-                <li key={m.id} className="list-row">
-                  <Link to={`/duel/${m.id}`}>{resultText(m, myId)}</Link>
-                  <span className="muted">{meta(m)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      )}
+              <section className="stack" aria-label="최근 결과">
+                <h3 className="section-title">최근 결과</h3>
+                {list.recent.length === 0 && <p className="muted">아직 끝난 대국이 없어요</p>}
+                <ul className="list">
+                  {list.recent.map((m) => (
+                    <li key={m.id} className="list-row">
+                      <Link to={`/duel/${m.id}`}>{resultText(m, myId)}</Link>
+                      <span className="muted">{meta(m)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

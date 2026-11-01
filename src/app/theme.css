@@ -125,6 +125,18 @@ body {
 }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 
+/* 넓은 화면 배치 도우미. 폰(900px 미만)에서는 .stack 과 똑같이 세로로 쌓인다.
+   .split        두 열 (왼쪽 2 : 오른쪽 3). 자식 하나만 있으면 한 줄 전체.
+   .split-aside  왼쪽 본문 + 오른쪽 좁은 열(.split-side). 본문은 .split-main
+   .split-even   같은 폭 두 열, .split-3 같은 폭 세 열
+   .split-sticky 첫 열이 스크롤을 따라 붙는다
+   .grid-cards   카드 격자 (300px 이상 칸을 채운다)
+   세로 간격은 --split-gap 으로 바꿀 수 있다 (기본 10px, .stack 과 같다) */
+.split { display: flex; flex-direction: column; gap: var(--split-gap, 10px); }
+.split > * { min-width: 0; }
+.grid-cards { display: flex; flex-direction: column; gap: 10px; }
+.grid-cards > * { min-width: 0; }
+
 .btn {
   font: inherit;
   min-height: 44px;
@@ -217,3 +229,22 @@ select.input { padding-right: 8px; }
 .duel-status-me { color: var(--accent-strong); }
 .duel-headline { margin: 0; font-size: 24px; font-weight: 700; color: var(--accent-strong); }
 .duel-score { margin: 0; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* 데스크톱 (900px 이상): 본문 폭 1100px, 머리글도 같은 폭·왼쪽 끝에 맞춘다 */
+@media (min-width: 900px) {
+  .app-header { padding: 12px 0 0; }
+  .app-header-inner { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  .page { max-width: 1100px; }
+  .free-option { flex: 0 1 220px; }
+
+  .split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; align-items: start; }
+  .split-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .split-aside { grid-template-columns: minmax(0, 1fr) 340px; }
+  .split-aside > .split-main { grid-column: 1; grid-row: 1; }
+  .split-aside > .split-side { grid-column: 2; grid-row: 1; }
+  .split > :only-child { grid-column: 1 / -1; }
+  .split-sticky > :first-child { position: sticky; top: 16px; }
+
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+}

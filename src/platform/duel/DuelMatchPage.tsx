@@ -179,6 +179,19 @@ export function DuelMatchPage() {
   const iCreated = v.status === 'waiting' && v.players[0]?.id === profile?.id
   const names: [string, string] = [nameOf(v, 0), nameOf(v, 1)]
   const boardShown = v.status !== 'waiting' && v.status !== 'void' && !!Board && v.view !== null && v.view !== undefined
+  // 선수·차례·결과·기권. 게임 화면이 있으면 화면 안(넓은 화면에서는 조작 열)에 넣는다. 폰에서는 순서가 같다
+  const head = (
+    <>
+      <Players v={v} />
+      {v.status === 'active' && mine && (
+        <p className={myTurn ? 'duel-status duel-status-me' : 'duel-status'} role="status">
+          {myTurn ? '내 차례' : '상대 차례'}
+        </p>
+      )}
+    </>
+  )
+  const result = finished && <Result v={v} onRematch={() => void rematch()} rematchBusy={rematchBusy} rematchError={rematchError} />
+  const resignBtn = v.status === 'active' && mine && <ResignButton onResign={resign} disabled={busy} />
 
   return (
     <div className="stack">
@@ -189,12 +202,7 @@ export function DuelMatchPage() {
           <span className="badge">턴 {v.turn_seconds}초</span>
         </div>
       </div>
-      <Players v={v} />
-      {v.status === 'active' && mine && (
-        <p className={myTurn ? 'duel-status duel-status-me' : 'duel-status'} role="status">
-          {myTurn ? '내 차례' : '상대 차례'}
-        </p>
-      )}
+      {!boardShown && head}
       {/* 게임 화면이 있으면 오류는 화면이 보여 준다 */}
       {error && !boardShown && <p className="notice" role="alert">{error}</p>}
 
@@ -209,7 +217,7 @@ export function DuelMatchPage() {
         </section>
       ) : (
         <>
-          {finished && <Result v={v} onRematch={() => void rematch()} rematchBusy={rematchBusy} rematchError={rematchError} />}
+          {!boardShown && result}
           {v.status !== 'void' && (
             <section aria-label="게임 화면">
               {boardShown && Board ? (
@@ -222,6 +230,8 @@ export function DuelMatchPage() {
                   error={error}
                   names={names}
                   onAction={(a) => { if (myTurn) act(a) }}
+                  header={<>{head}{result}</>}
+                  footer={resignBtn}
                 />
               ) : (
                 !Board && <p className="muted">준비 중인 게임이에요</p>
@@ -231,7 +241,7 @@ export function DuelMatchPage() {
         </>
       )}
 
-      {v.status === 'active' && mine && <ResignButton onResign={resign} disabled={busy} />}
+      {!boardShown && resignBtn}
     </div>
   )
 }

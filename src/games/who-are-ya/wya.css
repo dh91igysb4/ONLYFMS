@@ -5,10 +5,12 @@
   --wya-strip: rgba(0, 0, 0, 0.14);
   --wya-input: #2f6bd6;
   --wya-display: 'Archivo', 'Arial Black', system-ui, sans-serif;
+  --split-gap: 14px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
+.wya-side, .wya-hist { display: flex; flex-direction: column; gap: 14px; }
 .wya-meta { display: flex; align-items: baseline; gap: 8px; }
 .wya-meta strong { font-size: 15px; }
 .wya-time { margin-left: auto; }
