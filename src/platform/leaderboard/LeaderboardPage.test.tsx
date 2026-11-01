@@ -20,12 +20,12 @@ vi.mock('../../games/index.ts', () => {
     { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeDefaultSort: 'best' } },
   ]
   return {
-  games,
-  getGame: (id: string) => games.find((g) => g.manifest.id === id),
-  duels: [
-    { manifest: { id: 'yacht', name: '요트 다이스', hidden: false } },
-    { manifest: { id: 'secret-duel', name: '비밀 대전', hidden: true } },
-  ],
+    games,
+    getGame: (id: string) => games.find((g) => g.manifest.id === id),
+    duels: [
+      { manifest: { id: 'yacht', name: '요트 다이스', hidden: false } },
+      { manifest: { id: 'secret-duel', name: '비밀 대전', hidden: true } },
+    ],
   }
 })
 

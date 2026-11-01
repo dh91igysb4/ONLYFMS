@@ -1,6 +1,6 @@
 -- 자유 플레이 최고 점수: lb_free / _free_stats의 best_score 열 (툴칫솔 설계 §5.1)
 begin;
-select plan(9);
+select plan(10);
 
 insert into public.game_modes (game_id, daily, contest, free) values ('test-guess', true, true, true);
 insert into public.hidden_games (game_id) values ('test-guess');
@@ -32,7 +32,6 @@ select ok(not has_function_privilege('anon', 'public._free_stats(text, boolean)'
 set local role authenticated;
 set local request.jwt.claims = :'ADM';
 
-
 select is((select best_score from public.lb_free('test-guess') where handle = 'echo1'), 7.5, 'lb_free: U1 best_score 7.5');
 select is((select best_score from public.lb_free('test-guess') where handle = 'echo2'), 9.0, 'lb_free: U2 best_score 9.0');
 select results_eq(
@@ -40,3 +39,10 @@ select results_eq(
   $$values ('echo1', 3, 3, 5.2), ('echo2', 1, 1, 9.0)$$,
   'lb_free: existing columns and server order unchanged');
 select is((select best_score from public.lb_free() where handle = 'echo1'), 7.5, 'lb_free(null): best_score present');
+select is(
+  (select array_agg(k order by k) from jsonb_object_keys(public.user_stats('echo1') -> 'free_by_game' -> 0) k),
+  array['best_streak','game_id','plays','win_rate','wins'],
+  'user_stats: free_by_game keys unchanged');
+
+select * from finish();
+rollback;
