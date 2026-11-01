@@ -75,7 +75,10 @@ export function HomePage() {
         <button type="button" className="btn btn-sm btn-ghost" onClick={startEdit}>편집</button>
       </div>
       {visible.length === 0 ? (
-        <p className="muted">표시할 블록이 없어요. 편집에서 켜 주세요</p>
+        <div className="stack">
+          <p className="muted">표시할 블록이 없어요. 편집에서 켜 주세요</p>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={startEdit}>편집</button>
+        </div>
       ) : (
         <div className="home-grid">
           {visible.map((e) => {

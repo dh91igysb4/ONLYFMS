@@ -154,8 +154,11 @@ test('모두 꺼짐 → 안내 문구, 마운트 없음', () => {
   profile = { home_layout: [{ id: 'a', on: false }, { id: 'b', on: false }, { id: 'c', on: false }] }
   render(<HomePage />)
   expect(screen.getByText('표시할 블록이 없어요. 편집에서 켜 주세요')).toBeTruthy()
-  expect(screen.getAllByRole('button', { name: '편집' }).length).toBeGreaterThan(0)
+  const buttons = screen.getAllByRole('button', { name: '편집' })
+  expect(buttons).toHaveLength(2)
   expect(mountSpy).not.toHaveBeenCalled()
+  fireEvent.click(buttons[1])
+  expect(screen.getByRole('button', { name: '완료' })).toBeTruthy()
 })
 
 test('편집 모드에서는 블록을 마운트하지 않고 끝 버튼은 disabled', () => {
