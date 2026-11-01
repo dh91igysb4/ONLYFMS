@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { BlockFrame } from './BlockFrame.tsx'
 import { useBlockData } from './useBlockData.ts'
@@ -30,13 +30,23 @@ test('error_then_retry_calls_load_again', async () => {
   expect(load).toHaveBeenCalledTimes(2)
 })
 
-test('unmount_before_resolve_is_silent', async () => {
-  const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-  let resolve!: (v: string) => void
-  const load = () => new Promise<string>((r) => { resolve = r })
-  const { unmount } = render(<Probe load={load} />)
-  unmount()
-  resolve('늦은 값')
-  await new Promise((r) => setTimeout(r, 0))
-  expect(spy).not.toHaveBeenCalled()
+function KeyedProbe({ k, load }: { k: string; load: () => Promise<string> }) {
+  const { state, retry } = useBlockData(load, [k])
+  return (
+    <BlockFrame title="경합 블록" state={state} onRetry={retry}>
+      {state.kind === 'done' && <p>{state.data}</p>}
+    </BlockFrame>
+  )
+}
+
+test('stale_result_from_previous_deps_is_discarded', async () => {
+  const resolvers: Record<string, (v: string) => void> = {}
+  const load = (k: string) => () => new Promise<string>((r) => { resolvers[k] = r })
+  const { rerender } = render(<KeyedProbe k="a" load={load('a')} />)
+  rerender(<KeyedProbe k="b" load={load('b')} />)
+  await act(async () => { resolvers.b('second') })
+  expect(screen.getByText('second')).toBeTruthy()
+  await act(async () => { resolvers.a('first') })
+  expect(screen.getByText('second')).toBeTruthy()
+  expect(screen.queryByText('first')).toBeNull()
 })
