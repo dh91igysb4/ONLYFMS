@@ -129,7 +129,7 @@ export function toggle(layout: HomeLayoutEntry[], id: string): HomeLayoutEntry[]
 
 ### 5.2 편집 모드
 
-- `편집`을 누르면 지금 레이아웃을 복사해 편집용 상태로 둔다. 블록 내용은 렌더하지 않고 `BlockFrame`이 제목만 있는 줄로 바꾼다(편집 중 RPC 호출 없음, 목록이 짧아져 순서 바꾸기 쉬움).
+- `편집`을 누르면 지금 레이아웃을 복사해 편집용 상태로 둔다. 블록 컴포넌트는 마운트하지 않고 `EditList`가 블록 제목 줄 목록을 그린다(편집 중 RPC 호출 없음, 목록이 짧아져 순서 바꾸기 쉬움).
 - 각 줄: 제목, `켜기` 스위치(`role="switch"`, `aria-checked`), `↑`·`↓` 버튼(`aria-label="<제목> 위로"` 등, 끝에서는 비활성).
 - 꺼진 줄은 흐리게(토큰 색만 사용).
 - 하단: `완료`(저장) · `취소`(편집 전 상태로) · `기본값으로`(편집 상태를 기본 순서·전부 켜짐으로 바꿈. 저장은 `완료` 때 한다).
@@ -160,7 +160,7 @@ src/platform/home/
   blocks.ts, blocks.test.ts
   layout.ts, layout.test.ts
   useBlockData.ts
-  BlockFrame.tsx
+  BlockFrame.tsx, EditList.tsx
   HomePage.tsx, HomePage.test.tsx
   blocks/DailyBlock.tsx, ContestsBlock.tsx, DuelsBlock.tsx,
          WeeklyBlock.tsx, EloBlock.tsx, StreakBlock.tsx  (+ 각 .test.tsx)
