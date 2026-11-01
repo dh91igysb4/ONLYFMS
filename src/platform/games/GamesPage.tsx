@@ -17,7 +17,7 @@ function statusText(s: Status | undefined): string {
   return '오늘 기록을 불러오지 못했어요'
 }
 
-export function HomePage() {
+export function GamesPage() {
   const { profile } = useAuth()
   const visible = games.filter((g) => !g.manifest.hidden || profile?.is_admin)
   const [status, setStatus] = useState<Record<string, Status>>({})

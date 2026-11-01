@@ -6,7 +6,8 @@ import { Layout } from '../platform/layout/Layout.tsx'
 import { AdminPage } from '../platform/admin/AdminPage.tsx'
 import { LeaderboardPage } from '../platform/leaderboard/LeaderboardPage.tsx'
 import { ProfilePage } from '../platform/profile/ProfilePage.tsx'
-import { HomePage } from '../platform/games/HomePage.tsx'
+import { HomePage } from '../platform/home/HomePage.tsx'
+import { GamesPage } from '../platform/games/GamesPage.tsx'
 import { DailyPage } from '../platform/games/DailyPage.tsx'
 import { FreePage } from '../platform/games/FreePage.tsx'
 import { ContestListPage } from '../platform/contests/ContestListPage.tsx'
@@ -26,6 +27,7 @@ export function AppRoutes() {
       <Route path="/welcome" element={<WelcomePage />} />
       <Route element={<RequireApproved><Layout /></RequireApproved>}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/games" element={<GamesPage />} />
         <Route path="/play/:game/daily" element={<DailyPage />} />
         <Route path="/play/:game/free" element={<FreePage />} />
         <Route path="/contests" element={<ContestListPage />} />

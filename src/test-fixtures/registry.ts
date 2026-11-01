@@ -8,7 +8,8 @@ import { logic } from './test-guess/logic.ts'
 
 export const testGuess: GameModule = { manifest, logic }
 
-export function withTestGame(real: { games: GameModule[] }) {
+// real의 나머지 export(duels, getDuel 등)는 그대로 살린다.
+export function withTestGame(real: typeof import('../games/index.ts')) {
   const games = [testGuess, ...real.games]
-  return { games, getGame: (id: string) => games.find((g) => g.manifest.id === id) }
+  return { ...real, games, getGame: (id: string) => games.find((g) => g.manifest.id === id) }
 }
