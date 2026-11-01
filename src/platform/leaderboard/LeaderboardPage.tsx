@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
-import { games } from '../../games/index.ts'
+import { games, getGame } from '../../games/index.ts'
 import { now } from '../../lib/serverTime.ts'
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
@@ -24,8 +24,8 @@ type ContestsData = {
   contests: { contest_id: string; title: string; ends_at: string; podium: { handle: string; score: number }[] }[]
   totals: { user_id: string; handle: string; total: number }[]
 }
-type FreeRow = { user_id: string; handle: string; plays: number; wins: number; win_rate: number; current_streak: number; best_streak: number | null; avg_score: number }
-type Sort = 'wins' | 'rate' | 'plays'
+type FreeRow = { user_id: string; handle: string; plays: number; wins: number; win_rate: number; current_streak: number; best_streak: number | null; avg_score: number; best_score: number }
+type Sort = 'wins' | 'rate' | 'plays' | 'best'
 type Data = { tab: Tab; rows: ScoreRow[] | FreeRow[] | ContestsData }
 
 export const pct = (r: number) => `${Math.round(r * 1000) / 10}%`
@@ -35,6 +35,7 @@ function sortFree(rows: FreeRow[], s: Sort): FreeRow[] {
     wins: (a: FreeRow, b: FreeRow) => b.wins - a.wins || b.win_rate - a.win_rate,
     rate: (a: FreeRow, b: FreeRow) => b.win_rate - a.win_rate || b.wins - a.wins,
     plays: (a: FreeRow, b: FreeRow) => b.plays - a.plays || b.wins - a.wins,
+    best: (a: FreeRow, b: FreeRow) => b.best_score - a.best_score || b.plays - a.plays,
   }[s]
   return [...rows].sort(by)
 }
@@ -43,8 +44,10 @@ function Handle({ handle }: { handle: string }) {
   return <Link to={`/u/${handle}`}>{handle}</Link>
 }
 
-const SORTS: [Sort, string][] = [['wins', '정답 수'], ['rate', '정답률'], ['plays', '플레이 수']]
-const SORT_COLUMN: Record<Sort, string> = { wins: '정답', rate: '정답률', plays: '플레이' }
+const SORTS: [Sort, string][] = [['wins', '정답 수'], ['rate', '정답률'], ['plays', '플레이 수'], ['best', '최고 점수']]
+const SORT_COLUMN: Record<Sort, string> = { wins: '정답', rate: '정답률', plays: '플레이', best: '최고' }
+
+const defaultSortFor = (id: string): Sort => (id ? getGame(id)?.manifest.freeDefaultSort ?? 'wins' : 'wins')
 
 export function LeaderboardPage() {
   const { profile } = useAuth()
@@ -96,7 +99,7 @@ export function LeaderboardPage() {
       {tab !== 'contests' && tab !== 'duel' && (
         <div className="lb-filters">
           <span className="lb-pill">
-            <select aria-label="게임" value={game} onChange={(e) => setGame(e.target.value)}>
+            <select aria-label="게임" value={game} onChange={(e) => { setGame(e.target.value); setSort(defaultSortFor(e.target.value)) }}>
               <option value="">전체 합계</option>
               {visible.map((g) => <option key={g.manifest.id} value={g.manifest.id}>{g.manifest.name}</option>)}
             </select>
@@ -104,7 +107,7 @@ export function LeaderboardPage() {
           {tab === 'free' && (
             <span className="lb-pill">
               <select aria-label="정렬" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                {SORTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                {SORTS.filter(([id]) => game || id !== 'best').map(([id, label]) => <option key={id} value={id}>{label}</option>)}
               </select>
             </span>
           )}
@@ -138,13 +141,14 @@ export function LeaderboardPage() {
             <LbTable
               cols={[
                 { label: '아이디' },
-                ...(['플레이', '정답', '정답률', '평균'].map((label) => ({ label, num: true, sorted: SORT_COLUMN[sort] === label }))),
+                ...(['플레이', '정답', '정답률', '평균', ...(game ? ['최고'] : [])].map((label) => ({ label, num: true, sorted: SORT_COLUMN[sort] === label }))),
                 ...(game ? [{ label: '연속', num: true }, { label: '최고 연속', num: true }] : []),
               ]}
               rows={freeRows.map((r, i) => ({
                 id: r.user_id, top: i < 3, me: r.user_id === myId,
                 cells: [
                   <Handle handle={r.handle} />, r.plays, r.wins, pct(r.win_rate), r.avg_score,
+                  ...(game ? [r.best_score] : []),
                   ...(game ? [r.current_streak, r.best_streak ?? '-'] : []),
                 ],
               }))}

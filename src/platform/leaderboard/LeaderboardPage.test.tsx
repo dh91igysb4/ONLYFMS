@@ -12,16 +12,22 @@ vi.mock('../../lib/api.ts', async (orig) => ({
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
-vi.mock('../../games/index.ts', () => ({
-  games: [
+vi.mock('../../games/index.ts', () => {
+  const games = [
     { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } },
     { manifest: { id: 'secret', name: '비밀 게임', hidden: true } },
-  ],
+    { manifest: { id: 'who-are-ya', name: '후알야', hidden: false } },
+    { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeDefaultSort: 'best' } },
+  ]
+  return {
+  games,
+  getGame: (id: string) => games.find((g) => g.manifest.id === id),
   duels: [
     { manifest: { id: 'yacht', name: '요트 다이스', hidden: false } },
     { manifest: { id: 'secret-duel', name: '비밀 대전', hidden: true } },
   ],
-}))
+  }
+})
 
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { LeaderboardPage } from './LeaderboardPage.tsx'
@@ -30,8 +36,8 @@ const today = () => kstDate(Date.now())
 const row = (rank: number, user_id: string, handle: string, score = 10) => ({
   rank, user_id, handle, score, action_count: 3, finished_at: null,
 })
-const free = (user_id: string, handle: string, plays: number, wins: number, rate: number, cur = 1, best: number | null = 2) => ({
-  user_id, handle, plays, wins, win_rate: rate, current_streak: cur, best_streak: best, avg_score: 5,
+const free = (user_id: string, handle: string, plays: number, wins: number, rate: number, cur = 1, best: number | null = 2, best_score = 0) => ({
+  user_id, handle, plays, wins, win_rate: rate, current_streak: cur, best_streak: best, avg_score: 5, best_score,
 })
 
 function setup(over: Record<string, unknown> = {}) {
@@ -105,6 +111,50 @@ test('streak_hidden_in_total_view', async () => {
   fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'test-guess' } })
   await screen.findByText('최고 연속')
   expect(screen.getByText('연속')).toBeTruthy()
+})
+
+test('toothbrush_defaults_to_best_sort', async () => {
+  admin = true
+  setup({ lb_free: [free('a', 'alpha', 10, 9, 0.9, 1, 2, 5), free('b', 'beta', 3, 1, 0.3, 1, 2, 9.5), free('c', 'gamma', 5, 3, 0.6, 1, 2, 7)] })
+  renderPage()
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'toothbrush' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'toothbrush' }))
+  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('best')
+  await waitFor(() => expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['beta', 'gamma', 'alpha']))
+  expect(screen.getByRole('columnheader', { name: '최고' }).getAttribute('aria-sort')).toBe('descending')
+})
+
+test('who_are_ya_keeps_wins_sort', async () => {
+  setup({ lb_free: [free('a', 'alpha', 10, 3, 0.3, 1, 2, 5)] })
+  renderPage()
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'who-are-ya' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'who-are-ya' }))
+  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('wins')
+  const best = await screen.findByRole('columnheader', { name: '최고' })
+  expect(best.getAttribute('aria-sort')).toBeNull()
+  expect(screen.getByRole('columnheader', { name: '정답' }).getAttribute('aria-sort')).toBe('descending')
+})
+
+test('best_hidden_in_total_view', async () => {
+  admin = true
+  setup({ lb_free: [free('a', 'alpha', 10, 3, 0.3, 1, null, 5)] })
+  renderPage()
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  expect(screen.queryByRole('columnheader', { name: '최고' })).toBeNull()
+  expect(screen.queryByRole('option', { name: '최고 점수' })).toBeNull()
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'toothbrush' } })
+  await screen.findByRole('columnheader', { name: '최고' })
+  expect(screen.getByRole('option', { name: '최고 점수' })).toBeTruthy()
+  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('best')
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: '' } })
+  await waitFor(() => expect(screen.queryByRole('columnheader', { name: '최고' })).toBeNull())
+  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('wins')
+  expect(screen.queryByRole('option', { name: '최고 점수' })).toBeNull()
 })
 
 test('my_row_highlighted', async () => {
