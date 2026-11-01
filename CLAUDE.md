@@ -11,6 +11,7 @@
 - `src/platform/{auth,games,contests,duel,leaderboard,profile,admin}/` 플랫폼 화면. 게임별 코드는 두지 않는다.
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `src/test-fixtures/` 테스트 전용 게임(`test-guess`, 숫자 맞히기)과 등록부 래퍼. 운영 등록부에 넣지 않는다. 플랫폼 테스트는 `vi.mock`으로 `withTestGame`/`withTestGameUi`를 끼워 쓴다
+- `src/platform/games/freeLogQueue.ts` + 테이블 `free_play_logs`: 자유 플레이의 시드와 행동 기록. `free_plays` 행 저장 뒤에 올린다
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차
@@ -20,6 +21,8 @@
 4. 새 마이그레이션(`npx supabase@2 migration new`)으로 `game_modes` 행과, 숨김 게임이면 `hidden_games` 행을 추가 (등록부 테스트 `registry.test.ts`와 일치해야 한다)
 5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
 6. 문제없으면 `hidden`을 풀어 공개
+
+manifest에 `freeDefaultSort`를 두면 자유 플레이 리더보드의 기본 정렬을 지정할 수 있다.
 
 대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):
 - manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).
