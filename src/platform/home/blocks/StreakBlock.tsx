@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { games } from '../../../games/index.ts'
+import { games, getGame } from '../../../games/index.ts'
 import { rpc } from '../../../lib/api.ts'
 import { useAuth } from '../../auth/AuthProvider.tsx'
 import { BlockFrame } from '../BlockFrame.tsx'
@@ -8,6 +8,7 @@ import { useBlockData } from '../useBlockData.ts'
 type Row = {
   user_id: string; handle: string; plays: number; wins: number
   win_rate: number; current_streak: number; best_streak: number | null; avg_score: number
+  best_score: number | null
 }
 type Item = { id: string; name: string; rows: Row[] }
 
@@ -32,7 +33,9 @@ export function StreakBlock({ title }: { title: string }) {
             <div key={it.id}>
               <h4>{it.name}</h4>
               {mine
-                ? <p className="card-status">{`${mine.plays}판 · 승률 ${Math.round(mine.win_rate * 100)}% · 연속 ${mine.current_streak} (최고 ${mine.best_streak ?? 0})`}</p>
+                ? <p className="card-status">{getGame(it.id)?.manifest.freeDefaultSort === 'best'
+                  ? `${mine.plays}판 · 최고 ${(mine.best_score ?? 0).toFixed(1)}점`
+                  : `${mine.plays}판 · 승률 ${Math.round(mine.win_rate * 100)}% · 연속 ${mine.current_streak} (최고 ${mine.best_streak ?? 0})`}</p>
                 : <p className="muted">아직 기록이 없어요</p>}
               <div className="card-actions">
                 <Link className="btn btn-ghost" to={`/play/${it.id}/free`}>자유 플레이</Link>

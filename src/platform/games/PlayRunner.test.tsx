@@ -5,8 +5,28 @@ const playMock = vi.fn()
 const submitMock = vi.fn(async () => {})
 vi.mock('../../games/index.ts', async (orig) =>
   (await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
-vi.mock('../../games/ui.ts', async (orig) =>
-  (await import('../../test-fixtures/ui.ts')).withTestGameUi(await orig()))
+const burst = vi.hoisted(() => ({ on: false }))
+vi.mock('../../games/ui.ts', async (orig) => {
+  const base = (await import('../../test-fixtures/ui.ts')).withTestGameUi(await orig())
+  return {
+    ...base,
+    getGameComponent: (id: string) => {
+      const Real = base.getGameComponent(id)
+      if (!burst.on || id !== 'test-guess' || !Real) return Real
+      // 한 번의 클릭에서 onAction을 동기로 두 번 부르는 화면
+      return (props: import('../../games/ui.ts').GameProps) => (
+        <div>
+          <Real {...props} />
+          <button onClick={() => { props.onAction({ type: 'guess', value: 1 }); props.onAction({ type: 'guess', value: 2 }) }}>연속</button>
+        </div>
+      )
+    },
+  }
+})
+vi.mock('./seed.ts', async () => {
+  const actual = await vi.importActual<typeof import('./seed.ts')>('./seed.ts')
+  return { ...actual, newSeed: () => new Uint8Array(16).fill(3) }
+})
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'http://x', supabaseKey: 'k' }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
@@ -17,9 +37,13 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
 }))
 vi.mock('./freeQueue.ts', () => ({ submit: (...a: unknown[]) => (submitMock as (...x: unknown[]) => unknown)(...a) }))
 
+const submitLogMock = vi.fn()
+vi.mock('./freeLogQueue.ts', () => ({ submitLog: (...a: unknown[]) => submitLogMock(...a) }))
+
 import { ApiError, type PlayView } from '../../lib/api.ts'
 import { PlayRunner } from './PlayRunner.tsx'
 import { logic } from '../../test-fixtures/test-guess/logic.ts'
+import { rngFromSeed } from '../../shared/rng.ts'
 
 const emptyState = { guesses: [], feedback: [], hintUsed: false, parity: null, gaveUp: false }
 function view(over: Partial<PlayView> = {}): PlayView {
@@ -39,6 +63,7 @@ function guess(n: number) {
 beforeEach(() => {
   playMock.mockReset()
   submitMock.mockClear()
+  submitLogMock.mockClear()
 })
 
 test('server_mode_sends_expected_count', async () => {
@@ -175,11 +200,11 @@ test('invalid_action_shows_message_and_refreshes_view', async () => {
 })
 
 test('local_mode_submits_free_play_on_finish', async () => {
-  vi.spyOn(Math, 'random').mockReturnValue(0.49) // 정답 50
+  const answer = (logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(3)), { range: '100' }) as { answer: number }).answer
   render(<PlayRunner mode="local" gameId="test-guess" options={{ range: '100' }} />)
   await screen.findByText('남은 기회 8')
-  guess(50)
-  await screen.findByText(/정답은 50/)
+  guess(answer)
+  await screen.findByText(new RegExp(`정답은 ${answer}`))
   expect(submitMock).toHaveBeenCalledTimes(1)
   expect(submitMock).toHaveBeenCalledWith(expect.objectContaining({
     user_id: 'u1', game_id: 'test-guess', options: { range: '100' },
@@ -187,7 +212,40 @@ test('local_mode_submits_free_play_on_finish', async () => {
     client_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
   }))
   expect(submitMock.mock.calls[0]).not.toContain('played_at')
-  vi.restoreAllMocks()
+})
+
+test('local_mode_submits_log_with_seed_and_actions', async () => {
+  const answer = (logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(3)), { range: '100' }) as { answer: number }).answer
+  const wrong = answer === 1 ? 2 : 1
+  const scorePromise = Promise.resolve()
+  submitMock.mockReturnValueOnce(scorePromise)
+  render(<PlayRunner mode="local" gameId="test-guess" options={{ range: '100' }} />)
+  await screen.findByText('남은 기회 8')
+  guess(wrong)
+  await screen.findByText('남은 기회 7')
+  guess(answer)
+  await screen.findByText(new RegExp(`정답은 ${answer}`))
+  expect(submitLogMock).toHaveBeenCalledTimes(1)
+  const [log, after] = submitLogMock.mock.calls[0]
+  expect(log).toEqual({
+    client_id: (submitMock.mock.calls[0] as unknown[])[0] && ((submitMock.mock.calls[0] as unknown[])[0] as { client_id: string }).client_id,
+    user_id: 'u1',
+    seed: '03'.repeat(16),
+    actions: [{ type: 'guess', value: wrong }, { type: 'guess', value: answer }],
+  })
+  expect(after).toBe(scorePromise)
+})
+
+test('local_mode_applies_sync_actions_in_order', async () => {
+  burst.on = true
+  try {
+    render(<PlayRunner mode="local" gameId="test-guess" options={{ range: '100' }} />)
+    await screen.findByText('남은 기회 8')
+    fireEvent.click(screen.getByRole('button', { name: '연속' }))
+    await screen.findByText('남은 기회 6')
+  } finally {
+    burst.on = false
+  }
 })
 
 test('timeout_409_shows_result_and_notice', async () => {

@@ -2,6 +2,7 @@
 // games/index.ts는 Edge Function(Deno)도 가져오므로 React 컴포넌트를 거기에 넣지 않고 여기서 따로 잇는다 (§4.7).
 import type { ComponentType, ReactNode } from 'react'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
+import { Game as ToothbrushGame } from './toothbrush/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
@@ -19,6 +20,7 @@ export type GameProps = {
 /** 새 게임은 manifest·logic을 index.ts에, 화면을 여기에 한 줄씩 등록한다. */
 const components: Record<string, ComponentType<GameProps>> = {
   'who-are-ya': WhoAreYaGame,
+  toothbrush: ToothbrushGame,
 }
 
 export function getGameComponent(id: string): ComponentType<GameProps> | undefined {

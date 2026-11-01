@@ -1,0 +1,60 @@
+/* 양치 시뮬레이터 화면. 바깥 UI 색은 theme.css 토큰만 쓴다.
+   캔버스 안(치아·플라그·잇몸)은 draw.ts의 고정색이다. */
+.tb { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tb-meta { margin: 0; font-size: 14px; color: var(--muted); }
+.tb-bar { height: 8px; border-radius: 4px; background: var(--panel); overflow: hidden; }
+.tb-bar > span { display: block; height: 100%; background: var(--lime); transition: width 0.1s linear; }
+.tb-bar-gum > span { background: var(--lose-text); }
+.tb-gum { display: flex; flex-direction: column; gap: 4px; }
+.tb-gum-hot .tb-meta { color: var(--lose-text); font-weight: 700; }
+.tb-gum-hot .tb-bar-gum { box-shadow: 0 0 0 2px var(--lose-text); }
+
+.tb-stage { position: relative; width: 100%; }
+.tb-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  height: auto;
+  border-radius: 12px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+.tb-dim { opacity: 0.5; }
+.tb-hint {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border-radius: 12px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.tb-zones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tb-zone {
+  font: inherit;
+  font-size: 13px;
+  min-height: 44px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.tb-zone:disabled { opacity: 0.4; cursor: not-allowed; }
+.tb-zone-on { background: var(--lime); color: var(--on-accent); border-color: var(--accent-edge); font-weight: 700; }
+.tb-error { margin: 0; color: var(--lose-text); font-size: 14px; }
+
+.tb-result h2 { margin: 0; }
+.tb-score { margin: 0; font-size: 36px; font-weight: 800; color: var(--accent-strong); }
+.tb-zones-result { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+.tb-zones-result li { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--panel); padding: 4px 0; }

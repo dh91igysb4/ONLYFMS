@@ -56,6 +56,8 @@ export type Manifest = {
   category?: 'solo' | 'duel'
   /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
   duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
+  /** 자유 플레이 리더보드에서 이 게임을 골랐을 때의 기본 정렬. 생략하면 'wins' */
+  freeDefaultSort?: 'wins' | 'rate' | 'plays' | 'best'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

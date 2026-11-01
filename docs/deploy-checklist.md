@@ -114,6 +114,12 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
   - [ ] 기본값으로 → 완료가 오류 없이 저장됨 (null 초기화 경로)
   - [ ] 폰은 한 열, 넓은 화면(900px 이상)은 두 열
 
+## 양치 시뮬레이터(숨김) 배포
+`claude/toothbrush-game` 머지 전에, 미리보기에서 관리자 계정으로 확인한다.
+
+- [ ] 마이그레이션: `npx -y supabase@2 db push` → 파일 이름순으로 `20261101155028_toothbrush.sql`, `20261101160235_free_play_logs.sql`, `20261101161044_free_best_score.sql` 세 개가 적용된다.
+- [ ] `play` Edge Function은 이번 변경에 재배포가 필요 없다(설계 §6). Vercel 배포만 하면 된다.
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지
