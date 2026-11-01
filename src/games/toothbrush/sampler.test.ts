@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Sampler, TICK_MS, chunk } from './sampler'
+import { Sampler, TICK_MS, chunk } from './sampler.ts'
 
 function run(hz: number): number[] {
   const s = new Sampler()
@@ -79,6 +79,18 @@ describe('Sampler', () => {
     s.take()
     s.down(100, 50)
     s.frame(4 * TICK_MS)
+    expect(s.take()).toEqual([100, 50, 100, 50])
+  })
+
+  it('relift_between_frames_not_interpolated', () => {
+    const s = new Sampler()
+    s.down(0, 0)
+    s.frame(0)
+    s.frame(TICK_MS)
+    s.take()
+    s.up()
+    s.down(100, 50)
+    s.frame(3 * TICK_MS)
     expect(s.take()).toEqual([100, 50, 100, 50])
   })
 

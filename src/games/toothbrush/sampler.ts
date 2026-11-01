@@ -1,4 +1,4 @@
-import { MAX_SAMPLES } from './logic'
+import { MAX_SAMPLES } from './logic.ts'
 
 export const TICK_MS = 1000 / 60
 export const GAP_MS = 250
@@ -18,9 +18,11 @@ export class Sampler {
   down(x: number, y: number): void {
     if (!this.started) {
       this.started = true
+      // 의도: 첫 누름 전 기준 시각은 버리고, 시계 기준은 다음 프레임 시각으로 잡는다.
       this.last = null
       this.acc = 0
     }
+    if (!this.touching) this.origin = null
     this.touching = true
     this.px = x
     this.py = y
