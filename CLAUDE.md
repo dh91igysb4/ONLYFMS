@@ -44,7 +44,7 @@
 ## 데이터 갱신 (후알야 `who-are-ya`)
 1. FotMob 스쿼드를 다시 수집해 `data/fotmob_squads.json`을 바꾼다.
 2. `python3 scripts/build-wya-data.py` → `src/games/who-are-ya/data.ts` 재생성 (직접 고치지 않는다).
-   - '쉬움'은 시장가치 3,000만 유로 이상이 기본이고, `scripts/wya_easy.py`의 수동 명단(`EASY_IN`: 유명하지만 값이 낮은 선수, `EASY_OUT`: 값만 높은 덜 알려진 유망주)으로 바로잡는다. 갱신 때 새로 3,000만을 넘긴 선수와 이적·은퇴를 보고 명단을 함께 고친다.
+   - '쉬움'은 시장가치 3,000만 유로 이상이 기본이고, `scripts/wya_easy.py`의 수동 명단(`EASY_IN`: 값은 낮아도 축구팬이면 알 만한 선수, `EASY_OUT`: 값만 높고 덜 알려진 선수. 경계 예시는 파일 머리말)으로 바로잡는다. 갱신 때 새로 3,000만을 넘긴 선수와 이적·은퇴를 보고 명단을 함께 고친다.
 3. 출제 풀·판정이 바뀌므로 `src/games/who-are-ya/logic.ts`의 `logic.version`을 올린다.
 4. `npm test && npm run typecheck && npm run build` 후 PR → 진행 중 데일리가 적은 새벽(KST)에 배포.
 5. `play` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy play --no-verify-jwt`, `docs/deploy-checklist.md` §3). 함수가 data.ts를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다.
