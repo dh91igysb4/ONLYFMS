@@ -1,7 +1,7 @@
 # ONLYFMS 축구 데이터 계층 설계
 
 - 작성일: 2026-10-31
-- 상태: 검토 대기
+- 상태: 검토 대기 (개정 1: 2026-11-01 출처·라이선스 구체화, 외부 ID 대응표, 후알야 출처 전환)
 - 범위: 여러 게임이 함께 쓰는 축구 데이터(선수·팀·커리어·대회·경기·라인업)의 저장 방식, 문제 생성 경로, 선수 검색, 이를 위해 필요한 플랫폼 변경. 개별 게임의 규칙·점수는 게임마다 별도 설계 문서로 붙인다(플랫폼 설계 §14).
 - 선행 문서: [ONLYFMS 플랫폼 설계](2026-10-31-onlyfms-platform-design.md)
 
@@ -74,12 +74,14 @@ data/football/
   team_competitions.csv
   players.csv
   aliases.csv
+  external_ids.csv
   spells.csv
   caps.csv
   honours.csv
   matches.csv          (단계 2)
   match_players.csv    (단계 2)
   player_seasons.csv   (단계 3)
+  restricted/          재배포 제한 출처(API-Football, StatsBomb)에서 온 CSV (§4.3)
 ```
 
 - UTF-8, 헤더 있음, 쉼표 구분. 빈 값은 빈 칸. 날짜는 `YYYY-MM-DD`, 날짜를 모르면 `YYYY`만 쓰고 정밀도 컬럼으로 표시한다(§5).
@@ -91,20 +93,32 @@ data/football/
 - 모든 엔터티 ID는 **영구 고정 문자열**이다. 한번 출제된 문제가 ID를 들고 있으므로 ID는 바꾸거나 재사용하지 않는다. 지우는 대신 `retired = true`로 둔다.
 - 위키데이터 항목이 있으면 그 QID를 쓴다(예: `Q11571`). 없으면 `x-` 접두사에 사람이 읽을 수 있는 이름(`x-kim-minjae-1996`).
 - 두 항목이 같은 대상으로 밝혀지면 하나를 남기고 다른 하나를 `retired`로 둔다. `aliases`에 옛 ID를 기록해 옛 문제의 표시가 깨지지 않게 한다.
+- 다른 출처의 ID(API-Football, StatsBomb, FotMob 등)는 우리 ID로 쓰지 않고 `football_external_ids`(§5)에 대응표로만 둔다. 출처를 바꿔도 우리 ID와 이미 출제된 문제는 그대로이다.
 
 ### 4.3 출처와 라이선스
 
-| 출처 | 쓰임 | 비고 |
-|---|---|---|
-| 위키데이터 (CC0) | 선수·팀·국가·커리어 기간·수상의 1차 수집 | SPARQL로 가져오는 스크립트 `scripts/football/fetch-wikidata.ts` |
-| 직접 입력 | 한글 이름, 별칭, 누락·오류 보정, 라인업, 클럽 색상 | PR로 리뷰 |
-| 위키백과 | 사람이 사실을 확인하는 참고 자료 | 문장을 복사하지 않고 사실만 옮긴다 |
+원칙: **사실(누가 언제 어느 팀에 있었나)은 저작권 대상이 아니지만, 남의 데이터베이스를 대량 복제하면 이용약관과 저작권법상 데이터베이스제작자 권리(제93조)에 걸린다.** 그래서 라이선스가 명시된 출처, 약관이 허용하는 API, 사람이 직접 확인해 입력한 사실만 쓴다.
 
-- Transfermarkt, FBref, Sofascore 등은 크롤링을 금지하는 이용약관이 있어 **자동 수집하지 않는다.**
+| 출처 | 라이선스·조건 | 맡는 데이터 | 단계 |
+|---|---|---|---|
+| 위키데이터 | CC0, 제한 없음 | 선수(생년월일·국적·포지션·주발·키), 클럽 커리어 기간, 국가대표, 수상, 클럽 색상, 한국어 이름(라벨), 외부 ID 대응 | 1 (뼈대) |
+| API-Football (api-sports.io) | 무료 플랜 하루 100회, 약관 준수(원본 재배포 금지 취지) | 현재 스쿼드·등번호, 이적, 시즌별 출전·골·도움, 경기 라인업 | 1 (현재 스쿼드), 3 |
+| StatsBomb Open Data | 비상업적 이용, 출처·로고 표기, 이용 동의서 준수 | 공개된 경기(월드컵·유로 등)의 라인업·포지션 | 2 |
+| openfootball | 퍼블릭 도메인(CC0) | 경기 결과·일정 | 2 |
+| 직접 입력 | 우리 데이터 | 한글 이름·별칭 다듬기, 명경기 라인업, TenaBall·Connections 질문, 누락·오류 보정 | 전 단계 |
+| 위키백과 | 사람이 사실을 확인하는 참고 자료 | (직접 입력의 근거) | 전 단계 |
+
+- 수집 스크립트는 `scripts/football/fetch-<source>.ts`로 출처마다 하나씩 두고, 결과는 §4.1의 CSV로 쓴다. 자동 수집은 이 표의 출처만 한다.
+- **쓰지 않는 출처:** Transfermarkt, FBref, FotMob, Sofascore, WhoScored 등 약관으로 자동 수집을 금지하는 사이트. 이들을 크롤링해 만든 Kaggle 등의 2차 데이터셋도 표시된 라이선스와 무관하게 쓰지 않는다.
+- **후알야의 현재 출처(FotMob)** 는 위 원칙과 맞지 않는다. API-Football 현재 스쿼드로 바꾼다(§10). 바꾸기 전까지는 지금 절차(CLAUDE.md "데이터 갱신")를 유지한다.
+- **재배포 제한 데이터의 분리:** API-Football·StatsBomb에서 온 데이터는 `data/football/restricted/` 아래 CSV에만 둔다. 사이트 화면에 쓰는 것은 약관 범위 안이지만, 원본을 공개 저장소에 올리면 재배포가 될 수 있다. 저장소는 비공개로 유지하고, 공개로 바꿀 일이 생기면 `restricted/`를 먼저 뺀다. `data/football/README.md`에 파일별 출처를 적는다.
+- StatsBomb 데이터를 쓴 게임은 결과 화면 하단에 "Data: StatsBomb" 출처를 표기한다.
+- API 키(`API_FOOTBALL_KEY`)는 수집 스크립트만 쓰며 `.env.local`에 둔다. Vercel·Edge Function에는 넣지 않는다(사이트는 API를 직접 부르지 않는다).
 - 선수 사진·클럽 엠블럼 이미지는 저작권·상표 문제로 저장하지 않는다. 화면에는 국기 이모지, 클럽 색상, 텍스트를 쓴다.
-- 위키데이터의 커리어 기간은 누락이 많다. 단계 1에서는 **5대 리그 + K리그1 현역과 최근 20년 은퇴 선수**로 범위를 좁히고, 출제에 쓰기 전 생성기가 검증 규칙(§7.3)으로 불완전한 선수를 걸러낸다.
+- 위키데이터의 커리어 기간은 누락이 많다. 단계 1에서는 **5대 리그 + K리그1 현역과 최근 20년 은퇴 선수**로 범위를 좁히고, 출제에 쓰기 전 생성기가 검증 규칙(§7.3)으로 불완전한 선수를 걸러낸다. 현역 선수의 최근 구간은 API-Football 이적 기록으로 보완한다.
+- 각 서비스의 무료 한도·약관은 바뀔 수 있다. 수집 스크립트를 처음 돌리기 전에 그 시점 약관을 확인하고 README에 확인 날짜를 적는다.
 
-## 5. DB 스키마 (마이그레이션 `0006_football.sql` 부터)
+## 5. DB 스키마 (`npx supabase@2 migration new football` 부터)
 
 공통 규칙: 모든 테이블 이름은 `football_` 접두사, RLS를 켜고 **승인 사용자는 읽기만, 쓰기는 적재 스크립트(service role)만** 한다. 데이터 자체는 공개 지식이고 어떤 문제가 출제될지는 들어 있지 않으므로 읽기를 막을 이유가 없다.
 
@@ -172,6 +186,17 @@ data/football/
 | alias | text | `손흥민`, `Son Heung-min`, `Sonny`, 옛 ID 등 |
 | lang | text NULL | `ko`, `en` 등 |
 | PK | (entity_id, alias) | |
+
+**football_external_ids**: 다른 출처 ID 대응표(§4.2). 수집 스크립트가 출처 데이터를 우리 ID에 붙일 때 쓴다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| entity_id | text | 선수·팀·경기 ID |
+| source | text | `wikidata`, `api-football`, `statsbomb`, `fotmob`, `transfermarkt` |
+| external_id | text | 그 출처의 ID |
+| PK | (source, external_id) | 한 외부 ID는 우리 엔터티 하나에만 |
+
+- `transfermarkt`·`fotmob` ID는 위키데이터에 이미 있는 대응(P2446 등)을 옮겨 적는 것뿐이며, 그 사이트에서 데이터를 가져오지 않는다. 후알야 전환(§10) 때 옛 FotMob ID를 이어 주는 데 쓴다.
 
 **football_spells**: 클럽 커리어 한 구간.
 
@@ -332,6 +357,7 @@ export interface GameGenerator<Puzzle> {
 - `npm run football:load`: `scripts/football/load.sh`. `DATABASE_URL`(로컬 또는 원격) 대상으로 `psql \copy`로 임시 테이블에 넣고, 한 트랜잭션 안에서 `football_*`에 upsert한 뒤 `football_meta.dataset_version`을 갱신한다. CSV에서 사라진 행은 지우지 않고 `retired = true`로 둔다(행을 지우는 것은 ID 영구 규칙과 충돌).
 - 원격 적재는 배포 체크리스트에 단계로 추가한다. 원격 `DATABASE_URL`은 비밀값이므로 커밋하지 않는다.
 - 갱신 주기: 이적 시장(여름·겨울) 뒤에 한 번씩. 이미 출제된 문제는 고정본이라 영향이 없다.
+- 갱신 순서: `fetch-wikidata` → `fetch-api-football`(하루 100회 한도 안에서 리그별로 나눠 실행, 받은 응답은 `.cache/`에 보관해 재실행 때 다시 부르지 않음) → 직접 입력분 병합 → CSV PR → 머지 후 `football:load`.
 - 데이터 오류 제보는 이 문서 범위 밖이다. 우선은 친구들이 메신저로 알려 주면 PR로 고친다.
 
 ## 9. 테스트
@@ -350,17 +376,19 @@ export interface GameGenerator<Puzzle> {
 ## 10. 구현 순서
 
 1. 단계 1 스키마 마이그레이션, RLS, `football_search`, pgTAP
-2. `data/football/` 초기 데이터(5대 리그 + K리그1 범위, 위키데이터 수집 + 한글 이름 보정)와 적재 스크립트
+2. `data/football/` 초기 데이터와 수집·적재 스크립트: `fetch-wikidata`(5대 리그 + K리그1 범위) → 한글 이름 보정 → `fetch-api-football`(현재 스쿼드·등번호) → `football:load`
 3. 플랫폼 변경 §6.3(설정별 은행), §6.4(은행 자유 플레이), §6.2(공유 풀)
 4. `src/shared/football.ts`, `scripts/puzzles-gen.ts`, `EntityPicker`
-5. 첫 게임: Who Are Ya(풀 사용) 또는 Box2Box(풀 없음) 중 하나를 별도 게임 설계로 붙인다. 풀이 필요 없는 Box2Box를 먼저 하면 3단계에서 §6.2를 미룰 수 있다.
-6. 단계 2(Missing XI), 단계 3(TenaBall 등)은 해당 게임 설계와 함께 추가한다.
+5. 첫 새 게임: Box2Box(풀 없음)를 별도 게임 설계로 붙인다. 후알야는 이미 FotMob 번들 방식으로 운영 중이므로 §6.2는 필요해질 때까지 미룬다.
+6. 후알야 출처 전환: `build-wya-data.py`의 입력을 `data/football/`(API-Football 현재 스쿼드)로 바꾼다. 게임 코드는 `data.ts` 생성 구조를 유지한다. 옛 FotMob 숫자 ID로 저장된 문제는 `football_external_ids`로 이어 붙이고 `logic.version`을 올린다. `data/fotmob_squads.json`은 전환 PR에서 지운다.
+7. 단계 2(Missing XI: StatsBomb + 직접 입력), 단계 3(TenaBall 등: API-Football 시즌 기록)은 해당 게임 설계와 함께 추가한다.
 
 ## 11. 결정할 것
 
 - 단계 1 데이터 범위: 5대 리그 + K리그1이 적당한지, 과거 레전드를 얼마나 넣을지.
 - 한글 이름 표기 기준(국립국어원 외래어 표기법 vs 국내 중계 관행). 검색은 별칭으로 둘 다 받으므로 표시용 대표 이름만 정하면 된다.
-- 첫 게임을 Who Are Ya와 Box2Box 중 무엇으로 할지.
+- 후알야 출처 전환(§10의 6) 시점: 공통 데이터 첫 적재 직후 vs 다음 이적 시장 갱신 때.
+- API-Football 무료 한도(하루 100회)로 단계 3 시즌 기록까지 감당할지, 그때 유료 플랜(월 단위)을 잠깐 쓸지.
 
 ## 12. 범위 밖
 
