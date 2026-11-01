@@ -104,7 +104,7 @@ function asTier(v: string | undefined): Tier {
 }
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 1,
+  version: 2,
 
   pickPuzzle(rng, options) {
     const tier = asTier(options.tier)

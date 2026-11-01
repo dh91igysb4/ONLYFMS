@@ -80,7 +80,7 @@ describe('who-are-ya compare', () => {
 
 describe('who-are-ya logic', () => {
   test('version and puzzleKey', () => {
-    expect(logic.version).toBe(1)
+    expect(logic.version).toBe(2)
     expect(logic.puzzleKey(P)).toBe(String(ANSWER.id))
   })
 

@@ -6,6 +6,10 @@
 """
 import json
 import os
+import sys
+
+sys.dont_write_bytecode = True  # scripts/__pycache__ 생기지 않게
+from wya_easy import EASY_IN, EASY_OUT
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'data', 'fotmob_squads.json')
@@ -54,6 +58,11 @@ def build(d):
                 grp = GROUP.get(main) or ROLEG.get(p['role']['key'], 'MF')
                 val = (p.get('transferValue') or 0) / 1e6
                 tier = 1 if val >= 30 else 2 if (topclub and val >= 12) else 3
+                # 시장가치와 유명도가 어긋나는 선수는 수동 명단으로 바로잡는다 (scripts/wya_easy.py)
+                if p['id'] in EASY_IN:
+                    tier = 1
+                elif p['id'] in EASY_OUT and tier == 1:
+                    tier = 2
                 sh = p.get('shirtNumber')
                 players.append([p['id'], p['name'], tix[tn], p.get('ccode') or '', p.get('cname') or '', main or grp, grp,
                                 p.get('age'), int(sh) if str(sh).isdigit() else None, tier])
@@ -100,6 +109,10 @@ def main():
         f.write(emit(data))
     ps = data['players']
     print('players', len(ps), 'tiers', {t: sum(1 for p in ps if p[9] <= t) for t in (1, 2, 3)}, 'missing', data['missing'])
+    ids = {p[0] for p in ps}
+    gone = sorted((EASY_IN | EASY_OUT) - ids)
+    if gone:
+        print('easy-list ids not in data (ignored):', gone)
     print(OUT, os.path.getsize(OUT) // 1024, 'KB')
 
 
