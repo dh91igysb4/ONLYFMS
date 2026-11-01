@@ -8,6 +8,7 @@ import { getGame } from '../../../src/games/index.ts'
 import { logic as ng } from '../../../src/test-fixtures/test-guess/logic.ts'
 import { manifest as ngManifest } from '../../../src/test-fixtures/test-guess/manifest.ts'
 import { PLAYERS } from '../../../src/games/who-are-ya/data.ts'
+import { logic as wyaLogic } from '../../../src/games/who-are-ya/logic.ts'
 
 const url = Deno.env.get('TEST_DB_URL')
 if (!url) throw new Error('TEST_DB_URL is required (npm run fn:test)')
@@ -618,7 +619,7 @@ t('who_are_ya_daily_plays_through_handler', async () => {
   const [it] = await sql`select puzzle, puzzle_key, logic_version from public.contest_items where id = ${itemId}`
   const answer = (it.puzzle as { answer: { id: number; name: string } }).answer
   assert.equal(it.puzzle_key, String(answer.id))
-  assert.equal(it.logic_version, 1)
+  assert.equal(it.logic_version, wyaLogic.version)
   // 기본 옵션(쉬움)이므로 티어 1 선수
   assert.equal(PLAYERS.find((p) => p[0] === answer.id)?.[9], 1)
 
