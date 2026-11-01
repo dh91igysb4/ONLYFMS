@@ -31,7 +31,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -54,7 +54,7 @@ body {
 }
 .app-logo { height: 32px; width: auto; flex-shrink: 0; }
 .app-wordmark {
-  font-family: 'Exo 2', system-ui, sans-serif;
+  font-family: 'Exo 2', 'Pretendard Variable', Pretendard, system-ui, sans-serif;
   font-style: italic;
   font-weight: 800;
   font-size: 22px;
