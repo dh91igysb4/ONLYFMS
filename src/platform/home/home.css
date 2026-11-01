@@ -7,3 +7,6 @@
 /* 편집 모드 한 줄. 꺼진 블록은 흐리게 */
 .home-edit-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); }
 .home-edit-row[data-off="true"] { opacity: 0.5; }
+
+/* 블록 안 목록 */
+.home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
