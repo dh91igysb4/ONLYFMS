@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { supabase } from '../../lib/supabase.ts'
+// 순환 import: 상대 모듈은 함수 안에서만 호출하고 모듈 최상위에서는 쓰지 않으므로 안전하다
 import { flushLogs } from './freeLogQueue.ts'
 
 // 자유 플레이 기록 대기열 (설계 §11). 저장에 실패하면 localStorage에 보관했다가 다시 보낸다.

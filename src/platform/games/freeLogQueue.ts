@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase.ts'
+// 순환 import: 상대 모듈은 함수 안에서만 호출하고 모듈 최상위에서는 쓰지 않으므로 안전하다
 import { pendingIds } from './freeQueue.ts'
 
 // 자유 플레이 행동 로그 대기열 (설계 §5.3). 점수 대기열(freeQueue)과 키·메모리를 따로 쓴다.

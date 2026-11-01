@@ -36,7 +36,7 @@ function Result({ st, score }: { st: PublicState; score: number | null }) {
 function Play({ publicState, onAction, error }: GameProps) {
   const st = publicState as PublicState
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const sampler = useRef(new Sampler())
+  const [sampler] = useState(() => new Sampler())
   const pointer = useRef<number | null>(null)
   const cursor = useRef<[number, number] | null>(null)
   const dirty = useRef(true)
@@ -69,7 +69,7 @@ function Play({ publicState, onAction, error }: GameProps) {
   useEffect(() => {
     let raf = 0
     const tick = () => {
-      sampler.current.frame(performance.now())
+      sampler.frame(performance.now())
       if (dirty.current) {
         dirty.current = false
         const g = canvasRef.current?.getContext('2d') ?? null
@@ -80,12 +80,12 @@ function Play({ publicState, onAction, error }: GameProps) {
     }
     raf = requestAnimationFrame(tick)
     const timer = setInterval(() => {
-      for (const s of chunk(sampler.current.take())) send.current({ type: 'b', s })
+      for (const s of chunk(sampler.take())) send.current({ type: 'b', s })
     }, SEND_MS)
     return () => {
       cancelAnimationFrame(raf)
       clearInterval(timer)
-      sampler.current.take()
+      sampler.take()
     }
   }, [])
 
@@ -101,10 +101,10 @@ function Play({ publicState, onAction, error }: GameProps) {
     pointer.current = e.pointerId
     e.currentTarget.setPointerCapture?.(e.pointerId)
     const [x, y] = toLogical(e)
-    const first = !sampler.current.started
-    sampler.current.down(x, y)
+    const first = !sampler.started
+    sampler.down(x, y)
     // 시계는 누른 순간부터 간다: 기준 시각을 지금으로 잡는다
-    if (first) sampler.current.frame(performance.now())
+    if (first) sampler.frame(performance.now())
     cursor.current = [x, y]
     dirty.current = true
     setTouched(true)
@@ -113,7 +113,7 @@ function Play({ publicState, onAction, error }: GameProps) {
   function onMove(e: ReactPointerEvent<HTMLCanvasElement>) {
     if (pointer.current !== e.pointerId) return
     const [x, y] = toLogical(e)
-    sampler.current.move(x, y)
+    sampler.move(x, y)
     cursor.current = [x, y]
     dirty.current = true
   }
@@ -121,7 +121,7 @@ function Play({ publicState, onAction, error }: GameProps) {
   function onEnd(e: ReactPointerEvent<HTMLCanvasElement>) {
     if (pointer.current !== e.pointerId) return
     pointer.current = null
-    sampler.current.up()
+    sampler.up()
     cursor.current = null
     dirty.current = true
   }

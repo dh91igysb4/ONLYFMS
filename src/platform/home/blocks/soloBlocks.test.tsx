@@ -118,6 +118,22 @@ describe('StreakBlock', () => {
     expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'test-guess' })
   })
 
+  test('best-sort game shows best score instead of win rate; normal game unchanged', async () => {
+    const mineRow = { user_id: 'u1', handle: 'kane', plays: 7, wins: 7, win_rate: 1, current_streak: 7, best_streak: 7, avg_score: 60 }
+    rpcMock.mockImplementation(async (_fn: string, args: { p_game: string }) => (
+      args.p_game === 'toothbrush'
+        ? [{ ...mineRow, best_score: 83.46 }]
+        : args.p_game === 'test-guess' ? [{ ...mineRow, plays: 12, wins: 5, win_rate: 0.4167, current_streak: 3, best_streak: 5, best_score: 9 }] : []
+    ))
+    wrap(<StreakBlock title="내 기록" />)
+    const h = await screen.findByRole('heading', { name: '양치 시뮬레이터', level: 4 })
+    const tb = within(h.parentElement as HTMLElement)
+    expect(await tb.findByText('7판 · 최고 83.5점')).toBeInTheDocument()
+    expect(tb.queryByText(/승률/)).not.toBeInTheDocument()
+    const s = await ngSection()
+    expect(await s.findByText('12판 · 승률 42% · 연속 3 (최고 5)')).toBeInTheDocument()
+  })
+
   test('no row of mine', async () => {
     rpcMock.mockResolvedValue([])
     wrap(<StreakBlock title="내 기록" />)

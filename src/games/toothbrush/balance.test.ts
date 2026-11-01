@@ -9,8 +9,6 @@ function scores(kind: BotKind): number[] {
   if (!s) {
     s = SEEDS.map((seed) => playBot(kind, seed))
     cache.set(kind, s)
-    const avg = s.reduce((a, b) => a + b, 0) / s.length
-    console.log(`[balance] ${kind}: avg ${avg.toFixed(3)} min ${Math.min(...s)} max ${Math.max(...s)}`)
   }
   return s
 }
