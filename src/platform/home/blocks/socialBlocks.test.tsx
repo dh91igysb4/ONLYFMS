@@ -146,6 +146,10 @@ describe('EloBlock', () => {
     expect(await screen.findByText('2위')).toBeInTheDocument()
     expect(screen.getByText('레이팅 대전 3승 1무 2패')).toBeInTheDocument()
     expect(screen.getByText('레이팅 1650')).toBeInTheDocument()
+    const mineRow = screen.getByText('2. kane 1650')
+    expect(mineRow).toHaveClass('me')
+    expect(mineRow).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByText('1. a 1700')).not.toHaveClass('me')
   })
 
   test('hidden game for non-admin: no games, no rpc', async () => {

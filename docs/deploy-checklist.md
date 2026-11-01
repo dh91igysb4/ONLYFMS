@@ -102,6 +102,18 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
   - [ ] 프로필 상대 전적
 - [ ] 문제없으면 숨김 해제 PR(새 마이그레이션 `delete from hidden_games where game_id = 'yacht';` + manifest `hidden: false`)
 
+## 홈 대시보드 배포
+`feat/home-dashboard` 머지 전에, 미리보기에서 확인한다. Edge Function은 다시 배포하지 않는다.
+
+- [ ] 마이그레이션 먼저: `npx -y supabase@2 db push` → `20261101150803_home_layout.sql` (`profiles.home_layout` 컬럼 + `set_home_layout` RPC)
+- [ ] 그다음 Vercel 배포. 프런트가 먼저 나가면 홈은 기본 배치로 보이고, 마이그레이션을 적용하기 전까지 저장이 실패한다.
+- [ ] 수동 확인 (폰과 PC 모두)
+  - [ ] 편집 → 순서 바꾸기 → 완료 → 새로고침해도 순서 유지
+  - [ ] 다른 기기에서도 같은 순서로 보임
+  - [ ] 블록을 모두 끄면 안내 문구와 편집 버튼이 보임
+  - [ ] 기본값으로 → 완료가 오류 없이 저장됨 (null 초기화 경로)
+  - [ ] 폰은 한 열, 넓은 화면(900px 이상)은 두 열
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

@@ -10,3 +10,4 @@
 
 /* 블록 안 목록 */
 .home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.home-list .me { color: var(--accent-strong); font-weight: 700; }

@@ -22,7 +22,8 @@ export function WeeklyBlock({ title }: { title: string }) {
   }, [profile?.id, profile?.is_admin])
 
   const line = (r: Row) => (
-    <li key={r.user_id} aria-current={r.user_id === profile?.id ? 'true' : undefined}>
+    <li key={r.user_id} className={r.user_id === profile?.id ? 'me' : undefined}
+      aria-current={r.user_id === profile?.id ? 'true' : undefined}>
       {`${r.rank}. ${r.handle} ${r.score}점`}
     </li>
   )

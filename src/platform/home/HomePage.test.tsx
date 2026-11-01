@@ -154,10 +154,9 @@ test('모두 꺼짐 → 안내 문구, 마운트 없음', () => {
   profile = { home_layout: [{ id: 'a', on: false }, { id: 'b', on: false }, { id: 'c', on: false }] }
   render(<HomePage />)
   expect(screen.getByText('표시할 블록이 없어요. 편집에서 켜 주세요')).toBeTruthy()
-  const buttons = screen.getAllByRole('button', { name: '편집' })
-  expect(buttons).toHaveLength(2)
+  expect(screen.getByRole('button', { name: '편집' })).toBeTruthy()
   expect(mountSpy).not.toHaveBeenCalled()
-  fireEvent.click(buttons[1])
+  fireEvent.click(screen.getByRole('button', { name: '블록 편집 열기' }))
   expect(screen.getByRole('button', { name: '완료' })).toBeTruthy()
 })
 
@@ -172,4 +171,22 @@ test('편집 모드에서는 블록을 마운트하지 않고 끝 버튼은 disa
   expect((screen.getByRole('button', { name: 'A 아래로' }) as HTMLButtonElement).disabled).toBe(false)
   const row = screen.getByRole('switch', { name: 'A 표시' }).closest('.home-edit-row')!
   expect(within(row as HTMLElement).getByText('A')).toBeTruthy()
+})
+
+test('편집 진입과 취소 후 포커스가 홈 제목으로 이동', () => {
+  render(<HomePage />)
+  expect(document.activeElement).not.toBe(screen.getByRole('heading', { name: '홈' }))
+  edit()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: '홈' }))
+  ;(document.activeElement as HTMLElement).blur()
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: '홈' }))
+})
+
+test('완료 성공 후에도 포커스가 홈 제목으로 이동', async () => {
+  render(<HomePage />)
+  edit()
+  done()
+  await waitFor(() => expect(screen.getByRole('button', { name: '편집' })).toBeTruthy())
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: '홈' }))
 })

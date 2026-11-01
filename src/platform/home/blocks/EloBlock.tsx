@@ -49,7 +49,8 @@ export function EloBlock({ title }: { title: string }) {
               {placed.length > 0 && (
                 <ul className="home-list">
                   {placed.slice(0, 3).map((r, i) => (
-                    <li key={r.handle}>{`${i + 1}. ${r.handle} ${r.rating}`}</li>
+                    <li key={r.handle} className={r === mine ? 'me' : undefined}
+                      aria-current={r === mine ? 'true' : undefined}>{`${i + 1}. ${r.handle} ${r.rating}`}</li>
                   ))}
                 </ul>
               )}

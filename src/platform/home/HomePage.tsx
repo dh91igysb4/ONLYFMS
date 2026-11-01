@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { homeBlockIds, homeBlocks } from './blocks.ts'
@@ -17,6 +17,15 @@ export function HomePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const savingRef = useRef(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const wasEditing = useRef(false)
+  const isEditing = editing !== null
+
+  // 모드가 바뀌면(첫 마운트 제외) 제목으로 포커스를 옮긴다. 눌렀던 버튼이 사라지기 때문
+  useEffect(() => {
+    if (wasEditing.current !== isEditing) headingRef.current?.focus()
+    wasEditing.current = isEditing
+  }, [isEditing])
 
   const effective = savedLayout !== undefined ? savedLayout : profile?.home_layout
   const layout = resolveLayout(effective, homeBlockIds)
@@ -53,7 +62,7 @@ export function HomePage() {
   if (editing) {
     return (
       <div className="stack">
-        <h2>홈</h2>
+        <h2 ref={headingRef} tabIndex={-1}>홈</h2>
         {error && <p className="form-error" role="alert">{error}</p>}
         <EditList layout={editing} titles={titles} onChange={setEditing} disabled={saving} />
         <div className="row">
@@ -71,13 +80,13 @@ export function HomePage() {
   return (
     <div className="stack">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>홈</h2>
+        <h2 ref={headingRef} tabIndex={-1}>홈</h2>
         <button type="button" className="btn btn-sm btn-ghost" onClick={startEdit}>편집</button>
       </div>
       {visible.length === 0 ? (
         <div className="stack">
           <p className="muted">표시할 블록이 없어요. 편집에서 켜 주세요</p>
-          <button type="button" className="btn btn-sm btn-ghost" onClick={startEdit}>편집</button>
+          <button type="button" className="btn btn-sm btn-ghost" aria-label="블록 편집 열기" onClick={startEdit}>편집</button>
         </div>
       ) : (
         <div className="home-grid">
