@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { supabase } from '../../lib/supabase.ts'
+import { flushLogs } from './freeLogQueue.ts'
 
 // 자유 플레이 기록 대기열 (설계 §11). 저장에 실패하면 localStorage에 보관했다가 다시 보낸다.
 // 서버는 client_id가 같은 행을 무시하므로(upsert ignoreDuplicates) 재전송해도 중복 저장되지 않는다.
@@ -72,6 +73,15 @@ async function doFlush(): Promise<void> {
   }
 }
 
+/** 지금 점수 대기열에 있는 client_id들. 로그 대기열이 점수 행보다 먼저 보내지 않게 한다. */
+export function pendingIds(): Set<string> {
+  return new Set(read().map((r) => r.client_id))
+}
+
+function flushAll(): Promise<void> {
+  return flush().then(() => flushLogs())
+}
+
 export function flush(): Promise<void> {
   // 이미 보내는 중이면 끝난 뒤 한 번 더 돈다. 그사이 쌓인 행이 다음 접속까지 남지 않게 한다.
   if (inFlight) return inFlight.then(() => flush())
@@ -90,7 +100,7 @@ export async function submit(row: FreePlayRow): Promise<void> {
 
 /** 온라인으로 돌아오면 대기열을 비운다. 해제 함수를 돌려준다. */
 export function flushOnOnline(): () => void {
-  const h = () => void flush()
+  const h = () => void flushAll()
   window.addEventListener('online', h)
   return () => window.removeEventListener('online', h)
 }
@@ -98,7 +108,7 @@ export function flushOnOnline(): () => void {
 /** 앱 어디에 있든 시작할 때와 온라인 복귀 때 대기열을 비운다. 레이아웃에서 한 번 쓴다. */
 export function useFreeQueueFlush(): void {
   useEffect(() => {
-    void flush()
+    void flushAll()
     return flushOnOnline()
   }, [])
 }

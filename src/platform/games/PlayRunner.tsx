@@ -6,7 +6,8 @@ import { getGameComponent } from '../../games/ui.ts'
 import type { Ctx } from '../../games/types.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import * as freeQueue from './freeQueue.ts'
-import { newSeed } from './seed.ts'
+import * as freeLogQueue from './freeLogQueue.ts'
+import { newSeed, seedHex } from './seed.ts'
 import { rngFromSeed } from '../../shared/rng.ts'
 
 export type PlayRunnerProps =
@@ -211,7 +212,6 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
   const seedRef = useRef<Uint8Array>(init?.seed ?? new Uint8Array(16))
   const [error, setError] = useState<string | null>(null)
   const submitted = useRef(false)
-  void seedRef // Task 9가 제출 지점에서 읽을 때까지 미사용
 
   if (!mod || !Game || !init) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
 
@@ -236,9 +236,11 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
     if (mod.logic.isFinished(r.state, ctx()) && !submitted.current) {
       submitted.current = true
       const final = mod.logic.score(r.state, ctx())
-      void freeQueue.submit({
-        client_id: crypto.randomUUID(),
-        user_id: profile?.id ?? '',
+      const clientId = crypto.randomUUID()
+      const userId = profile?.id ?? ''
+      const p = freeQueue.submit({
+        client_id: clientId,
+        user_id: userId,
         game_id: gameId,
         options,
         logic_version: mod.logic.version,
@@ -246,6 +248,10 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
         score: final,
         action_count: mod.logic.actionCount(r.state),
       })
+      void freeLogQueue.submitLog(
+        { client_id: clientId, user_id: userId, seed: seedHex(seedRef.current), actions: [...actionsRef.current] },
+        p,
+      )
     }
   }
 

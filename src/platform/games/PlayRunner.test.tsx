@@ -37,6 +37,9 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
 }))
 vi.mock('./freeQueue.ts', () => ({ submit: (...a: unknown[]) => (submitMock as (...x: unknown[]) => unknown)(...a) }))
 
+const submitLogMock = vi.fn()
+vi.mock('./freeLogQueue.ts', () => ({ submitLog: (...a: unknown[]) => submitLogMock(...a) }))
+
 import { ApiError, type PlayView } from '../../lib/api.ts'
 import { PlayRunner } from './PlayRunner.tsx'
 import { logic } from '../../test-fixtures/test-guess/logic.ts'
@@ -60,6 +63,7 @@ function guess(n: number) {
 beforeEach(() => {
   playMock.mockReset()
   submitMock.mockClear()
+  submitLogMock.mockClear()
 })
 
 test('server_mode_sends_expected_count', async () => {
@@ -208,6 +212,28 @@ test('local_mode_submits_free_play_on_finish', async () => {
     client_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
   }))
   expect(submitMock.mock.calls[0]).not.toContain('played_at')
+})
+
+test('local_mode_submits_log_with_seed_and_actions', async () => {
+  const answer = (logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(3)), { range: '100' }) as { answer: number }).answer
+  const wrong = answer === 1 ? 2 : 1
+  const scorePromise = Promise.resolve()
+  submitMock.mockReturnValueOnce(scorePromise)
+  render(<PlayRunner mode="local" gameId="test-guess" options={{ range: '100' }} />)
+  await screen.findByText('남은 기회 8')
+  guess(wrong)
+  await screen.findByText('남은 기회 7')
+  guess(answer)
+  await screen.findByText(new RegExp(`정답은 ${answer}`))
+  expect(submitLogMock).toHaveBeenCalledTimes(1)
+  const [log, after] = submitLogMock.mock.calls[0]
+  expect(log).toEqual({
+    client_id: (submitMock.mock.calls[0] as unknown[])[0] && ((submitMock.mock.calls[0] as unknown[])[0] as { client_id: string }).client_id,
+    user_id: 'u1',
+    seed: '03'.repeat(16),
+    actions: [{ type: 'guess', value: wrong }, { type: 'guess', value: answer }],
+  })
+  expect(after).toBe(scorePromise)
 })
 
 test('local_mode_applies_sync_actions_in_order', async () => {
