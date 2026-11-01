@@ -20,7 +20,7 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
 }))
 
 import { ApiError } from '../../lib/api.ts'
-import { HomePage } from './HomePage.tsx'
+import { GamesPage } from './GamesPage.tsx'
 import { DailyPage } from './DailyPage.tsx'
 import { FreePage } from './FreePage.tsx'
 import { resetServerTime, syncFromView } from '../../lib/serverTime.ts'
@@ -34,7 +34,7 @@ async function ngCard() {
 
 test('home shows own daily score for admin-visible hidden game', async () => {
   rpcMock.mockResolvedValue([{ user_id: 'u2', score: 3 }, { user_id: 'u1', score: 8.5 }])
-  render(<MemoryRouter><HomePage /></MemoryRouter>)
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
   const card = await ngCard()
   expect(await card.findByText('오늘 8.5점')).toBeInTheDocument()
   expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), p_game: 'test-guess' })
@@ -44,11 +44,11 @@ test('home shows own daily score for admin-visible hidden game', async () => {
 
 test('home says not played yet, and hides hidden games from non-admins', async () => {
   rpcMock.mockResolvedValue([])
-  const r = render(<MemoryRouter><HomePage /></MemoryRouter>)
+  const r = render(<MemoryRouter><GamesPage /></MemoryRouter>)
   expect(await (await ngCard()).findByText('아직 안 풀었어요')).toBeInTheDocument()
   r.unmount()
   admin = false
-  render(<MemoryRouter><HomePage /></MemoryRouter>)
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
   expect(await screen.findByText('후알야')).toBeInTheDocument()
   expect(screen.queryByText('테스트 숫자 맞히기')).toBeNull()
 })
@@ -115,7 +115,7 @@ test('home uses server-synced time for the KST day', async () => {
   rpcMock.mockResolvedValue([])
   // 서버 시각 2030-01-01 00:30 KST (브라우저 시계와 무관)
   syncFromView(Date.parse('2029-12-31T15:30:00Z'))
-  render(<MemoryRouter><HomePage /></MemoryRouter>)
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
   await (await ngCard()).findByText('아직 안 풀었어요')
   expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: '2030-01-01', p_game: 'test-guess' })
 })

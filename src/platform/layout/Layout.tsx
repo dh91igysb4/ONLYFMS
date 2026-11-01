@@ -16,7 +16,8 @@ export function Layout() {
             {profile?.handle && <UserMenu handle={profile.handle} />}
           </div>
           <nav className="nav" aria-label="주 메뉴">
-            <NavLink to="/" end>게임</NavLink>
+            <NavLink to="/" end>홈</NavLink>
+            <NavLink to="/games">게임</NavLink>
             <NavLink to="/contests">대회</NavLink>
             <NavLink to="/duel">대전</NavLink>
             <NavLink to="/leaderboard">리더보드</NavLink>
