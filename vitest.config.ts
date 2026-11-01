@@ -8,6 +8,6 @@ export default defineConfig({
     // CSS 원문을 ?raw로 읽는 테스트(palettes.test.ts)용: 기본값은 CSS를 빈 문자열로 바꾼다
     css: { include: [/\.css\?raw$/] },
     setupFiles: ['./src/test-setup.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'supabase/functions/play/engine.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts', 'supabase/functions/play/engine.test.ts'],
   },
 })
