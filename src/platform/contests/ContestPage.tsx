@@ -204,52 +204,55 @@ export function ContestPage() {
 
       {contest.visibility === 'invite' && code && phase !== 'cancelled' && phase !== 'ended' && <InviteLink code={code} />}
 
+      {/* 넓은 화면: 왼쪽 문제, 오른쪽 순위. 취소된 대회는 둘 다 없으므로 빈 칸을 남기지 않는다 */}
       {phase !== 'cancelled' && (
-        <section className="stack" aria-label="문제">
-          <h3 className="section-title">문제</h3>
-          <ul className="list">
-            {items.map((it) => {
-              const label = `${it.position}번 ${gameName(it.game_id)}`
-              return (
-                <li key={it.id} className="list-row">
-                  {phase === 'live' && joined ? (
-                    <Link to={`/contests/${id}/${it.position}`}>{label}</Link>
-                  ) : (
-                    <span>{label}</span>
-                  )}
-                  {phase === 'ended' && <pre className="reveal">{revealText(it)}</pre>}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
+        <div className="split">
+          <section className="stack" aria-label="문제">
+            <h3 className="section-title">문제</h3>
+            <ul className="list">
+              {items.map((it) => {
+                const label = `${it.position}번 ${gameName(it.game_id)}`
+                return (
+                  <li key={it.id} className="list-row">
+                    {phase === 'live' && joined ? (
+                      <Link to={`/contests/${id}/${it.position}`}>{label}</Link>
+                    ) : (
+                      <span>{label}</span>
+                    )}
+                    {phase === 'ended' && <pre className="reveal">{revealText(it)}</pre>}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
 
-      {(phase === 'live' || phase === 'ended') && (
-        <section className="stack" aria-label="순위">
-          <h3 className="section-title">{phase === 'live' ? '실시간 순위' : '최종 순위'}</h3>
-          {lbError ? (
-            <div className="stack" role="alert">
-              <p className="form-error">순위를 불러오지 못했어요</p>
-              <button className="btn btn-primary" onClick={() => setLbAttempt((n) => n + 1)}>다시 시도</button>
-            </div>
-          ) : lb.length === 0 ? (
-            <p className="muted">아직 기록이 없어요</p>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr><th>순위</th><th>아이디</th><th>점수</th><th>푼 문제</th></tr>
-              </thead>
-              <tbody>
-                {lb.map((r) => (
-                  <tr key={r.user_id} className={r.user_id === me ? 'me' : undefined}>
-                    <td>{r.rank}</td><td>{r.handle ?? '(알 수 없음)'}</td><td>{r.score}</td><td>{r.solved_items}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {(phase === 'live' || phase === 'ended') && (
+            <section className="stack" aria-label="순위">
+              <h3 className="section-title">{phase === 'live' ? '실시간 순위' : '최종 순위'}</h3>
+              {lbError ? (
+                <div className="stack" role="alert">
+                  <p className="form-error">순위를 불러오지 못했어요</p>
+                  <button className="btn btn-primary" onClick={() => setLbAttempt((n) => n + 1)}>다시 시도</button>
+                </div>
+              ) : lb.length === 0 ? (
+                <p className="muted">아직 기록이 없어요</p>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr><th>순위</th><th>아이디</th><th>점수</th><th>푼 문제</th></tr>
+                  </thead>
+                  <tbody>
+                    {lb.map((r) => (
+                      <tr key={r.user_id} className={r.user_id === me ? 'me' : undefined}>
+                        <td>{r.rank}</td><td>{r.handle ?? '(알 수 없음)'}</td><td>{r.score}</td><td>{r.solved_items}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
           )}
-        </section>
+        </div>
       )}
 
       {canCancel && (

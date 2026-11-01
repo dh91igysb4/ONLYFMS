@@ -206,61 +206,67 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
 
   return (
     <section className="wya">
-      <div className="wya-meta">
-        <strong>남은 기회 {MAX_GUESSES - n}</strong>
-        {remainingMs !== null && !finished && <span className="muted wya-time">⏱ {formatTime(remainingMs)}</span>}
-      </div>
+      {/* 넓은 화면: 왼쪽(따라붙음) 입력·도구·맞힌 정보, 오른쪽 추측 기록 */}
+      <div className="split split-sticky">
+        <div className="wya-side">
+          <div className="wya-meta">
+            <strong>남은 기회 {MAX_GUESSES - n}</strong>
+            {remainingMs !== null && !finished && <span className="muted wya-time">⏱ {formatTime(remainingMs)}</span>}
+          </div>
 
-      <div className="wya-card">
-        {finished && answer ? (
-          <div className="wya-stage"><div className="wya-ans">{answer.name}<small>{answer.team}</small></div></div>
-        ) : (
-          <Revealed s={s} />
-        )}
+          <div className="wya-card">
+            {finished && answer ? (
+              <div className="wya-stage"><div className="wya-ans">{answer.name}<small>{answer.team}</small></div></div>
+            ) : (
+              <Revealed s={s} />
+            )}
 
-        {finished ? (
-          answer && <ul className="wya-rows" aria-label="정답"><GuessRowView g={answer} fb={compare(answer, answer)} className="wya-answer" /></ul>
-        ) : (
-          <>
-            <Search guessed={guessed} n={n} busy={busy} onPick={(id) => onAction({ type: 'guess', id })} />
-            {s.initials && <p className="wya-hintline" role="status">이니셜 <b>{s.initials}</b></p>}
-            <div className="wya-tools">
-              <button type="button" disabled={!canHint} onClick={() => onAction({ type: 'hint' })}>
-                {s.initials ? '힌트 사용함' : n >= HINT_AFTER ? '힌트(이니셜) -3점' : `힌트(이니셜)는 ${HINT_AFTER}번 틀린 뒤`}
-              </button>
-              {confirmGiveUp ? (
-                <button type="button" disabled={busy} onClick={() => { setConfirmGiveUp(false); onAction({ type: 'give_up' }) }}>
-                  한 번 더 누르면 포기
-                </button>
-              ) : (
-                <button type="button" disabled={busy} onClick={() => setConfirmGiveUp(true)}>포기하고 정답 보기</button>
-              )}
+            {finished ? (
+              answer && <ul className="wya-rows" aria-label="정답"><GuessRowView g={answer} fb={compare(answer, answer)} className="wya-answer" /></ul>
+            ) : (
+              <>
+                <Search guessed={guessed} n={n} busy={busy} onPick={(id) => onAction({ type: 'guess', id })} />
+                {s.initials && <p className="wya-hintline" role="status">이니셜 <b>{s.initials}</b></p>}
+                <div className="wya-tools">
+                  <button type="button" disabled={!canHint} onClick={() => onAction({ type: 'hint' })}>
+                    {s.initials ? '힌트 사용함' : n >= HINT_AFTER ? '힌트(이니셜) -3점' : `힌트(이니셜)는 ${HINT_AFTER}번 틀린 뒤`}
+                  </button>
+                  {confirmGiveUp ? (
+                    <button type="button" disabled={busy} onClick={() => { setConfirmGiveUp(false); onAction({ type: 'give_up' }) }}>
+                      한 번 더 누르면 포기
+                    </button>
+                  ) : (
+                    <button type="button" disabled={busy} onClick={() => setConfirmGiveUp(true)}>포기하고 정답 보기</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {finished && (
+            <div className="wya-result" role="status">
+              <p className={`wya-msg ${s.won ? 'wya-win' : 'wya-lose'}`}>{s.won ? `${n}번 만에 정답` : '정답을 못 맞혔어요'}</p>
+              {score !== null && <p className="wya-score">{score}점</p>}
             </div>
-          </>
-        )}
-      </div>
+          )}
+          {error && <p className="form-error" role="alert">{error}</p>}
 
-      {finished && (
-        <div className="wya-result" role="status">
-          <p className={`wya-msg ${s.won ? 'wya-win' : 'wya-lose'}`}>{s.won ? `${n}번 만에 정답` : '정답을 못 맞혔어요'}</p>
-          {score !== null && <p className="wya-score">{score}점</p>}
+          <div className="wya-legend" aria-hidden="true">
+            <span style={{ ['--c' as string]: 'var(--hit)' }}>같은 클럽</span>
+            <span style={{ ['--c' as string]: 'var(--near)' }}>같은 리그, 다른 클럽</span>
+            <span style={{ ['--c' as string]: 'var(--miss)' }}>다른 리그</span>
+          </div>
         </div>
-      )}
-      {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="wya-hist">
+          <ol className="wya-rows" aria-label="추측 기록" reversed>
+            {rows.map((g, i) => (
+              <GuessRowView key={g.id} g={g} fb={g.fb} className={i === 0 ? 'wya-latest' : ''} />
+            ))}
+          </ol>
 
-      <div className="wya-legend" aria-hidden="true">
-        <span style={{ ['--c' as string]: 'var(--hit)' }}>같은 클럽</span>
-        <span style={{ ['--c' as string]: 'var(--near)' }}>같은 리그, 다른 클럽</span>
-        <span style={{ ['--c' as string]: 'var(--miss)' }}>다른 리그</span>
+          <p className="wya-foot">FotMob 스쿼드 {FETCHED} 수집 · 소속팀·등번호·나이는 수집 시점 기준</p>
+        </div>
       </div>
-
-      <ol className="wya-rows" aria-label="추측 기록" reversed>
-        {rows.map((g, i) => (
-          <GuessRowView key={g.id} g={g} fb={g.fb} className={i === 0 ? 'wya-latest' : ''} />
-        ))}
-      </ol>
-
-      <p className="wya-foot">FotMob 스쿼드 {FETCHED} 수집 · 소속팀·등번호·나이는 수집 시점 기준</p>
     </section>
   )
 }

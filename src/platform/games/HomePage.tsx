@@ -42,19 +42,24 @@ export function HomePage() {
   return (
     <div className="stack">
       <h2>게임 목록</h2>
-      <UpcomingContests />
-      {visible.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
-      {visible.map(({ manifest: m }) => (
-        <article key={m.id} className="card">
-          <h3 className="card-title">{m.name}</h3>
-          <p className="muted">{m.description}</p>
-          {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
-          <div className="card-actions">
-            {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
-            {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
-          </div>
-        </article>
-      ))}
+      {/* 넓은 화면: 왼쪽 게임 카드 격자, 오른쪽 좁은 열에 대회 */}
+      <div className="split split-aside">
+        <UpcomingContests />
+        <div className="grid-cards split-main">
+          {visible.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
+          {visible.map(({ manifest: m }) => (
+            <article key={m.id} className="card">
+              <h3 className="card-title">{m.name}</h3>
+              <p className="muted">{m.description}</p>
+              {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
+              <div className="card-actions">
+                {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
+                {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

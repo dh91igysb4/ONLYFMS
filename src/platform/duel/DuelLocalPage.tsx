@@ -63,20 +63,6 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   return (
     <div className="stack">
       <h2 className="page-title">{mod.manifest.name} · 같은 화면</h2>
-      {over ? (
-        <section className="card" aria-label="결과">
-          <p className="card-title">
-            {result.winner === null ? '무승부' : `${NAMES[result.winner]} 승리`}
-          </p>
-          {result.scores && (
-            <p className="card-status">{NAMES[0]} {result.scores[0]} : {result.scores[1]} {NAMES[1]}</p>
-          )}
-          <div className="card-actions">
-            <button type="button" className="btn btn-primary" onClick={restart}>다시 하기</button>
-            <Link className="btn btn-ghost" to="/duel">대전으로</Link>
-          </div>
-        </section>
-      ) : null}
       <Board
         key={round}
         view={logic.view(state, seat)}
@@ -87,13 +73,27 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
         error={error}
         names={NAMES}
         onAction={act}
+        header={over ? (
+          <section className="card" aria-label="결과">
+            <p className="card-title">
+              {result.winner === null ? '무승부' : `${NAMES[result.winner]} 승리`}
+            </p>
+            {result.scores && (
+              <p className="card-status">{NAMES[0]} {result.scores[0]} : {result.scores[1]} {NAMES[1]}</p>
+            )}
+            <div className="card-actions">
+              <button type="button" className="btn btn-primary" onClick={restart}>다시 하기</button>
+              <Link className="btn btn-ghost" to="/duel">대전으로</Link>
+            </div>
+          </section>
+        ) : null}
+        footer={!over && (
+          <p className="card-status" data-testid="turn" aria-live="polite">
+            {NAMES[seat]} 차례
+            {passed && <span className="muted"> · 기기를 넘겨주세요</span>}
+          </p>
+        )}
       />
-      {!over && (
-        <p className="card-status" data-testid="turn" aria-live="polite">
-          {NAMES[seat]} 차례
-          {passed && <span className="muted"> · 기기를 넘겨주세요</span>}
-        </p>
-      )}
     </div>
   )
 }

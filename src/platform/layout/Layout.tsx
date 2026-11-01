@@ -10,17 +10,19 @@ export function Layout() {
   return (
     <div className="layout">
       <header className="app-header">
-        <div className="header-row">
-          <Brand />
-          {profile?.handle && <UserMenu handle={profile.handle} />}
+        <div className="app-header-inner">
+          <div className="header-row">
+            <Brand />
+            {profile?.handle && <UserMenu handle={profile.handle} />}
+          </div>
+          <nav className="nav" aria-label="주 메뉴">
+            <NavLink to="/" end>게임</NavLink>
+            <NavLink to="/contests">대회</NavLink>
+            <NavLink to="/duel">대전</NavLink>
+            <NavLink to="/leaderboard">리더보드</NavLink>
+            {profile?.is_admin && <NavLink to="/admin">관리자</NavLink>}
+          </nav>
         </div>
-        <nav className="nav" aria-label="주 메뉴">
-          <NavLink to="/" end>게임</NavLink>
-          <NavLink to="/contests">대회</NavLink>
-          <NavLink to="/duel">대전</NavLink>
-          <NavLink to="/leaderboard">리더보드</NavLink>
-          {profile?.is_admin && <NavLink to="/admin">관리자</NavLink>}
-        </nav>
       </header>
       <main className="page">
         <Outlet />

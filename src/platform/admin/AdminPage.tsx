@@ -24,9 +24,14 @@ export function AdminPage() {
   return (
     <div className="stack">
       <h2 className="page-title">관리자</h2>
-      <UsersSection />
-      <ContestsSection />
-      <BankSection />
+      {/* 넓은 화면: 왼쪽 가입 승인, 오른쪽 대회 관리·문제 은행 */}
+      <div className="split split-even">
+        <UsersSection />
+        <div className="stack">
+          <ContestsSection />
+          <BankSection />
+        </div>
+      </div>
     </div>
   )
 }

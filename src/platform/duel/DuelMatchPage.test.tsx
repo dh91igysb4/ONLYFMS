@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, type NavigateFunction } from 'react-router-dom'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import type { ReactNode } from 'react'
 
 // ---- 가짜 Realtime 채널
 type Handler = () => void
@@ -40,11 +41,14 @@ vi.mock('../../games/ui.ts', () => ({
   getDuelComponent: () =>
     boardMissing
       ? undefined
-      : (p: { onAction(a: unknown): void; toMove: number | null; error?: string | null }) => (
+      : (p: { onAction(a: unknown): void; toMove: number | null; error?: string | null; header?: ReactNode; footer?: ReactNode }) => (
+          // 실제 화면처럼 플랫폼 머리(선수·차례·결과)는 맨 앞, 꼬리(기권)는 맨 뒤에 그린다
           <div>
+            {p.header}
             {p.error && <p role="alert">{p.error}</p>}
             <p>보드 {String(p.toMove)}</p>
             <button onClick={() => p.onAction({ type: 'roll', keep: [] })}>둔다</button>
+            {p.footer}
           </div>
         ),
 }))

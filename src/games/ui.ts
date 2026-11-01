@@ -1,6 +1,6 @@
 // 브라우저 전용 게임 화면 등록부.
 // games/index.ts는 Edge Function(Deno)도 가져오므로 React 컴포넌트를 거기에 넣지 않고 여기서 따로 잇는다 (§4.7).
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
 
@@ -38,6 +38,10 @@ export type DuelGameProps = {
   onAction(action: unknown): void
   /** 좌석 순서의 아이디 */
   names: [string, string]
+  /** 플랫폼 내용(선수·시간·결과). 화면은 맨 앞(넓은 화면에서는 조작 열 맨 위)에 그대로 그린다 */
+  header?: ReactNode
+  /** 플랫폼 내용(차례 안내·기권). 화면은 맨 뒤(넓은 화면에서는 조작 열 맨 아래)에 그대로 그린다 */
+  footer?: ReactNode
 }
 
 /** 대전 게임 화면 등록부. 새 대전 게임 화면을 여기에 한 줄씩 등록한다. */
