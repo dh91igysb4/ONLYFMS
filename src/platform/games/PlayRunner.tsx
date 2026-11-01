@@ -6,6 +6,8 @@ import { getGameComponent } from '../../games/ui.ts'
 import type { Ctx } from '../../games/types.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import * as freeQueue from './freeQueue.ts'
+import { newSeed } from './seed.ts'
+import { rngFromSeed } from '../../shared/rng.ts'
 
 export type PlayRunnerProps =
   | {
@@ -194,30 +196,42 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
   const init = useMemo(() => {
     if (!mod) return null
     const startedAt = Date.now()
-    const puzzle = mod.logic.pickPuzzle(Math.random, options)
+    const seed = newSeed()
+    const puzzle = mod.logic.pickPuzzle(rngFromSeed(seed), options)
     const ctx: Ctx = { now: startedAt, startedAt, deadline: null }
-    return { puzzle, startedAt, state: mod.logic.initState(puzzle, ctx) }
+    return { puzzle, seed, startedAt, state: mod.logic.initState(puzzle, ctx) }
     // 새 판은 부모가 key로 다시 만든다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const [state, setState] = useState<unknown>(init?.state)
+  const [, setState] = useState<unknown>(init?.state)
+  // 화면이 다시 그려지기 전에 onAction이 여러 번 불려도 매번 직전 결과에 적용하려고 ref로 쥔다.
+  const stateRef = useRef<unknown>(init?.state)
+  // 적용된 행동과 출제 시드. 제출 지점이 읽어 간다.
+  const actionsRef = useRef<unknown[]>([])
+  const seedRef = useRef<Uint8Array>(init?.seed ?? new Uint8Array(16))
   const [error, setError] = useState<string | null>(null)
   const submitted = useRef(false)
+  void seedRef // Task 9가 제출 지점에서 읽을 때까지 미사용
 
   if (!mod || !Game || !init) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
 
   const ctx = (): Ctx => ({ now: Date.now(), startedAt: init.startedAt, deadline: null })
+  const state = stateRef.current
   const finished = mod.logic.isFinished(state, ctx())
   const score = finished ? mod.logic.score(state, ctx()) : null
 
   function onAction(action: unknown) {
-    if (!mod || !init || finished) return
-    const r = mod.logic.apply(init.puzzle, state, action, ctx())
+    if (!mod || !init) return
+    const cur = stateRef.current
+    if (mod.logic.isFinished(cur, ctx())) return
+    const r = mod.logic.apply(init.puzzle, cur, action, ctx())
     if ('error' in r) {
       setError(r.error)
       return
     }
     setError(null)
+    actionsRef.current.push(action)
+    stateRef.current = r.state
     setState(r.state)
     if (mod.logic.isFinished(r.state, ctx()) && !submitted.current) {
       submitted.current = true
