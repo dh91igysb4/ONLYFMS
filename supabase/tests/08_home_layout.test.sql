@@ -1,6 +1,6 @@
 -- 홈 레이아웃: profiles.home_layout 컬럼과 set_home_layout RPC
 begin;
-select plan(19);
+select plan(26);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'a@example.com'),
@@ -34,6 +34,14 @@ select throws_ok($$select public.set_home_layout('[{"id":"daily","on":true,"x":1
 select throws_ok($$select public.set_home_layout('[{"id":"Daily","on":true}]')$$, 'P0001', 'home_layout_invalid', 'invalid: uppercase id');
 select throws_ok($$select public.set_home_layout('[{"id":"daily","on":"yes"}]')$$, 'P0001', 'home_layout_invalid', 'invalid: non-boolean on');
 select throws_ok($$select public.set_home_layout('[{"id":"daily","on":true},{"id":"daily","on":false}]')$$, 'P0001', 'home_layout_invalid', 'invalid: duplicate id');
+
+select throws_ok($$select public.set_home_layout('[{"id":1,"on":true}]')$$, 'P0001', 'home_layout_invalid', 'invalid: non-string id');
+select throws_ok($$select public.set_home_layout('[{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","on":true}]')$$, 'P0001', 'home_layout_invalid', 'invalid: 33-char id');
+select throws_ok($$select public.set_home_layout('[null]')$$, 'P0001', 'home_layout_invalid', 'invalid: null element');
+select throws_ok($$select public.set_home_layout('[[1]]')$$, 'P0001', 'home_layout_invalid', 'invalid: nested array element');
+select throws_ok($$select public.set_home_layout('["a"]')$$, 'P0001', 'home_layout_invalid', 'invalid: scalar element');
+select throws_ok($$select public.set_home_layout('1')$$, 'P0001', 'home_layout_invalid', 'invalid: top-level scalar');
+select throws_ok($$select public.set_home_layout('null'::jsonb)$$, 'P0001', 'home_layout_invalid', 'invalid: jsonb null');
 
 select is(
   (select home_layout from public.my_profile()),
