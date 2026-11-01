@@ -9,6 +9,7 @@ export type Profile = {
   status: 'pending' | 'approved' | 'rejected'
   is_admin: boolean
   palette?: string
+  home_layout?: unknown
   appearance?: string
 }
 
