@@ -37,6 +37,7 @@ test('qResolveNames_escapes_and_tags', () => {
   expect(q).toContain('"A \\"B\\" C\\\\D"@en')
   expect(q).toContain('rdfs:label|skos:altLabel ?lit')
   expect(q).toContain('wd:Q937857')
+  expect(q).not.toContain('wdt:P106')
 })
 
 test('resolve_picks_most_linked_plausible_candidate', () => {

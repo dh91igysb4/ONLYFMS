@@ -1,10 +1,7 @@
 // 레전드 명단 만들기의 순수 부분 (입출력 없음, legends.test.ts).
 // 원본 manual/ballon_dor_nominees.csv(이름)를 위키데이터 ID로 바꿔 manual/legends.csv에 넣는다. 입출력은 resolve-legends.ts.
 // 설계 docs/superpowers/specs/2026-11-01-football-data-layer-design.md §3.4.
-import { cmp, type Row } from './wikidata.ts'
-
-/** 직업: 축구 선수 */
-const FOOTBALLER = 'Q937857'
+import { cmp, IS_FOOTBALLER, type Row } from './wikidata.ts'
 /** legends.csv에서 이 도구가 만든 줄의 note 머리. 다시 돌리면 이 줄들만 새로 만든다(손으로 넣은 줄은 그대로) */
 export const BALLON_MARK = '[발롱도르]'
 
@@ -32,7 +29,7 @@ export function qResolveNames(names: readonly string[]): string {
   return `SELECT ?lit ?p ?links ?birth WHERE {
   VALUES ?lit { ${values} }
   ?p rdfs:label|skos:altLabel ?lit .
-  ?p wdt:P106 wd:${FOOTBALLER} .
+  ${IS_FOOTBALLER}
   OPTIONAL { ?p wikibase:sitelinks ?links }
   OPTIONAL { ?p wdt:P569 ?birth }
 }`

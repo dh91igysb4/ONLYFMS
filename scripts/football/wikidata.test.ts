@@ -354,3 +354,12 @@ test('foundedOf_four_digit_plausible_years_only', () => {
   expect(foundedOf('0080-01-01T00:00:00Z')).toBe('')
   expect(foundedOf('')).toBe('')
 })
+
+test('footballer_condition_sees_all_ranks', () => {
+  // 은퇴 후 감독이 우선 순위인 선수도 축구 선수로 본다: wdt:P106(최고 순위만) 대신 p:P106/ps:P106, 폐기된 진술만 제외
+  for (const q of [qPlayersAtTeams(['Q1'], 2017, 2026), qOccupation(['Q1'])]) {
+    expect(q).not.toContain('wdt:P106')
+    expect(q).toContain('ps:P106 wd:Q937857')
+    expect(q).toContain('wikibase:DeprecatedRank')
+  }
+})

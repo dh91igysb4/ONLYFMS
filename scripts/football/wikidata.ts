@@ -24,6 +24,11 @@ export function flat(b: Binding): Row {
 
 /** 직업: 축구 선수 */
 const FOOTBALLER = 'Q937857'
+/**
+ * "직업이 축구 선수" 조건 (변수 ?p). wdt:P106은 가장 높은 순위의 값만 보므로, 은퇴 후 '감독'이 우선 순위(preferred)인
+ * 선수(사비·마테우스·박지성 등)가 빠진다. 모든 순위의 진술을 보되 폐기(deprecated)된 것만 뺀다 (2026-11-02 확인).
+ */
+export const IS_FOOTBALLER = `?p p:P106 ?occ . ?occ ps:P106 wd:${FOOTBALLER} ; wikibase:rank ?occRank . FILTER(?occRank != wikibase:DeprecatedRank)`
 /** 이적 방식(P1642) 값: 임대 */
 export const LOAN = 'Q2914547'
 /** 인스턴스(P31): 축구 클럽 (하위 분류 포함) */
@@ -75,7 +80,7 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
   return `SELECT DISTINCT ?p WHERE {
   VALUES ?team { ${ids(teams)} }
   ?p p:P54 ?st . ?st ps:P54 ?team .
-  ?p wdt:P106 wd:${FOOTBALLER} .
+  ${IS_FOOTBALLER}
   OPTIONAL { ?st pq:P580 ?s } OPTIONAL { ?st pq:P582 ?e }
   FILTER(BOUND(?s) || BOUND(?e))
   FILTER(!BOUND(?e) || ?e >= ${day(from, '07-01')})
@@ -89,7 +94,7 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
 export function qOccupation(players: readonly string[]): string {
   return `SELECT DISTINCT ?p WHERE {
   VALUES ?p { ${ids(players)} }
-  ?p wdt:P106 wd:${FOOTBALLER} .
+  ${IS_FOOTBALLER}
 }`
 }
 
