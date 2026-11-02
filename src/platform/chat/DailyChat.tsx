@@ -20,9 +20,19 @@ function charCount(s: string): number {
   return [...s].length
 }
 
+/** 손가락 입력 기기(휴대폰 등) */
+function isCoarsePointer(): boolean {
+  try {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches
+  } catch {
+    return false
+  }
+}
+
 type UrlState = Record<string, string | 'failed'>
 
-/** 경로별 서명 주소. 불러오기에 실패하면 새 주소를 한 번만 다시 받는다(만료 대비). */
+/** 경로별 서명 주소. 불러오기에 실패하면 새 주소를 한 번만 다시 받는다(만료 대비). 다시 받은 주소가 잘 뜨면 다음 만료에 또 한 번 받을 수 있다. */
 function useSignedUrls() {
   const [urls, setUrls] = useState<UrlState>({})
   const alive = useRef(true)
@@ -53,7 +63,8 @@ function useSignedUrls() {
       requested.add(path)
       load(path)
     }
-    return { ensure, onError: fail }
+    const loaded = (path: string) => { retried.delete(path) }
+    return { ensure, onError: fail, onLoad: loaded }
   })
   return { urls, ...api }
 }
@@ -77,7 +88,7 @@ export function DailyChat({ itemId }: { itemId: string }) {
   const lastTop = useRef(0)
   const prevEdges = useRef<{ first?: string; last?: string }>({})
   const olderAnchor = useRef<{ height: number; top: number } | null>(null)
-  const { urls, ensure, onError } = useSignedUrls()
+  const { urls, ensure, onError, onLoad: onUrlLoad } = useSignedUrls()
 
   const trimmedLen = charCount(text.trim())
   const tooLong = trimmedLen > MAX_CHARS
@@ -130,7 +141,8 @@ export function DailyChat({ itemId }: { itemId: string }) {
     lastTop.current = top
   }
 
-  function onImageLoad() {
+  function onImageLoad(path: string | null) {
+    if (path) onUrlLoad(path)
     if (atBottom.current) scrollToBottom()
   }
 
@@ -166,8 +178,10 @@ export function DailyChat({ itemId }: { itemId: string }) {
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    // 한글 조합 중 Enter는 글자 확정이다
-    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+    // 한글 조합 중 Enter는 글자 확정이다(일부 브라우저는 isComposing 대신 keyCode 229만 준다)
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return
+    // 터치 기기에서는 Enter가 줄바꿈이고 보내기 버튼으로만 보낸다
+    if (isCoarsePointer()) return
     e.preventDefault()
     void submit()
   }
@@ -208,7 +222,7 @@ export function DailyChat({ itemId }: { itemId: string }) {
               onCancelDelete={() => setConfirmId((c) => (c === m.id ? null : c))}
               onOpen={() => setViewing(m.imagePath)}
               onImageError={() => m.imagePath && onError(m.imagePath)}
-              onImageLoad={onImageLoad}
+              onImageLoad={() => onImageLoad(m.imagePath)}
             />
           ))}
         </ol>

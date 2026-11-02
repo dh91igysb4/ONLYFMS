@@ -32,13 +32,16 @@ function byTime(a: ChatMessage, b: ChatMessage): number {
   return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-/** id로 합친다. 새로 온 것이 이기되, 모르는 아이디는 이미 아는 값으로 채우고 지운 표시는 되돌리지 않는다. */
-function merge(prev: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+/**
+ * id로 합친다. 새로 온 것이 이기되, 모르는 아이디는 이미 아는 값으로 채우고 지운 표시는 되돌리지 않는다.
+ * onlyKnown이면 이미 있는 id만 고친다(Realtime UPDATE: 불러온 범위 밖 행이 끼면 이전 글 커서가 틀어진다).
+ */
+function merge(prev: ChatMessage[], incoming: ChatMessage[], onlyKnown = false): ChatMessage[] {
   const map = new Map(prev.map((m) => [m.id, m]))
   for (const m of incoming) {
     const old = map.get(m.id)
     if (!old) {
-      map.set(m.id, m)
+      if (!onlyKnown) map.set(m.id, m)
       continue
     }
     const deleted = old.deleted || m.deleted
@@ -76,10 +79,10 @@ export function useChat(itemId: string): UseChat {
   // 불러오기 오류 문구. 이후 폴링이 성공하면 이 문구만 지운다(보내기 오류는 남긴다).
   const loadErrorRef = useRef<string | null>(null)
 
-  const apply = useCallback((incoming: ChatMessage[]) => {
+  const apply = useCallback((incoming: ChatMessage[], onlyKnown = false) => {
     for (const m of incoming) if (m.userId && m.handle) handles.current.set(m.userId, m.handle)
     setMessages((prev) => {
-      const next = merge(prev, incoming)
+      const next = merge(prev, incoming, onlyKnown)
       messagesRef.current = next
       return next
     })
@@ -154,7 +157,7 @@ export function useChat(itemId: string): UseChat {
               createdAt: r.created_at ?? new Date().toISOString(),
               deleted: r.deleted_at != null,
               mine: uid !== null && uid === userId,
-            }])
+            }], payload.eventType === 'UPDATE')
           },
         )
         .subscribe((status: string) => {

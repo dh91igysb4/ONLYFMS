@@ -26,6 +26,9 @@ export async function prepareChatImage(file: File): Promise<Blob> {
     canvas.height = h
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new ApiError('image_unsupported', 0)
+    // JPEG에는 투명이 없어 그냥 그리면 투명한 곳이 검게 된다
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, w, h)
     ctx.drawImage(bmp, 0, 0, w, h)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
     if (!blob) throw new ApiError('image_unsupported', 0)

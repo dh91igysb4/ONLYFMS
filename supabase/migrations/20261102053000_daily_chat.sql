@@ -184,7 +184,9 @@ create policy daily_chat_objects_select on storage.objects
 
 create policy daily_chat_objects_insert on storage.objects
   for insert to authenticated
+  -- 이름은 <item_id>/<user_id>/<13자리 epoch_ms>.jpg 하나만(하위 폴더·다른 이름 금지)
   with check (bucket_id = 'daily-chat'
+              and name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9]{13}\.jpg$'
               and public.can_chat_path(name)
               and (storage.foldername(name))[2] = auth.uid()::text);
 

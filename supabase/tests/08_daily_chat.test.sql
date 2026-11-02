@@ -3,7 +3,7 @@
 -- 보내기 전에는 소유자 권한으로 그 사용자 행의 created_at을 과거로 민다(age).
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-chat*)을 쓴다.
 begin;
-select plan(103);
+select plan(107);
 insert into public.hidden_games (game_id) values ('g-chat-hidden');
 
 \set A '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}'
@@ -21,6 +21,8 @@ insert into public.hidden_games (game_id) values ('g-chat-hidden');
 \set off   'd1000000-0000-0000-0000-000000000003'
 \set canc  'd1000000-0000-0000-0000-000000000004'
 \set hid   'd1000000-0000-0000-0000-000000000005'
+-- hid2: 오늘 데일리, 숨김 게임, 관리자 E가 시작만 함(안 끝냄)
+\set hid2  'd1000000-0000-0000-0000-000000000006'
 
 -- ---------------------------------------------------------------- fixture (superuser)
 -- A 오늘 맞힘, B 오늘 포기(finished, 0점), C 시작만, D 미시작, E 관리자(오늘·어제·숨김 끝냄), F 미승인(오늘 끝냄)
@@ -50,6 +52,7 @@ insert into public.contests (id, kind, title, visibility, starts_at, ends_at, ca
 insert into public.contest_items (id, contest_id, position, game_id, logic_version, generated_at) values
   (:'today', 'c1000000-0000-0000-0000-000000000001', 1, 'g-chat', 1, now()),
   (:'hid',   'c1000000-0000-0000-0000-000000000001', 2, 'g-chat-hidden', 1, now()),
+  (:'hid2',  'c1000000-0000-0000-0000-000000000001', 3, 'g-chat-hidden', 1, now()),
   (:'yday',  'c1000000-0000-0000-0000-000000000002', 1, 'g-chat', 1, now()),
   (:'off',   'c1000000-0000-0000-0000-000000000003', 1, 'g-chat', 1, now()),
   (:'canc',  'c1000000-0000-0000-0000-000000000004', 1, 'g-chat', 1, now());
@@ -63,7 +66,8 @@ insert into public.attempts (item_id, user_id, state, logic_version, finished, s
   (:'off',   '00000000-0000-0000-0000-0000000000e1', '{}', 1, true, 5, now()),
   (:'canc',  '00000000-0000-0000-0000-0000000000e1', '{}', 1, true, 5, now()),
   (:'hid',   '00000000-0000-0000-0000-0000000000e1', '{}', 1, true, 5, now()),
-  (:'hid',   '00000000-0000-0000-0000-0000000000e5', '{}', 1, true, 5, now());
+  (:'hid',   '00000000-0000-0000-0000-0000000000e5', '{}', 1, true, 5, now()),
+  (:'hid2',  '00000000-0000-0000-0000-0000000000e5', '{}', 1, false, 0, null);
 -- 다른 날·숨김 문항의 글(E). 오늘 문항 목록에 섞이지 않아야 한다.
 insert into public.daily_chat (item_id, user_id, body, created_at) values
   (:'yday', :'ue', 'yesterday', now() - interval '1 day'),
@@ -266,6 +270,9 @@ set local request.jwt.claims = :'E';
 select ok(public.can_chat(:'hid'), 'hidden_game: admin (finished) → true');
 select results_eq($$select body from public.chat_list('d1000000-0000-0000-0000-000000000005')$$,
   $$values ('hidden'::text)$$, 'hidden_game: admin lists hidden item chat');
+select ok(not public.can_chat(:'hid2'), 'hidden_game: admin who has not finished → false');
+select throws_ok($$select * from public.chat_list('d1000000-0000-0000-0000-000000000006')$$,
+  'P0001', 'forbidden', 'hidden_game: admin (unfinished) list forbidden');
 
 -- ---------------------------------------------------------------- no_direct_writes
 set local request.jwt.claims = :'A';
@@ -292,6 +299,12 @@ select lives_ok($$insert into storage.objects (bucket_id, name, owner) values ('
 select throws_ok($$insert into storage.objects (bucket_id, name, owner) values ('daily-chat',
                    'd1000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-0000000000e2/1730000000001.jpg', auth.uid())$$,
   '42501', null, 'storage_policies: A cannot upload to B''s folder');
+select throws_ok($$insert into storage.objects (bucket_id, name, owner) values ('daily-chat',
+                   'd1000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-0000000000e1/a/b.jpg', auth.uid())$$,
+  '42501', null, 'storage_policies: nested path under own folder rejected');
+select throws_ok($$insert into storage.objects (bucket_id, name, owner) values ('daily-chat',
+                   'd1000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-0000000000e1/x.jpg', auth.uid())$$,
+  '42501', null, 'storage_policies: non-epoch file name rejected');
 select throws_ok($$insert into storage.objects (bucket_id, name, owner) values ('daily-chat',
                    'd1000000-0000-0000-0000-000000000002/00000000-0000-0000-0000-0000000000e1/1730000000001.jpg', auth.uid())$$,
   '42501', null, 'storage_policies: A cannot upload to an item they cannot chat on');

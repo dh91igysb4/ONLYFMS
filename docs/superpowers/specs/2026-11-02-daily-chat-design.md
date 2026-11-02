@@ -66,8 +66,8 @@
 
 - 버킷 `daily-chat`: 비공개, 파일 최대 1MB, `image/jpeg`만.
 - `storage.objects` 정책(버킷 `daily-chat`):
-  - select: `can_chat((storage.foldername(name))[1]::uuid)`.
-  - insert: 위 조건 + `(storage.foldername(name))[2] = auth.uid()::text`.
+  - select: `can_chat_path(name) or is_admin()` (관리자는 관리를 위해 모든 채팅 사진을 보고 지울 수 있다. Storage 삭제는 select 정책도 통과해야 한다).
+  - insert: `can_chat_path(name)` + `(storage.foldername(name))[2] = auth.uid()::text` + 파일 이름이 `^[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9]{13}\.jpg$`(`<item_id>/<user_id>/<13자리 epoch_ms>.jpg`, 하위 폴더 불가).
   - delete: 본인 폴더 또는 관리자.
 - 화면은 `createSignedUrl(path, 3600)`으로 보여준다.
 
@@ -76,7 +76,7 @@
 - 위치: 데일리 화면(`DailyPage`, 플랫폼)에서 그 문항이 끝났을 때(`finished`) 게임 화면 아래에 "오늘의 대화" 카드(모든 폭 공통, 데스크톱에서는 본문 폭 전체). 게임 화면 내부 배치(2열)는 게임 코드라 건드리지 않는다. 지난 데일리를 끝난 상태로 다시 열어도 보인다.
 - 목록: 아이디·시각·내용, 내 메시지는 오른쪽·다른 색(테마 토큰). 지운 메시지는 "삭제된 메시지". 위로 스크롤하면 이전 100개 더 불러오기.
 - 새 글: Realtime insert/update 이벤트로 붙이거나 갱신. 맨 아래에 있으면 자동 스크롤, 위에 있으면 "새 메시지" 버튼. Realtime과 별개로 5초마다 `chat_list`로 최신을 맞춘다(중복은 id로 제거).
-- 입력: 글 입력칸(Enter 보내기, Shift+Enter 줄바꿈, 300자 표시), 사진 버튼. 보내는 중 비활성, 실패하면 메시지 옆 "다시 보내기". 오류 문구: `too_fast` "조금 천천히 보내 주세요", `too_many` "잠시 뒤에 다시 보내 주세요", `forbidden` "문제를 끝낸 사람만 쓸 수 있어요", 사진 형식 오류 "지원하지 않는 형식이에요".
+- 입력: 글 입력칸(Enter 보내기(터치 기기에서는 줄바꿈, 보내기 버튼으로 전송), Shift+Enter 줄바꿈, 300자 표시), 사진 버튼. 보내는 중 비활성, 실패하면 메시지 옆 "다시 보내기". 오류 문구: `too_fast` "조금 천천히 보내 주세요", `too_many` "잠시 뒤에 다시 보내 주세요", `forbidden` "문제를 끝낸 사람만 쓸 수 있어요", 사진 형식 오류 "지원하지 않는 형식이에요".
 - 사진: 고르면 브라우저에서 EXIF 방향 반영 → 긴 쪽 1280px JPEG(품질 0.85)로 줄임(GPS 등 메타데이터 제거) → 1MB 넘으면 거부 → Storage 업로드 → `chat_post`. 업로드 후 `chat_post`가 실패하면 올린 파일을 지운다. 목록에서는 최대 240px 썸네일, 누르면 크게.
 - 지우기: 내 메시지(관리자는 모두)에 "지우기" → 확인 → `chat_delete` → 돌려받은 경로의 파일 삭제.
 

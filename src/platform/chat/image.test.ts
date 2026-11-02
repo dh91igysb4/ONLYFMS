@@ -12,7 +12,13 @@ test('fitSize', () => {
 })
 
 function stubCanvas(size: number) {
-  const ctx = { drawImage: vi.fn() }
+  const calls: string[] = []
+  const ctx = {
+    fillStyle: '' as string,
+    fillRect: vi.fn((..._a: number[]) => { calls.push(`fillRect:${ctx.fillStyle}`) }),
+    drawImage: vi.fn((..._a: unknown[]) => { calls.push('drawImage') }),
+    calls,
+  }
   vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
     if (tag !== 'canvas') throw new Error('unexpected ' + tag)
     return {
@@ -48,4 +54,13 @@ test('정상: EXIF 방향 옵션과 축소 크기로 그린다', async () => {
   expect(blob.size).toBe(1_048_576)
   expect(cib.mock.calls[0][1]).toEqual({ imageOrientation: 'from-image' })
   expect(ctx.drawImage).toHaveBeenCalledWith(bmp, 0, 0, 1280, 960)
+})
+
+test('투명 사진이 검게 되지 않게 흰색을 먼저 칠한다', async () => {
+  const bmp = { width: 800, height: 600, close: vi.fn() }
+  vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bmp))
+  const ctx = stubCanvas(1000)
+  await prepareChatImage(new File(['x'], 'a.png'))
+  expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 800, 600)
+  expect(ctx.calls).toEqual(['fillRect:#fff', 'drawImage'])
 })

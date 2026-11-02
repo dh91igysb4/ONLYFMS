@@ -140,6 +140,34 @@ test('send_ignores_enter_while_composing', async () => {
   expect(postChat).not.toHaveBeenCalled()
 })
 
+test('send_ignores_enter_keycode_229', async () => {
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText(/아직 대화가 없어요/)
+  fireEvent.change(textbox(), { target: { value: '안녕' } })
+  fireEvent.keyDown(textbox(), { key: 'Enter', keyCode: 229 })
+  expect(postChat).not.toHaveBeenCalled()
+})
+
+test('coarse_pointer_enter_is_newline', async () => {
+  const mm = vi.fn((q: string) => ({ matches: q === '(pointer: coarse)', media: q }))
+  vi.stubGlobal('matchMedia', mm)
+  try {
+    postChat.mockResolvedValue({ id: 'n1', createdAt: '2026-11-02T06:00:00.000Z' })
+    render(<DailyChat itemId={ITEM} />)
+    await screen.findByText(/아직 대화가 없어요/)
+    fireEvent.change(textbox(), { target: { value: '안녕' } })
+    const ev = fireEvent.keyDown(textbox(), { key: 'Enter' })
+    // 기본 동작(줄바꿈)을 막지 않는다
+    expect(ev).toBe(true)
+    expect(postChat).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+    await screen.findByText('안녕')
+    expect(postChat).toHaveBeenCalledWith(ITEM, '안녕', null)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 test('send_button_states', async () => {
   render(<DailyChat itemId={ITEM} />)
   await screen.findByText(/아직 대화가 없어요/)
@@ -345,6 +373,25 @@ test('signed_url_retry_once', async () => {
   expect(signedChatImageUrl).toHaveBeenCalledTimes(2)
 })
 
+test('signed_url_retry_resets_after_load', async () => {
+  signedChatImageUrl
+    .mockResolvedValueOnce('https://signed/1')
+    .mockResolvedValueOnce('https://signed/2')
+    .mockResolvedValueOnce('https://signed/3')
+  listChat.mockResolvedValue([msg('c', { imagePath: 'it1/u2/1.jpg', body: null })])
+  render(<DailyChat itemId={ITEM} />)
+  const img = await screen.findByRole('img', { name: 'son의 사진' })
+  expect(img).toHaveAttribute('src', 'https://signed/1')
+  fireEvent.error(img)
+  await vi.waitFor(() => expect(screen.getByRole('img', { name: 'son의 사진' })).toHaveAttribute('src', 'https://signed/2'))
+  fireEvent.load(screen.getByRole('img', { name: 'son의 사진' }))
+  // 한 시간 뒤 다시 만료돼도 새 주소를 한 번 더 받는다
+  fireEvent.error(screen.getByRole('img', { name: 'son의 사진' }))
+  await vi.waitFor(() => expect(screen.getByRole('img', { name: 'son의 사진' })).toHaveAttribute('src', 'https://signed/3'))
+  expect(signedChatImageUrl).toHaveBeenCalledTimes(3)
+  expect(screen.queryByText('사진을 불러오지 못했어요')).toBeNull()
+})
+
 test('image_opens_large_view', async () => {
   signedChatImageUrl.mockResolvedValue('https://signed/1')
   listChat.mockResolvedValue([msg('c', { imagePath: 'it1/u2/1.jpg', body: null })])
@@ -373,6 +420,23 @@ test('load_older', async () => {
   expect(await screen.findByText('오래된 글')).toBeInTheDocument()
   expect(listChat).toHaveBeenLastCalledWith(ITEM, '2026-11-02T05:00:00.000Z')
   expect(screen.queryByRole('button', { name: '이전 대화 더 보기' })).toBeNull()
+})
+
+test('realtime_update_for_unknown_id_ignored', async () => {
+  const page = Array.from({ length: 100 }, (_, i) =>
+    msg(`m${i}`, { createdAt: new Date(Date.parse('2026-11-02T05:00:00Z') + i * 1000).toISOString() }))
+  listChat.mockResolvedValueOnce(page)
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText('글 m99')
+  // 불러온 범위 밖(더 오래된) 행이 고쳐져도 끼워 넣지 않는다
+  act(() => rtCallback!({ eventType: 'UPDATE', new: row('ghost', { body: '유령', created_at: '2026-11-01T00:00:00.000Z' }) }))
+  expect(screen.queryByText('유령')).toBeNull()
+  listChat.mockResolvedValueOnce([])
+  fireEvent.click(screen.getByRole('button', { name: '이전 대화 더 보기' }))
+  await vi.waitFor(() => expect(listChat).toHaveBeenLastCalledWith(ITEM, '2026-11-02T05:00:00.000Z'))
+  // INSERT는 여전히 붙는다
+  act(() => rtCallback!({ eventType: 'INSERT', new: row('n1') }))
+  expect(await screen.findByText('실시간 n1')).toBeInTheDocument()
 })
 
 test('no_older_button_when_first_page_short', async () => {
