@@ -107,8 +107,14 @@ async function main() {
   log(`경력 ${spells.length}개, 국가대표 ${caps.length}개 (유스·2군·이름 없는 팀·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
 
   // 5. 선수 정보·수상
-  const { players, transfermarkt } = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cacheDir), caps, teamMap)
-  const awards = buildAwards(await batched('수상', playerIds, 200, qAwards, o.cacheDir))
+  const built = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cacheDir), caps, teamMap)
+  // 어느 언어로도 이름이 없는 선수는 화면에 보일 이름이 없어 뺀다(경력·국가대표·수상·별칭·외부 ID도 함께)
+  const players = built.players.filter((p) => p.name_en)
+  const nameless = built.players.filter((p) => !p.name_en).map((p) => p.id)
+  const keptPlayers = new Set(players.map((p) => p.id))
+  if (nameless.length) log(`이름 라벨이 없는 선수 ${nameless.length}명 뺌: ${nameless.slice(0, 10).join(' ')}${nameless.length > 10 ? ' …' : ''}`)
+  const transfermarkt = [...built.transfermarkt].filter(([id]) => keptPlayers.has(id))
+  const awards = buildAwards(await batched('수상', playerIds, 200, qAwards, o.cacheDir)).filter((h) => keptPlayers.has(h.player_id))
 
   // 6. 국가
   const keptTeams = teams.filter((t) => t.kind !== 'other')
@@ -118,7 +124,9 @@ async function main() {
   // 7. 직접 입력한 한글 이름, 검색용 별칭
   const namesKo = readManual(o.out, 'names_ko.csv')
   const fixed = applyNamesKo(players, namesKo) + applyNamesKo(keptTeams, namesKo) + applyNamesKo(nations, namesKo)
-  const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cacheDir))
+  // 질의는 처음 목록 그대로(캐시 재사용), 뺀 선수의 별칭은 결과에서 거른다
+  const keptIds0 = new Set(keptTeams.map((t) => t.id))
+  const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cacheDir)).filter((x) => keptPlayers.has(x.entity_id) || keptIds0.has(x.entity_id))
 
   // 8. 쓰기 (팀은 유스·2군 제외, 경력·시즌 참가팀은 남은 팀만). 열과 행 순서는 schema.ts가 정한다
   const keptIds = new Set(keptTeams.map((t) => t.id))
@@ -130,9 +138,9 @@ async function main() {
     team_competitions: teamComps.filter((t) => keptIds.has(t.team_id)),
     players,
     aliases,
-    external_ids: [...transfermarkt].map(([entity_id, external_id]) => ({ entity_id, source: 'transfermarkt', external_id })),
-    spells,
-    caps,
+    external_ids: transfermarkt.map(([entity_id, external_id]) => ({ entity_id, source: 'transfermarkt', external_id })),
+    spells: spells.filter((x) => keptPlayers.has(x.player_id)),
+    caps: caps.filter((x) => keptPlayers.has(x.player_id)),
     honours,
   }
   for (const f of FILE_NAMES) writeFileSync(join(o.out, `${f}.csv`), toCsv(FILES[f].columns, sortRows(f, out[f]) as Record<string, unknown>[]))

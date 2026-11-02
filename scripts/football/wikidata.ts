@@ -93,12 +93,19 @@ export function qOccupation(players: readonly string[]): string {
 }`
 }
 
+/** 영문 표시 이름 후보 언어(이 순서로 고른다). 한국어는 마지막 수단 */
+export const NAME_LANGS = ['en', 'mul', 'es', 'pt', 'fr', 'de', 'it', 'nl', 'tr', 'ko'] as const
+/** 영어·한국어 말고 이름 후보로 받는 라벨: 변수 ?l_<lang> (값이 하나씩이라 줄이 늘지 않는다) */
+const EXTRA_NAME_LANGS = NAME_LANGS.filter((l) => l !== 'en' && l !== 'ko')
+const extraLabels = (s: string) => EXTRA_NAME_LANGS.map((l) => `  OPTIONAL { ?${s} rdfs:label ?l_${l} FILTER(LANG(?l_${l}) = "${l}") }`).join('\n')
+const extraVars = EXTRA_NAME_LANGS.map((l) => `?l_${l}`).join(' ')
+
 /** 선수 기본 정보. 값이 여럿인 속성 때문에 선수당 여러 줄이 나온다 (buildPlayers가 합친다) */
 export function qPlayerDetails(players: readonly string[]): string {
-  return `SELECT ?p ?en ?mul ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
+  return `SELECT ?p ?en ${extraVars} ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
   VALUES ?p { ${ids(players)} }
   OPTIONAL { ?p rdfs:label ?en FILTER(LANG(?en) = "en") }
-  OPTIONAL { ?p rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
+${extraLabels('p')}
   OPTIONAL { ?p rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?p p:P569/psv:P569 [ wikibase:timeValue ?birth ; wikibase:timePrecision ?bprec ] }
   OPTIONAL { ?p wdt:P1532 ?sport }
@@ -134,10 +141,10 @@ export function qSpells(players: readonly string[]): string {
 
 /** 팀 정보와 분류용 인스턴스(P31), 엠블럼 색(P6364 → sRGB P465) */
 export function qTeams(teams: readonly string[]): string {
-  return `SELECT ?t ?en ?mul ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
+  return `SELECT ?t ?en ${extraVars} ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
   VALUES ?t { ${ids(teams)} }
   OPTIONAL { ?t rdfs:label ?en FILTER(LANG(?en) = "en") }
-  OPTIONAL { ?t rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
+${extraLabels('t')}
   OPTIONAL { ?t rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?t wdt:P1813 ?short FILTER(LANG(?short) = "en") }
   OPTIONAL { ?t wdt:P31 ?type }
@@ -150,10 +157,10 @@ export function qTeams(teams: readonly string[]): string {
 
 /** 국가 이름과 국기용 코드. ISO 3166-1(P297)이 없으면 3166-2(P300, 예: GB-ENG) */
 export function qNations(nations: readonly string[]): string {
-  return `SELECT ?n ?en ?mul ?ko ?iso2 ?iso3166_2 WHERE {
+  return `SELECT ?n ?en ${extraVars} ?ko ?iso2 ?iso3166_2 WHERE {
   VALUES ?n { ${ids(nations)} }
   OPTIONAL { ?n rdfs:label ?en FILTER(LANG(?en) = "en") }
-  OPTIONAL { ?n rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
+${extraLabels('n')}
   OPTIONAL { ?n rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?n wdt:P297 ?iso2 }
   OPTIONAL { ?n wdt:P300 ?iso3166_2 }
@@ -223,9 +230,12 @@ export type Precision = 'day' | 'year'
 export type DateValue = { date: string; precision: Precision }
 
 /** 위키데이터 시각값과 정밀도(11 = 일, 9·10 = 연·월)를 CSV 날짜로. 일 단위가 아니면 연도만 쓴다 */
+/** 이보다 이른 연도는 입력 오류로 본다(예: 2024를 24로 적어 0024-01-15가 된 경력) */
+export const MIN_YEAR = 1850
+
 export function dateOf(time: string | undefined, prec: string | undefined): DateValue | null {
   const m = time?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/)
-  if (!m) return null
+  if (!m || Number(m[1]) < MIN_YEAR) return null
   const p = Number(prec ?? 11)
   if (p < 9) return null
   return p >= 11 ? { date: `${m[1]}-${m[2]}-${m[3]}`, precision: 'day' } : { date: m[1], precision: 'year' }
@@ -311,17 +321,29 @@ export function valuesOf(rows: readonly Row[], v: string): string[] {
 }
 const firstOf = (rows: readonly Row[], v: string) => valuesOf(rows, v)[0] ?? ''
 /**
- * 영문 표시 이름(name_en, DB에서 필수): 영어 라벨 → 다국어(mul) 라벨 → 마지막 수단으로 한국어 라벨.
+ * 영문 표시 이름(name_en, DB에서 필수): NAME_LANGS 순(영어 → 다국어 mul → 라틴 문자 주요 언어 → 마지막 수단 한국어).
  * 위키데이터는 2024년부터 여러 언어에서 같은 이름(주로 인명)을 mul 하나로 합치고 영어 라벨을 지우고 있다.
- * K리그 하부·유소년 클럽처럼 한국어 라벨만 있는 항목도 있다.
+ * 영어·mul 없이 스페인어·포르투갈어·튀르키예어 라벨만 있는 선수, 한국어 라벨만 있는 K리그 하부 클럽도 있다.
  */
-export const nameEnOf = (rows: readonly Row[]) => firstOf(rows, 'en') || firstOf(rows, 'mul') || firstOf(rows, 'ko')
+export function nameEnOf(rows: readonly Row[]): string {
+  for (const l of NAME_LANGS) {
+    const v = firstOf(rows, l === 'en' || l === 'ko' ? l : `l_${l}`)
+    if (v) return v
+  }
+  return ''
+}
 /** 출전·골 같은 횟수: 0 이상 정수만(소수점 아래 0은 허용). 그 밖은 빈 값 */
 export function countOf(v: string | undefined): string {
   return v && /^\d+(\.0+)?$/.test(v) ? String(parseInt(v, 10)) : ''
 }
 
 // ---------------------------------------------------------------- CSV 행 만들기
+
+/** 창단 연도: MIN_YEAR 이후의 4자리 연도만(기원전·0년 같은 값은 빈 값) */
+export function foundedOf(v: string): string {
+  const m = /^\+?(\d{4})-/.exec(v)
+  return m && Number(m[1]) >= MIN_YEAR ? m[1] : ''
+}
 
 export type Team = { id: string; kind: TeamKind; name_ko: string; name_en: string; short_name: string; nation_id: string; colors: string; founded: string; retired: string }
 
@@ -337,7 +359,7 @@ export function buildTeams(rows: readonly Row[]): Team[] {
       nation_id: kind === 'national' ? firstOf(rs, 'sport') || firstOf(rs, 'country') : firstOf(rs, 'country'),
       // 비율 정보가 없어 같은 비율로 나눈다 (Who Ate All the Pies용은 직접 보정)
       colors: hex.length ? JSON.stringify(hex.map((h) => ({ hex: `#${h.toUpperCase()}`, share: +(1 / hex.length).toFixed(3) }))) : '',
-      founded: firstOf(rs, 'founded').slice(0, 4).replace(/^0+/, ''),
+      founded: foundedOf(firstOf(rs, 'founded')),
       retired: 'false',
     })
   }

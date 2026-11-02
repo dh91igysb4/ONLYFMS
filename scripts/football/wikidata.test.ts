@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, teamKind, teamStarts, toCsv, countOf, nameEnOf, qAliases, qPlayerDetails, type Row, type Team,
+  seasonWindows, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -296,16 +296,16 @@ test('countOf_accepts_non_negative_integers_only', () => {
 })
 
 test('name_en_falls_back_to_mul_then_ko_label', () => {
-  expect(nameEnOf([{ en: 'Son Heung-min', mul: 'Son Heung-min' }])).toBe('Son Heung-min')
-  expect(nameEnOf([{ mul: 'Kylian Mbappé' }])).toBe('Kylian Mbappé')
+  expect(nameEnOf([{ en: 'Son Heung-min', l_mul: 'Son Heung-min' }])).toBe('Son Heung-min')
+  expect(nameEnOf([{ l_mul: 'Kylian Mbappé' }])).toBe('Kylian Mbappé')
   expect(nameEnOf([{ ko: '수원 삼성 블루윙즈' }])).toBe('수원 삼성 블루윙즈') // 한국어 라벨만 있으면 마지막 수단
   expect(nameEnOf([{}])).toBe('')
-  const { players } = buildPlayers([{ p: 'Q1', mul: 'Mul Name', ko: '멀' }], [], new Map())
+  const { players } = buildPlayers([{ p: 'Q1', l_mul: 'Mul Name', ko: '멀' }], [], new Map())
   expect(players[0].name_en).toBe('Mul Name')
-  expect(buildTeams([{ t: 'Q2', mul: 'Mul FC', type: 'Q476028' }])[0].name_en).toBe('Mul FC')
-  expect(buildTeams([{ t: 'Q3', mul: 'Mul FC B', type: 'Q476028' }])[0].kind).toBe('other') // 유스·2군 판별도 mul 이름으로
-  expect(buildNations([{ n: 'Q4', mul: 'Mulland' }])[0].name_en).toBe('Mulland')
-  expect(qPlayerDetails(['Q1'])).toContain('LANG(?mul) = "mul"')
+  expect(buildTeams([{ t: 'Q2', l_mul: 'Mul FC', type: 'Q476028' }])[0].name_en).toBe('Mul FC')
+  expect(buildTeams([{ t: 'Q3', l_mul: 'Mul FC B', type: 'Q476028' }])[0].kind).toBe('other') // 유스·2군 판별도 mul 이름으로
+  expect(buildNations([{ n: 'Q4', l_mul: 'Mulland' }])[0].name_en).toBe('Mulland')
+  expect(qPlayerDetails(['Q1'])).toContain('LANG(?l_mul) = "mul"')
   expect(qAliases(['Q1'])).toContain('"mul"')
 })
 
@@ -329,4 +329,28 @@ test('buildTeams_drops_team_without_any_name', () => {
   const { spells, dropped } = buildSpells([{ p: 'Q1', st: 's1', team: 'Q9', s: '2018-07-01T00:00:00Z', sprec: '11' }], new Map(teams.map((t) => [t.id, t])))
   expect(spells).toEqual([])
   expect(dropped).toBe(1)
+})
+
+// ---------------------------------------------------------------- 전체 수집(2026-11-02)에서 나온 문제
+
+test('name_en_language_order', () => {
+  expect(nameEnOf([{ l_pt: 'Pelé Jr', ko: '펠레' }])).toBe('Pelé Jr') // 라틴 문자 언어가 한국어보다 먼저
+  expect(nameEnOf([{ l_tr: 'Arda Güler', l_es: 'Arda Guler' }])).toBe('Arda Guler') // NAME_LANGS 순
+  expect(nameEnOf([{ ko: '김민수' }])).toBe('김민수')
+  const q = qTeams(['Q1'])
+  for (const l of ['mul', 'es', 'pt', 'fr', 'de', 'it', 'nl', 'tr']) expect(q).toContain(`?l_${l}`)
+})
+
+test('dateOf_rejects_implausible_years', () => {
+  expect(dateOf('0024-01-15T00:00:00Z', '11')).toBeNull() // 2024를 24로 적은 입력 오류
+  expect(dateOf('1849-12-31T00:00:00Z', '11')).toBeNull()
+  expect(dateOf('1850-01-01T00:00:00Z', '11')).toEqual({ date: '1850-01-01', precision: 'day' })
+})
+
+test('foundedOf_four_digit_plausible_years_only', () => {
+  expect(foundedOf('1882-01-01T00:00:00Z')).toBe('1882')
+  expect(foundedOf('-0600-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('+0000-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('0080-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('')).toBe('')
 })
