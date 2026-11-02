@@ -19,7 +19,8 @@ create table public.daily_chat (
   created_at timestamptz not null default now(),
   deleted_at timestamptz,
   constraint daily_chat_content check (deleted_at is not null or body is not null or image_path is not null),
-  constraint daily_chat_body_len check (body is null or char_length(btrim(body)) between 1 and 300),
+  constraint daily_chat_body_len check (
+    body is null or char_length(regexp_replace(body, '^\s+|\s+$', '', 'g')) between 1 and 300),
   -- 작성자 본인 폴더·해당 문항만 (탈퇴로 user_id가 null이 되면 식이 null → 통과)
   constraint daily_chat_image_path check (
     image_path is null or image_path ~ ('^' || item_id || '/' || user_id || '/[0-9]{13}\.jpg$'))
@@ -43,6 +44,16 @@ language sql stable security definer set search_path = public as $$
        and c.kind = 'daily'
        and c.cancelled_at is null
        and (public.is_admin() or not public._is_hidden_game(i.game_id)))
+$$;
+
+-- Storage 경로용: 첫 폴더가 uuid 형식이 아니면 오류 없이 false (정책에서 ::uuid 형 변환이 터지지 않게)
+create function public.can_chat_path(p_name text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when (storage.foldername(p_name))[1] ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      then public.can_chat(((storage.foldername(p_name))[1])::uuid)
+    else false
+  end
 $$;
 
 -- ------------------------------------------------------------------ policies
@@ -79,7 +90,8 @@ returns table (id uuid, created_at timestamptz)
 language plpgsql volatile security definer set search_path = public as $$
 declare
   v_uid  uuid := auth.uid();
-  v_body text := nullif(btrim(p_body), '');
+  -- 앞뒤 공백(스페이스·탭·줄바꿈·CR 등)을 모두 걷어낸다. 공백만이면 null
+  v_body text := nullif(regexp_replace(p_body, '^\s+|\s+$', '', 'g'), '');
 begin
   if v_uid is null or not public.can_chat(p_item) then
     raise exception using errcode = 'P0001', message = 'forbidden';
@@ -140,14 +152,16 @@ grant select (id, item_id, user_id, body, image_path, created_at, deleted_at)
 -- ------------------------------------------------------------------ execute grants
 revoke execute on function
   public.can_chat(uuid),
+  public.can_chat_path(text),
   public.chat_list(uuid, timestamptz, int),
   public.chat_post(uuid, text, text),
   public.chat_delete(uuid)
 from public, anon, authenticated;
 
--- can_chat은 RLS·Storage 정책이 invoker 권한으로 부르므로 authenticated에 연다(auth.uid()로 스스로 거른다).
+-- can_chat·can_chat_path는 RLS·Storage 정책이 invoker 권한으로 부르므로 authenticated에 연다(auth.uid()로 스스로 거른다).
 grant execute on function
   public.can_chat(uuid),
+  public.can_chat_path(text),
   public.chat_list(uuid, timestamptz, int),
   public.chat_post(uuid, text, text),
   public.chat_delete(uuid)
@@ -164,13 +178,14 @@ on conflict (id) do nothing;
 
 create policy daily_chat_objects_select on storage.objects
   for select to authenticated
+  -- 관리자도 보인다: Storage API의 삭제는 select 정책도 통과해야 하므로, 관리자가 끝내지 않은 문항의 사진도 지울 수 있게
   using (bucket_id = 'daily-chat'
-         and public.can_chat(((storage.foldername(name))[1])::uuid));
+         and (public.can_chat_path(name) or public.is_admin()));
 
 create policy daily_chat_objects_insert on storage.objects
   for insert to authenticated
   with check (bucket_id = 'daily-chat'
-              and public.can_chat(((storage.foldername(name))[1])::uuid)
+              and public.can_chat_path(name)
               and (storage.foldername(name))[2] = auth.uid()::text);
 
 create policy daily_chat_objects_delete on storage.objects

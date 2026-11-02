@@ -3,7 +3,7 @@
 -- 보내기 전에는 소유자 권한으로 그 사용자 행의 created_at을 과거로 민다(age).
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-chat*)을 쓴다.
 begin;
-select plan(90);
+select plan(103);
 insert into public.hidden_games (game_id) values ('g-chat-hidden');
 
 \set A '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}'
@@ -83,6 +83,9 @@ select throws_ok($$insert into public.daily_chat (item_id, user_id, image_path) 
                    '00000000-0000-0000-0000-0000000000e1',
                    'd1000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-0000000000e2/1730000000000.jpg')$$,
   '23514', null, 'constraint: image_path must be author''s folder');
+select throws_ok($$insert into public.daily_chat (item_id, user_id, body) values ('d1000000-0000-0000-0000-000000000001',
+                   '00000000-0000-0000-0000-0000000000e1', E'\n\t \r')$$, '23514', null,
+  'constraint: whitespace-only (newline/tab/CR) body rejected');
 
 -- ---------------------------------------------------------------- publication
 select is((select count(*)::int from pg_publication_tables
@@ -124,6 +127,10 @@ select throws_ok($$select public.chat_post('d1000000-0000-0000-0000-000000000001
   'P0001', 'invalid_message', 'post_ok_and_lengths: 301 chars invalid');
 select throws_ok($$select public.chat_post('d1000000-0000-0000-0000-000000000001', '   ')$$,
   'P0001', 'invalid_message', 'post_ok_and_lengths: blank invalid');
+select throws_ok($$select public.chat_post('d1000000-0000-0000-0000-000000000001', E'\n\t ')$$,
+  'P0001', 'invalid_message', 'post_ok_and_lengths: newline/tab-only invalid');
+select throws_ok($$select public.chat_post('d1000000-0000-0000-0000-000000000001', E'\r\n' || repeat('a', 301) || E'\n')$$,
+  'P0001', 'invalid_message', 'post_ok_and_lengths: 301 chars inside newlines invalid');
 select throws_ok($$select public.chat_post('d1000000-0000-0000-0000-000000000001', null, null)$$,
   'P0001', 'invalid_message', 'post_ok_and_lengths: null + null invalid');
 reset role;
@@ -317,6 +324,41 @@ select lives_ok($$delete from storage.objects where bucket_id = 'daily-chat'$$, 
 reset role;
 select is((select count(*)::int from storage.objects where bucket_id = 'daily-chat'), 0,
   'storage_policies: A deleted own object');
+
+-- 첫 폴더가 uuid가 아닌 경로: 오류 없이 false·거부
+set local role authenticated;
+set local request.jwt.claims = :'A';
+select is(public.can_chat_path('not-a-uuid/00000000-0000-0000-0000-0000000000e1/1730000000003.jpg'), false,
+  'can_chat_path: non-uuid folder → false, no error');
+select is(public.can_chat_path('1730000000003.jpg'), false, 'can_chat_path: no folder → false');
+select is(public.can_chat_path(null), false, 'can_chat_path: null → false');
+select ok(public.can_chat_path('d1000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-0000000000e1/1730000000003.jpg'),
+  'can_chat_path: today item folder → true for A');
+select throws_ok($$insert into storage.objects (bucket_id, name, owner) values ('daily-chat',
+                   'not-a-uuid/00000000-0000-0000-0000-0000000000e1/1730000000003.jpg', auth.uid())$$,
+  '42501', null, 'storage_policies: non-uuid folder upload rejected by RLS (not a cast error)');
+-- 소유자가 넣은 비정상 이름 객체와, 관리자 E가 끝내지 않은 문항(일반 대회 off)의 사진
+reset role;
+insert into storage.objects (bucket_id, name, owner) values
+  ('daily-chat', 'not-a-uuid/x/1730000000004.jpg', :'ua'),
+  ('daily-chat', 'd1000000-0000-0000-0000-000000000003/00000000-0000-0000-0000-0000000000e1/1730000000005.jpg', :'ua');
+set local role authenticated;
+set local request.jwt.claims = :'A';
+select is((select count(*)::int from storage.objects where bucket_id = 'daily-chat'), 0,
+  'storage_policies: select over a non-uuid object does not error (A sees 0)');
+set local request.jwt.claims = :'E';
+select ok(not public.can_chat('d1000000-0000-0000-0000-000000000003'), 'admin_storage: E has not finished item off');
+select is((select count(*)::int from storage.objects
+            where name = 'd1000000-0000-0000-0000-000000000003/00000000-0000-0000-0000-0000000000e1/1730000000005.jpg'), 1,
+  'admin_storage: admin sees photo of an item they did not finish');
+select lives_ok($$delete from storage.objects
+                   where name = 'd1000000-0000-0000-0000-000000000003/00000000-0000-0000-0000-0000000000e1/1730000000005.jpg'$$,
+  'admin_storage: admin delete runs');
+reset role;
+select is((select count(*)::int from storage.objects
+            where name = 'd1000000-0000-0000-0000-000000000003/00000000-0000-0000-0000-0000000000e1/1730000000005.jpg'), 0,
+  'admin_storage: admin deleted photo of an unfinished item');
+delete from storage.objects where bucket_id = 'daily-chat';
 
 -- ---------------------------------------------------------------- too_fast / too_many
 update public.daily_chat set created_at = created_at - interval '10 seconds' where user_id = :'ua';
