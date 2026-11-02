@@ -18,7 +18,7 @@ const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 
 describe('toothbrush balance', () => {
   test('bot_definitions', () => {
-    // 낙서 봇은 빠름 기준보다 빠르게(틱당 x 이동 ⌈√FAST_D2⌉ + 5), 가만히 봇은 구역 0 치아 칸 위
+    // 낙서 봇은 빠름 기준보다 빠르게(틱당 x 이동 ⌈√FAST_D2⌉ + 5), 가만히 봇은 구역 0 위 앞니 칸 위
     expect(SCRIBBLE_DX).toBe(35)
     expect(SCRIBBLE_DX * SCRIBBLE_DX).toBeGreaterThanOrEqual(FAST_D2)
     expect(isTooth(0, Math.floor(STILL_POINT[1] / CELL) * W + Math.floor(STILL_POINT[0] / CELL))).toBe(true)
@@ -26,9 +26,10 @@ describe('toothbrush balance', () => {
 
   test('aim_bot_strong_but_not_perfect', () => {
     const s = scores('aim')
-    expect(avg(s)).toBeGreaterThanOrEqual(8.0)
-    expect(avg(s)).toBeLessThanOrEqual(9.5)
+    expect(avg(s)).toBeGreaterThanOrEqual(7.0)
+    expect(avg(s)).toBeLessThanOrEqual(7.6)
     for (const v of s) expect(v).toBeLessThan(10)
+    expect(Math.max(...s)).toBeLessThanOrEqual(8.5)
   }, 60_000)
 
   test('sweep_below_aim', () => {

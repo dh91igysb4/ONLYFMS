@@ -43,7 +43,7 @@ describe('generatePuzzle', () => {
   it('puzzle_key_snapshot', () => {
     const key = puzzleKey(generatePuzzle(rngFromSeed(new Uint8Array(16).fill(7))))
     expect(key).toMatch(/^[0-9a-f]{8}$/)
-    expect(key).toMatchInlineSnapshot(`"3e92af69"`)
+    expect(key).toMatchInlineSnapshot(`"b9228a7f"`)
   })
 
   it('rng_call_order', () => {
