@@ -2,7 +2,7 @@
 // 봇은 실제 상태를 읽고 logic.apply로 끝까지 진행해 최종 점수를 돌려준다.
 import { rngFromSeed } from '../../shared/rng.ts'
 import type { Ctx } from '../types.ts'
-import { CELL, H, LH, LW, R, TOTAL_TICKS, W, ZONE_COUNT } from './constants.ts'
+import { CELL, FAST_D2, H, LH, LW, R, TOTAL_TICKS, W, ZONE_COUNT } from './constants.ts'
 import { generatePuzzle, type Puzzle } from './generate.ts'
 import { isTooth, toothCells, ZONE_SHAPES } from './mask.ts'
 import { logic, MAX_SAMPLES, type Action, type State } from './logic.ts'
@@ -33,6 +33,9 @@ function toothBounds(zone: number): [number, number, number, number] {
   }
   return [r0, r1, c0, c1]
 }
+
+/** 낙서 봇의 틱당 x 이동량: 빠름 기준(√FAST_D2)보다 5 이상 빠르게 */
+export const SCRIBBLE_DX = Math.ceil(Math.sqrt(FAST_D2)) + 5
 
 /** 펜 위치. 목표를 향해 축마다 ±min(3, |차이|)씩, 이동이 0이면 x로 ±3 짧은 왕복 */
 class Pen {
@@ -157,14 +160,14 @@ function playSweep(run: Runner): void {
 
 function playScribble(run: Runner, rng: () => number): void {
   const [r0, r1] = toothBounds(0)
-  const x0 = LW / 2 - 12
+  const x0 = LW / 2 - Math.floor(SCRIBBLE_DX / 2)
   let flip = 0
   while (run.ticksLeft > 0) {
     const row = r0 + Math.floor(rng() * (r1 - r0 + 1))
     const y = row * CELL + 5
     const s: number[] = []
     for (let k = 0; k < MAX_SAMPLES; k++) {
-      s.push(x0 + 25 * flip, y)
+      s.push(x0 + SCRIBBLE_DX * flip, y)
       flip = 1 - flip
     }
     run.brush(s)

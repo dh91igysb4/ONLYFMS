@@ -93,13 +93,13 @@ describe('toothbrush logic', () => {
     const p = toothPuzzle(100)
     const run = runner(p)
     const s0 = logic.initState(p, ctx)
-    // d² = 144 = 12²
-    const f = run(s0, b([X, Y], [X + 12, Y]))
-    expect(FAST_D2).toBe(144)
+    // d² = 900 = 30²
+    const f = run(s0, b([X, Y], [X + 30, Y]))
+    expect(FAST_D2).toBe(900)
     expect(f.gumTicks).toBe(1)
     expect(f.removed).toBe(29 * DEC_SLOW + 29 * DEC_FAST)
-    // 143은 두 정수 제곱의 합이 아니므로, 144 미만에서 만들 수 있는 가장 큰 값 137 = 11² + 4²
-    const o = run(s0, b([X, Y], [X + 11, Y + 4]))
+    // 899는 두 정수 제곱의 합이 아니므로, 900 미만에서 만들 수 있는 가장 큰 값 898 = 27² + 13²
+    const o = run(s0, b([X, Y], [X + 27, Y + 13]))
     expect(o.gumTicks).toBe(0)
     expect(o.removed).toBe(29 * DEC_SLOW + 29 * DEC_OPT)
   })
