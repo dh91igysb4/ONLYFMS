@@ -12,8 +12,9 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { LEAGUES, type League } from './leagues.ts'
+import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
 import {
-  applyLeagueNations, applyNamesKo, buildAliases, cmp, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
+  applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
   coverage, currentSeason, flat, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
   qPlayersAtTeams, qSeasons, qSpells, qTeams, seasonWindows, teamStarts, toCsv, type Binding, type Row, type Team, type Window,
 } from './wikidata.ts'
@@ -175,27 +176,42 @@ async function main() {
   const fixed = applyNamesKo(players, namesKo) + applyNamesKo(keptTeams, namesKo) + applyNamesKo(nations, namesKo)
   const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cacheDir))
 
-  // 8. 쓰기 (팀은 유스·2군 제외, 경력·시즌 참가팀은 남은 팀만)
+  // 8. 쓰기 (팀은 유스·2군 제외, 경력·시즌 참가팀은 남은 팀만). 열과 행 순서는 schema.ts가 정한다
   const keptIds = new Set(keptTeams.map((t) => t.id))
-  const write = (name: string, csv: string) => writeFileSync(join(o.out, name), csv)
-  write('competitions.csv', toCsv(['id', 'name_ko', 'name_en', 'kind', 'nation_id', 'tier'], o.leagues.map((l) => ({ ...l, kind: 'league' }))))
-  write('nations.csv', toCsv(['id', 'name_ko', 'name_en', 'iso2', 'confederation'], nations))
-  write('teams.csv', toCsv(['id', 'kind', 'name_ko', 'name_en', 'short_name', 'nation_id', 'colors', 'founded', 'retired'], keptTeams))
-  write('team_competitions.csv', toCsv(['team_id', 'competition_id', 'season'], teamComps.filter((t) => keptIds.has(t.team_id))))
-  write('players.csv', toCsv(['id', 'name_ko', 'name_en', 'birth_date', 'birth_precision', 'nation_id', 'position', 'position_detail', 'foot', 'height_cm', 'shirt_number', 'popularity', 'retired'], players))
-  write('aliases.csv', toCsv(['entity_id', 'alias', 'lang'], aliases))
-  write('external_ids.csv', toCsv(['entity_id', 'source', 'external_id'], [...transfermarkt].sort().map(([entity_id, external_id]) => ({ entity_id, source: 'transfermarkt', external_id }))))
-  write('spells.csv', toCsv(['player_id', 'team_id', 'start_date', 'end_date', 'date_precision', 'loan', 'apps', 'goals', 'source_ref'], spells))
-  write('caps.csv', toCsv(['player_id', 'team_id', 'caps', 'goals', 'first_year', 'last_year'], caps))
   const honours = [...seasons.honours.filter((h) => keptIds.has(h.team_id)), ...awards]
-    .sort((a, b) => cmp(a.honour, b.honour) || cmp(a.season, b.season) || cmp(a.team_id + a.player_id, b.team_id + b.player_id))
-  write('honours.csv', toCsv(['honour', 'season', 'team_id', 'player_id'], honours))
+  const out: Record<FileName, object[]> = {
+    competitions: o.leagues.map((l) => ({ ...l, kind: 'league' })),
+    nations,
+    teams: keptTeams,
+    team_competitions: teamComps.filter((t) => keptIds.has(t.team_id)),
+    players,
+    aliases,
+    external_ids: [...transfermarkt].map(([entity_id, external_id]) => ({ entity_id, source: 'transfermarkt', external_id })),
+    spells,
+    caps,
+    honours,
+  }
+  for (const f of FILE_NAMES) writeFileSync(join(o.out, `${f}.csv`), toCsv(FILES[f].columns, sortRows(f, out[f]) as Record<string, unknown>[]))
+
+  // 9. 쓴 결과를 CSV 규칙으로 검사 (npm test의 data.test.ts와 같은 규칙)
+  const written = {} as Dataset['files'], headers = {} as Dataset['headers']
+  for (const f of FILE_NAMES) {
+    const text = readFileSync(join(o.out, `${f}.csv`), 'utf8')
+    written[f] = parseCsv(text)
+    headers[f] = text.split(/\r?\n/, 1)[0].split(',')
+  }
+  const problems = checkDataset({ files: written, headers }, readManual(o.out, 'legends.csv'))
 
   const noKo = players.filter((p) => !p.name_ko).length
   const noPos = players.filter((p) => !p.position).length
   log(`\n완료: ${o.out}/`)
   log(`  선수 ${players.length}명 (한글 이름 없음 ${noKo}, 포지션 없음 ${noPos}), 팀 ${keptTeams.length}개, 국가 ${nations.length}개`)
   log(`  경력 ${spells.length}, 국가대표 ${caps.length}, 수상·우승 ${honours.length}, 별칭 ${aliases.length}, 직접 입력 한글 이름 적용 ${fixed}`)
+  if (problems.length) {
+    log(`\nCSV 검사 오류 ${problems.length}개 (앞 30개). 수집기 버그는 scripts/football/, 데이터 문제는 manual/로 고친다:`)
+    for (const m of problems.slice(0, 30)) log(`  ${m}`)
+    process.exitCode = 1
+  } else log('  CSV 검사 통과')
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

@@ -85,8 +85,10 @@
 
 **Interfaces:**
 - `schema.ts`
-  - `export const FILES: Record<FileName, { columns: string[]; key: string[] }>`: 설계 §5.2 표 그대로
-  - `export function checkDataset(files: Record<FileName, Row[]>, headers: Record<FileName, string[]>, legends?: Row[]): string[]`: 오류 메시지 목록을 돌려준다(빈 배열이면 통과). 검사 항목은 설계 §9.1 전부(헤더 일치, 기본 키 중복·정렬, 참조, 날짜·정밀도, enum, popularity 범위, colors JSON 배열, 레전드 반영).
+  - `export const FILES: Record<FileName, { columns: string[]; key: string[]; order: string[] }>`: 설계 §5.2 표 그대로. `key`는 중복 금지(DB 기본 키), `order`는 파일 안 행 순서(리뷰용, 예: 경력은 `player_id, start_date, source_ref`, 시즌 참가팀은 `competition_id, season, team_id`). 수집기가 쓰던 순서를 그대로 옮겼고, 대회만 `leagues.ts` 순서 대신 id 순으로 바꿨다.
+  - `export function sortRows(file, rows)`: `order` 순 정렬 사본. 수집기가 CSV를 쓸 때 쓴다.
+  - `export function checkDataset(dataset: { files: Record<FileName, Row[]>; headers: Record<FileName, string[]> }, legends?: Row[]): string[]`: 오류 메시지(`파일:줄: 내용`) 목록을 돌려준다(빈 배열이면 통과). 검사 항목은 설계 §9.1 전부(헤더 일치, 기본 키 중복·정렬, 참조, 날짜·정밀도, enum, popularity 범위, colors JSON 배열, 레전드 반영)에 더해 ID 형식(`Q숫자` 또는 `x-소문자`), 필수 이름(`name_en`), 우승·개인상 행 모양.
+  - 수집기는 CSV를 다 쓴 뒤 같은 `checkDataset`을 돌려 오류를 출력하고 종료 코드 1로 끝낸다(파일은 남김).
 - 픽스처 내용(최소, 테스트가 이름으로 참조):
   - 국가: 대한민국 Q884, 잉글랜드 Q21, 프랑스 Q142, 스페인 Q29
   - 대회: 프리미어리그 Q9448, 라리가 Q324867
@@ -99,11 +101,11 @@
   - 규칙별 실패 케이스: 픽스처를 메모리에서 바꿔 각 규칙이 정확한 오류를 내는지(헤더 열 순서 바뀜, PK 중복, 정렬 깨짐, 없는 선수 참조, `caps.team_id`가 club, 날짜 `2020-13-01`, 정밀도 `year`인데 날짜가 `YYYY-MM-DD`, `position = ST`, `popularity = 101`, `colors = "red"`, 레전드 누락)
   - `real data`: `data/football/players.csv`가 있으면 실데이터 전체 검사, 없으면 `test.skip`
 
-- [ ] **Step 1: 픽스처 CSV 작성** (실제 QID는 위키데이터를 볼 수 없으면 `x-` ID로 대신한다. 테스트는 ID가 아니라 이름으로 검사한다)
-- [ ] **Step 2: `data.test.ts` 작성 → 실패 확인** — `npx vitest run scripts/football/data.test.ts`
-- [ ] **Step 3: `schema.ts` 구현, 수집기가 `FILES` 열 목록을 쓰도록 바꿈**
-- [ ] **Step 4: 통과 확인** — `npx vitest run scripts/football && npm run typecheck`
-- [ ] **Step 5: 커밋** — `test: 축구 CSV 형식·참조 검사와 테스트 픽스처`
+- [x] **Step 1: 픽스처 CSV 작성** (실제 QID는 위키데이터를 볼 수 없으면 `x-` ID로 대신한다. 테스트는 ID가 아니라 이름으로 검사한다)
+- [x] **Step 2: `data.test.ts` 작성 → 실패 확인** — `npx vitest run scripts/football/data.test.ts`
+- [x] **Step 3: `schema.ts` 구현, 수집기가 `FILES` 열 목록을 쓰도록 바꿈**
+- [x] **Step 4: 통과 확인** — `npx vitest run scripts/football && npm run typecheck`
+- [x] **Step 5: 커밋** — `test: 축구 CSV 형식·참조 검사와 테스트 픽스처`
 
 ---
 

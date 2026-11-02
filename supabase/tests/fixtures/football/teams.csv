@@ -1,0 +1,6 @@
+id,kind,name_ko,name_en,short_name,nation_id,colors,founded,retired
+Q18741,club,토트넘 홋스퍼,Tottenham Hotspur F.C.,Tottenham,Q21,"[{""hex"":""#FFFFFF"",""share"":0.5},{""hex"":""#132257"",""share"":0.5}]",1882,false
+Q8682,club,레알 마드리드,Real Madrid CF,,Q29,,1902,false
+x-hamburger-sv,club,함부르크 SV,Hamburger SV,HSV,Q183,,1887,false
+x-kor-nt,national,대한민국 축구 국가대표팀,South Korea national football team,,Q884,,,false
+x-old-fc,club,,Old FC,,Q21,,,false
