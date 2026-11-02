@@ -40,7 +40,7 @@ const b = (...pts: [number, number][]) => ({ type: 'b' as const, s: pts.flat() }
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const idx = (c: number, r: number) => r * W + c
 
-// 구역 0 왼쪽 가운데 앞니 안의 칸 (20, 14)의 중심 (칫솔 29칸이 모두 치아 칸)
+// 구역 0 왼쪽 위 가운데 앞니 끝(아랫니와 맞물린 곳) 칸 (20, 14)의 중심 (칫솔 29칸이 모두 치아 칸)
 const X = 205
 const Y = 145
 
@@ -339,7 +339,7 @@ describe('toothbrush logic', () => {
   })
 
   it('contract_basics', () => {
-    expect(logic.version).toBe(3)
+    expect(logic.version).toBe(4)
     const p = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(4)), {})
     expect(p).toEqual(generatePuzzle(rngFromSeed(new Uint8Array(16).fill(4))))
     expect(logic.puzzleKey(p)).toBe(puzzleKey(p))

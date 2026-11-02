@@ -74,7 +74,7 @@ describe('toothbrush Game', () => {
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(6)
     for (const b of buttons) expect(b).toBeDisabled()
-    expect(screen.getByRole('button', { name: '위 바깥 0%' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '바깥 0%' })).toBeInTheDocument()
   })
 
   test('no_actions_before_press', () => {
@@ -188,6 +188,6 @@ describe('toothbrush Game', () => {
     expect(screen.getByRole('heading', { name: '양치 끝' })).toBeInTheDocument()
     expect(screen.getByText('8.37점')).toBeInTheDocument()
     expect(screen.getByText('잇몸 손상 2초')).toBeInTheDocument()
-    expect(screen.getByText(/위 바깥/)).toBeInTheDocument()
+    expect(screen.getByText(/혀/)).toBeInTheDocument()
   })
 })

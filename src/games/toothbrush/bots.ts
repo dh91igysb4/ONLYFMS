@@ -174,10 +174,10 @@ function playScribble(run: Runner, rng: () => number): void {
   }
 }
 
-/** 가만히 봇이 누르는 점: 구역 0 오른쪽 가운데 앞니의 중심 */
+/** 가만히 봇이 누르는 점: 구역 0 오른쪽 위 가운데 앞니의 중심 */
 export const STILL_POINT: readonly [number, number] = (() => {
-  const teeth = ZONE_SHAPES[0].teeth
-  const b = teeth[teeth.length / 2]
+  const upper = ZONE_SHAPES[0].teeth.filter((b) => b[4] > 0)
+  const b = upper[upper.length / 2]
   const p: [number, number] = [b[1], b[2]]
   if (!isTooth(0, Math.floor(p[1] / CELL) * W + Math.floor(p[0] / CELL))) throw new Error('still point not on a tooth')
   return p

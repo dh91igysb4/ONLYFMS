@@ -1,6 +1,7 @@
 // 양치 캔버스 그리기 (순수 그리기 도우미). 캔버스 안의 색은 테마와 상관없는 고정색이다
 // (CLAUDE.md 금지 사항의 예외: 양치 캔버스 내부 색).
-// 치아는 mask.ts의 같은 도형 정의(ZONE_SHAPES)로 그린다. 그래서 보이는 치아와 판정 치아가 칸 해상도 안에서 일치한다.
+// 치아·혀는 mask.ts의 같은 도형 정의(ZONE_SHAPES)로 그린다. 그래서 보이는 면과 판정 칸이 칸 해상도 안에서 일치한다.
+// 입·혀·치열 윤곽, 장식 치아 같은 그림 전용 도형도 ZONE_SHAPES에서 읽는다.
 // 그리기는 부동소수를 써도 된다(판정에 쓰이지 않는다).
 import { H, LH, LW, MAX_THICK, R, W, CELL } from './constants.ts'
 import {
@@ -28,9 +29,21 @@ const TOOTH_EDGE = 'rgba(110, 80, 60, 0.45)'
 const GROOVE = 'rgba(150, 120, 85, 0.55)'
 const BRUSH = 'rgba(120, 200, 255, 0.9)'
 const PLAQUE: readonly [number, number, number] = [218, 190, 58]
+/** 설태: 매끈한 우윳빛 크림 막. 얇으면 하얀 우윳빛, 두꺼우면 살짝 크림색 (치아 플라그의 노란색과 구분) */
+const COAT_THIN: readonly [number, number, number] = [255, 250, 244]
+const COAT_THICK: readonly [number, number, number] = [246, 236, 212]
 
-type V = 'front' | 'inner' | 'chew'
-const VIEW: readonly V[] = ['front', 'inner', 'chew', 'front', 'inner', 'chew']
+/** 두께 → 설태 불투명도. 분홍 혀 위에서 얇은 설태도 또렷하게 바닥값을 높게 둔다 */
+function coatAlpha(t: number): number {
+  return 0.5 + (0.38 * Math.min(t, MAX_THICK)) / MAX_THICK
+}
+const TONGUE_TOP = '#e07b86'
+
+type V = 'front' | 'inner' | 'chew' | 'tongue'
+const VIEW: readonly V[] = ['front', 'inner', 'chew', 'tongue', 'inner', 'chew']
+
+/** 위 치아(축이 아래를 향함)인가 */
+const isUpper = (b: Box) => b[4] > 0
 
 /** 두께 → 플라그 불투명도. 얇은 플라그도 보이게 바닥값을 둔다. */
 function plaqueAlpha(t: number): number {
@@ -346,17 +359,63 @@ function drawTongue(g: CanvasRenderingContext2D, e: Ellipse): void {
   g.fill()
 }
 
+/** 내민 혀 (혀 구역 3): 닦을 수 있는 혀 상자를 혀끝이 아래로 오게 그린다. 매끈한 분홍과 뿌리 그늘 */
+function drawTongueBody(g: CanvasRenderingContext2D, b: Box): void {
+  const [, , , , , hw, hh] = b
+  g.save()
+  enterBox(g, b)
+  g.beginPath()
+  boxPath(g, b)
+  const grad = g.createLinearGradient(-hw, 0, hw, 0)
+  grad.addColorStop(0, TONGUE_DEEP)
+  grad.addColorStop(0.18, TONGUE)
+  grad.addColorStop(0.5, TONGUE_TOP)
+  grad.addColorStop(0.82, TONGUE)
+  grad.addColorStop(1, TONGUE_DEEP)
+  g.fillStyle = grad
+  g.fill()
+  g.save()
+  g.clip()
+  // 입 안으로 들어가는 뿌리 그늘
+  const root = g.createLinearGradient(0, -hh, 0, -hh + 60)
+  root.addColorStop(0, 'rgba(60, 10, 20, 0.6)')
+  root.addColorStop(1, 'rgba(60, 10, 20, 0)')
+  g.fillStyle = root
+  g.fillRect(-hw, -hh, 2 * hw, 60)
+  g.restore()
+  g.restore()
+}
+
+/** 혀 가운데 정중구 홈과 윤기 (설태 위에 그린다) */
+function drawTongueGroove(g: CanvasRenderingContext2D, b: Box): void {
+  const [, , , , , hw, hh] = b
+  g.save()
+  enterBox(g, b)
+  g.strokeStyle = 'rgba(150, 50, 65, 0.5)'
+  g.lineCap = 'round'
+  g.lineWidth = 5
+  g.beginPath()
+  g.moveTo(0, -hh + 14)
+  g.bezierCurveTo(-3, -hh * 0.2, 3, hh * 0.2, 0, hh * 0.55)
+  g.stroke()
+  g.fillStyle = 'rgba(255, 255, 255, 0.14)'
+  g.beginPath()
+  g.ellipse(-hw * 0.45, hh * 0.1, hw * 0.16, hh * 0.32, 0.1, 0, Math.PI * 2)
+  g.fill()
+  g.restore()
+}
+
 function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
   const s = ZONE_SHAPES[zone]
   const view = VIEW[zone]
   const upper = zone < 3
-  if (view === 'front') {
+  if (view === 'front' || view === 'tongue') {
     const skin = g.createLinearGradient(0, 0, 0, LH)
     skin.addColorStop(0, SKIN)
     skin.addColorStop(1, SKIN_SHADE)
     g.fillStyle = skin
     g.fillRect(0, 0, LW, LH)
-    const o = opening(s.inside)
+    const o = opening(view === 'front' ? s.inside : s.mouth ?? [])
     drawLips(g, o)
     g.beginPath()
     openingPath(g, o)
@@ -383,10 +442,12 @@ function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
       g.stroke()
       drawRidges(g, LW / 2, 128, -1, 4, 120)
       // 아래쪽 혀끝 (치아에 겹치지 않는 곳)
-      g.fillStyle = '#9c4050'
-      g.beginPath()
-      g.ellipse(LW / 2, LH + 50, 190, 64, 0, 0, Math.PI * 2)
-      g.fill()
+      if (s.tongue) {
+        g.fillStyle = '#9c4050'
+        g.beginPath()
+        ellipsePath(g, s.tongue)
+        g.fill()
+      }
     } else {
       const pts = gumPoints(s.teeth, 10)
       g.beginPath()
@@ -400,7 +461,7 @@ function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
     return
   }
   // 씹는 면: 치열 따라 잇몸 띠, 안쪽에 입천장(위) 또는 혀(아래)
-  const a = ZONE_SHAPES[zone].arch
+  const a = s.arch
   if (!a) return
   g.lineWidth = 104
   g.strokeStyle = GUM
@@ -418,14 +479,15 @@ function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
     ellipsePath(g, inner)
     g.fill()
     drawRidges(g, a[0], a[1] - a[3] + 70, 1, 4, 110)
-  } else {
-    drawTongue(g, [a[0], a[1] - 10, a[2] - 66, a[3] - 66])
+  } else if (s.tongue) {
+    drawTongue(g, s.tongue)
   }
 }
 
 let plaqueCanvas: HTMLCanvasElement | null = null
 
-function drawPlaque(g: CanvasRenderingContext2D, teeth: readonly Box[], thick: readonly number[]): void {
+/** 두께를 48×32 이미지에 찍어 부드럽게 확대한 뒤 도형 합집합으로 잘라 덮는다. 혀는 매끈한 우윳빛 설태 */
+function drawPlaque(g: CanvasRenderingContext2D, shapes: readonly Box[], thick: readonly number[], coat: boolean): void {
   if (typeof document === 'undefined') return
   if (!plaqueCanvas) {
     plaqueCanvas = document.createElement('canvas')
@@ -439,6 +501,14 @@ function drawPlaque(g: CanvasRenderingContext2D, teeth: readonly Box[], thick: r
   for (let i = 0; i < W * H; i++) {
     const t = thick[i]
     if (!(t > 0)) continue
+    if (coat) {
+      const k = Math.min(t, MAX_THICK) / MAX_THICK
+      d[4 * i] = Math.round(COAT_THIN[0] + (COAT_THICK[0] - COAT_THIN[0]) * k)
+      d[4 * i + 1] = Math.round(COAT_THIN[1] + (COAT_THICK[1] - COAT_THIN[1]) * k)
+      d[4 * i + 2] = Math.round(COAT_THIN[2] + (COAT_THICK[2] - COAT_THIN[2]) * k)
+      d[4 * i + 3] = Math.round(255 * coatAlpha(t))
+      continue
+    }
     d[4 * i] = PLAQUE[0]
     d[4 * i + 1] = PLAQUE[1]
     d[4 * i + 2] = PLAQUE[2]
@@ -447,7 +517,7 @@ function drawPlaque(g: CanvasRenderingContext2D, teeth: readonly Box[], thick: r
   pg.putImageData(img, 0, 0)
   g.save()
   g.beginPath()
-  for (const b of teeth) addBox(g, b)
+  for (const b of shapes) addBox(g, b)
   g.clip()
   g.imageSmoothingEnabled = true
   g.imageSmoothingQuality = 'high'
@@ -463,32 +533,70 @@ export function drawZone(
 ): void {
   const s = ZONE_SHAPES[zone]
   const view = VIEW[zone]
-  const upper = zone < 3
   g.save()
   g.clearRect(0, 0, LW, LH)
   drawBackground(g, zone)
-  if (view === 'front') {
+  if (view === 'tongue') {
+    const o = opening(s.mouth ?? [])
+    g.save()
+    g.beginPath()
+    openingPath(g, o)
+    g.clip()
+    const deep = g.createRadialGradient(LW / 2, o.top + 60, 10, LW / 2, o.top + 60, 260)
+    deep.addColorStop(0, MOUTH_DEEP)
+    deep.addColorStop(1, MOUTH)
+    g.fillStyle = deep
+    g.fillRect(0, 0, LW, LH)
+    const decor = s.decor ?? []
+    drawGum(g, decor.filter(isUpper), -40, GUM, 6)
+    drawGum(g, decor.filter((b) => !isUpper(b)), LH + 40, GUM, 6)
+    for (const b of decor) drawTooth(g, b, 'front')
+    g.restore()
+    g.beginPath()
+    openingPath(g, o)
+    g.lineWidth = 3
+    g.strokeStyle = LIP_LINE
+    g.stroke()
+    // 혀 = 혀 상자 ∩ inside 타원 (판정과 같은 도형)
+    const clipInside = () => {
+      for (const e of s.inside) { g.beginPath(); ellipsePath(g, e); g.clip() }
+    }
+    g.save()
+    clipInside()
+    for (const b of s.teeth) drawTongueBody(g, b)
+    drawPlaque(g, s.teeth, thick, true)
+    for (const b of s.teeth) drawTongueGroove(g, b)
+    g.restore()
+    g.lineWidth = 2.5
+    g.strokeStyle = 'rgba(120, 30, 45, 0.5)'
+    g.save()
+    clipInside()
+    g.beginPath()
+    for (const b of s.teeth) addBox(g, b)
+    g.stroke()
+    g.restore()
+    g.save()
+    g.beginPath()
+    for (const b of s.teeth) addBox(g, b)
+    g.clip()
+    g.beginPath()
+    for (const e of s.inside) ellipsePath(g, e)
+    g.stroke()
+    g.restore()
+  } else if (view === 'front') {
     g.save()
     g.beginPath()
     openingPath(g, opening(s.inside))
     g.clip()
-    // 입 안 깊은 곳
-    const deep = g.createLinearGradient(0, upper ? 0 : LH, 0, upper ? LH : 0)
-    deep.addColorStop(0.45, MOUTH)
-    deep.addColorStop(1, MOUTH_DEEP)
-    g.fillStyle = deep
+    g.fillStyle = MOUTH_DEEP
     g.fillRect(0, 0, LW, LH)
-    if (upper) {
-      g.fillStyle = '#7a2c3a'
-      g.beginPath()
-      g.ellipse(LW / 2, LH + 10, 190, 90, 0, 0, Math.PI * 2)
-      g.fill()
-    }
-    drawGum(g, s.teeth, upper ? -40 : LH + 40, GUM)
-  }
-  for (const b of s.teeth) drawTooth(g, b, view)
-  drawPlaque(g, s.teeth, thick)
-  if (view === 'front') {
+    const up = s.teeth.filter(isUpper), lo = s.teeth.filter((b) => !isUpper(b))
+    drawGum(g, up, -40, GUM)
+    drawGum(g, lo, LH + 40, GUM)
+    // 다문 앞니: 아랫니를 먼저 그리고 윗니가 그 끝을 덮는다 (판정도 위 치아가 먼저)
+    for (const b of lo) drawTooth(g, b, view)
+    for (const b of up) drawTooth(g, b, view)
+    drawPlaque(g, s.teeth, thick, false)
     g.restore()
     // 입술 안쪽 경계 그늘
     g.beginPath()
@@ -496,6 +604,9 @@ export function drawZone(
     g.lineWidth = 3
     g.strokeStyle = LIP_LINE
     g.stroke()
+  } else {
+    for (const b of s.teeth) drawTooth(g, b, view)
+    drawPlaque(g, s.teeth, thick, false)
   }
   for (const e of s.outside) drawTongue(g, e)
   g.restore()

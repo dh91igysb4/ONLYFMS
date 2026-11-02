@@ -94,7 +94,7 @@ function brush(state: State, s: number[]): State {
 }
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 3,
+  version: 4,
 
   pickPuzzle(rng, _options) {
     return generatePuzzle(rng)
