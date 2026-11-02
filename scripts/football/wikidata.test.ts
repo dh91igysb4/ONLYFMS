@@ -319,3 +319,12 @@ test('buildSpells_drops_reversed_dates_and_bad_counts', () => {
   expect(spells[0].apps).toBe('')
   expect(spells[0].goals).toBe('3')
 })
+
+test('buildTeams_drops_team_without_any_name', () => {
+  const teams = buildTeams([{ t: 'Q9', type: 'Q476028', country: 'Q29' }, { t: 'Q8', ko: '수원 FC', type: 'Q476028' }])
+  expect(teams.find((t) => t.id === 'Q9')!.kind).toBe('other')
+  expect(teams.find((t) => t.id === 'Q8')).toMatchObject({ kind: 'club', name_en: '수원 FC' })
+  const { spells, dropped } = buildSpells([{ p: 'Q1', st: 's1', team: 'Q9', s: '2018-07-01T00:00:00Z', sprec: '11' }], new Map(teams.map((t) => [t.id, t])))
+  expect(spells).toEqual([])
+  expect(dropped).toBe(1)
+})

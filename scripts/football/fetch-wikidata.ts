@@ -160,7 +160,7 @@ async function main() {
   const teamMap = new Map<string, Team>(teams.map((t) => [t.id, t]))
   const { spells, national, dropped } = buildSpells(spellRows, teamMap)
   const caps = buildCaps(national)
-  log(`경력 ${spells.length}개, 국가대표 ${caps.length}개 (유스·2군·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
+  log(`경력 ${spells.length}개, 국가대표 ${caps.length}개 (유스·2군·이름 없는 팀·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
 
   // 5. 선수 정보·수상
   const { players, transfermarkt } = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cacheDir), caps, teamMap)

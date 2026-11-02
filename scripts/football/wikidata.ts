@@ -323,7 +323,8 @@ export function buildTeams(rows: readonly Row[]): Team[] {
   const out: Team[] = []
   for (const [id, rs] of groupBy(rows, 't')) {
     const en = nameEnOf(rs)
-    const kind = teamKind(valuesOf(rs, 'type'), en)
+    // 영어·mul·한국어 라벨이 모두 없는 팀(합쳐져 빈 항목만 남은 리다이렉트 등)은 이름을 붙일 수 없어 유스·2군처럼 뺀다
+    const kind = en ? teamKind(valuesOf(rs, 'type'), en) : 'other'
     const hex = valuesOf(rs, 'hex')
     out.push({
       id, kind, name_ko: firstOf(rs, 'ko'), name_en: en, short_name: firstOf(rs, 'short'),
@@ -339,7 +340,7 @@ export function buildTeams(rows: readonly Row[]): Team[] {
 
 export type Spell = { player_id: string; team_id: string; start_date: string; end_date: string; date_precision: Precision; loan: string; apps: string; goals: string; source_ref: string }
 
-/** 팀 경력. 유스·2군(other), 날짜 없는 구간, 종료일이 시작일보다 앞인 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
+/** 팀 경력. 유스·2군·이름 없는 팀(other), 날짜 없는 구간, 종료일이 시작일보다 앞인 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
 export function buildSpells(rows: readonly Row[], teams: ReadonlyMap<string, Team>): { spells: Spell[]; national: Spell[]; dropped: number } {
   const spells: Spell[] = [], national: Spell[] = []
   let dropped = 0
