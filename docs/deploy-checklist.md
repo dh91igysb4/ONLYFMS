@@ -120,6 +120,20 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
 - [ ] 마이그레이션: `npx -y supabase@2 db push` → 파일 이름순으로 `20261101155028_toothbrush.sql`, `20261101160235_free_play_logs.sql`, `20261101161044_free_best_score.sql` 세 개가 적용된다.
 - [ ] `play` Edge Function은 이번 변경에 재배포가 필요 없다(설계 §6). Vercel 배포만 하면 된다.
 
+## 데일리 채팅 배포
+`feat/daily-chat` 머지 전에, 미리보기에서 확인한다. Edge Function은 다시 배포하지 않는다.
+
+- [ ] 마이그레이션 먼저: `npx -y supabase@2 db push` → `20261102053000_daily_chat.sql` (테이블·RPC·RLS·Realtime publication·`daily-chat` 버킷·Storage 정책)
+- [ ] 그다음 Vercel 배포(머지)
+- [ ] 원격에서만 확인할 것 (로컬 shim으로는 검증되지 않음)
+  - [ ] `db push`가 `storage.objects` 정책과 `daily-chat` 버킷을 만들었는지 (대시보드 Storage → Policies에서 확인. 버킷은 비공개여야 한다)
+  - [ ] 관리자가 아직 안 끝낸 문항의 사진도 지울 수 있는지
+  - [ ] 끝낸 계정 둘이 글·사진을 주고받으면 1~2초 안에 보이는지
+  - [ ] 안 끝낸 계정은 채팅이 보이지 않고, 개발자 도구 Network → WS 프레임에 `daily_chat` 이벤트가 오지 않는지
+  - [ ] 안 끝낸 계정으로 사진 서명 주소 만들기가 실패하는지
+  - [ ] 지운 뒤 (받아 둔 서명 주소를 포함해) 사진 주소가 열리지 않는지
+  - [ ] 아이폰·안드로이드에서 사진 고르기·줄이기·올리기
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지
