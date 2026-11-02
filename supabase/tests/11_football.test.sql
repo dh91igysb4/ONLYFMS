@@ -2,7 +2,7 @@
 -- 테스트용 행은 x-t3-* ID로 슈퍼유저(= 적재 스크립트의 소유자 연결)가 직접 넣는다.
 -- 픽스처 적재(Task 4) 뒤에도 깨지지 않도록 전체 행 수가 아니라 이 ID들로 확인한다.
 begin;
-select plan(46);
+select plan(48);
 
 \set AP '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}'
 \set PE '{"sub":"00000000-0000-0000-0000-0000000000f2","role":"authenticated"}'
@@ -60,6 +60,8 @@ insert into public.football_honours (honour, season, team_id) values ('x-t3-leag
 insert into public.football_meta (key, value) values ('x-t3-key', 'v');
 
 select is((select alias_norm from public.football_aliases where entity_id = 'x-t3-p'), 'testplayer', 'alias_norm_generated');
+select is((select alias_words from public.football_aliases where entity_id = 'x-t3-p'), '{test,player}'::text[], 'alias_words_generated');
+select is(public.football_words('Jean-Pierre  Papin'), '{jean,pierre,papin}'::text[], 'football_words splits on spaces and hyphens');
 
 -- ---------------------------------------------------------------- 제약
 select throws_ok($$insert into public.football_players (id, name_en, birth_date, birth_precision) values ('x-t3-bad1', 'B', '1992-07-08', 'year')$$,

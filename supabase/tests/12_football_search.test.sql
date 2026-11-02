@@ -1,7 +1,7 @@
 -- 선수·팀 검색 RPC football_search (football-data-layer Task 5, 설계 2026-11-01 §8)
 -- scripts/db-test.sh가 미리 적재한 픽스처(supabase/tests/fixtures/football)를 쓴다.
 begin;
-select plan(37);
+select plan(40);
 
 \set AP '{"sub":"00000000-0000-0000-0000-0000000000f3","role":"authenticated"}'
 \set PE '{"sub":"00000000-0000-0000-0000-0000000000f4","role":"authenticated"}'
@@ -56,6 +56,19 @@ select is((select count(*)::int from public.football_search('tottenham', 'player
 -- 부분 일치가 정확·앞부분 일치보다 뒤: 'kim'은 두 김민수(앞부분), 'minsu'는 부분
 select is((select count(*)::int from public.football_search('kimmin', 'player')), 2, 'prefix match');
 
+-- 실데이터 'xavi' 사례: 앞부분 일치끼리는 이름이 길어도 인지도 높은 선수가 먼저
+reset role;
+insert into public.football_players (id, name_en, popularity) values ('x-zz-long', 'Zzxavi Hernandezlongname', 100), ('x-zz-short', 'Zzxavi Si', 50),
+  ('x-zz-harry', 'Harry Zzkane', 90), ('x-zz-kfirst', 'Zzkane Ferdinand', 10);
+insert into public.football_aliases (entity_id, alias, lang) values ('x-zz-long', 'Zzxavi Hernandezlongname', 'en'), ('x-zz-short', 'Zzxavi Si', 'en'),
+  ('x-zz-harry', 'Harry Zzkane', 'en'), ('x-zz-kfirst', 'Zzkane Ferdinand', 'en');
+set local role authenticated;
+set local request.jwt.claims = :'AP';
+select is((select id from public.football_search('zzxavi', 'player') limit 1), 'x-zz-long', 'prefix matches: popular long name before short name');
+-- 실데이터 'kane' 사례: 성(이름의 한 단어)으로 시작해도 앞부분 일치라 인지도 높은 Harry Kane이 먼저
+select is((select id from public.football_search('zzkane', 'player') limit 1), 'x-zz-harry', 'word prefix: surname search ranks popular player first');
+select is((select id from public.football_search('음바페', 'player') limit 1), 'Q21621995', 'word prefix: korean surname');
+
 -- 오타: 부분 일치는 아니지만 trigram 유사도로 찾음
 select is((select id from public.football_search('tottenham hotspurs', 'team') limit 1), 'Q18741', 'search_fuzzy: trigram similarity');
 
@@ -76,9 +89,9 @@ select is((select count(*)::int from public.football_search('zzclamp', 'player',
 select is((select count(*)::int from public.football_search('zzclamp', 'player', 0)), 1, 'search_lim: min 1');
 select is((select count(*)::int from public.football_search('zzclamp', 'player')), 10, 'search_lim: default 10');
 select is((select count(*)::int from public.football_search('zzclamp', 'player', null)), 10, 'search_lim: null → 10');
--- 같은 점수(앞부분 일치)에서는 유사도가 먼저: 이름이 짧은 한 자리 번호가 앞, 그 안에서는 유사도가 같아 popularity 순
-select results_eq($$select id from public.football_search('zzclamp', 'player', 2)$$, $$values ('x-clamp-9'::text), ('x-clamp-8'::text)$$,
-  'same score: similarity, then popularity desc');
+-- 같은 점수(앞부분 일치)에서는 인지도가 먼저: 이름 길이(유사도)와 상관없이 popularity 순
+select results_eq($$select id from public.football_search('zzclamp', 'player', 2)$$, $$values ('x-clamp-25'::text), ('x-clamp-24'::text)$$,
+  'same score: popularity desc before similarity');
 select is((select count(*)::int from public.football_search('  - ', 'player')), 0, 'search_empty: only separators');
 select is((select count(*)::int from public.football_search(null, 'player')), 0, 'search_empty: null');
 select is((select count(*)::int from public.football_search('%', 'player')), 0, 'search_like_escape: %');

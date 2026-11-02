@@ -13,6 +13,13 @@ language sql immutable parallel safe set search_path = '' as $$
   select regexp_replace(lower(extensions.unaccent('extensions.unaccent'::regdictionary, x)), '[[:space:].''’·-]', '', 'g')
 $$;
 
+-- 이름을 단어로 나눠 각각 정규화한 배열. 성만으로 찾기('kane' → Harry Kane)에 쓴다(football_search의 앞부분 일치)
+create function public.football_words(x text) returns text[]
+language sql immutable parallel safe set search_path = '' as $$
+  select coalesce(array_agg(public.football_norm(w)) filter (where public.football_norm(w) <> ''), '{}')
+  from unnest(regexp_split_to_array(x, '[[:space:]-]+')) w
+$$;
+
 -- ---------------------------------------------------------------- 엔터티 (폐기: retired)
 
 create table public.football_nations (
@@ -84,6 +91,7 @@ create table public.football_aliases (
   alias text not null,
   lang text,
   alias_norm text generated always as (public.football_norm(alias)) stored,
+  alias_words text[] generated always as (public.football_words(alias)) stored,
   primary key (entity_id, alias)
 );
 
@@ -165,3 +173,5 @@ $$;
 revoke all on sequence public.football_honours_id_seq from public, anon, authenticated;
 revoke execute on function public.football_norm(text) from public, anon;
 grant execute on function public.football_norm(text) to authenticated;
+revoke execute on function public.football_words(text) from public, anon;
+grant execute on function public.football_words(text) to authenticated;
