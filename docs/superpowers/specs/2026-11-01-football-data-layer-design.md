@@ -242,7 +242,7 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 - 픽스처: `supabase/tests/fixtures/football/*.csv` (선수 10명 안팎: 한글·영문·악센트 이름, 동명이인, 폐기 대상 포함)
 - `scripts/db-test.sh`가 마이그레이션 뒤 `football:load`로 픽스처를 적재하고 pgTAP를 돌린다.
-- `supabase/tests/08_football.test.sql` (pgTAP)
+- `supabase/tests/11_football.test.sql` (pgTAP)
   - 승인 사용자는 `football_*`를 읽고, 대기·익명 사용자는 0행 또는 권한 오류
   - `authenticated`의 insert·update·delete는 모두 거부
   - `football_search`: `손흥민`·`흥민`·`son heung min`·`Son Heung-min`이 같은 선수를 찾음, `mbappe`가 `Mbappé`를 찾음, `retired` 제외, `kind`·`lim` 처리, 반환 열에 경력 정보 없음, 비승인 `forbidden`

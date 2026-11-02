@@ -112,8 +112,8 @@
 ### Task 3: DB 스키마·RLS·정규화 함수
 
 **Files:**
-- Create: `supabase/migrations/<타임스탬프>_football.sql` (`npx supabase@2 migration new football`)
-- Create: `supabase/tests/08_football.test.sql` (스키마·권한 부분, 검색은 Task 5에서 더함)
+- Create: `supabase/migrations/20261102061500_football.sql` (`npx supabase@2 migration new football`)
+- Create: `supabase/tests/11_football.test.sql` (스키마·권한 부분, 검색은 Task 5에서 더함)
 
 **Interfaces:**
 - 확장 `pg_trgm`, `unaccent` (schema `extensions`)
@@ -122,7 +122,7 @@
 - 인덱스는 설계 §6.4. `football_aliases.alias_norm`은 `gin (alias_norm extensions.gin_trgm_ops)`.
 - 권한: 모든 `football_*`에 `alter table … enable row level security`, `revoke all … from anon, authenticated`, `grant select … to authenticated`, 정책 `football_<t>_select for select to authenticated using (public.is_approved())`. `football_norm`은 `authenticated`에 execute 권한.
 
-- [ ] **Step 1: `08_football.test.sql` 작성** (기존 `07_duel.test.sql`의 사용자 생성·역할 전환 방식을 따른다)
+- [x] **Step 1: `11_football.test.sql` 작성** (기존 `07_duel.test.sql`의 사용자 생성·역할 전환 방식을 따른다)
   - `tables_exist`: 11개 테이블
   - `rls_enabled`: 모두 `relrowsecurity`
   - `approved_reads`: 테스트 안에서 소유자로 국가·선수 1행씩 넣고, 승인 사용자로 select하면 보이고 대기 사용자는 0행
@@ -131,10 +131,10 @@
   - `norm_examples`: `Son Heung-min` → `sonheungmin`, `Mbappé` → `mbappe`, `손 흥민` → `손흥민`, `Ødegaard` → `odegaard`, `O'Shea` → `oshea`
   - `alias_norm_generated`: 별칭을 넣으면 `alias_norm`이 채워짐
   - `date_checks`: `birth_precision = 'year'`에 `1992-07-08`을 넣으면 check 위반, `honours`에 같은 (honour, season, null, player) 두 번이면 unique 위반
-- [ ] **Step 2: 실패 확인** — `npm run db:test`
-- [ ] **Step 3: 마이그레이션 구현** — 이름이 `20261101020200_yacht_public.sql`보다 뒤인지 확인한다.
-- [ ] **Step 4: 통과 확인** — `npm run db:test` 전체 PASS
-- [ ] **Step 5: 커밋** — `feat: football_* 스키마·RLS·이름 정규화 함수`
+- [x] **Step 2: 실패 확인** — `npm run db:test`
+- [x] **Step 3: 마이그레이션 구현** — 이름이 `20261101020200_yacht_public.sql`보다 뒤인지 확인한다.
+- [x] **Step 4: 통과 확인** — `npm run db:test` 전체 PASS
+- [x] **Step 5: 커밋** — `feat: football_* 스키마·RLS·이름 정규화 함수`
 
 ---
 
@@ -169,7 +169,7 @@
 
 **Files:**
 - Create: `supabase/migrations/<타임스탬프>_football_search.sql` (Task 3 파일이 아직 머지 전이면 같은 파일에 넣어도 된다. 머지 후면 새 파일)
-- Modify: `supabase/tests/08_football.test.sql`
+- Modify: `supabase/tests/11_football.test.sql`
 
 **Interfaces:**
 - `public.football_search(q text, kind text, lim int default 10) returns table(id text, kind text, name_ko text, name_en text, nation_id text, position text, birth_year int, team_kind text)`
