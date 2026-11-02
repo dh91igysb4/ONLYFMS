@@ -131,10 +131,13 @@ test('score_game_shows_plays_avg_best_sorted_by_best', async () => {
   expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['아이디', '플레이', '평균', '최고'])
   expect(screen.getByRole('columnheader', { name: '최고' }).getAttribute('aria-sort')).toBe('descending')
   expect(screen.queryByLabelText('정렬')).toBeNull()
+  // 점수 게임은 평균·최고를 소수 둘째 자리까지
+  expect(within(screen.getByText('beta').closest('tr')!).getByText('9.50')).toBeTruthy()
+  expect(within(screen.getByText('beta').closest('tr')!).getByText('5.00')).toBeTruthy()
 })
 
 test('who_are_ya_keeps_wins_sort', async () => {
-  setup({ lb_free: [free('a', 'alpha', 10, 3, 0.3, 1, 2, 5)] })
+  setup({ lb_free: [{ ...free('a', 'alpha', 10, 3, 0.3, 1, 2, 5), avg_score: 8.33 }] })
   renderPage()
   tab('자유 플레이')
   await screen.findByText('alpha')
@@ -144,6 +147,8 @@ test('who_are_ya_keeps_wins_sort', async () => {
   const best = await screen.findByRole('columnheader', { name: '최고' })
   expect(best.getAttribute('aria-sort')).toBeNull()
   expect(screen.getByRole('columnheader', { name: '정답' }).getAttribute('aria-sort')).toBe('descending')
+  // 정답 게임의 평균은 지금처럼 소수 첫째 자리
+  expect(within(screen.getByText('alpha').closest('tr')!).getByText('8.3')).toBeTruthy()
 })
 
 test('best_hidden_in_total_view', async () => {

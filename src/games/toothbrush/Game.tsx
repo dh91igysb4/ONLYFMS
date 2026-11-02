@@ -22,7 +22,7 @@ function Result({ st, score }: { st: PublicState; score: number | null }) {
   return (
     <section className="tb tb-result">
       <h2>양치 끝</h2>
-      <p className="tb-score">{(score ?? 0).toFixed(1)}점</p>
+      <p className="tb-score">{(score ?? 0).toFixed(2)}점</p>
       <ul className="tb-zones-result" aria-label="구역별 청결도">
         {ZONE_LABELS.map((label, z) => (
           <li key={z}><span>{label}</span><b>{st.cleanByZone[z]}%</b></li>

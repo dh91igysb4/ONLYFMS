@@ -89,9 +89,10 @@
 
 ### 3.6 상태·점수
 - 상태: `{ zones: number[][] (6 × 1536), zone, ticks, cooldown, prev: [x, y] | null, gumTicks, switches, removed }`. `apply`는 바뀌는 구역 배열만 복사해 바꾸고 입력 상태를 변경하지 않는다.
-- `TOTAL = Σ ZONE_TOTAL`. 점수(정수 0.1점 단위로 계산):
-  - `tenths = ⌊(100 × removed + ⌊TOTAL / 2⌋) / TOTAL⌋ − ⌊gumTicks / 60⌋`
-  - `score = clamp(tenths, 0, 100) / 10`
+- `TOTAL = Σ ZONE_TOTAL`. 점수(정수 0.01점 단위로 계산, v3부터. v1·v2는 0.1점 단위였다):
+  - `hundredths = ⌊(1000 × removed + ⌊TOTAL / 2⌋) / TOTAL⌋ − 10 × ⌊gumTicks / 60⌋`
+  - `score = clamp(hundredths, 0, 1000) / 100`
+  - 저장은 `free_plays.score numeric(4,2)`(마이그레이션 `20261102052719_free_score_two_decimals`), 리더보드 평균·최고도 소수 둘째 자리. 화면은 이 게임(`freeStats: 'score'`)만 둘째 자리로 표시하고, 다른 자유 플레이 게임의 평균은 지금처럼 첫째 자리로 표시한다.
   - 즉 빠르게 문지른 1초마다 0.1점 감점이다. 끝나지 않았을 때도 같은 식("지금 포기하면 받을 점수").
 - `actionCount = switches`(구역 전환 횟수). 자유 플레이 정렬에는 쓰이지 않는다.
 - `publicState`: `{ zones, zone, ticksLeft, cooldown, gumTicks, started: ticks > 0, cleanByZone: number[] }`. `cleanByZone[z] = ⌊100 × (ZONE_TOTAL[z] − 남은 총량) / ZONE_TOTAL[z]⌋`(내림이라 플라그가 남아 있으면 100이 되지 않는다).
