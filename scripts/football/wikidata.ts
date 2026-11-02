@@ -40,13 +40,19 @@ const day = (year: number, md: string) => `"${year}-${md}T00:00:00Z"^^xsd:dateTi
 
 // ---------------------------------------------------------------- 질의
 
-/** 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 시즌은 시작일(P580)의 연도이며, 리그마다 자기 창 안의 시즌만 받는다 */
+/**
+ * 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 리그마다 자기 창 안의 시즌만 받는다.
+ * 시즌 연도는 시작일(P580), 없으면 시점(P585)의 연도. K리그1 2023·2024·2026 시즌 항목은 P585만 있다(2026-11-02 확인).
+ */
 export function qSeasons(windows: ReadonlyMap<string, Window>): string {
   const rows = [...windows].map(([id, w]) => `(wd:${id} ${w.from} ${w.to})`).join(' ')
   return `SELECT ?league ?season ?start ?team ?winner WHERE {
   VALUES (?league ?from ?to) { ${rows} }
-  ?season wdt:P3450 ?league ; wdt:P580 ?start .
-  FILTER(YEAR(?start) >= ?from && YEAR(?start) <= ?to)
+  ?season wdt:P3450 ?league .
+  OPTIONAL { ?season wdt:P580 ?s0 }
+  OPTIONAL { ?season wdt:P585 ?p0 }
+  BIND(COALESCE(?s0, ?p0) AS ?start)
+  FILTER(BOUND(?start) && YEAR(?start) >= ?from && YEAR(?start) <= ?to)
   OPTIONAL { ?season wdt:P1923 ?team . ?team wdt:P31/wdt:P279* wd:${CLUB} }
   OPTIONAL { ?season wdt:P1346 ?winner }
 }`

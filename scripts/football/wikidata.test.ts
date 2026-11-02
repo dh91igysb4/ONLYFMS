@@ -229,6 +229,8 @@ test('qSeasons_uses_each_league_window', () => {
   expect(q).toContain('(wd:Q9448 2012 2026)')
   expect(q).toContain('(wd:Q324867 2017 2026)')
   expect(q).toContain('YEAR(?start) >= ?from')
+  expect(q).toContain('wdt:P585') // 시작일이 없으면 시점으로 연도를 잡는다
+  expect(q).toContain('COALESCE(?s0, ?p0)')
 })
 
 test('teamStarts_earliest_window_of_its_leagues', () => {
