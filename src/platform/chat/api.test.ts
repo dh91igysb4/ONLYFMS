@@ -53,6 +53,23 @@ test('deleteChat: 경로가 있으면 사진을 지운다', async () => {
   expect(remove).toHaveBeenCalledWith(['i/u/1.jpg'])
 })
 
+test('deleteChat: RPC가 성공하면 사진 삭제 실패는 경고만 하고 넘어간다', async () => {
+  rpcMock.mockResolvedValue('i/u/1.jpg')
+  remove.mockResolvedValue({ error: { message: 'boom' } })
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  await expect(deleteChat('m1')).resolves.toBeUndefined()
+  expect(warn).toHaveBeenCalled()
+  remove.mockRejectedValue(new Error('net'))
+  await expect(deleteChat('m1')).resolves.toBeUndefined()
+  warn.mockRestore()
+})
+
+test('deleteChat: RPC 실패는 그대로 던지고 사진은 건드리지 않는다', async () => {
+  rpcMock.mockRejectedValue(Object.assign(new Error('forbidden'), { code: 'forbidden' }))
+  await expect(deleteChat('m1')).rejects.toMatchObject({ code: 'forbidden' })
+  expect(remove).not.toHaveBeenCalled()
+})
+
 test('deleteChat: null이면 remove 호출 안 함', async () => {
   rpcMock.mockResolvedValue(null)
   await deleteChat('m1')

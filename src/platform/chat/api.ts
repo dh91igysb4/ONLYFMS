@@ -58,7 +58,13 @@ export async function postChat(
 
 export async function deleteChat(id: string): Promise<void> {
   const path = await rpc<string | null>('chat_delete', { p_id: id })
-  if (path) await removeChatImage(path)
+  if (!path) return
+  // 메시지는 이미 지워졌다. 파일 삭제 실패로 지우기 자체를 실패로 보이지 않는다.
+  try {
+    await removeChatImage(path)
+  } catch (e) {
+    console.warn('chat: 사진 파일을 지우지 못했어요', path, e)
+  }
 }
 
 function storageError(): ApiError {

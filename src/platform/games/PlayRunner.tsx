@@ -16,6 +16,8 @@ export type PlayRunnerProps =
       itemId: string
       /** 409 ended를 받았을 때. 없으면 문제를 다시 열어 종료 화면을 보여 준다. */
       onEnded?: () => void
+      /** 문제의 끝남 여부가 정해지거나 바뀔 때(처음 연 문제가 이미 끝났을 때 포함). */
+      onFinishedChange?: (finished: boolean) => void
     }
   | {
       mode: 'local'
@@ -33,7 +35,15 @@ function bodyOf(e: ApiError): { message?: string; view?: PlayView } {
   return (e.body ?? {}) as { message?: string; view?: PlayView }
 }
 
-function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => void }) {
+function ServerRunner({
+  itemId,
+  onEnded,
+  onFinishedChange,
+}: {
+  itemId: string
+  onEnded?: () => void
+  onFinishedChange?: (finished: boolean) => void
+}) {
   const [view, setView] = useState<PlayView | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -129,6 +139,13 @@ function ServerRunner({ itemId, onEnded }: { itemId: string; onEnded?: () => voi
     // 문제가 바뀔 때만 다시 연다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId])
+
+  const finished = view ? view.finished : null
+  const finishedCb = useRef(onFinishedChange)
+  finishedCb.current = onFinishedChange
+  useEffect(() => {
+    if (finished !== null) finishedCb.current?.(finished)
+  }, [finished])
 
   const live = view !== null && !view.finished
   useEffect(() => {

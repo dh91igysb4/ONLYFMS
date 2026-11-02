@@ -19,6 +19,10 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
 
+vi.mock('../chat/DailyChat.tsx', () => ({
+  DailyChat: ({ itemId }: { itemId: string }) => <section><h3>오늘의 대화</h3><p>chat:{itemId}</p></section>,
+}))
+
 import { ApiError } from '../../lib/api.ts'
 import { GamesPage } from './GamesPage.tsx'
 import { DailyPage } from './DailyPage.tsx'
@@ -78,6 +82,46 @@ test('daily page asks for the daily item then opens it', async () => {
   await screen.findByText('남은 기회 8')
   expect(playMock).toHaveBeenNthCalledWith(1, { action: 'daily', game_id: 'test-guess' })
   expect(playMock).toHaveBeenNthCalledWith(2, { action: 'open', item_id: 'it9' })
+})
+
+test('daily chat is hidden until the daily is finished', async () => {
+  const base = {
+    item_id: 'it9', contest_id: 'c', game_id: 'test-guess', options: {}, finished: false, score: null, action_count: 0,
+    public_state: { guesses: [], feedback: [], hintUsed: false, parity: null, gaveUp: false },
+    ends_at: new Date(Date.now() + 1e6).toISOString(), server_now: Date.now(),
+  }
+  playMock.mockResolvedValueOnce({ contest_id: 'c', item_id: 'it9' })
+  playMock.mockResolvedValueOnce(base)
+  render(
+    <MemoryRouter initialEntries={['/play/test-guess/daily']}>
+      <Routes><Route path="/play/:game/daily" element={<DailyPage />} /></Routes>
+    </MemoryRouter>,
+  )
+  await screen.findByText('남은 기회 8')
+  expect(screen.queryByText('오늘의 대화')).toBeNull()
+  playMock.mockResolvedValueOnce({
+    ...base, finished: true, score: 10, action_count: 1, reveal: { answer: 5 },
+    public_state: { guesses: [5], feedback: ['hit'], hintUsed: false, parity: null, gaveUp: false },
+  })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: '추측' }))
+  expect(await screen.findByText('오늘의 대화')).toBeInTheDocument()
+  expect(screen.getByText('chat:it9')).toBeInTheDocument()
+})
+
+test('daily chat shows when reopening an already finished daily', async () => {
+  playMock.mockResolvedValueOnce({ contest_id: 'c', item_id: 'it8' })
+  playMock.mockResolvedValueOnce({
+    item_id: 'it8', contest_id: 'c', game_id: 'test-guess', options: {}, finished: true, score: 10, action_count: 1,
+    public_state: { guesses: [5], feedback: ['hit'], hintUsed: false, parity: null, gaveUp: false }, reveal: { answer: 5 },
+    ends_at: new Date(Date.now() - 1000).toISOString(), server_now: Date.now(),
+  })
+  render(
+    <MemoryRouter initialEntries={['/play/test-guess/daily']}>
+      <Routes><Route path="/play/:game/daily" element={<DailyPage />} /></Routes>
+    </MemoryRouter>,
+  )
+  expect(await screen.findByText('chat:it8')).toBeInTheDocument()
 })
 
 test('daily page shows day-changed notice on ended and reopens a new daily', async () => {
