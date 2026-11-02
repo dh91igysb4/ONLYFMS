@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ApiError, errorMessage, play } from '../../lib/api.ts'
 import { getGame } from '../../games/index.ts'
 import { PlayRunner } from './PlayRunner.tsx'
+import { DailyChat } from '../chat/DailyChat.tsx'
 
 export function DailyPage() {
   const { game = '' } = useParams()
@@ -12,11 +13,13 @@ export function DailyPage() {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [dayChanged, setDayChanged] = useState(false)
+  const [finished, setFinished] = useState(false)
 
   useEffect(() => {
     if (!supported) return
     let alive = true
     setItemId(null)
+    setFinished(false)
     setError(null)
     setDayChanged(false)
     play({ action: 'daily', game_id: game })
@@ -49,7 +52,8 @@ export function DailyPage() {
           <button className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>새 데일리 열기</button>
         </div>
       )}
-      {itemId && <PlayRunner mode="server" itemId={itemId} onEnded={onEnded} />}
+      {itemId && <PlayRunner mode="server" itemId={itemId} onEnded={onEnded} onFinishedChange={setFinished} />}
+      {itemId && finished && <DailyChat key={itemId} itemId={itemId} />}
     </div>
   )
 }

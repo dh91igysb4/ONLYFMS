@@ -54,3 +54,49 @@ grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- Storage: 실제 Supabase가 제공, 테스트 전용. 마이그레이션이 쓰는 부분만 흉내 낸다
+-- (storage.buckets 행 추가, storage.objects 정책, storage.foldername). 실제 Supabase처럼
+-- objects·buckets는 RLS가 켜져 있고 API 역할에게 표 권한이 있다(행은 정책으로만 보인다).
+create schema storage;
+grant usage on schema storage to anon, authenticated, service_role;
+
+create table storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  public             boolean default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[]
+);
+
+create table storage.objects (
+  id         uuid primary key default gen_random_uuid(),
+  bucket_id  text references storage.buckets (id),
+  name       text,
+  owner      uuid,
+  created_at timestamptz default now()
+);
+
+alter table storage.buckets enable row level security;
+alter table storage.objects enable row level security;
+grant all on table storage.buckets, storage.objects to anon, authenticated, service_role;
+
+-- Supabase와 같은 동작: 경로를 '/'로 나눈 조각에서 마지막(파일 이름)을 뺀 폴더 목록
+create function storage.foldername(name text) returns text[]
+language plpgsql as $$
+declare
+  _parts text[];
+begin
+  select string_to_array(name, '/') into _parts;
+  return _parts[1:array_length(_parts, 1) - 1];
+end
+$$;
+
+-- Realtime publication: 실제 Supabase가 제공, 테스트 전용.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end
+$$;
