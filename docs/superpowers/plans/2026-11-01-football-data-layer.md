@@ -157,11 +157,11 @@
   각 검사 실패 시 `FAIL: <이름>`을 출력하고 종료 코드 1, 모두 통과하면 `load-test: PASS`.
 - `db-test.sh` 순서: `db_start` → `db_migrate` → `DATABASE_URL=$TEST_DB_URL bash scripts/football/load.sh supabase/tests/fixtures/football` → `pg_prove` → `TEST_DB_URL=… bash scripts/football/load-test.sh`. pgTAP 테스트는 각자 롤백하므로 픽스처는 그대로 남는다.
 
-- [ ] **Step 1: `load-test.sh` 작성 → `db-test.sh`에 연결 → 실패 확인** (`npm run db:test` → load.sh 없음)
-- [ ] **Step 2: `load.sh`·`load.sql` 구현**
-- [ ] **Step 3: 통과 확인** — `npm run db:test` (pgTAP PASS, `load-test: PASS`)
-- [ ] **Step 4: Task 3의 `approved_reads`를 픽스처 기준으로 단순화할 수 있으면 정리** (선택)
-- [ ] **Step 5: 커밋** — `feat: 축구 CSV 적재 스크립트(멱등·폐기 처리·한 트랜잭션)`
+- [x] **Step 1: `load-test.sh` 작성 → `db-test.sh`에 연결 → 실패 확인** (`npm run db:test` → load.sh 없음)
+- [x] **Step 2: `load.sh`·`load.sql` 구현**
+- [x] **Step 3: 통과 확인** — `npm run db:test` (pgTAP PASS, `load-test: PASS`)
+- [x] **Step 4: Task 3의 `approved_reads`를 픽스처 기준으로 단순화할 수 있으면 정리** (선택) — *하지 않음: 11_football은 자기 x-t3-* 행으로 검사해 픽스처와 독립적이라 그대로 둠*
+- [x] **Step 5: 커밋** — `feat: 축구 CSV 적재 스크립트(멱등·폐기 처리·한 트랜잭션)`
 
 ---
 

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "db:test": "bash scripts/db-test.sh",
     "fn:test": "bash scripts/fn-test.sh",
-    "football:fetch": "node scripts/football/fetch-wikidata.ts"
+    "football:fetch": "node scripts/football/fetch-wikidata.ts",
+    "football:load": "bash scripts/football/load.sh"
   },
   "dependencies": {
     "@fontsource/exo-2": "^5.3.0",
