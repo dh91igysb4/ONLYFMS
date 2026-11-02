@@ -13,6 +13,16 @@ describe('mask', () => {
     }
   })
 
+  it('box_corner_radii_valid', () => {
+    for (const s of ZONE_SHAPES) {
+      for (const [, , , , , hw, hh, rg, re] of s.teeth) {
+        expect(rg).toBeLessThanOrEqual(Math.min(hw, hh))
+        expect(re).toBeLessThanOrEqual(Math.min(hw, hh))
+        expect(rg + re).toBeLessThanOrEqual(2 * hh)
+      }
+    }
+  })
+
   it('tooth_counts_per_zone', () => {
     expect(ZONE_SHAPES.map((s) => s.teeth.length)).toEqual([8, 8, 12, 10, 8, 14])
     // 화면 밖이라 칸이 없는 치아는 정의하지 않는다

@@ -31,8 +31,6 @@ const PLAQUE: readonly [number, number, number] = [218, 190, 58]
 
 type V = 'front' | 'inner' | 'chew'
 const VIEW: readonly V[] = ['front', 'inner', 'chew', 'front', 'inner', 'chew']
-/** 씹는 면 구역의 치열 타원(그림용 — mask.ts 치아 배치와 같은 값) [cx, cy, rx, ry] */
-const ARCH: Readonly<Record<number, Ellipse>> = { 2: [240, 330, 196, 292], 5: [240, -10, 196, 292] }
 
 /** 두께 → 플라그 불투명도. 얇은 플라그도 보이게 바닥값을 둔다. */
 function plaqueAlpha(t: number): number {
@@ -402,7 +400,8 @@ function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
     return
   }
   // 씹는 면: 치열 따라 잇몸 띠, 안쪽에 입천장(위) 또는 혀(아래)
-  const a = ARCH[zone]
+  const a = ZONE_SHAPES[zone].arch
+  if (!a) return
   g.lineWidth = 104
   g.strokeStyle = GUM
   g.beginPath()

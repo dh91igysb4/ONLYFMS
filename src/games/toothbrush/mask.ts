@@ -29,9 +29,10 @@ export type ZoneShape = {
   inside: readonly Ellipse[]
   /** 치아 칸은 이 타원들 모두의 밖이어야 한다 (혀에 가린 부분) */
   outside: readonly Ellipse[]
+  /** 씹는 면 구역(2·5)의 치열 타원. 그림 전용이며 판정에는 쓰지 않는다 */
+  arch?: Ellipse
 }
 
-// GEOM-BEGIN
 export const ZONE_SHAPES: readonly ZoneShape[] = [
   // 0
   {
@@ -81,6 +82,7 @@ export const ZONE_SHAPES: readonly ZoneShape[] = [
     ],
     inside: [],
     outside: [],
+    arch: [240, 330, 196, 292],
   },
   // 3
   {
@@ -134,9 +136,9 @@ export const ZONE_SHAPES: readonly ZoneShape[] = [
     ],
     inside: [],
     outside: [],
+    arch: [240, -10, 196, 292],
   },
 ]
-// GEOM-END
 
 export function inBox(b: Box, x: number, y: number): boolean {
   const [, cx, cy, ax, ay, hw, hh, rg, re] = b
