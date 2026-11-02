@@ -293,10 +293,11 @@ test('countOf_accepts_non_negative_integers_only', () => {
   expect(countOf(undefined)).toBe('')
 })
 
-test('name_en_falls_back_to_mul_label', () => {
+test('name_en_falls_back_to_mul_then_ko_label', () => {
   expect(nameEnOf([{ en: 'Son Heung-min', mul: 'Son Heung-min' }])).toBe('Son Heung-min')
   expect(nameEnOf([{ mul: 'Kylian Mbappé' }])).toBe('Kylian Mbappé')
-  expect(nameEnOf([{ ko: '손흥민' }])).toBe('')
+  expect(nameEnOf([{ ko: '수원 삼성 블루윙즈' }])).toBe('수원 삼성 블루윙즈') // 한국어 라벨만 있으면 마지막 수단
+  expect(nameEnOf([{}])).toBe('')
   const { players } = buildPlayers([{ p: 'Q1', mul: 'Mul Name', ko: '멀' }], [], new Map())
   expect(players[0].name_en).toBe('Mul Name')
   expect(buildTeams([{ t: 'Q2', mul: 'Mul FC', type: 'Q476028' }])[0].name_en).toBe('Mul FC')

@@ -305,10 +305,11 @@ export function valuesOf(rows: readonly Row[], v: string): string[] {
 }
 const firstOf = (rows: readonly Row[], v: string) => valuesOf(rows, v)[0] ?? ''
 /**
- * 영문 표시 이름: 영어 라벨, 없으면 다국어(mul) 라벨. 위키데이터는 2024년부터 여러 언어에서 같은 이름(주로 인명)을
- * mul 하나로 합치고 영어 라벨을 지우고 있다.
+ * 영문 표시 이름(name_en, DB에서 필수): 영어 라벨 → 다국어(mul) 라벨 → 마지막 수단으로 한국어 라벨.
+ * 위키데이터는 2024년부터 여러 언어에서 같은 이름(주로 인명)을 mul 하나로 합치고 영어 라벨을 지우고 있다.
+ * K리그 하부·유소년 클럽처럼 한국어 라벨만 있는 항목도 있다.
  */
-export const nameEnOf = (rows: readonly Row[]) => firstOf(rows, 'en') || firstOf(rows, 'mul')
+export const nameEnOf = (rows: readonly Row[]) => firstOf(rows, 'en') || firstOf(rows, 'mul') || firstOf(rows, 'ko')
 /** 출전·골 같은 횟수: 0 이상 정수만(소수점 아래 0은 허용). 그 밖은 빈 값 */
 export function countOf(v: string | undefined): string {
   return v && /^\d+(\.0+)?$/.test(v) ? String(parseInt(v, 10)) : ''
