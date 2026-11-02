@@ -52,7 +52,7 @@
   - `qOccupation(players)`: 레전드가 축구 선수(`P106 = Q937857`)인지 확인하는 질의. 결과에 없는 레전드는 경고 후 제외한다.
 - `fetch-wikidata.ts` 인자: `--to`, `--seasons N`(모든 리그 덮어쓰기), `--leagues`, `--limit-teams`, `--out`, `--cache`, `--no-cache`. `--from`은 없앤다(넘기면 "`--seasons`를 쓰세요" 오류). 선수 찾기는 `teamStarts`를 시작 연도별로 묶어 `qPlayersAtTeams(chunk, start, to)`를 호출한다. 3단계 뒤에 `manual/legends.csv`를 병합하고 직업을 확인한다.
 
-- [ ] **Step 1: K리그1 QID 확인 (네트워크 필요, 사람 또는 허용된 환경)** — *2026-11-02: 클라우드 환경에서 위키데이터 차단으로 보류. K리그1 없이 나머지 구현 완료, QID를 받으면 `leagues.ts`에 한 줄 추가* — `query.wikidata.org`에서 아래 질의를 돌려 현재 리그 항목과 시즌 항목(`P3450`)이 붙은 항목을 확인한다. 옛 이름 항목(K리그 클래식)이 따로 있으면 시즌이 어느 쪽에 붙는지 본다. 확인한 QID를 이 계획과 설계 §3.1 표에 적는다. 네트워크가 없으면 여기서 멈추고 사람에게 이 질의 결과를 요청한다(QID를 추측하지 않는다).
+- [x] **Step 1: K리그1 QID 확인 (네트워크 필요, 사람 또는 허용된 환경)** — *2026-11-02: 사람이 질의 결과를 전달 → `Q2386334`(K리그1, 시즌 37개). 옛 'K리그' Q482403(시즌 9개)은 쓰지 않음. `leagues.ts`에 추가* — `query.wikidata.org`에서 아래 질의를 돌려 현재 리그 항목과 시즌 항목(`P3450`)이 붙은 항목을 확인한다. 옛 이름 항목(K리그 클래식)이 따로 있으면 시즌이 어느 쪽에 붙는지 본다. 확인한 QID를 이 계획과 설계 §3.1 표에 적는다. 네트워크가 없으면 여기서 멈추고 사람에게 이 질의 결과를 요청한다(QID를 추측하지 않는다).
   ```sparql
   SELECT ?league ?leagueLabel (COUNT(?season) AS ?n) WHERE {
     ?league wdt:P31/wdt:P279* wd:Q15991303 ; wdt:P17 wd:Q884 .

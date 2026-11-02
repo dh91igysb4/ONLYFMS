@@ -1,8 +1,8 @@
 // 수집 대상 리그 (설계 docs/superpowers/specs/2026-11-01-football-data-layer-design.md §3.1).
 // id는 위키데이터 QID이며 football_competitions.id로 그대로 쓴다. 바꾸지 않는다(원 설계 §4.2).
 //
-// K리그1(대한민국 Q884, seasons 10, teams 12)은 QID를 위키데이터에서 확인한 뒤 추가한다
-// (계획 docs/superpowers/plans/2026-11-01-football-data-layer.md Task 1 Step 1의 질의). 추측해서 넣지 않는다.
+// K리그1 Q2386334: 2026-11-02 위키데이터 질의로 확인(대한민국 리그 중 시즌 항목 P3450이 가장 많음, 37개).
+// 옛 통합 항목 'K리그' Q482403(시즌 9개)은 쓰지 않는다. 최근 시즌이 그쪽에 붙어 있으면 커버리지 표에 빈칸으로 드러난다.
 
 export type League = {
   id: string
@@ -28,4 +28,5 @@ export const LEAGUES: League[] = [
   { id: 'Q216022', name_ko: '벨기에 프로리그', name_en: 'Belgian Pro League', nation_id: 'Q31', tier: 1, seasons: 10, teams: 16 },
   { id: 'Q167541', name_ko: '에레디비시', name_en: 'Eredivisie', nation_id: 'Q55', tier: 1, seasons: 10, teams: 18 },
   { id: 'Q485568', name_ko: '쉬페르리그', name_en: 'Süper Lig', nation_id: 'Q43', tier: 1, seasons: 10, teams: 18 },
+  { id: 'Q2386334', name_ko: 'K리그1', name_en: 'K League 1', nation_id: 'Q884', tier: 1, seasons: 10, teams: 12 },
 ]
