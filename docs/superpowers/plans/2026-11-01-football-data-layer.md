@@ -168,13 +168,15 @@
 ### Task 5: 검색 RPC `football_search`
 
 **Files:**
-- Create: `supabase/migrations/<타임스탬프>_football_search.sql` (Task 3 파일이 아직 머지 전이면 같은 파일에 넣어도 된다. 머지 후면 새 파일)
-- Modify: `supabase/tests/11_football.test.sql`
+- Create: `supabase/migrations/20261102062215_football_search.sql`
+- Create: `supabase/tests/12_football_search.test.sql` (검색 테스트는 별도 파일로 둠)
+- Modify: `supabase/migrations/20261102061500_football.sql` (RLS 정책을 `(select public.is_approved())`로, 머지 전이라 같은 파일 수정)
 
 **Interfaces:**
-- `public.football_search(q text, kind text, lim int default 10) returns table(id text, kind text, name_ko text, name_en text, nation_id text, position text, birth_year int, team_kind text)`
-  - `language plpgsql stable security invoker set search_path = public`
-  - `perform public._require_approved();` → `kind not in ('player','team')`면 `raise exception using errcode = 'P0001', message = 'bad_kind'`
+- `public.football_search(p_q text, p_kind text, p_lim int default 10) returns table(id text, kind text, name_ko text, name_en text, nation_id text, position text, birth_year int, team_kind text)`
+  - *구현 중 변경 (2026-11-02)*: 인자 `p_` 접두사(반환 열 `kind`와 이름 충돌), `security definer`(RLS 아래서는 trigram 인덱스를 못 씀), 후보 찾기를 `_football_match_long`(3글자 이상, `enable_seqscan = off`)·`_football_match_short`(1~2글자, 순차 스캔)로 분리. 승인 확인은 `is_approved()`로 직접(`_require_approved()`는 authenticated 실행 권한 없음). 설계 §8 갱신.
+  - `language plpgsql stable security definer set search_path = public, extensions`
+  - 승인 아니면 `forbidden` → `p_kind not in ('player','team')`면 `raise exception using errcode = 'P0001', message = 'bad_kind'`
   - `n := football_norm(q)`. 비었으면 빈 결과. `lim := greatest(1, least(coalesce(lim,10), 20))`
   - 후보: `football_aliases a where a.alias_norm like '%'||n||'%' or a.alias_norm % n`(`%` 연산자는 `extensions.%`, 유사도 기준은 `set_limit` 대신 `similarity(a.alias_norm, n) >= 0.3` 조건으로 명시)
   - 엔터티별 점수 `max(case when alias_norm = n then 3 when alias_norm like n||'%' then 2 when alias_norm like '%'||n||'%' then 1 else 0 end)`, `max(similarity(...))`
@@ -183,7 +185,7 @@
   - `n`에 `%`·`_`가 들어 있으면 `like` 전에 이스케이프한다.
 - 권한: `revoke all on function … from public, anon; grant execute … to authenticated`
 
-- [ ] **Step 1: pgTAP 추가** (픽스처가 적재된 상태를 전제)
+- [x] **Step 1: pgTAP 추가** (픽스처가 적재된 상태를 전제)
   - `search_ko_full`: `손흥민` → 첫 결과 손흥민
   - `search_ko_partial`: `흥민` → 손흥민 포함
   - `search_en_variants`: `son heung min`, `Son Heung-min`, `sonny` → 손흥민
@@ -198,10 +200,11 @@
   - `search_anon_denied`: anon 실행 권한 없음
   - `search_columns`: 반환 열 이름이 정확히 8개(경력·소속·생일 열 없음)
   - `search_like_escape`: `%`만 넣으면 전체가 나오지 않음
-- [ ] **Step 2: 실패 확인** — `npm run db:test`
-- [ ] **Step 3: 구현**
-- [ ] **Step 4: 통과 확인** — `npm run db:test`, 그리고 `explain`으로 별칭 1만 행을 넣었을 때 trigram 인덱스가 쓰이는지 한 번 확인한다(테스트에는 넣지 않음, PR 설명에 결과 기록).
-- [ ] **Step 5: 커밋** — `feat: 선수·팀 검색 RPC football_search`
+- [x] **Step 2: 실패 확인** — `npm run db:test`
+- [x] **Step 3: 구현**
+- [x] **Step 4: 통과 확인** — `npm run db:test`, 그리고 `explain`으로 별칭 1만 행을 넣었을 때 trigram 인덱스가 쓰이는지 한 번 확인한다(테스트에는 넣지 않음, PR 설명에 결과 기록).
+  - 측정(별칭 6만 행, 승인 사용자, 2026-11-02): 처음 구현은 RLS 정책의 행마다 `is_approved()` 호출과 RLS 아래 인덱스 불가로 250~570ms. 정책을 `(select …)`로, 함수를 정의자로, 1~2글자 경로를 분리한 뒤 `sonheung` 8~10ms, `흥민` 7ms, `손` 7ms, `선수 123` 44ms. 모든 별칭이 `Player`로 시작하는 합성 데이터의 `player 1a`는 100ms(후보 수천 개, 실제 이름에서는 드묾).
+- [x] **Step 5: 커밋** — `feat: 선수·팀 검색 RPC football_search`
 
 ---
 
@@ -229,7 +232,7 @@
 
 - [ ] **Step 1: `docs/deploy-checklist.md`**
   - §2의 "`0001`~`0005`" 문구를 "아직 원격에 없는 `supabase/migrations/` 전부(`npx supabase@2 migration list`로 확인)"로 고친다.
-  - "축구 데이터" 절 추가: ① `npx -y supabase@2 db push` (football 마이그레이션) ② psql 설치 확인 후 `DATABASE_URL='<대시보드 → Connect → Session pooler 연결 문자열>' npm run football:load` ③ SQL 편집기에서 `select * from football_meta;`와 `select count(*) from football_players;` ④ 승인 계정으로 브라우저 콘솔에서 `supabase.rpc('football_search', { q: '손흥민', kind: 'player' })`가 결과를 돌려주는지 ⑤ 문제가 생기면 출력 전문을 보고
+  - "축구 데이터" 절 추가: ① `npx -y supabase@2 db push` (football 마이그레이션) ② psql 설치 확인 후 `DATABASE_URL='<대시보드 → Connect → Session pooler 연결 문자열>' npm run football:load` ③ SQL 편집기에서 `select * from football_meta;`와 `select count(*) from football_players;` ④ 승인 계정으로 브라우저 콘솔에서 `supabase.rpc('football_search', { p_q: '손흥민', p_kind: 'player' })`가 결과를 돌려주는지 ⑤ 문제가 생기면 출력 전문을 보고
 - [ ] **Step 2: `CLAUDE.md`**
   - 설계 목록에 `docs/superpowers/specs/2026-11-01-football-data-layer-design.md`
   - 폴더 규칙에 `data/football/`(원본 CSV, 수집기 출력은 손으로 고치지 않음, 보정은 `manual/`), `scripts/football/`

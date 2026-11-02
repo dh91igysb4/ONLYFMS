@@ -156,7 +156,8 @@ begin
     execute format('alter table public.football_%s enable row level security', t);
     execute format('revoke all on table public.football_%s from public, anon, authenticated', t);
     execute format('grant select on table public.football_%s to authenticated', t);
-    execute format('create policy football_%1$s_select on public.football_%1$s for select to authenticated using (public.is_approved())', t);
+    -- (select …)로 감싸 쿼리당 한 번만 계산한다(행마다 부르면 별칭 6만 행 검색이 수백 ms)
+    execute format('create policy football_%1$s_select on public.football_%1$s for select to authenticated using ((select public.is_approved()))', t);
   end loop;
 end
 $$;

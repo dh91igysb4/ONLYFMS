@@ -131,7 +131,7 @@
 ### 6.1 공통 규칙
 
 - 테이블 이름은 `football_` 접두사. 열 값 제한은 Postgres enum 대신 `check` 제약으로 둔다(값 추가가 마이그레이션 한 줄로 끝남).
-- RLS를 켜고 `anon`·`authenticated`의 기본 권한을 회수한 뒤 `authenticated`에 `select`만 준다. 정책은 `using (public.is_approved())`. 쓰기 정책은 없다. 적재는 소유자 연결(RLS 우회)로만 한다.
+- RLS를 켜고 `anon`·`authenticated`의 기본 권한을 회수한 뒤 `authenticated`에 `select`만 준다. 정책은 `using ((select public.is_approved()))`(쿼리당 한 번만 계산되게 `select`로 감싼다. 행마다 부르면 별칭 6만 행 검색이 수백 ms). 쓰기 정책은 없다. 적재는 소유자 연결(RLS 우회)로만 한다.
 - 데이터는 공개 지식이고 출제 예정 문제가 들어 있지 않아 승인 사용자에게 전부 읽기를 연다(원 설계 §5와 같음).
 - 확장: `pg_trgm`, `unaccent`를 `extensions` 스키마에 만든다(`create extension if not exists … with schema extensions`).
 
@@ -211,14 +211,19 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 ## 8. 검색 RPC
 
-`public.football_search(q text, kind text, lim int default 10)`
+`public.football_search(p_q text, p_kind text, p_lim int default 10)` — 마이그레이션 `20261102062215_football_search.sql`
 
-- `security invoker`. 승인 사용자가 아니면 `forbidden` 예외(기존 `_require_approved()`, 리더보드 RPC와 같음). `authenticated`에만 실행 권한.
-- `kind`는 `player` 또는 `team`(그 밖이면 `bad_kind` 예외). `lim`은 1~20으로 자른다. `football_norm(q)`가 빈 문자열이면 빈 결과.
+- 인자는 `p_` 접두사(기존 RPC 관례). 반환 열 `kind`와 인자 이름이 같으면 함수를 만들 수 없다. 화면에서는 `supabase.rpc('football_search', { p_q, p_kind })`.
+- `security definer`. 승인 사용자가 아니면 `forbidden` 예외(리더보드 RPC와 같은 코드). `authenticated`에만 실행 권한.
+  - 정의자 권한인 이유: RLS가 걸린 테이블에서는 `LIKE`·trigram `%`(leakproof 아님)를 인덱스 조건으로 쓸 수 없어 늘 전 행을 훑는다(별칭 6만 행에서 110ms → 정의자로 8ms).
+- `p_kind`는 `player` 또는 `team`(그 밖이면 `bad_kind` 예외). `p_lim`은 1~20으로 자르고 null이면 10. `football_norm(p_q)`가 빈 문자열이면 빈 결과.
+- 후보 찾기는 정규화한 입력 `n`의 길이로 나눈다. 내부 함수 `_football_match_long`·`_football_match_short`는 누구에게도 실행 권한이 없다.
+  - 3글자 이상: 부분 일치 또는 trigram 유사도. 함수 안에서만 `enable_seqscan = off`로 trigram 인덱스를 쓰게 한다(플래너가 GIN 비용을 비관적으로 잡아 순차 스캔을 고르기 때문).
+  - 1~2글자: 완전한 trigram이 없어 인덱스가 전 행을 후보로 돌려주므로(1.9초) 순차 스캔 + 부분 일치만(7ms).
 - 일치 규칙: 별칭의 `alias_norm`과 정규화한 입력 `n`을 비교해 엔터티별로 가장 좋은 점수를 쓴다.
-  - 3: 완전 일치, 2: 앞부분 일치, 1: 부분 일치(`like '%n%'`), 0: trigram 유사도 0.3 이상
+  - 3: 완전 일치, 2: 앞부분 일치, 1: 부분 일치(`like '%n%'`, `%`·`_`는 이스케이프), 0: trigram 유사도 0.3 이상(`pg_trgm.similarity_threshold` 기본값)
   - 한글 두세 글자 이름은 trigram 유사도가 낮게 나와서(예: `손흥민`과 `흥민`은 0.17) 부분 일치를 함께 쓴다.
-- 정렬: 점수 내림차순 → 유사도 → 선수는 `popularity` 내림차순, 팀은 `name_en` → `id`.
+- 정렬: 점수 내림차순 → 유사도 내림차순 → 선수는 `popularity` 내림차순, 팀은 `name_en` → `id`. 같은 점수에서는 유사도가 먼저라 짧은 이름이 앞선다.
 - `retired` 엔터티는 뺀다. 팀은 `club`과 `national` 모두 나온다.
 - 반환 열: `id, kind, name_ko, name_en, nation_id, position, birth_year, team_kind`
   - 선수: `position`, `birth_year`(생년만, 생일 전체는 주지 않음), `team_kind`는 null
@@ -242,7 +247,7 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 - 픽스처: `supabase/tests/fixtures/football/*.csv` (선수 10명 안팎: 한글·영문·악센트 이름, 동명이인, 폐기 대상 포함)
 - `scripts/db-test.sh`가 마이그레이션 뒤 `football:load`로 픽스처를 적재하고 pgTAP를 돌린다.
-- `supabase/tests/11_football.test.sql` (pgTAP)
+- `supabase/tests/11_football.test.sql`(스키마·권한), `supabase/tests/12_football_search.test.sql`(검색) (pgTAP)
   - 승인 사용자는 `football_*`를 읽고, 대기·익명 사용자는 0행 또는 권한 오류
   - `authenticated`의 insert·update·delete는 모두 거부
   - `football_search`: `손흥민`·`흥민`·`son heung min`·`Son Heung-min`이 같은 선수를 찾음, `mbappe`가 `Mbappé`를 찾음, `retired` 제외, `kind`·`lim` 처리, 반환 열에 경력 정보 없음, 비승인 `forbidden`
