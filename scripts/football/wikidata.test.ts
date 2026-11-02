@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { LEAGUES } from './leagues.ts'
 import {
-  applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, dateOf,
-  flat, footOf, isYouthOrReserve, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qPlayersAtTeams, teamKind, toCsv,
-  type Row, type Team,
+  applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
+  flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
+  seasonWindows, teamKind, teamStarts, toCsv, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -159,7 +159,9 @@ test('seasons_manual_merge_and_coverage', () => {
     { team_id: 'Q18741', competition_id: PL.id, season: '2017' },
   ])
   expect(merged).toHaveLength(3)
-  expect(coverage(merged, [PL], 2016, 2018)[0].counts).toEqual([2, 1, 0])
+  const [cov] = coverage(merged, [{ ...PL, seasons: 3 }], seasonWindows([{ ...PL, seasons: 3 }], 2018))
+  expect(cov.from).toBe(2016)
+  expect(cov.counts).toEqual([2, 1, 0])
 })
 
 test('applyNamesKo_overrides_and_counts', () => {
@@ -192,4 +194,81 @@ test('applyLeagueNations_sets_club_nation_from_league', () => {
   expect(applyLeagueNations(teams, [{ team_id: 'Q18741', competition_id: PL.id, season: '2020' }, { team_id: 'Q170043', competition_id: PL.id, season: '2020' }], [PL])).toBe(1)
   expect(teams.find((t) => t.id === 'Q18741')!.nation_id).toBe('Q21')
   expect(teams.find((t) => t.id === 'Q170043')!.nation_id).toBe('Q884')
+})
+
+// ---------------------------------------------------------------- 리그별 시즌 창 (설계 2026-11-01 §3.2·§3.3)
+
+const LL = LEAGUES.find((l) => l.id === 'Q324867')! // 라리가
+const CH = LEAGUES.find((l) => l.id === 'Q19510')! // 챔피언십
+
+test('league_table_seasons_and_teams', () => {
+  expect(PL.id).toBe('Q9448')
+  expect(PL.seasons).toBe(15)
+  for (const l of LEAGUES.filter((x) => x.id !== PL.id)) expect(l.seasons).toBe(10)
+  for (const l of LEAGUES) expect(l.teams).toBeGreaterThanOrEqual(10)
+  expect(new Set(LEAGUES.map((l) => l.id)).size).toBe(LEAGUES.length)
+})
+
+test('currentSeason_switches_in_july', () => {
+  expect(currentSeason(new Date(2026, 5, 30))).toBe(2025)
+  expect(currentSeason(new Date(2026, 6, 1))).toBe(2026)
+  expect(currentSeason(new Date(2026, 10, 1))).toBe(2026)
+})
+
+test('seasonWindows_per_league_and_override', () => {
+  const w = seasonWindows([PL, LL], 2026)
+  expect(w.get(PL.id)).toEqual({ from: 2012, to: 2026 })
+  expect(w.get(LL.id)).toEqual({ from: 2017, to: 2026 })
+  const o = seasonWindows([PL, LL], 2026, 3)
+  expect(o.get(PL.id)).toEqual({ from: 2024, to: 2026 })
+  expect(o.get(LL.id)).toEqual({ from: 2024, to: 2026 })
+})
+
+test('qSeasons_uses_each_league_window', () => {
+  const q = qSeasons(seasonWindows([PL, LL], 2026))
+  expect(q).toContain('(wd:Q9448 2012 2026)')
+  expect(q).toContain('(wd:Q324867 2017 2026)')
+  expect(q).toContain('YEAR(?start) >= ?from')
+})
+
+test('teamStarts_earliest_window_of_its_leagues', () => {
+  const w = seasonWindows([PL, CH], 2026)
+  const tc = [
+    { team_id: 'Qa', competition_id: PL.id, season: '2013' }, { team_id: 'Qa', competition_id: CH.id, season: '2024' }, // EPL 시절이 있는 팀
+    { team_id: 'Qb', competition_id: CH.id, season: '2020' }, // 챔피언십만
+    { team_id: 'Qc', competition_id: PL.id, season: '2010' }, // 창 밖 기록만
+  ]
+  const s = teamStarts(tc, [{ league: PL.id, team: 'Qd' }, { league: CH.id, team: 'Qb' }], w)
+  expect(s.get('Qa')).toBe(2012)
+  expect(s.get('Qb')).toBe(2017)
+  expect(s.has('Qc')).toBe(false)
+  expect(s.get('Qd')).toBe(2012) // P118로만 잡힌 EPL 클럽
+  expect([...s.keys()]).toEqual(['Qa', 'Qb', 'Qd'])
+})
+
+test('coverage_warns_below_league_team_count', () => {
+  const small = { ...LL, id: 'Qk', teams: 12, seasons: 2 }
+  const big = { ...PL, seasons: 2 }
+  const rows = (comp: string, season: number, n: number) => Array.from({ length: n }, (_, i) => ({ team_id: `Q${comp}${season}${i}`, competition_id: comp, season: String(season) }))
+  const tc = [...rows('Qk', 2025, 12), ...rows('Qk', 2026, 11), ...rows(PL.id, 2025, 20), ...rows(PL.id, 2026, 19)]
+  const [k, p] = coverage(tc, [small, big], seasonWindows([small, big], 2026))
+  expect(k.counts).toEqual([12, 11])
+  expect(k.warn).toEqual([false, true])
+  expect(p.warn).toEqual([false, true])
+  const full = coverage([], LEAGUES, seasonWindows(LEAGUES, 2026))
+  expect(full.find((c) => c.league.id === PL.id)!.counts).toHaveLength(15)
+  expect(full.find((c) => c.league.id === LL.id)!.counts).toHaveLength(10)
+})
+
+test('mergeLegends_dedupes_and_drops_non_qids', () => {
+  const r = mergeLegends(['Q2', 'Q1'], [{ player_id: 'Q3', note: '앙리' }, { player_id: 'Q1', note: '' }, { player_id: 'x-abc', note: '' }, { player_id: ' Q4 ', note: '' }, { player_id: 'Q3', note: '' }])
+  expect(r.ids).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
+  expect(r.added).toEqual(['Q3', 'Q4'])
+  expect(r.invalid).toEqual(['x-abc'])
+})
+
+test('qOccupation_checks_footballer', () => {
+  const q = qOccupation(['Q1487', 'Q11571'])
+  expect(q).toContain('wd:Q937857')
+  expect(q).toContain('wd:Q1487 wd:Q11571')
 })

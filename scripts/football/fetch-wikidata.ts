@@ -1,7 +1,10 @@
 // 위키데이터에서 단계 1 데이터(선수·팀·국가·경력·국가대표·수상)를 받아 data/football/*.csv로 쓴다.
 // 설계 docs/superpowers/specs/2026-10-31-football-data-design.md §4·§8. 사용법은 data/football/README.md.
 //
-//   npm run football:fetch -- [--from 2016] [--to 2025] [--leagues Q9448,Q19510] [--limit-teams 5] [--no-cache]
+//   npm run football:fetch -- [--to 2026] [--seasons 3] [--leagues Q9448,Q19510] [--limit-teams 5] [--no-cache]
+//
+// 리그마다 최근 seasons 시즌(leagues.ts, 프리미어리그 15·나머지 10)을 받는다. --seasons는 모든 리그를 같은 수로 바꾼다(시험용).
+// manual/legends.csv의 선수(범위 밖 레전드)를 더한다. 설계 docs/superpowers/specs/2026-11-01-football-data-layer-design.md §3·§4.
 //
 // 위키데이터 공식 질의 서비스(query.wikidata.org)만 쓴다. 한 번에 한 요청, 요청 사이 1초 간격.
 // 응답은 .cache/wikidata/에 보관해 중간에 멈춰도 다시 돌리면 이어서 진행한다.
@@ -11,8 +14,8 @@ import { join } from 'node:path'
 import { LEAGUES, type League } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, cmp, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
-  coverage, flat, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qPlayerDetails, qPlayersAtTeams,
-  qSeasons, qSpells, qTeams, toCsv, type Binding, type Row, type Team,
+  coverage, currentSeason, flat, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
+  qPlayersAtTeams, qSeasons, qSpells, qTeams, seasonWindows, teamStarts, toCsv, type Binding, type Row, type Team, type Window,
 } from './wikidata.ts'
 
 const ENDPOINT = 'https://query.wikidata.org/sparql'
@@ -23,16 +26,17 @@ const UA = process.env.WIKIDATA_UA ?? 'ONLYFMS-data/0.1 (https://github.com/dh91
 function args() {
   const a = process.argv.slice(2)
   const get = (k: string) => { const i = a.indexOf(`--${k}`); return i >= 0 ? a[i + 1] : undefined }
-  const now = new Date()
-  const current = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
-  const to = Number(get('to') ?? current)
-  const from = Number(get('from') ?? to - 9)
+  if (a.includes('--from')) throw new Error('--from은 없어졌습니다. 리그별 시즌 수는 leagues.ts, 모든 리그를 같은 수로 바꾸려면 --seasons N')
+  const to = Number(get('to') ?? currentSeason(new Date()))
+  const seasons = get('seasons')
+  const override = seasons === undefined ? undefined : Number(seasons)
+  if (override !== undefined && !(Number.isInteger(override) && override >= 1)) throw new Error(`--seasons는 1 이상의 정수: ${seasons}`)
   const only = get('leagues')?.split(',')
   const leagues = only ? LEAGUES.filter((l) => only.includes(l.id)) : LEAGUES
   if (only && leagues.length !== only.length) throw new Error(`모르는 리그: ${only.filter((q) => !LEAGUES.some((l) => l.id === q)).join(', ')} (scripts/football/leagues.ts)`)
   const limit = get('limit-teams')
   return {
-    from, to, leagues,
+    windows: seasonWindows(leagues, to, override), leagues,
     limitTeams: limit ? Number(limit) : Infinity,
     out: get('out') ?? 'data/football',
     cacheDir: a.includes('--no-cache') ? null : (get('cache') ?? '.cache/wikidata'),
@@ -99,10 +103,11 @@ function readManual(dir: string, name: string): Row[] {
   return existsSync(f) ? parseCsv(readFileSync(f, 'utf8')) : []
 }
 
-function printCoverage(tc: ReturnType<typeof mergeTeamComps>, leagues: readonly League[], from: number, to: number) {
-  log(`\n시즌별 참가팀 수 (${from}~${to}, 빈칸·16 미만은 data/football/manual/team_competitions.csv로 채운다)`)
-  for (const { league, counts } of coverage(tc, leagues, from, to)) {
-    log(`  ${league.name_ko.padEnd(10)} ${counts.map((n) => (n === 0 ? ' --' : String(n).padStart(3)) + (n > 0 && n < 16 ? '!' : ' ')).join('')}`)
+function printCoverage(tc: ReturnType<typeof mergeTeamComps>, leagues: readonly League[], windows: ReadonlyMap<string, Window>) {
+  log(`\n시즌별 참가팀 수 (빈칸 --·정원 미만 !는 data/football/manual/team_competitions.csv로 채운다)`)
+  for (const { league, from, counts, warn } of coverage(tc, leagues, windows)) {
+    const cells = counts.map((n, i) => (n === 0 ? ' --' : String(n).padStart(3)) + (n > 0 && warn[i] ? '!' : ' ')).join('')
+    log(`  ${league.name_ko.padEnd(10)} ${from}~${from + counts.length - 1} (정원 ${league.teams}) ${cells}`)
   }
 }
 
@@ -110,23 +115,41 @@ async function main() {
   const o = args()
   if (o.cacheDir) mkdirSync(o.cacheDir, { recursive: true })
   mkdirSync(o.out, { recursive: true })
-  log(`리그 ${o.leagues.length}개, 시즌 ${o.from}~${o.to}`)
+  const to = Math.max(...[...o.windows.values()].map((w) => w.to))
+  log(`리그 ${o.leagues.length}개, 시즌 ${o.leagues.map((l) => `${l.name_ko} ${o.windows.get(l.id)!.from}~`).join(', ')} ~${to}`)
 
-  // 1. 시즌별 참가팀·우승
-  const seasons = buildSeasons(await query(qSeasons(o.leagues, o.from, o.to), o.cacheDir))
+  // 1. 시즌별 참가팀·우승 (리그마다 자기 창)
+  const seasons = buildSeasons(await query(qSeasons(o.windows), o.cacheDir))
   const leagueIds = new Set(o.leagues.map((l) => l.id))
   const teamComps = mergeTeamComps(seasons.teamComps, readManual(o.out, 'team_competitions.csv').filter((r) => leagueIds.has(r.competition_id)))
-  printCoverage(teamComps, o.leagues, o.from, o.to)
+  printCoverage(teamComps, o.leagues, o.windows)
 
-  // 2. 선수를 찾을 팀: 시즌 참가팀 + 지금 리그 소속 클럽
+  // 2. 선수를 찾을 팀과 팀별 시작 연도: 창 안 시즌 참가팀 + 지금 리그 소속 클럽
   const clubs = await query(qLeagueClubs(o.leagues), o.cacheDir)
-  let seedTeams = [...new Set([...teamComps.map((t) => t.team_id), ...clubs.map((r) => r.team)])].sort()
-  if (seedTeams.length > o.limitTeams) seedTeams = seedTeams.slice(0, o.limitTeams)
+  let starts = teamStarts(teamComps, clubs.map((r) => ({ league: r.league, team: r.team })), o.windows)
+  if (starts.size > o.limitTeams) starts = new Map([...starts].slice(0, o.limitTeams))
+  const seedTeams = [...starts.keys()]
   log(`\n대상 팀 ${seedTeams.length}개`)
 
-  // 3. 기간 안에 그 팀에 있었던 선수
-  const playerIds = [...new Set((await batched('선수 찾기', seedTeams, 20, (c) => qPlayersAtTeams(c, o.from, o.to), o.cacheDir)).map((r) => r.p))]
-  log(`선수 ${playerIds.length}명`)
+  // 3. 팀별 시작 연도부터 지금까지 그 팀에 있었던 선수 (시작 연도가 같은 팀끼리 묶어 질의)
+  const byStart = new Map<number, string[]>()
+  for (const [team, from] of starts) byStart.set(from, [...(byStart.get(from) ?? []), team])
+  const found = new Set<string>()
+  for (const [from, teams] of [...byStart].sort((a, b) => a[0] - b[0])) {
+    for (const r of await batched(`선수 찾기 (${from}~)`, teams, 20, (c) => qPlayersAtTeams(c, from, to), o.cacheDir)) found.add(r.p)
+  }
+  log(`선수 ${found.size}명`)
+
+  // 3-1. 레전드 수동 명단: 축구 선수인지 확인하고 더한다
+  const legends = mergeLegends([...found], readManual(o.out, 'legends.csv'))
+  for (const id of legends.invalid) log(`  레전드 명단: QID가 아님, 건너뜀: ${id}`)
+  let legendOk = new Set<string>()
+  if (legends.added.length) {
+    legendOk = new Set((await batched('레전드 확인', legends.added, 200, qOccupation, o.cacheDir)).map((r) => r.p))
+    for (const id of legends.added.filter((x) => !legendOk.has(x))) log(`  레전드 명단: 축구 선수가 아님, 뺌: ${id}`)
+  }
+  const playerIds = [...found, ...legends.added.filter((x) => legendOk.has(x))].sort()
+  log(`레전드 ${legendOk.size}명 추가 (제외 ${legends.added.length - legendOk.size + legends.invalid.length}명), 합계 ${playerIds.length}명`)
 
   // 4. 선수의 전체 경력과 그 경력에 나오는 팀
   const spellRows = await batched('경력', playerIds, 100, qSpells, o.cacheDir)

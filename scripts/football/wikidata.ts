@@ -38,12 +38,13 @@ const day = (year: number, md: string) => `"${year}-${md}T00:00:00Z"^^xsd:dateTi
 
 // ---------------------------------------------------------------- 질의
 
-/** 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 시즌은 시작일(P580)의 연도 */
-export function qSeasons(leagues: readonly League[], from: number, to: number): string {
+/** 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 시즌은 시작일(P580)의 연도이며, 리그마다 자기 창 안의 시즌만 받는다 */
+export function qSeasons(windows: ReadonlyMap<string, Window>): string {
+  const rows = [...windows].map(([id, w]) => `(wd:${id} ${w.from} ${w.to})`).join(' ')
   return `SELECT ?league ?season ?start ?team ?winner WHERE {
-  VALUES ?league { ${ids(leagues.map((l) => l.id))} }
+  VALUES (?league ?from ?to) { ${rows} }
   ?season wdt:P3450 ?league ; wdt:P580 ?start .
-  FILTER(?start >= ${day(from, '01-01')} && ?start <= ${day(to, '12-31')})
+  FILTER(YEAR(?start) >= ?from && YEAR(?start) <= ?to)
   OPTIONAL { ?season wdt:P1923 ?team . ?team wdt:P31/wdt:P279* wd:${CLUB} }
   OPTIONAL { ?season wdt:P1346 ?winner }
 }`
@@ -73,6 +74,14 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
   FILTER(!BOUND(?s) || ?s <= ${day(to + 1, '06-30')})
   OPTIONAL { ?p wdt:P569 ?b }
   FILTER(!BOUND(?b) || ?b >= ${day(from - 40, '01-01')})
+}`
+}
+
+/** 레전드 명단 확인: 직업이 축구 선수(P106)인 항목만 돌려준다 */
+export function qOccupation(players: readonly string[]): string {
+  return `SELECT DISTINCT ?p WHERE {
+  VALUES ?p { ${ids(players)} }
+  ?p wdt:P106 wd:${FOOTBALLER} .
 }`
 }
 
@@ -147,6 +156,54 @@ export function qAwards(players: readonly string[]): string {
   ?p p:P166 ?st . ?st ps:P166 ?award ; pq:P585 ?when .
   ?award wdt:P641 wd:${FOOTBALL} .
 }`
+}
+
+// ---------------------------------------------------------------- 시즌 창 (설계 2026-11-01 §3.2·§3.3)
+
+/** 수집할 시즌 범위(시작 연도 기준, 양끝 포함) */
+export type Window = { from: number; to: number }
+
+/** 현재 시즌: 7월 이후면 올해, 아니면 작년 (시즌 = 시작 연도) */
+export function currentSeason(now: Date): number {
+  return now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+}
+
+/** 리그별 창 [to − seasons + 1, to]. override가 있으면 모든 리그를 그 시즌 수로 */
+export function seasonWindows(leagues: readonly League[], to: number, override?: number): Map<string, Window> {
+  return new Map(leagues.map((l) => [l.id, { from: to - (override ?? l.seasons) + 1, to }]))
+}
+
+/**
+ * 팀별 선수 수집 시작 연도: 창 안에서 그 팀이 참가한 리그들, 그리고 지금 소속(P118)으로 적힌 리그들의
+ * 창 시작 중 가장 이른 해. 창 밖 참가 기록만 있는 팀은 빠진다. 키는 QID 순.
+ */
+export function teamStarts(teamComps: readonly TeamCompetition[], leagueClubs: readonly { league: string; team: string }[], windows: ReadonlyMap<string, Window>): Map<string, number> {
+  const m = new Map<string, number>()
+  const add = (team: string, from: number) => { const cur = m.get(team); if (cur === undefined || from < cur) m.set(team, from) }
+  for (const t of teamComps) {
+    const w = windows.get(t.competition_id)
+    const season = Number(t.season)
+    if (w && season >= w.from && season <= w.to) add(t.team_id, w.from)
+  }
+  for (const r of leagueClubs) {
+    const w = windows.get(r.league)
+    if (w && r.team) add(r.team, w.from)
+  }
+  return new Map([...m].sort((a, b) => cmp(a[0], b[0])))
+}
+
+/** 레전드 수동 명단(manual/legends.csv)을 찾은 선수에 더한다. QID가 아닌 값은 invalid로 돌려준다 */
+export function mergeLegends(found: readonly string[], legends: readonly Row[]): { ids: string[]; added: string[]; invalid: string[] } {
+  const have = new Set(found)
+  const added = new Set<string>(), invalid = new Set<string>()
+  for (const r of legends) {
+    const id = (r.player_id ?? '').trim()
+    if (!id) continue
+    if (!/^Q\d+$/.test(id)) { invalid.add(id); continue }
+    if (!have.has(id)) added.add(id)
+  }
+  const sort = (xs: Iterable<string>) => [...xs].sort(cmp)
+  return { ids: sort(new Set([...found, ...added])), added: sort(added), invalid: sort(invalid) }
 }
 
 // ---------------------------------------------------------------- 값 해석
@@ -434,13 +491,14 @@ export function applyLeagueNations(teams: readonly Team[], teamComps: readonly T
   return n
 }
 
-/** 리그·시즌별 참가팀 수. 비었거나 16팀 미만인 칸이 직접 채울 대상이다 */
-export function coverage(teamComps: readonly TeamCompetition[], leagues: readonly League[], from: number, to: number): { league: League; counts: number[] }[] {
-  return leagues.map((league) => ({
-    league,
-    counts: Array.from({ length: to - from + 1 }, (_, i) =>
-      teamComps.filter((t) => t.competition_id === league.id && Number(t.season) === from + i).length),
-  }))
+/** 리그별 창 안의 시즌별 참가팀 수. 비었거나 리그 정원(teams)보다 적은 칸(warn)이 직접 채울 대상이다 */
+export function coverage(teamComps: readonly TeamCompetition[], leagues: readonly League[], windows: ReadonlyMap<string, Window>): { league: League; from: number; counts: number[]; warn: boolean[] }[] {
+  return leagues.map((league) => {
+    const w = windows.get(league.id) ?? { from: 0, to: -1 }
+    const counts = Array.from({ length: w.to - w.from + 1 }, (_, i) =>
+      teamComps.filter((t) => t.competition_id === league.id && Number(t.season) === w.from + i).length)
+    return { league, from: w.from, counts, warn: counts.map((n) => n < league.teams) }
+  })
 }
 
 // ---------------------------------------------------------------- CSV

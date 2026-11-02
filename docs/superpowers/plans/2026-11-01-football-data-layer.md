@@ -46,13 +46,13 @@
   - `currentSeason(now: Date): number`: 7월(월 인덱스 6) 이후면 올해, 아니면 작년. `fetch-wikidata.ts`의 기존 계산을 옮긴다.
   - `seasonWindows(leagues: readonly League[], to: number, override?: number): Map<string, { from: number; to: number }>`: `from = to − (override ?? l.seasons) + 1`
   - `qSeasons(windows: ReadonlyMap<string, {from,to}>): string`: `VALUES (?league ?from ?to) { (wd:Q9448 2012 2026) … }`, `FILTER(YEAR(?start) >= ?from && YEAR(?start) <= ?to)`. 나머지 패턴은 기존과 같다.
-  - `teamStarts(teamComps: readonly TeamCompetition[], leagueClubs: readonly { league: string; team: string }[], windows): Map<string, number>`: 팀별로 창 안의 참가 기록이 있는 리그들의 `from` 중 최솟값, 참가 기록이 없고 `P118`로만 잡힌 팀은 그 리그의 `from`(여러 리그면 최솟값).
+  - `teamStarts(teamComps: readonly TeamCompetition[], leagueClubs: readonly { league: string; team: string }[], windows): Map<string, number>`: 팀별로 창 안의 참가 기록이 있는 리그들과 `P118` 리그들의 `from` 중 최솟값(설계 §3.3의 2). 창 밖 기록만 있는 팀은 제외.
   - `coverage(teamComps, leagues, windows)`: 리그마다 자기 창의 시즌별 팀 수를 내고, 0이거나 `league.teams`보다 적은 칸에 경고 표시를 한다. 반환 `{ league, from, counts }[]`.
   - `mergeLegends(found: readonly string[], legends: readonly Row[]): { ids: string[]; added: string[] }`: QID 형식(`^Q\d+$`)이 아닌 값은 버리고, 정렬된 합집합을 만든다.
   - `qOccupation(players)`: 레전드가 축구 선수(`P106 = Q937857`)인지 확인하는 질의. 결과에 없는 레전드는 경고 후 제외한다.
 - `fetch-wikidata.ts` 인자: `--to`, `--seasons N`(모든 리그 덮어쓰기), `--leagues`, `--limit-teams`, `--out`, `--cache`, `--no-cache`. `--from`은 없앤다(넘기면 "`--seasons`를 쓰세요" 오류). 선수 찾기는 `teamStarts`를 시작 연도별로 묶어 `qPlayersAtTeams(chunk, start, to)`를 호출한다. 3단계 뒤에 `manual/legends.csv`를 병합하고 직업을 확인한다.
 
-- [ ] **Step 1: K리그1 QID 확인 (네트워크 필요, 사람 또는 허용된 환경)** — `query.wikidata.org`에서 아래 질의를 돌려 현재 리그 항목과 시즌 항목(`P3450`)이 붙은 항목을 확인한다. 옛 이름 항목(K리그 클래식)이 따로 있으면 시즌이 어느 쪽에 붙는지 본다. 확인한 QID를 이 계획과 설계 §3.1 표에 적는다. 네트워크가 없으면 여기서 멈추고 사람에게 이 질의 결과를 요청한다(QID를 추측하지 않는다).
+- [ ] **Step 1: K리그1 QID 확인 (네트워크 필요, 사람 또는 허용된 환경)** — *2026-11-02: 클라우드 환경에서 위키데이터 차단으로 보류. K리그1 없이 나머지 구현 완료, QID를 받으면 `leagues.ts`에 한 줄 추가* — `query.wikidata.org`에서 아래 질의를 돌려 현재 리그 항목과 시즌 항목(`P3450`)이 붙은 항목을 확인한다. 옛 이름 항목(K리그 클래식)이 따로 있으면 시즌이 어느 쪽에 붙는지 본다. 확인한 QID를 이 계획과 설계 §3.1 표에 적는다. 네트워크가 없으면 여기서 멈추고 사람에게 이 질의 결과를 요청한다(QID를 추측하지 않는다).
   ```sparql
   SELECT ?league ?leagueLabel (COUNT(?season) AS ?n) WHERE {
     ?league wdt:P31/wdt:P279* wd:Q15991303 ; wdt:P17 wd:Q884 .
@@ -60,7 +60,7 @@
     SERVICE wikibase:label { bd:serviceParam wikibase:language "ko,en". }
   } GROUP BY ?league ?leagueLabel ORDER BY DESC(?n)
   ```
-- [ ] **Step 2: 테스트 추가** (`wikidata.test.ts`)
+- [x] **Step 2: 테스트 추가** (`wikidata.test.ts`)
   - `currentSeason`: 2026-06-30 → 2025, 2026-07-01 → 2026, 2026-11-01 → 2026
   - `seasonWindows`: 프리미어리그 15 → `{2012, 2026}`, 라리가 → `{2017, 2026}`, `override = 3` → 모두 `{2024, 2026}`
   - `qSeasons`: 리그별 VALUES 줄에 각자의 창이 들어감
@@ -68,9 +68,9 @@
   - `coverage`: K리그1 12팀 시즌은 경고 없음, 프리미어리그 19팀 시즌은 경고, 리그별 `counts` 길이가 창 길이(15·10)
   - `mergeLegends`: 중복·비QID 제거, `added`는 새로 더해진 것만
   - `qOccupation` 문장에 `Q937857`과 입력 QID가 들어감
-- [ ] **Step 3: 실패 확인** — `npx vitest run scripts/football/wikidata.test.ts`
-- [ ] **Step 4: 구현** — `leagues.ts`(Step 1의 K리그1 포함), `wikidata.ts`, `fetch-wikidata.ts`. 끝 출력에 "레전드 n명 추가, 제외 m명(축구 선수 아님)"을 보탠다. `legends.csv`는 헤더만 만든다.
-- [ ] **Step 5: 통과 확인** — `npx vitest run scripts/football && npm run typecheck`. 네트워크가 되는 환경이면 시험 수집 `npm run football:fetch -- --leagues Q9448 --limit-teams 5 --out /tmp/fb`가 끝나는지 확인한다(결과는 커밋하지 않음).
+- [x] **Step 3: 실패 확인** — `npx vitest run scripts/football/wikidata.test.ts`
+- [x] **Step 4: 구현** — `leagues.ts`(Step 1의 K리그1 포함), `wikidata.ts`, `fetch-wikidata.ts`. 끝 출력에 "레전드 n명 추가, 제외 m명(축구 선수 아님)"을 보탠다. `legends.csv`는 헤더만 만든다.
+- [x] **Step 5: 통과 확인** — `npx vitest run scripts/football && npm run typecheck`. 네트워크가 되는 환경이면 시험 수집 `npm run football:fetch -- --leagues Q9448 --limit-teams 5 --out /tmp/fb`가 끝나는지 확인한다(결과는 커밋하지 않음).
 - [ ] **Step 6: 커밋** — `feat: 축구 수집기 리그별 시즌 창·K리그1·레전드 명단`
 
 ---
