@@ -248,3 +248,15 @@ select.input { padding-right: 8px; }
 
   .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 }
+
+/* 헤더 로고 옆 글자 회전 (Brand.tsx). 두 줄을 같은 칸에 겹쳐 위로 밀어 올린다 */
+.brand-ticker { display: grid; align-items: center; overflow: hidden; height: 28px; }
+.brand-ticker > .app-wordmark { grid-area: 1 / 1; white-space: nowrap; }
+.app-wordmark--note { font-size: 15px; letter-spacing: 0; }
+.app-wordmark.is-entering { animation: brand-enter 400ms ease-out both; }
+.app-wordmark.is-leaving { animation: brand-leave 400ms ease-in both; }
+@keyframes brand-enter { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes brand-leave { from { transform: none; opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-wordmark.is-entering, .app-wordmark.is-leaving { animation: none; }
+}

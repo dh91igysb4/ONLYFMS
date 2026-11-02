@@ -32,3 +32,8 @@ export function kstWeekStart(date: string): string {
   const sinceMonday = (dow + 6) % 7
   return ymd(new Date(ms - sinceMonday * DAY_MS))
 }
+
+// date('YYYY-MM-DD')까지 남은 KST 달력일. 당일 0, 지나면 음수
+export function kstDaysUntil(date: string, nowMs: number): number {
+  return Math.round((dateToUtcMidnight(date) - dateToUtcMidnight(kstDate(nowMs))) / DAY_MS)
+}
