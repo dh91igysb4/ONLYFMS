@@ -4,7 +4,7 @@ import { rngFromSeed } from '../../shared/rng.ts'
 import type { Ctx } from '../types.ts'
 import { CELL, H, LH, LW, R, TOTAL_TICKS, W, ZONE_COUNT } from './constants.ts'
 import { generatePuzzle, type Puzzle } from './generate.ts'
-import { toothCells, toothRows, TOOTH_WIDTHS } from './mask.ts'
+import { isTooth, toothCells, ZONE_SHAPES } from './mask.ts'
 import { logic, MAX_SAMPLES, type Action, type State } from './logic.ts'
 
 export type BotKind = 'aim' | 'sweep' | 'scribble' | 'still'
@@ -23,8 +23,16 @@ const BRUSH: readonly (readonly [number, number])[] = (() => {
 const clampX = (x: number) => Math.min(LW - 1, Math.max(0, x))
 const clampY = (y: number) => Math.min(LH - 1, Math.max(0, y))
 const center = (i: number): [number, number] => [(i % W) * CELL + 5, Math.floor(i / W) * CELL + 5]
-const TOOTH_COL_MIN = 1
-const TOOTH_COL_MAX = TOOTH_WIDTHS.reduce((a, b) => a + b, 0)
+
+/** 구역 치아 칸의 행·열 범위 [r0, r1, c0, c1] (toothCells에서 구한다) */
+function toothBounds(zone: number): [number, number, number, number] {
+  let r0 = H, r1 = -1, c0 = W, c1 = -1
+  for (const i of toothCells(zone)) {
+    const r = Math.floor(i / W), c = i % W
+    r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c)
+  }
+  return [r0, r1, c0, c1]
+}
 
 /** 펜 위치. 목표를 향해 축마다 ±min(3, |차이|)씩, 이동이 0이면 x로 ±3 짧은 왕복 */
 class Pen {
@@ -107,11 +115,11 @@ function playAim(run: Runner): void {
   }
 }
 
-/** 치아 행 범위를 7칸 간격 줄로 나눈 왕복 경로 (줄 중심 행, 마지막 줄은 범위 안으로) */
+/** 치아 칸 행 범위를 7칸 간격 줄로 나눈 왕복 경로 (줄 중심 행, 마지막 줄은 범위 안으로) */
 function sweepWaypoints(zone: number): [number, number][] {
-  const [r0, r1] = toothRows(zone)
+  const [r0, r1, c0, c1] = toothBounds(zone)
   const lines = Math.ceil((r1 - r0 + 1) / (2 * R + 1))
-  const xl = TOOTH_COL_MIN * CELL + 5, xr = TOOTH_COL_MAX * CELL + 5
+  const xl = c0 * CELL + 5, xr = c1 * CELL + 5
   const pts: [number, number][] = []
   for (let k = 0; k < lines; k++) {
     const row = Math.min(r0 + R + (2 * R + 1) * k, r1 - R)
@@ -148,7 +156,7 @@ function playSweep(run: Runner): void {
 }
 
 function playScribble(run: Runner, rng: () => number): void {
-  const [r0, r1] = toothRows(0)
+  const [r0, r1] = toothBounds(0)
   const x0 = LW / 2 - 12
   let flip = 0
   while (run.ticksLeft > 0) {
@@ -163,9 +171,18 @@ function playScribble(run: Runner, rng: () => number): void {
   }
 }
 
+/** 가만히 봇이 누르는 점: 구역 0 오른쪽 가운데 앞니의 중심 */
+export const STILL_POINT: readonly [number, number] = (() => {
+  const teeth = ZONE_SHAPES[0].teeth
+  const b = teeth[teeth.length / 2]
+  const p: [number, number] = [b[1], b[2]]
+  if (!isTooth(0, Math.floor(p[1] / CELL) * W + Math.floor(p[0] / CELL))) throw new Error('still point not on a tooth')
+  return p
+})()
+
 function playStill(run: Runner): void {
   const s: number[] = []
-  for (let k = 0; k < MAX_SAMPLES; k++) s.push(LW / 2, LH / 2)
+  for (let k = 0; k < MAX_SAMPLES; k++) s.push(STILL_POINT[0], STILL_POINT[1])
   while (run.ticksLeft > 0) run.brush(s)
 }
 

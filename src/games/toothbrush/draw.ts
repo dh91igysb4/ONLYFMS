@@ -1,11 +1,10 @@
 // 양치 캔버스 그리기 (순수 그리기 도우미). 캔버스 안의 색은 테마와 상관없는 고정색이다
 // (CLAUDE.md 금지 사항의 예외: 양치 캔버스 내부 색).
 import { CELL, H, LH, LW, MAX_THICK, R, W } from './constants.ts'
-import { gumRows, isTooth } from './mask.ts'
+import { isTooth } from './mask.ts'
 
 const MOUTH = '#3b1e28'
 const TOOTH = '#f4f1ea'
-const GUM = '#d77a7a'
 const BRUSH = 'rgba(120, 200, 255, 0.9)'
 
 /** 두께 → 플라그 불투명도. 얇은 플라그도 보이게 바닥값을 둔다. */
@@ -22,11 +21,6 @@ export function drawZone(
   g.clearRect(0, 0, LW, LH)
   g.fillStyle = MOUTH
   g.fillRect(0, 0, LW, LH)
-  const gum = gumRows(zone)
-  if (gum) {
-    g.fillStyle = GUM
-    g.fillRect(0, gum[0] * CELL, LW, (gum[1] - gum[0] + 1) * CELL)
-  }
   for (let r = 0; r < H; r++) {
     for (let c = 0; c < W; c++) {
       const i = r * W + c

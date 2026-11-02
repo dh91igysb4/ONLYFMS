@@ -40,9 +40,9 @@ const b = (...pts: [number, number][]) => ({ type: 'b' as const, s: pts.flat() }
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const idx = (c: number, r: number) => r * W + c
 
-// 구역 0 치아 한가운데 칸 (20, 16)의 중심
+// 구역 0 왼쪽 가운데 앞니 안의 칸 (20, 14)의 중심 (칫솔 29칸이 모두 치아 칸)
 const X = 205
-const Y = 165
+const Y = 145
 
 /** 칸 (cx, cy) 칫솔 범위 칸 목록 (격자 안만) */
 function footprint(cx: number, cy: number): number[] {
@@ -56,7 +56,7 @@ function footprint(cx: number, cy: number): number[] {
   return out
 }
 
-/** 1틱 닦고 구역 1로 옮긴 뒤 대기 30틱을 (X, Y)에서 끝낸 상태 */
+/** 1틱 닦고 구역 1로 옮긴 뒤 대기 30틱을 (X, Y)에서 끝낸 상태 (구역 1 확인은 격자 전체 퍼즐로) */
 function afterCooldownAtCenter(p: Puzzle): State {
   const run = runner(p)
   let s = run(logic.initState(p, ctx), b([X, Y]))
@@ -74,7 +74,7 @@ describe('toothbrush logic', () => {
     const s0 = logic.initState(p, ctx)
     const s1 = run(s0, b([X, Y]))
     const s2 = run(s1, b([X + 3, Y])) // d² = 9
-    const fp = footprint(20, 16)
+    const fp = footprint(20, 14)
     expect(fp.length).toBe(29)
     for (const i of fp) {
       expect(s1.zones[0][i]).toBe(100 - DEC_SLOW)
@@ -130,7 +130,7 @@ describe('toothbrush logic', () => {
   })
 
   it('cooldown_updates_prev_without_cleaning', () => {
-    const p = toothPuzzle(100)
+    const p = fullPuzzle(100)
     const run = runner(p)
     let s = run(logic.initState(p, ctx), b([X, Y]))
     s = run(s, { type: 'z', zone: 1 })
@@ -150,7 +150,7 @@ describe('toothbrush logic', () => {
     // 31번째 틱: 대기 마지막 틱의 prev 기준 d² = 4 → 최적
     const t31 = run(end, b([X + 2, Y]))
     expect(t31.removed - end.removed).toBe(29 * DEC_OPT)
-    for (const i of footprint(20, 16)) expect(t31.zones[1][i]).toBe(100 - DEC_OPT)
+    for (const i of footprint(20, 14)) expect(t31.zones[1][i]).toBe(100 - DEC_OPT)
   })
 
   it('clips_at_grid_edge', () => {
@@ -165,11 +165,11 @@ describe('toothbrush logic', () => {
   })
 
   it('never_negative', () => {
-    const p = toothPuzzle(2)
+    const p = fullPuzzle(2)
     const run = runner(p)
     const s = afterCooldownAtCenter(p)
     const t = run(s, b([X + 3, Y])) // 최적
-    for (const i of footprint(20, 16)) expect(t.zones[1][i]).toBe(0)
+    for (const i of footprint(20, 14)) expect(t.zones[1][i]).toBe(0)
     expect(t.removed - s.removed).toBe(29 * 2)
     expect(Math.min(...t.zones[1])).toBe(0)
   })
@@ -335,7 +335,7 @@ describe('toothbrush logic', () => {
   })
 
   it('contract_basics', () => {
-    expect(logic.version).toBe(1)
+    expect(logic.version).toBe(2)
     const p = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(4)), {})
     expect(p).toEqual(generatePuzzle(rngFromSeed(new Uint8Array(16).fill(4))))
     expect(logic.puzzleKey(p)).toBe(puzzleKey(p))
