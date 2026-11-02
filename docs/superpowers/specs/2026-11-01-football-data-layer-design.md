@@ -158,7 +158,7 @@
 
 **football_team_competitions**: `team_id text references football_teams`, `competition_id text references football_competitions`, `season int`, pk 세 열
 
-**football_aliases**: `entity_id text not null`, `alias text not null`, `lang text`, `alias_norm text generated always as (public.football_norm(alias)) stored`, pk `(entity_id, alias)`. `entity_id`는 선수·팀 어느 쪽이든 될 수 있어 FK를 걸지 않고, CSV 검사(§9.1)가 존재를 확인한다.
+**football_aliases**: `entity_id text not null`, `alias text not null`, `lang text`, `alias_norm text generated always as (public.football_norm(alias)) stored`, `alias_words text[] generated always as (public.football_words(alias)) stored`(이름을 공백·하이픈으로 나눠 각각 정규화, 성만으로 찾기용), pk `(entity_id, alias)`. `entity_id`는 선수·팀 어느 쪽이든 될 수 있어 FK를 걸지 않고, CSV 검사(§9.1)가 존재를 확인한다.
 
 **football_external_ids**: `entity_id text not null`, `source text not null`, `external_id text not null`, pk `(source, external_id)`
 
@@ -213,6 +213,7 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 - 대상 팀은 11개 리그 × 창 안 시즌 참가팀으로 약 400~500개, 선수는 2만~3만 명, 경력은 15만~25만 행으로 예상한다.
 - CSV 합계 약 20~30MB, DB는 인덱스 포함 100MB 안쪽으로 무료 등급 한도(500MB) 안이다. 첫 수집 후 실제 값을 이 절에 적는다.
+- **첫 수집 실측(2026-11-02, 데이터 브랜치 `data/football-v1`)**: 선수 13,180명, 팀 5,497개, 국가 201개, 경력 68,913, 국가대표 4,404, 수상·우승 752, 별칭 46,216, 외부 ID 12,739. CSV 합계 9.1MB(최대 `spells.csv` 6.0MB). 로컬 Postgres 16 적재 2.5~3.9초, `football_*` 합계 38MB(경력 17MB, 별칭 13MB). 검색 5~37ms.
 
 ## 8. 검색 RPC
 
@@ -226,9 +227,10 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
   - 3글자 이상: 부분 일치 또는 trigram 유사도. 함수 안에서만 `enable_seqscan = off`로 trigram 인덱스를 쓰게 한다(플래너가 GIN 비용을 비관적으로 잡아 순차 스캔을 고르기 때문).
   - 1~2글자: 완전한 trigram이 없어 인덱스가 전 행을 후보로 돌려주므로(1.9초) 순차 스캔 + 부분 일치만(7ms).
 - 일치 규칙: 별칭의 `alias_norm`과 정규화한 입력 `n`을 비교해 엔터티별로 가장 좋은 점수를 쓴다.
-  - 3: 완전 일치, 2: 앞부분 일치, 1: 부분 일치(`like '%n%'`, `%`·`_`는 이스케이프), 0: trigram 유사도 0.3 이상(`pg_trgm.similarity_threshold` 기본값)
+  - 3: 완전 일치, 2: 앞부분 일치(전체 이름 또는 이름의 한 단어, `alias_words`), 1: 부분 일치(`like '%n%'`, `%`·`_`는 이스케이프), 0: trigram 유사도 0.3 이상(`pg_trgm.similarity_threshold` 기본값)
+  - 단어 앞부분 일치는 실데이터에서 `kane`에 해리 케인보다 케인 퍼디낸드가 앞서(띄어쓰기를 지운 `harrykane`은 부분 일치뿐) 추가했다(2026-11-02).
   - 한글 두세 글자 이름은 trigram 유사도가 낮게 나와서(예: `손흥민`과 `흥민`은 0.17) 부분 일치를 함께 쓴다.
-- 정렬: 점수 내림차순 → 유사도 내림차순 → 선수는 `popularity` 내림차순, 팀은 `name_en` → `id`. 같은 점수에서는 유사도가 먼저라 짧은 이름이 앞선다.
+- 정렬: 점수 내림차순 → (선수이고 점수 1 이상이면) `popularity` 내림차순 → 유사도 내림차순 → 선수는 `popularity`, 팀은 `name_en` → `id`. 유사도는 짧은 이름이 높게 나와, 처음처럼 유사도를 먼저 보면 실데이터에서 `xavi`에 사비 에르난데스(인지도 100)보다 사비 시몬스·사비 토레스가 앞섰다(2026-11-02). 철자가 비슷한 것만으로 걸린 결과(점수 0)는 유사도를 먼저 본다.
 - `retired` 엔터티는 뺀다. 팀은 `club`과 `national` 모두 나온다.
 - 반환 열: `id, kind, name_ko, name_en, nation_id, position, birth_year, team_kind`
   - 선수: `position`, `birth_year`(생년만, 생일 전체는 주지 않음), `team_kind`는 null
@@ -280,6 +282,7 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 - **경력 누락**: 날짜 없는 구간은 빠진다. 위키데이터에 없는 이적은 직접 입력이나 다음 단계 API-Football로 보완한다.
 - **국적**: 성인 대표팀 출전 → 종목 국적 → 시민권 순이라 이중 국적 선수가 틀릴 수 있다(`manual/` 보정 대상, 필요해지면 `manual/nations.csv`를 추가).
 - **비어 있는 열**: `shirt_number`, `confederation`, 대부분의 `foot`. 클럽 색 비율은 균등 분할이다.
+- **팀 검색 순서**: 팀에는 인지도(`popularity`)가 없어 같은 점수면 `name_en` 순이다. `united`에 맨체스터 유나이티드가 먼저 나오지 않는다. 팀 위키 문서 수를 수집해 인지도를 두는 것은 다음 단계에서 한다.
 - **수상 이름**: `honours`는 개인상의 QID만 들고 있고 상 이름 테이블이 없다. 화면에 상 이름이 필요한 게임에서 추가한다.
 - **한글 이름 표기**: 위키데이터 한국어 라벨을 그대로 쓰고, 없거나 어색하면 `manual/names_ko.csv`로 고친다. 표기 기준(외래어 표기법 vs 중계 관행)은 정하지 않고 리뷰에서 그때그때 판단한다. 검색은 별칭으로 여러 표기를 받는다.
 

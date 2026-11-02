@@ -215,12 +215,15 @@
 - Modify: `data/football/manual/team_competitions.csv`, `data/football/manual/names_ko.csv`, `data/football/manual/legends.csv` (필요한 만큼)
 - Modify: 설계 §7.4 (실제 용량)
 
-- [ ] **Step 1: 전체 수집** — 로컬 PC 또는 위키데이터가 허용된 환경에서 `npm run football:fetch` (40분~1시간 예상). 중간에 끊기면 다시 돌린다(캐시로 이어 감).
+- [x] **Step 1: 전체 수집** — 로컬 PC 또는 위키데이터가 허용된 환경에서 `npm run football:fetch` (40분~1시간 예상). 중간에 끊기면 다시 돌린다(캐시로 이어 감).
 - [ ] **Step 2: 커버리지 표 확인** — 경고 칸(특히 K리그1, 2026 시즌)을 위키백과 등에서 확인해 `manual/team_competitions.csv`에 채우고 다시 수집한다(캐시가 있어 빠름).
+  - *2026-11-02 첫 수집 결과*: 라리가·리그 1만 빈칸 없음. 위키데이터 P1923이 빈 시즌이 많다: 프리미어리그 25/26~, 분데스리가 26/27, 세리에 A 23/24~, 에레디비시 21/22~, 챔피언십 20/21~, 프리메이라리가·쉬페르리그 대부분, 벨기에 거의 전부, K리그1 전 시즌(3~7팀).
+  - K리그1 2017~2025는 `manual/team_competitions.csv`로 채움(108행, 2026은 승강 결과 확인 후). 상주 상무 Q484536(~2020), 김천 상무 Q104099625(2021~).
+  - 나머지 리그의 빈 시즌은 수가 많아 손으로 채우기 어렵다. openfootball(퍼블릭 도메인, 원 설계 §4.3) football.json이 en.1·en.2·de.1·es.1·it.1·fr.1·nl.1·pt.1(18/19~)을 2026/27까지, europe 저장소가 쉬페르리그를 텍스트로 가진다(벨기에 일부, K리그 없음). 출처 추가 여부는 사람이 정한다.
 - [ ] **Step 3: 레전드 첫 명단** — *2026-11-02 변경: 발롱도르 후보 381명(설계 §3.4).* `npm run football:legends`로 `legends.csv`를 만들고, 확인 필요·못 찾음을 `ballon_dor_nominees.csv`의 `player_id`로 정한 뒤 다시 돌린다. 그다음 다시 수집한다.
 - [ ] **Step 4: 검사** — `npm test` (실데이터 `checkDataset` 통과). 오류가 나면 수집기 버그는 Task 1 코드로, 데이터 문제는 `manual/`로 고친다.
-- [ ] **Step 5: 로컬 적재 확인** — `npm run db:test`의 임시 DB 대신 `bash scripts/db-up.sh`로 띄운 DB에 `DATABASE_URL=… npm run football:load`를 실행해 행 수와 소요 시간을 기록한 뒤 `db-down.sh`
-- [ ] **Step 6: 용량 기록** — 파일별 크기·행 수, DB 크기(`pg_total_relation_size`)를 설계 §7.4에 적는다. `spells.csv`가 50MB를 넘으면 멈추고 사람과 범위를 다시 정한다.
+- [x] **Step 5: 로컬 적재 확인** — `npm run db:test`의 임시 DB 대신 `bash scripts/db-up.sh`로 띄운 DB에 `DATABASE_URL=… npm run football:load`를 실행해 행 수와 소요 시간을 기록한 뒤 `db-down.sh`
+- [x] **Step 6: 용량 기록** — 파일별 크기·행 수, DB 크기(`pg_total_relation_size`)를 설계 §7.4에 적는다. `spells.csv`가 50MB를 넘으면 멈추고 사람과 범위를 다시 정한다.
 - [ ] **Step 7: 커밋** — `chore: 축구 데이터 첫 수집 (11개 리그, 데이터셋 <해시>)`
 
 ---
