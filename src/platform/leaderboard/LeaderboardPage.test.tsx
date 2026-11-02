@@ -17,7 +17,7 @@ vi.mock('../../games/index.ts', () => {
     { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } },
     { manifest: { id: 'secret', name: '비밀 게임', hidden: true } },
     { manifest: { id: 'who-are-ya', name: '후알야', hidden: false } },
-    { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeDefaultSort: 'best' } },
+    { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeStats: 'score' } },
   ]
   return {
     games,
@@ -113,17 +113,24 @@ test('streak_hidden_in_total_view', async () => {
   expect(screen.getByText('연속')).toBeTruthy()
 })
 
-test('toothbrush_defaults_to_best_sort', async () => {
+test('score_game_shows_plays_avg_best_sorted_by_best', async () => {
   admin = true
-  setup({ lb_free: [free('a', 'alpha', 10, 9, 0.9, 1, 2, 5), free('b', 'beta', 3, 1, 0.3, 1, 2, 9.5), free('c', 'gamma', 5, 3, 0.6, 1, 2, 7)] })
+  setup({ lb_free: [
+    free('a', 'alpha', 10, 9, 0.9, 1, 2, 5),
+    free('b', 'beta', 3, 1, 0.3, 1, 2, 9.5),
+    { ...free('c', 'gamma', 5, 3, 0.6, 1, 2, 7), avg_score: 4 },
+    { ...free('d', 'delta', 2, 2, 1, 1, 2, 7), avg_score: 6 },
+  ] })
   renderPage()
   tab('자유 플레이')
   await screen.findByText('alpha')
   fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'toothbrush' } })
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'toothbrush' }))
-  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('best')
-  await waitFor(() => expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['beta', 'gamma', 'alpha']))
+  // 최고 내림차순, 같으면 평균 내림차순
+  await waitFor(() => expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['beta', 'delta', 'gamma', 'alpha']))
+  expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['아이디', '플레이', '평균', '최고'])
   expect(screen.getByRole('columnheader', { name: '최고' }).getAttribute('aria-sort')).toBe('descending')
+  expect(screen.queryByLabelText('정렬')).toBeNull()
 })
 
 test('who_are_ya_keeps_wins_sort', async () => {
@@ -149,11 +156,10 @@ test('best_hidden_in_total_view', async () => {
   expect(screen.queryByRole('option', { name: '최고 점수' })).toBeNull()
   fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'toothbrush' } })
   await screen.findByRole('columnheader', { name: '최고' })
-  expect(screen.getByRole('option', { name: '최고 점수' })).toBeTruthy()
-  expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('best')
   fireEvent.change(screen.getByLabelText('게임'), { target: { value: '' } })
   await waitFor(() => expect(screen.queryByRole('columnheader', { name: '최고' })).toBeNull())
   expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('wins')
+  expect(screen.getByRole('columnheader', { name: '정답' })).toBeTruthy()
   expect(screen.queryByRole('option', { name: '최고 점수' })).toBeNull()
 })
 

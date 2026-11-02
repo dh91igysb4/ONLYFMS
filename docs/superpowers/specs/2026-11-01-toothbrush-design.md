@@ -24,7 +24,7 @@
   puzzleSource: 'generate',
   dailyTimeLimitSec: null,
   options: [],
-  freeDefaultSort: 'best',   // §5.1에서 추가하는 선택 필드
+  freeStats: 'score',   // §5.1에서 추가하는 선택 필드
 }
 ```
 
@@ -124,12 +124,13 @@
   - 0004의 정의 그대로 다시 만들되, 반환 맨 끝에 `best_score numeric`(= `max(f.score)`)을 추가한다. `lb_free`의 서버 정렬은 그대로 둔다.
   - 권한은 0004 패턴을 다시 적용한다: 두 함수 모두 `revoke all … from public, anon, authenticated`, `lb_free`만 `grant execute … to authenticated`. (새 함수에는 PUBLIC 실행 권한이 기본으로 붙으므로 revoke가 필수다.)
   - `user_stats`(0004:271)는 `select st.*`에서 이름으로 키를 뽑으므로 영향이 없다. 다시 만들 필요는 없고, 출력도 바뀌지 않는다(DB 테스트로 확인).
-- `Manifest`에 선택 필드 `freeDefaultSort?: 'wins' | 'rate' | 'plays' | 'best'` 추가. 생략하면 `'wins'`(지금과 같음).
+- `Manifest`에 선택 필드 `freeStats?: 'solve' | 'score'` 추가. 생략하면 `'solve'`(지금과 같음). (처음에는 `freeDefaultSort`였으나 2026-11-02 사용자 요청으로 바꿈: 점수 게임은 열 자체를 줄인다.)
+- `freeStats: 'score'` 게임을 고르면 열은 아이디·플레이·평균·최고만, 정렬은 최고 → 평균 → 플레이 내림차순으로 고정하고 정렬 선택 상자를 숨긴다.
 - `LeaderboardPage`:
   - `FreeRow`에 `best_score`, `Sort`에 `'best'`, `sortFree`에 `best`(`best_score` desc → `plays` desc), `SORTS`에 `['best', '최고 점수']`, `SORT_COLUMN.best = '최고'`.
-  - 게임 필터를 바꾸면 정렬을 그 게임의 `freeDefaultSort ?? 'wins'`로 맞춘다('전체 합계'는 `'wins'`).
+  - 게임 필터를 바꾸면 점수 게임은 `'best'`, 그 밖은 `'wins'`로 정렬을 맞춘다('전체 합계'는 `'wins'`).
   - '최고' 열과 '최고 점수' 정렬 선택지는 게임을 하나 골랐을 때만 보인다(전체 합계의 최고 점수는 의미가 없다).
-  - 후알야는 `freeDefaultSort`가 없으므로 기본 화면이 그대로다. 기존 `LeaderboardPage.test.tsx`의 정렬 테스트는 그대로 통과해야 한다.
+  - 후알야는 `freeStats`가 없으므로 기본 화면이 그대로다. 기존 `LeaderboardPage.test.tsx`의 정렬 테스트는 그대로 통과해야 한다.
 
 ### 5.2 자유 플레이 출제 시드
 - 새 모듈 `src/platform/games/seed.ts`: `newSeed(): Uint8Array`(16바이트, `crypto.getRandomValues`), `seedHex(seed): string`(소문자 16진 32자).
@@ -198,7 +199,7 @@ check (octet_length(actions::text) <= 262144)   -- 256KB. jsonb::text는 공백�
 - `Game.test.tsx`: 렌더링. 시작 전 구역 버튼 비활성. 가짜 타이머로 포인터 누름 뒤 샘플이 50ms 묶음·30개 이하로 나가는지. 누르기 전에는 행동이 없는지. 30Hz·60Hz 프레임에서 같은 손동작이 같은 샘플 열을 내는지(보간). 250ms 넘는 공백 뒤 `(-1, -1)`.
 - 플랫폼:
   - `registry.test.ts`(등록부·시드 일치).
-  - `LeaderboardPage.test.tsx`: 기본 정렬이 `freeDefaultSort`를 따르는지, 후알야는 그대로인지, '최고' 열·선택지 표시 조건, 기존 `free_tab_sort_toggle` 통과.
+  - `LeaderboardPage.test.tsx`: 점수 게임의 열·정렬이 `freeStats`를 따르는지, 후알야는 그대로인지, '최고' 열·선택지 표시 조건, 기존 `free_tab_sort_toggle` 통과.
   - `PlayRunner.test.tsx`: 시드 모듈 모킹, 로그 제출, 동기 연속 행동.
   - `freeLogQueue.test.ts`: 점수 대기열에 있으면 건너뜀, 23503 3회 뒤 제거, 42501·23514 즉시 제거, localStorage 쓰기 실패에도 점수 대기열 무사, 최대 10건.
 - DB(`supabase/tests/`): `free_play_logs` RLS(남의 `client_id` 거부, 미승인 거부, 숨김 게임 본인 기록 허용, 본인·관리자 조회, 남의 로그 조회 불가, UPDATE·DELETE 불가), 크기 제한, `lb_free`·`_free_stats`의 `best_score`, `user_stats` 출력 불변, `anon`의 `lb_free` 실행 불가.
