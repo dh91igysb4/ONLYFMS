@@ -29,9 +29,14 @@ const TOOTH_EDGE = 'rgba(110, 80, 60, 0.45)'
 const GROOVE = 'rgba(150, 120, 85, 0.55)'
 const BRUSH = 'rgba(120, 200, 255, 0.9)'
 const PLAQUE: readonly [number, number, number] = [218, 190, 58]
-/** 설태: 희끄무레한 크림색 (치아 플라그의 노란색과 구분) */
-const COAT: readonly [number, number, number] = [238, 228, 200]
-const COAT_FLECK = ['255, 252, 240', '214, 196, 150'] as const
+/** 설태: 매끈한 우윳빛 크림 막. 얇으면 하얀 우윳빛, 두꺼우면 살짝 크림색 (치아 플라그의 노란색과 구분) */
+const COAT_THIN: readonly [number, number, number] = [255, 250, 244]
+const COAT_THICK: readonly [number, number, number] = [246, 236, 212]
+
+/** 두께 → 설태 불투명도. 분홍 혀 위에서 얇은 설태도 또렷하게 바닥값을 높게 둔다 */
+function coatAlpha(t: number): number {
+  return 0.5 + (0.38 * Math.min(t, MAX_THICK)) / MAX_THICK
+}
 const TONGUE_TOP = '#e07b86'
 
 type V = 'front' | 'inner' | 'chew' | 'tongue'
@@ -354,7 +359,7 @@ function drawTongue(g: CanvasRenderingContext2D, e: Ellipse): void {
   g.fill()
 }
 
-/** 내민 혀 (혀 구역 3): 닦을 수 있는 혀 상자를 혀끝이 아래로 오게 그린다. 유두 점과 뿌리 그늘 */
+/** 내민 혀 (혀 구역 3): 닦을 수 있는 혀 상자를 혀끝이 아래로 오게 그린다. 매끈한 분홍과 뿌리 그늘 */
 function drawTongueBody(g: CanvasRenderingContext2D, b: Box): void {
   const [, , , , , hw, hh] = b
   g.save()
@@ -371,16 +376,6 @@ function drawTongueBody(g: CanvasRenderingContext2D, b: Box): void {
   g.fill()
   g.save()
   g.clip()
-  // 유두: 고정 의사난수 점
-  let h = 12345
-  const rnd = () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return h / 0x7fffffff }
-  g.fillStyle = 'rgba(255, 196, 200, 0.35)'
-  for (let k = 0; k < 260; k++) {
-    const x = (rnd() * 2 - 1) * hw, y = (rnd() * 2 - 1) * hh
-    g.beginPath()
-    g.arc(x, y, 1.2 + rnd() * 1.6, 0, Math.PI * 2)
-    g.fill()
-  }
   // 입 안으로 들어가는 뿌리 그늘
   const root = g.createLinearGradient(0, -hh, 0, -hh + 60)
   root.addColorStop(0, 'rgba(60, 10, 20, 0.6)')
@@ -491,7 +486,7 @@ function drawBackground(g: CanvasRenderingContext2D, zone: number): void {
 
 let plaqueCanvas: HTMLCanvasElement | null = null
 
-/** 두께를 48×32 이미지에 찍어 부드럽게 확대한 뒤 도형 합집합으로 잘라 덮는다. 혀는 크림색 설태에 알갱이 얼룩을 더한다 */
+/** 두께를 48×32 이미지에 찍어 부드럽게 확대한 뒤 도형 합집합으로 잘라 덮는다. 혀는 매끈한 우윳빛 설태 */
 function drawPlaque(g: CanvasRenderingContext2D, shapes: readonly Box[], thick: readonly number[], coat: boolean): void {
   if (typeof document === 'undefined') return
   if (!plaqueCanvas) {
@@ -506,10 +501,17 @@ function drawPlaque(g: CanvasRenderingContext2D, shapes: readonly Box[], thick: 
   for (let i = 0; i < W * H; i++) {
     const t = thick[i]
     if (!(t > 0)) continue
-    const c = coat ? COAT : PLAQUE
-    d[4 * i] = c[0]
-    d[4 * i + 1] = c[1]
-    d[4 * i + 2] = c[2]
+    if (coat) {
+      const k = Math.min(t, MAX_THICK) / MAX_THICK
+      d[4 * i] = Math.round(COAT_THIN[0] + (COAT_THICK[0] - COAT_THIN[0]) * k)
+      d[4 * i + 1] = Math.round(COAT_THIN[1] + (COAT_THICK[1] - COAT_THIN[1]) * k)
+      d[4 * i + 2] = Math.round(COAT_THIN[2] + (COAT_THICK[2] - COAT_THIN[2]) * k)
+      d[4 * i + 3] = Math.round(255 * coatAlpha(t))
+      continue
+    }
+    d[4 * i] = PLAQUE[0]
+    d[4 * i + 1] = PLAQUE[1]
+    d[4 * i + 2] = PLAQUE[2]
     d[4 * i + 3] = Math.round(255 * plaqueAlpha(t))
   }
   pg.putImageData(img, 0, 0)
@@ -520,20 +522,6 @@ function drawPlaque(g: CanvasRenderingContext2D, shapes: readonly Box[], thick: 
   g.imageSmoothingEnabled = true
   g.imageSmoothingQuality = 'high'
   g.drawImage(plaqueCanvas, 0, 0, W, H, 0, 0, W * CELL, H * CELL)
-  if (coat) {
-    // 설태 알갱이: 고정 위치 점, 그 칸 두께에 비례한 불투명도
-    let h = 777
-    const rnd = () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return h / 0x7fffffff }
-    for (let k = 0; k < 1400; k++) {
-      const x = rnd() * LW, y = rnd() * LH, r = 1.5 + rnd() * 2.5, f = COAT_FLECK[k & 1]
-      const t = thick[Math.floor(y / CELL) * W + Math.floor(x / CELL)]
-      if (!(t > 0)) continue
-      g.fillStyle = `rgba(${f}, ${(0.9 * plaqueAlpha(t)).toFixed(2)})`
-      g.beginPath()
-      g.arc(x, y, r, 0, Math.PI * 2)
-      g.fill()
-    }
-  }
   g.restore()
 }
 
