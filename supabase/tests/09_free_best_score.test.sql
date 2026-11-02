@@ -36,7 +36,7 @@ select is((select best_score from public.lb_free('test-guess') where handle = 'e
 select is((select best_score from public.lb_free('test-guess') where handle = 'echo2'), 9.0, 'lb_free: U2 best_score 9.0');
 select results_eq(
   $$select handle::text, plays, wins, avg_score from public.lb_free('test-guess')$$,
-  $$values ('echo1', 3, 3, 5.2), ('echo2', 1, 1, 9.0)$$,
+  $$values ('echo1', 3, 3, 5.17), ('echo2', 1, 1, 9.0)$$,  -- 평균은 소수 둘째 자리(20261102052719)
   'lb_free: existing columns and server order unchanged');
 select is((select best_score from public.lb_free() where handle = 'echo1'), 7.5, 'lb_free(null): best_score present');
 select is(

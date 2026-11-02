@@ -145,7 +145,7 @@ export function LeaderboardPage() {
                 cols={[{ label: '아이디' }, { label: '플레이', num: true }, { label: '평균', num: true }, { label: '최고', num: true, sorted: true }]}
                 rows={freeRows.map((r, i) => ({
                   id: r.user_id, top: i < 3, me: r.user_id === myId,
-                  cells: [<Handle handle={r.handle} />, r.plays, r.avg_score, r.best_score],
+                  cells: [<Handle handle={r.handle} />, r.plays, Number(r.avg_score).toFixed(2), Number(r.best_score).toFixed(2)],
                 }))}
               />
             ) : (
@@ -158,7 +158,7 @@ export function LeaderboardPage() {
                 rows={freeRows.map((r, i) => ({
                   id: r.user_id, top: i < 3, me: r.user_id === myId,
                   cells: [
-                    <Handle handle={r.handle} />, r.plays, r.wins, pct(r.win_rate), r.avg_score,
+                    <Handle handle={r.handle} />, r.plays, r.wins, pct(r.win_rate), Math.round(r.avg_score * 10) / 10,
                     ...(game ? [r.best_score] : []),
                     ...(game ? [r.current_streak, r.best_streak ?? '-'] : []),
                   ],

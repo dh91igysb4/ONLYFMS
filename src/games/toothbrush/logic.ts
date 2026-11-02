@@ -94,7 +94,7 @@ function brush(state: State, s: number[]): State {
 }
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 2,
+  version: 3,
 
   pickPuzzle(rng, _options) {
     return generatePuzzle(rng)
@@ -135,8 +135,9 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   },
 
   score(state) {
-    const tenths = Math.floor((100 * state.removed + Math.floor(TOTAL / 2)) / TOTAL) - Math.floor(state.gumTicks / 60)
-    return Math.min(100, Math.max(0, tenths)) / 10
+    // 0.01점 단위 정수로 계산한다. 잇몸 손상 1초(60틱)마다 0.1점(= 10) 감점
+    const hundredths = Math.floor((1000 * state.removed + Math.floor(TOTAL / 2)) / TOTAL) - 10 * Math.floor(state.gumTicks / 60)
+    return Math.min(1000, Math.max(0, hundredths)) / 100
   },
 
   actionCount(state) {
