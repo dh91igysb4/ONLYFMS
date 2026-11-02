@@ -33,7 +33,7 @@ export function StreakBlock({ title }: { title: string }) {
             <div key={it.id}>
               <h4>{it.name}</h4>
               {mine
-                ? <p className="card-status">{getGame(it.id)?.manifest.freeDefaultSort === 'best'
+                ? <p className="card-status">{getGame(it.id)?.manifest.freeStats === 'score'
                   ? `${mine.plays}판 · 최고 ${(mine.best_score ?? 0).toFixed(1)}점`
                   : `${mine.plays}판 · 승률 ${Math.round(mine.win_rate * 100)}% · 연속 ${mine.current_streak} (최고 ${mine.best_streak ?? 0})`}</p>
                 : <p className="muted">아직 기록이 없어요</p>}

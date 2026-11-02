@@ -22,7 +22,7 @@
 5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
 6. 문제없으면 `hidden`을 풀어 공개
 
-manifest에 `freeDefaultSort`를 두면 자유 플레이 리더보드의 기본 정렬을 지정할 수 있다.
+점수로 겨루는 게임은 manifest에 `freeStats: 'score'`를 둔다. 자유 플레이 리더보드가 플레이·평균·최고만 보여 주고 최고 점수 순으로 고정되며, 홈 블록도 최고 점수를 보여 준다.
 
 대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):
 - manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).

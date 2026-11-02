@@ -9,5 +9,5 @@ export const manifest: Manifest = {
   puzzleSource: 'generate',
   dailyTimeLimitSec: null,
   options: [],
-  freeDefaultSort: 'best',
+  freeStats: 'score',
 }
