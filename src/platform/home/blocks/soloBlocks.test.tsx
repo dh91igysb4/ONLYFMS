@@ -128,7 +128,7 @@ describe('StreakBlock', () => {
     wrap(<StreakBlock title="내 기록" />)
     const h = await screen.findByRole('heading', { name: '양치 시뮬레이터', level: 4 })
     const tb = within(h.parentElement as HTMLElement)
-    expect(await tb.findByText('7판 · 최고 83.5점')).toBeInTheDocument()
+    expect(await tb.findByText('7판 · 최고 83.46점')).toBeInTheDocument()
     expect(tb.queryByText(/승률/)).not.toBeInTheDocument()
     const s = await ngSection()
     expect(await s.findByText('12판 · 승률 42% · 연속 3 (최고 5)')).toBeInTheDocument()

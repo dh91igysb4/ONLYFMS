@@ -293,13 +293,17 @@ describe('toothbrush logic', () => {
     const sc = (removed: number, gumTicks: number) => logic.score({ ...base, removed, gumTicks }, ctx)
     expect(sc(TOTAL, 0)).toBe(10)
     expect(sc(Math.floor(TOTAL / 2), 0)).toBe(5)
-    // 5.0이 되는 최소 removed: ⌊(100r + ⌊T/2⌋) / T⌋ ≥ 50 ⇔ r ≥ ⌈(50T − ⌊T/2⌋) / 100⌉
-    const edge = Math.ceil((50 * TOTAL - Math.floor(TOTAL / 2)) / 100)
-    if (TOTAL === 330000) expect(edge).toBe(163350)
+    // 0.01점 단위: ⌊(1000r + ⌊T/2⌋) / T⌋. 5.00이 되는 최소 removed: r ≥ ⌈(500T − ⌊T/2⌋) / 1000⌉
+    const edge = Math.ceil((500 * TOTAL - Math.floor(TOTAL / 2)) / 1000)
     expect(sc(edge, 0)).toBe(5)
-    expect(sc(edge - 1, 0)).toBe(4.9)
+    expect(sc(edge - 1, 0)).toBe(4.99)
+    // 소수 둘째 자리까지 나온다
+    const r837 = Math.ceil((837 * TOTAL - Math.floor(TOTAL / 2)) / 1000)
+    expect(sc(r837, 0)).toBe(8.37)
+    // 잇몸: 1초(60틱)마다 0.1점
     expect(sc(TOTAL, 59)).toBe(10)
     expect(sc(TOTAL, 60)).toBe(9.9)
+    expect(sc(r837, 120)).toBe(8.17)
     expect(sc(0, 600)).toBe(0)
     expect(sc(0, 0)).toBe(0)
   })
@@ -335,7 +339,7 @@ describe('toothbrush logic', () => {
   })
 
   it('contract_basics', () => {
-    expect(logic.version).toBe(2)
+    expect(logic.version).toBe(3)
     const p = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(4)), {})
     expect(p).toEqual(generatePuzzle(rngFromSeed(new Uint8Array(16).fill(4))))
     expect(logic.puzzleKey(p)).toBe(puzzleKey(p))

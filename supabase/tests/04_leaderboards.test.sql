@@ -266,7 +266,7 @@ select is(public.lb_contests(:'today'::date - 1, :'today'::date + 1),
 -- free_streaks
 select results_eq(
   $$select handle::text, plays, wins, win_rate, current_streak, best_streak, avg_score from public.lb_free('open-game')$$,
-  $$values ('alpha', 6, 5, 0.833, 3, 3, 8.3), ('bravo', 5, 4, 0.800, 1, 3, 8.0)$$,
+  $$values ('alpha', 6, 5, 0.833, 3, 3, 8.33), ('bravo', 5, 4, 0.800, 1, 3, 8.0)$$,  -- 자유 평균은 소수 둘째 자리(20261102052719)
   'free_streaks: W W L W W W → current 3, best 3; W W W L W → current 1, best 3');
 select results_eq(
   $$select handle::text, plays, wins, current_streak, best_streak from public.lb_free()$$,
