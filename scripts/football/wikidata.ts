@@ -11,6 +11,8 @@ export type Row = Record<string, string>
 export function flat(b: Binding): Row {
   const r: Row = {}
   for (const [k, v] of Object.entries(b)) {
+    // '알 수 없는 값'(somevalue)은 .well-known/genid/<해시> 주소로 온다. 값이 없는 것으로 친다
+    if (v.type === 'uri' && v.value.startsWith('http://www.wikidata.org/.well-known/genid/')) continue
     r[k] = v.type === 'uri' && v.value.startsWith('http://www.wikidata.org/')
       ? v.value.slice(v.value.lastIndexOf('/') + 1)
       : v.value
@@ -87,9 +89,10 @@ export function qOccupation(players: readonly string[]): string {
 
 /** 선수 기본 정보. 값이 여럿인 속성 때문에 선수당 여러 줄이 나온다 (buildPlayers가 합친다) */
 export function qPlayerDetails(players: readonly string[]): string {
-  return `SELECT ?p ?en ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
+  return `SELECT ?p ?en ?mul ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
   VALUES ?p { ${ids(players)} }
   OPTIONAL { ?p rdfs:label ?en FILTER(LANG(?en) = "en") }
+  OPTIONAL { ?p rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
   OPTIONAL { ?p rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?p p:P569/psv:P569 [ wikibase:timeValue ?birth ; wikibase:timePrecision ?bprec ] }
   OPTIONAL { ?p wdt:P1532 ?sport }
@@ -102,11 +105,11 @@ export function qPlayerDetails(players: readonly string[]): string {
 }`
 }
 
-/** 검색용 다른 이름(한국어·영어) */
+/** 검색용 다른 이름(한국어·영어·다국어 mul) */
 export function qAliases(entities: readonly string[]): string {
   return `SELECT ?x ?alias ?lang WHERE {
   VALUES ?x { ${ids(entities)} }
-  ?x skos:altLabel ?alias . BIND(LANG(?alias) AS ?lang) FILTER(?lang IN ("ko", "en"))
+  ?x skos:altLabel ?alias . BIND(LANG(?alias) AS ?lang) FILTER(?lang IN ("ko", "en", "mul"))
 }`
 }
 
@@ -125,9 +128,10 @@ export function qSpells(players: readonly string[]): string {
 
 /** 팀 정보와 분류용 인스턴스(P31), 엠블럼 색(P6364 → sRGB P465) */
 export function qTeams(teams: readonly string[]): string {
-  return `SELECT ?t ?en ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
+  return `SELECT ?t ?en ?mul ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
   VALUES ?t { ${ids(teams)} }
   OPTIONAL { ?t rdfs:label ?en FILTER(LANG(?en) = "en") }
+  OPTIONAL { ?t rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
   OPTIONAL { ?t rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?t wdt:P1813 ?short FILTER(LANG(?short) = "en") }
   OPTIONAL { ?t wdt:P31 ?type }
@@ -140,9 +144,10 @@ export function qTeams(teams: readonly string[]): string {
 
 /** 국가 이름과 국기용 코드. ISO 3166-1(P297)이 없으면 3166-2(P300, 예: GB-ENG) */
 export function qNations(nations: readonly string[]): string {
-  return `SELECT ?n ?en ?ko ?iso2 ?iso3166_2 WHERE {
+  return `SELECT ?n ?en ?mul ?ko ?iso2 ?iso3166_2 WHERE {
   VALUES ?n { ${ids(nations)} }
   OPTIONAL { ?n rdfs:label ?en FILTER(LANG(?en) = "en") }
+  OPTIONAL { ?n rdfs:label ?mul FILTER(LANG(?mul) = "mul") }
   OPTIONAL { ?n rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?n wdt:P297 ?iso2 }
   OPTIONAL { ?n wdt:P300 ?iso3166_2 }
@@ -299,6 +304,15 @@ export function valuesOf(rows: readonly Row[], v: string): string[] {
   return [...new Set(rows.map((r) => r[v]).filter((x): x is string => !!x))].sort()
 }
 const firstOf = (rows: readonly Row[], v: string) => valuesOf(rows, v)[0] ?? ''
+/**
+ * 영문 표시 이름: 영어 라벨, 없으면 다국어(mul) 라벨. 위키데이터는 2024년부터 여러 언어에서 같은 이름(주로 인명)을
+ * mul 하나로 합치고 영어 라벨을 지우고 있다.
+ */
+export const nameEnOf = (rows: readonly Row[]) => firstOf(rows, 'en') || firstOf(rows, 'mul')
+/** 출전·골 같은 횟수: 0 이상 정수만(소수점 아래 0은 허용). 그 밖은 빈 값 */
+export function countOf(v: string | undefined): string {
+  return v && /^\d+(\.0+)?$/.test(v) ? String(parseInt(v, 10)) : ''
+}
 
 // ---------------------------------------------------------------- CSV 행 만들기
 
@@ -307,7 +321,7 @@ export type Team = { id: string; kind: TeamKind; name_ko: string; name_en: strin
 export function buildTeams(rows: readonly Row[]): Team[] {
   const out: Team[] = []
   for (const [id, rs] of groupBy(rows, 't')) {
-    const en = firstOf(rs, 'en')
+    const en = nameEnOf(rs)
     const kind = teamKind(valuesOf(rs, 'type'), en)
     const hex = valuesOf(rs, 'hex')
     out.push({
@@ -324,7 +338,7 @@ export function buildTeams(rows: readonly Row[]): Team[] {
 
 export type Spell = { player_id: string; team_id: string; start_date: string; end_date: string; date_precision: Precision; loan: string; apps: string; goals: string; source_ref: string }
 
-/** 팀 경력. 유스·2군(other)과 날짜 없는 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
+/** 팀 경력. 유스·2군(other), 날짜 없는 구간, 종료일이 시작일보다 앞인 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
 export function buildSpells(rows: readonly Row[], teams: ReadonlyMap<string, Team>): { spells: Spell[]; national: Spell[]; dropped: number } {
   const spells: Spell[] = [], national: Spell[] = []
   let dropped = 0
@@ -336,9 +350,11 @@ export function buildSpells(rows: readonly Row[], teams: ReadonlyMap<string, Tea
     const sp: Spell = {
       player_id: r.p, team_id: r.team, start_date: s.date, end_date: e?.date ?? '',
       date_precision: s.precision === 'day' && (!e || e.precision === 'day') ? 'day' : 'year',
-      loan: valuesOf(rs, 'loan').length ? 'true' : 'false', apps: firstOf(rs, 'apps'), goals: firstOf(rs, 'goals'), source_ref: st,
+      loan: valuesOf(rs, 'loan').length ? 'true' : 'false', apps: countOf(firstOf(rs, 'apps')), goals: countOf(firstOf(rs, 'goals')), source_ref: st,
     }
     if (sp.date_precision === 'year') { sp.start_date = sp.start_date.slice(0, 4); sp.end_date = sp.end_date.slice(0, 4) }
+    // 종료일이 시작일보다 앞인 구간은 원본 오류라 뺀다
+    if (sp.end_date && cmp(sp.end_date, sp.start_date) < 0) { dropped++; continue }
     ;(team.kind === 'national' ? national : spells).push(sp)
   }
   return { spells: spells.sort(bySpell), national: national.sort(bySpell), dropped }
@@ -393,7 +409,7 @@ export function buildPlayers(rows: readonly Row[], caps: readonly Cap[], teams: 
     const tm = firstOf(rs, 'tm')
     if (tm) transfermarkt.set(id, tm)
     players.push({
-      id, name_ko: firstOf(rs, 'ko'), name_en: firstOf(rs, 'en'),
+      id, name_ko: firstOf(rs, 'ko'), name_en: nameEnOf(rs),
       birth_date: births[0]?.date ?? '', birth_precision: births[0]?.precision ?? '',
       nation_id: pickNation(capsBy.get(id) ?? [], teams, valuesOf(rs, 'sport'), valuesOf(rs, 'cit')),
       position: pos.group ?? '', position_detail: pos.detail, foot: footOf(valuesOf(rs, 'footLabel')),
@@ -411,7 +427,7 @@ export type Nation = { id: string; name_ko: string; name_en: string; iso2: strin
 
 export function buildNations(rows: readonly Row[]): Nation[] {
   return [...groupBy(rows, 'n')].map(([id, rs]) => ({
-    id, name_ko: firstOf(rs, 'ko'), name_en: firstOf(rs, 'en'),
+    id, name_ko: firstOf(rs, 'ko'), name_en: nameEnOf(rs),
     iso2: (firstOf(rs, 'iso2') || firstOf(rs, 'iso3166_2')).toLowerCase(),
     confederation: '',
   })).sort(byId)

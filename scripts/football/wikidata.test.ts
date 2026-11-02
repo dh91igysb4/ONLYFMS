@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, teamKind, teamStarts, toCsv, type Row, type Team,
+  seasonWindows, teamKind, teamStarts, toCsv, countOf, nameEnOf, qAliases, qPlayerDetails, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -271,4 +271,50 @@ test('qOccupation_checks_footballer', () => {
   const q = qOccupation(['Q1487', 'Q11571'])
   expect(q).toContain('wd:Q937857')
   expect(q).toContain('wd:Q1487 wd:Q11571')
+})
+
+// ---------------------------------------------------------------- 첫 시험 수집(2026-11-02)에서 나온 문제
+
+test('flat_drops_unknown_value_genid', () => {
+  expect(flat({
+    st: { type: 'uri', value: 'http://www.wikidata.org/entity/statement/Q1-A' },
+    apps: { type: 'uri', value: 'http://www.wikidata.org/.well-known/genid/fa1e758b47996787792335f7e190c6e6' },
+    goals: { type: 'literal', value: '12' },
+  })).toEqual({ st: 'Q1-A', goals: '12' })
+})
+
+test('countOf_accepts_non_negative_integers_only', () => {
+  expect(countOf('12')).toBe('12')
+  expect(countOf('7.0')).toBe('7')
+  expect(countOf('0')).toBe('0')
+  expect(countOf('1fe0d9169a7f6803dbc8ee7febe0982a')).toBe('')
+  expect(countOf('-3')).toBe('')
+  expect(countOf('2.5')).toBe('')
+  expect(countOf(undefined)).toBe('')
+})
+
+test('name_en_falls_back_to_mul_label', () => {
+  expect(nameEnOf([{ en: 'Son Heung-min', mul: 'Son Heung-min' }])).toBe('Son Heung-min')
+  expect(nameEnOf([{ mul: 'Kylian Mbappé' }])).toBe('Kylian Mbappé')
+  expect(nameEnOf([{ ko: '손흥민' }])).toBe('')
+  const { players } = buildPlayers([{ p: 'Q1', mul: 'Mul Name', ko: '멀' }], [], new Map())
+  expect(players[0].name_en).toBe('Mul Name')
+  expect(buildTeams([{ t: 'Q2', mul: 'Mul FC', type: 'Q476028' }])[0].name_en).toBe('Mul FC')
+  expect(buildTeams([{ t: 'Q3', mul: 'Mul FC B', type: 'Q476028' }])[0].kind).toBe('other') // 유스·2군 판별도 mul 이름으로
+  expect(buildNations([{ n: 'Q4', mul: 'Mulland' }])[0].name_en).toBe('Mulland')
+  expect(qPlayerDetails(['Q1'])).toContain('LANG(?mul) = "mul"')
+  expect(qAliases(['Q1'])).toContain('"mul"')
+})
+
+test('buildSpells_drops_reversed_dates_and_bad_counts', () => {
+  const teams = new Map<string, Team>([['Qc', { id: 'Qc', kind: 'club', name_ko: '', name_en: 'C', short_name: '', nation_id: '', colors: '', founded: '', retired: 'false' }]])
+  const { spells, dropped } = buildSpells([
+    { p: 'Q1', st: 's1', team: 'Qc', s: '2017-01-01T00:00:00Z', sprec: '9', e: '2015-01-01T00:00:00Z', eprec: '9' },
+    { p: 'Q1', st: 's2', team: 'Qc', s: '2018-07-01T00:00:00Z', sprec: '11', apps: 'abc', goals: '3' },
+    { p: 'Q1', st: 's3', team: 'Qc', s: '2019-01-01T00:00:00Z', sprec: '9', e: '2019-01-01T00:00:00Z', eprec: '9' },
+  ], teams)
+  expect(dropped).toBe(1)
+  expect(spells.map((s) => s.source_ref)).toEqual(['s2', 's3'])
+  expect(spells[0].apps).toBe('')
+  expect(spells[0].goals).toBe('3')
 })
