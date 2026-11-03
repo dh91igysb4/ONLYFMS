@@ -12,7 +12,8 @@
     "fn:test": "bash scripts/fn-test.sh",
     "football:fetch": "node scripts/football/fetch-wikidata.ts",
     "football:load": "bash scripts/football/load.sh",
-    "football:legends": "node scripts/football/resolve-legends.ts"
+    "football:legends": "node scripts/football/resolve-legends.ts",
+    "football:openfootball": "node scripts/football/fetch-openfootball.ts"
   },
   "dependencies": {
     "@fontsource/exo-2": "^5.3.0",

@@ -15,9 +15,10 @@ import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName 
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
   coverage, currentSeason, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
-  qPlayersAtTeams, qSeasons, qSpells, qTeams, seasonWindows, teamStarts, toCsv, type Row, type Team, type Window,
+  qPlayersAtTeams, qSeasons, qSpells, qTeams, seasonWindows, teamStarts, toCsv, type Row, type Team, type TeamCompetition, type Window,
 } from './wikidata.ts'
 import { batched, log, query } from './wdqs.ts'
+import { combineTeamComps, completeSeasons, type SeasonInfo } from './openfootball.ts'
 
 // ---------------------------------------------------------------- 인자
 
@@ -49,7 +50,7 @@ function readManual(dir: string, name: string): Row[] {
 }
 
 function printCoverage(tc: ReturnType<typeof mergeTeamComps>, leagues: readonly League[], windows: ReadonlyMap<string, Window>) {
-  log(`\n시즌별 참가팀 수 (빈칸 --·정원 미만 !는 data/football/manual/team_competitions.csv로 채운다)`)
+  log(`\n시즌별 참가팀 수 (openfootball 포함. 빈칸 --·정원 미만 !는 data/football/manual/team_competitions.csv로 채운다)`)
   for (const { league, from, counts, warn } of coverage(tc, leagues, windows)) {
     const cells = counts.map((n, i) => (n === 0 ? ' --' : String(n).padStart(3)) + (n > 0 && warn[i] ? '!' : ' ')).join('')
     log(`  ${league.name_ko.padEnd(10)} ${from}~${from + counts.length - 1} (정원 ${league.teams}) ${cells}`)
@@ -66,7 +67,14 @@ async function main() {
   // 1. 시즌별 참가팀·우승 (리그마다 자기 창)
   const seasons = buildSeasons(await query(qSeasons(o.windows), o.cacheDir))
   const leagueIds = new Set(o.leagues.map((l) => l.id))
-  const teamComps = mergeTeamComps(seasons.teamComps, readManual(o.out, 'team_competitions.csv').filter((r) => leagueIds.has(r.competition_id)))
+  // 위키데이터 + openfootball 경기 일정(npm run football:openfootball, 설계 §3.5) + 직접 입력.
+  // openfootball 명단이 다 이어진 시즌은 openfootball이 기준, 우승 기록의 옛 ID는 remap.csv로 옮긴다
+  const of = (name: string) => { const f = join(o.out, 'openfootball', name); return existsSync(f) ? parseCsv(readFileSync(f, 'utf8')) : [] }
+  const combined = combineTeamComps(seasons.teamComps, of('team_competitions.csv') as unknown as TeamCompetition[], completeSeasons(of('seasons.csv') as unknown as SeasonInfo[]))
+  const remap = new Map(of('remap.csv').map((r) => [r.from_id, r.to_id]))
+  for (const h of seasons.honours) h.team_id = remap.get(h.team_id) ?? h.team_id
+  const teamComps = mergeTeamComps(combined.rows, readManual(o.out, 'team_competitions.csv')).filter((r) => leagueIds.has(r.competition_id))
+  if (combined.dropped.length) log(`openfootball 기준으로 뺀 위키데이터 참가팀 ${combined.dropped.length}개`)
   printCoverage(teamComps, o.leagues, o.windows)
 
   // 2. 선수를 찾을 팀과 팀별 시작 연도: 창 안 시즌 참가팀 + 지금 리그 소속 클럽
