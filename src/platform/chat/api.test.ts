@@ -8,13 +8,15 @@ vi.mock('../../lib/supabase.ts', () => ({
   supabase: { storage: { from: (b: string) => from(b) } }, supabaseUrl: 'http://x', supabaseKey: 'k',
 }))
 const rpcMock = vi.fn()
+const chatBotMock = vi.fn()
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
   rpc: (...a: unknown[]) => rpcMock(...a),
+  chatBot: (...a: unknown[]) => chatBotMock(...a),
 }))
 
 import {
-  chatErrorMessage, deleteChat, listChat, postChat, removeChatImage, signedChatImageUrl, uploadChatImage,
+  askBot, chatErrorMessage, deleteChat, listChat, postChat, removeChatImage, signedChatImageUrl, uploadChatImage,
 } from './api.ts'
 
 beforeEach(() => { vi.clearAllMocks() })
@@ -108,4 +110,22 @@ test('chatErrorMessage', () => {
   expect(chatErrorMessage('image_too_large')).toBe('사진이 너무 커요')
   expect(chatErrorMessage('network')).toBe('연결이 불안정해요. 다시 시도해 주세요')
   expect(chatErrorMessage('zzz')).toBe('문제가 생겼어요 (zzz)')
+})
+
+test('askBot은 봇 답을 봇 이름의 남의 글로 바꾼다', async () => {
+  chatBotMock.mockResolvedValue({
+    bot: { id: 'jaewon', handle: '재원봇' },
+    replies: [{ id: 'r1', created_at: '2026-01-01T00:00:00.000Z', body: 'ㅇㄴ' }],
+  })
+  const out = await askBot('item1')
+  expect(chatBotMock).toHaveBeenCalledWith({ item_id: 'item1' })
+  expect(out).toEqual([{
+    id: 'r1', userId: null, handle: '재원봇', body: 'ㅇㄴ', imagePath: null,
+    createdAt: '2026-01-01T00:00:00.000Z', deleted: false, mine: false, bot: true,
+  }])
+})
+
+test('askBot은 부름말이 없으면 빈 목록', async () => {
+  chatBotMock.mockResolvedValue({ replies: [] })
+  expect(await askBot('item1')).toEqual([])
 })

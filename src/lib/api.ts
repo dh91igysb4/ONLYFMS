@@ -152,7 +152,9 @@ export async function rpc<T>(name: string, args?: Record<string, unknown>): Prom
   return res.data as T
 }
 
-async function callFunction(name: string, body: Record<string, unknown>): Promise<unknown> {
+async function callFunction(
+  name: string, body: Record<string, unknown>, opts: { quiet?: boolean } = {},
+): Promise<unknown> {
   let res: Response
   try {
     const { data } = await supabase.auth.getSession()
@@ -177,13 +179,25 @@ async function callFunction(name: string, body: Record<string, unknown>): Promis
   }
   if (!res.ok) {
     const code = (json as { error?: string } | null)?.error ?? 'unknown'
-    throw notifyDenied(new ApiError(code, res.status, json))
+    const e = new ApiError(code, res.status, json)
+    throw opts.quiet ? e : notifyDenied(e)
   }
   return json
 }
 
 export async function play(body: Record<string, unknown>): Promise<PlayView> {
   return (await callFunction('play', body)) as PlayView
+}
+
+/** chat-bot Edge Function의 응답 (supabase/functions/chat-bot/handler.ts) */
+export type ChatBotReply = {
+  bot?: { id: string; handle: string }
+  replies: { id: string; created_at: string; body: string }[]
+}
+
+/** 채팅 봇 부르기. 봇 호출 실패가 권한 알림(로그아웃 등)으로 번지지 않게 조용히 던진다. */
+export async function chatBot(body: { item_id: string }): Promise<ChatBotReply> {
+  return (await callFunction('chat-bot', body, { quiet: true })) as ChatBotReply
 }
 
 /** 1대1 대전 요청. 409 본문(최신 `view` 포함)은 ApiError.body로 온다. create는 DuelCreated를 돌려준다. */

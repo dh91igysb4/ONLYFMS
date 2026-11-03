@@ -1,4 +1,4 @@
-import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
+import { ApiError, chatBot, errorMessage, rpc } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
 
 const BUCKET = 'daily-chat'
@@ -12,6 +12,8 @@ export type ChatMessage = {
   createdAt: string
   deleted: boolean
   mine: boolean
+  /** 봇 글(user_id 없음). 이름을 아직 모를 때 '알 수 없음' 대신 '…'로 보이게 한다 */
+  bot?: boolean
 }
 
 type ChatRow = {
@@ -54,6 +56,26 @@ export async function postChat(
   })
   const r = rows[0]
   return { id: r.id, createdAt: r.created_at }
+}
+
+/**
+ * 방금 쓴 글로 봇을 부른다. 봇 부름말이 없으면 서버가 빈 목록을 돌려준다(모델 호출 없음).
+ * 봇 글은 user_id가 없고 mine은 항상 false다.
+ */
+export async function askBot(itemId: string): Promise<ChatMessage[]> {
+  const res = await chatBot({ item_id: itemId })
+  const handle = res.bot?.handle ?? null
+  return res.replies.map((r) => ({
+    id: r.id,
+    userId: null,
+    handle,
+    body: r.body,
+    imagePath: null,
+    createdAt: r.created_at,
+    deleted: false,
+    mine: false,
+    bot: true,
+  }))
 }
 
 export async function deleteChat(id: string): Promise<void> {

@@ -134,6 +134,28 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
   - [ ] 지운 뒤 (받아 둔 서명 주소를 포함해) 사진 주소가 열리지 않는지
   - [ ] 아이폰·안드로이드에서 사진 고르기·줄이기·올리기
 
+## 채팅 봇(재원봇) 배포
+`feat/chat-bot` 머지 전에, 미리보기에서 확인한다. 설계 `docs/superpowers/specs/2026-11-03-chat-bot-design.md`.
+
+- [ ] 마이그레이션: `npx -y supabase@2 db push` → `20261103072000_chat_bot.sql` (봇 표 3개, `daily_chat.bot_id`, `chat_list` 봇 이름)
+- [ ] 봇 내용 넣기 (공개 저장소에 없는 원본 사용)
+  - `restricted/jaewon/`에 `bot.json`, `system_prompt.md`, `examples.json`을 둔다 (gitignore. 저장소에 올리지 않는다)
+  - `python3 scripts/chat-bot/build-seed.py jaewon` → `restricted/jaewon/seed.sql`
+  - 대시보드 SQL 편집기에 붙여 넣어 실행하거나 `psql "$SUPABASE_DB_URL" -f restricted/jaewon/seed.sql`. 다시 실행하면 덮어쓴다
+- [ ] 함수 시크릿과 배포
+```bash
+npx supabase@2 secrets set ANTHROPIC_API_KEY=<키>
+npx supabase@2 functions deploy chat-bot --no-verify-jwt
+```
+- [ ] 그다음 Vercel 배포(머지)
+- [ ] 원격 확인
+  - [ ] 끝낸 계정으로 `@재원 ...`을 쓰면 몇 초 안에 `재원봇` 글이 1~6개 뜨는지 (다른 계정 화면에서도. 처음 1~5초는 이름이 `…`일 수 있다)
+  - [ ] 부름말 없는 글에는 봇이 답하지 않는지
+  - [ ] 8초 안에 다시 부르면 답이 없는지 (`too_fast`, 화면 오류 없음)
+  - [ ] 브라우저에서 `chat_bots`·`chat_bot_examples` select가 거부되는지 (system_prompt가 새지 않는지)
+  - [ ] 관리자가 봇 글을 지울 수 있는지
+- [ ] 끄기: `update public.chat_bots set enabled = false where id = 'jaewon';` (SQL 편집기)
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

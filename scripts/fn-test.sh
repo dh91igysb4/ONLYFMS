@@ -12,7 +12,7 @@ DB_DIR="$(printf '%s\n' "$out" | sed -n 's/^DB_DIR=//p')"
 TEST_DB_URL="$(printf '%s\n' "$out" | sed -n 's/^TEST_DB_URL=//p')"
 trap 'bash "$ROOT/scripts/db-down.sh" "$DB_DIR"' EXIT
 cd "$ROOT"
-for fn in play duel; do
+for fn in play duel chat-bot; do
   TEST_DB_URL="$TEST_DB_URL" $DENO test --allow-all --config "supabase/functions/$fn/deno.json" \
     "supabase/functions/$fn/" "$@"
 done

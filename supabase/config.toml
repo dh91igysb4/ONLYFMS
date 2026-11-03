@@ -431,3 +431,8 @@ verify_jwt = false
 # 반영되지 않으면 `functions deploy duel --no-verify-jwt`로 배포.
 [functions.duel]
 verify_jwt = false
+
+# ONLYFMS: chat-bot 함수도 토큰을 함수 안에서 확인한다(auth.getUser).
+# 반영되지 않으면 `functions deploy chat-bot --no-verify-jwt`로 배포. 시크릿 ANTHROPIC_API_KEY 필요.
+[functions.chat-bot]
+verify_jwt = false

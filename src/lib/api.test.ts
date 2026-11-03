@@ -10,7 +10,7 @@ vi.mock('./supabase.ts', () => ({
   supabaseKey: 'pub',
 }))
 
-import { ApiError, duel, duelErrorMessage, errorMessage, play, rpc } from './api.ts'
+import { ApiError, chatBot, duel, onAccessDenied, duelErrorMessage, errorMessage, play, rpc } from './api.ts'
 
 beforeEach(() => { rpcMock.mockReset() })
 afterEach(() => vi.unstubAllGlobals())
@@ -99,4 +99,24 @@ test('duel messages', () => {
   expect(duelErrorMessage('not_due')).toBe('')
   expect(duelErrorMessage('version_changed')).toBe('규칙이 바뀌어 이 대국은 무효가 됐어요')
   expect(errorMessage('stale')).toBe('다른 화면에서 진행된 내용으로 갱신했어요') // 대회 문구는 그대로
+})
+
+test('chatBot posts to /functions/v1/chat-bot', async () => {
+  const body = { bot: { id: 'jaewon', handle: '재원봇' }, replies: [{ id: 'r1', created_at: 't', body: 'ㅇㄴ' }] }
+  const f = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }))
+  vi.stubGlobal('fetch', f)
+  expect(await chatBot({ item_id: 'i1' })).toEqual(body)
+  const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+  expect(url).toBe('http://sb.test/functions/v1/chat-bot')
+  expect(JSON.parse(init.body as string)).toEqual({ item_id: 'i1' })
+})
+
+test('chatBot 403 does not notify access-denied listeners', async () => {
+  const seen: string[] = []
+  const off = onAccessDenied((c) => seen.push(c))
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 })))
+  const e = await err(chatBot({ item_id: 'i1' }))
+  expect([e.code, e.status]).toEqual(['forbidden', 403])
+  expect(seen).toEqual([])
+  off()
 })

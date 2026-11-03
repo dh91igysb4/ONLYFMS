@@ -5,3 +5,5 @@
 dist/
 node_modules/
 .cache/
+# 공개 저장소에 올리면 안 되는 원본(단톡방 대화 등). 설계 2026-11-03-chat-bot §5
+restricted/

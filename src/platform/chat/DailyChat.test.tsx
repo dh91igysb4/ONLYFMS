@@ -9,6 +9,7 @@ const uploadChatImage = vi.fn()
 const removeChatImage = vi.fn()
 const signedChatImageUrl = vi.fn()
 const prepareChatImage = vi.fn()
+const askBot = vi.fn()
 vi.mock('./api.ts', async (orig) => ({
   ...(await orig<typeof import('./api.ts')>()),
   listChat: (...a: unknown[]) => listChat(...a),
@@ -17,6 +18,7 @@ vi.mock('./api.ts', async (orig) => ({
   uploadChatImage: (...a: unknown[]) => uploadChatImage(...a),
   removeChatImage: (...a: unknown[]) => removeChatImage(...a),
   signedChatImageUrl: (...a: unknown[]) => signedChatImageUrl(...a),
+  askBot: (...a: unknown[]) => askBot(...a),
 }))
 vi.mock('./image.ts', () => ({ prepareChatImage: (...a: unknown[]) => prepareChatImage(...a) }))
 
@@ -59,7 +61,8 @@ function row(id: string, o: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-  for (const f of [listChat, postChat, deleteChat, uploadChatImage, removeChatImage, signedChatImageUrl, prepareChatImage, removeChannel]) f.mockReset()
+  for (const f of [listChat, postChat, deleteChat, uploadChatImage, removeChatImage, signedChatImageUrl, prepareChatImage, removeChannel, askBot]) f.mockReset()
+  askBot.mockResolvedValue([])
   admin = false
   rtCallback = null
   channelThrows = false
@@ -484,4 +487,61 @@ test('new_message_button_when_scrolled_up', async () => {
   act(() => rtCallback!({ eventType: 'INSERT', new: row('n2', { created_at: '2026-11-02T06:05:00Z' }) }))
   await screen.findByText('실시간 n2')
   expect(screen.queryByRole('button', { name: '새 메시지' })).toBeNull()
+})
+
+test('send_text_calls_bot_and_shows_replies', async () => {
+  postChat.mockResolvedValue({ id: 'n1', createdAt: '2026-11-02T06:00:00.000Z' })
+  askBot.mockResolvedValue([
+    msg('b1', { userId: null, handle: '재원봇', body: 'ㅇㄴ', createdAt: '2026-11-02T06:00:01.000Z', bot: true }),
+    msg('b2', { userId: null, handle: '재원봇', body: '저건 왜 노카드임', createdAt: '2026-11-02T06:00:01.001Z', bot: true }),
+  ])
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText(/아직 대화가 없어요/)
+  fireEvent.change(textbox(), { target: { value: '@재원 심판 어떰' } })
+  fireEvent.keyDown(textbox(), { key: 'Enter' })
+  const li = (await screen.findByText('저건 왜 노카드임')).closest('li') as HTMLElement
+  expect(within(li).getByText('재원봇')).toBeInTheDocument()
+  expect(li).not.toHaveAttribute('data-mine')
+  expect(askBot).toHaveBeenCalledWith(ITEM)
+  expect(askBot.mock.invocationCallOrder[0]).toBeGreaterThan(postChat.mock.invocationCallOrder[0])
+})
+
+test('bot_failure_is_silent', async () => {
+  postChat.mockResolvedValue({ id: 'n1', createdAt: '2026-11-02T06:00:00.000Z' })
+  askBot.mockRejectedValue(new ApiError('bot_failed', 502))
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText(/아직 대화가 없어요/)
+  fireEvent.change(textbox(), { target: { value: '@재원' } })
+  fireEvent.keyDown(textbox(), { key: 'Enter' })
+  await screen.findByText('@재원')
+  await act(async () => {})
+  expect(askBot).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('alert')).toBeNull()
+  warn.mockRestore()
+})
+
+test('image_only_send_does_not_call_bot', async () => {
+  prepareChatImage.mockResolvedValue(new Blob(['jpg'], { type: 'image/jpeg' }))
+  uploadChatImage.mockResolvedValue('it1/u1/1700000000001.jpg')
+  postChat.mockResolvedValue({ id: 'n1', createdAt: '2026-11-02T06:00:00.000Z' })
+  signedChatImageUrl.mockResolvedValue('https://signed/mine')
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText(/아직 대화가 없어요/)
+  pickFile()
+  fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+  await screen.findByRole('img', { name: 'kane의 사진' })
+  expect(askBot).not.toHaveBeenCalled()
+})
+
+test('realtime_bot_row_shows_placeholder_then_poll_name', async () => {
+  render(<DailyChat itemId={ITEM} />)
+  await screen.findByText(/아직 대화가 없어요/)
+  act(() => rtCallback!({ eventType: 'INSERT', new: row('b1', { user_id: null, bot_id: 'jaewon', body: 'ㅗ' }) }))
+  const li = (await screen.findByText('ㅗ')).closest('li') as HTMLElement
+  expect(within(li).getByText('…')).toBeInTheDocument()
+  expect(within(li).queryByText('알 수 없음')).toBeNull()
+  listChat.mockResolvedValue([msg('b1', { userId: null, handle: '재원봇', body: 'ㅗ', createdAt: '2026-11-02T06:00:00.000Z' })])
+  await tick()
+  expect(within((await screen.findByText('ㅗ')).closest('li') as HTMLElement).getByText('재원봇')).toBeInTheDocument()
 })

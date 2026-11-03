@@ -298,7 +298,7 @@ function Message(props: {
   onImageLoad: () => void
 }) {
   const { m, canDelete, confirming, url } = props
-  const name = m.handle ?? (m.userId ? '…' : '알 수 없음')
+  const name = m.handle ?? (m.userId || m.bot ? '…' : '알 수 없음')
   return (
     <li className={`chat-msg${m.mine ? ' chat-mine' : ''}`} data-mine={m.mine ? 'true' : undefined}>
       <div className="chat-meta">

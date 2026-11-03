@@ -3,7 +3,7 @@ import { ApiError } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import {
-  chatErrorMessage, deleteChat, listChat, postChat, removeChatImage, uploadChatImage, type ChatMessage,
+  askBot, chatErrorMessage, deleteChat, listChat, postChat, removeChatImage, uploadChatImage, type ChatMessage,
 } from './api.ts'
 import { prepareChatImage } from './image.ts'
 
@@ -20,6 +20,8 @@ type RealtimeRow = {
   image_path: string | null
   created_at: string
   deleted_at: string | null
+  /** 봇 글이면 봇 id (user_id는 null) */
+  bot_id?: string | null
 }
 
 function codeOf(e: unknown): string {
@@ -151,6 +153,8 @@ export function useChat(itemId: string): UseChat {
             apply([{
               id: r.id,
               userId: uid,
+              // 봇 글(bot_id)은 이름을 모른다 → 비워 두면 이미 아는 이름이 남고, 다음 폴링(chat_list)이 채운다
+              ...(r.bot_id ? { bot: true } : {}),
               handle: uid ? handles.current.get(uid) ?? null : null,
               body: r.body ?? null,
               imagePath: r.image_path ?? null,
@@ -198,6 +202,18 @@ export function useChat(itemId: string): UseChat {
     }
   }, [itemId, apply])
 
+  // 글을 쓴 뒤 봇을 부른다. 실패는 화면에 띄우지 않는다(봇은 덤이다).
+  const callBot = useCallback(async () => {
+    try {
+      const rows = await askBot(itemId)
+      if (!alive.current || rows.length === 0) return
+      apply(rows)
+    } catch (e) {
+      const code = codeOf(e)
+      if (code !== 'too_fast' && code !== 'too_many') console.warn('chat: 봇 호출 실패', code)
+    }
+  }, [itemId, apply])
+
   const send = useCallback(async (body: string | null, file: File | null): Promise<boolean> => {
     const text = body?.trim() ? body.trim() : null
     if (!text && !file) return false
@@ -235,12 +251,13 @@ export function useChat(itemId: string): UseChat {
         deleted: false,
         mine: true,
       }])
+      if (text) void callBot()
       return true
     } catch (e) {
       if (alive.current) setError(chatErrorMessage(codeOf(e)))
       return false
     }
-  }, [itemId, userId, userHandle, apply])
+  }, [itemId, userId, userHandle, apply, callBot])
 
   const remove = useCallback(async (id: string) => {
     try {
