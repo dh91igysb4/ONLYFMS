@@ -95,6 +95,25 @@ describe('matchTeam', () => {
     expect(matchTeam('Only Spain', SA, idx, new Map())).toEqual({ status: 'missing', candidates: ['Q3'] })
     expect(matchTeam('Nobody FC', SA, idx, new Map())).toEqual({ status: 'missing', candidates: [] })
   })
+  it('경력이 가장 많은 후보의 1/10 미만이면 리그 참가 기록이 있어도 뺀다', () => {
+    const BL = { id: 'Q82595', nation_id: 'Q183' }
+    const de = buildIndex([
+      { id: 'Q6463', nation_id: 'Q183', names: ['FC St. Pauli'] },
+      { id: 'Q97905925', nation_id: 'Q183', names: ['FC St. Pauli'] },
+      { id: 'Q157828', nation_id: 'Q183', names: ['Holstein Kiel'] },
+      { id: 'Q97940890', nation_id: 'Q183', names: ['Holstein Kiel'] },
+      { id: 'Q10', nation_id: 'Q183', names: ['Small Twin'] },
+      { id: 'Q11', nation_id: 'Q183', names: ['Small Twin'] },
+    ], new Map([['Q6463', 51], ['Q157828', 19], ['Q97940890', 1], ['Q10', 20], ['Q11', 2]]), [
+      { team_id: 'Q97905925', competition_id: 'Q82595', season: '2024' },
+      { team_id: 'Q97940890', competition_id: 'Q82595', season: '2024' },
+      { team_id: 'Q11', competition_id: 'Q82595', season: '2024' },
+    ])
+    expect(matchTeam('FC St. Pauli', BL, de, new Map())).toEqual({ status: 'ok', team_id: 'Q6463', via: 'exact' })
+    expect(matchTeam('Holstein Kiel', BL, de, new Map())).toEqual({ status: 'ok', team_id: 'Q157828', via: 'exact' })
+    // 1/10 이상이면 예전처럼 참가 기록이 먼저
+    expect(matchTeam('Small Twin', BL, de, new Map())).toEqual({ status: 'ok', team_id: 'Q11', via: 'exact' })
+  })
   it('직접 지정이 먼저, 리그를 비우면 모든 리그', () => {
     const o = readOverrides([
       { competition_id: 'Q15804', name: 'Twin', team_id: 'Q2' },

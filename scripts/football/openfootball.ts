@@ -132,14 +132,18 @@ export type Match =
  * 이름 하나를 팀 ID에 잇는다. 직접 지정(overrides) → 엄격한 이름 → 느슨한 이름 순.
  * 후보가 여럿이면 (그 리그 참가 기록, 국적 일치, 경력 수) 순으로 고르고, 셋 다 같으면 애매(ambiguous)로 둔다.
  * 그 리그 참가 기록도 국적 일치도 없는 후보는 다른 나라의 같은 이름 팀일 수 있어 쓰지 않는다(missing, candidates에 남김).
+ * 경력 수가 가장 많은 후보의 1/10 미만인 후보는 먼저 뺀다. 위키데이터에는 클럽과 이름이 같은 별도 항목(Q979xxxxx, 경력 0~1)이
+ * 시즌 참가팀으로 적혀 있어, 참가 기록을 먼저 보면 실제 클럽 대신 그 항목이 뽑혔다(2026-11-05, 분데스리가 장크트 파울리·홀슈타인 킬 등).
  */
 export function matchTeam(name: string, league: League, idx: TeamIndex, overrides: ReadonlyMap<string, string>): Match {
   const manual = overrides.get(overrideKey(league.id, name)) ?? overrides.get(overrideKey('', name))
   if (manual) return { status: 'ok', team_id: manual, via: 'manual' }
   const k = nameKeys(name)
   for (const via of ['exact', 'loose'] as const) {
-    const ids = [...(idx[via].get(k[via]) ?? [])]
-    if (!ids.length) continue
+    const all = [...(idx[via].get(k[via]) ?? [])]
+    if (!all.length) continue
+    const most = Math.max(...all.map((id) => idx.spells.get(id) ?? 0))
+    const ids = all.filter((id) => (idx.spells.get(id) ?? 0) * 10 >= most)
     const score = (id: string) => [
       idx.leagues.get(id)?.has(league.id) ? 1 : 0,
       idx.nation.get(id) === league.nation_id || NATION_OK[league.nation_id]?.includes(idx.nation.get(id) ?? '') ? 1 : 0,
