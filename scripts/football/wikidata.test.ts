@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { LEAGUES } from './leagues.ts'
 import {
-  applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, dateOf,
-  flat, footOf, isYouthOrReserve, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qPlayersAtTeams, teamKind, toCsv,
-  type Row, type Team,
+  applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
+  flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
+  seasonWindows, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -40,10 +40,10 @@ test('footOf', () => {
 })
 
 test('youth_reserve_and_team_kind', () => {
-  for (const l of ['England national under-21 football team', 'Jong Ajax', 'Real Madrid B', 'FC Bayern Munich II', 'Juventus U23', 'Manchester United Reserves', "England women's national football team", 'Northern Ireland national Junior football team']) {
+  for (const l of ['England national under-21 football team', 'Jong Ajax', 'Real Madrid B', 'FC Bayern Munich II', 'Juventus U23', 'Manchester United Reserves', "England women's national football team", 'Northern Ireland national Junior football team', 'Willem II U19', "Willem II Women's"]) {
     expect(isYouthOrReserve(l)).toBe(true)
   }
-  for (const l of ['Borussia Mönchengladbach', 'Olympique de Marseille', 'Club Brugge KV', 'Tottenham Hotspur F.C.']) {
+  for (const l of ['Borussia Mönchengladbach', 'Olympique de Marseille', 'Club Brugge KV', 'Tottenham Hotspur F.C.', 'Willem II', 'Willem II Tilburg']) {
     expect(isYouthOrReserve(l)).toBe(false)
   }
   expect(teamKind(['Q6979593'], 'South Korea national football team')).toBe('national')
@@ -159,7 +159,9 @@ test('seasons_manual_merge_and_coverage', () => {
     { team_id: 'Q18741', competition_id: PL.id, season: '2017' },
   ])
   expect(merged).toHaveLength(3)
-  expect(coverage(merged, [PL], 2016, 2018)[0].counts).toEqual([2, 1, 0])
+  const [cov] = coverage(merged, [{ ...PL, seasons: 3 }], seasonWindows([{ ...PL, seasons: 3 }], 2018))
+  expect(cov.from).toBe(2016)
+  expect(cov.counts).toEqual([2, 1, 0])
 })
 
 test('applyNamesKo_overrides_and_counts', () => {
@@ -192,4 +194,172 @@ test('applyLeagueNations_sets_club_nation_from_league', () => {
   expect(applyLeagueNations(teams, [{ team_id: 'Q18741', competition_id: PL.id, season: '2020' }, { team_id: 'Q170043', competition_id: PL.id, season: '2020' }], [PL])).toBe(1)
   expect(teams.find((t) => t.id === 'Q18741')!.nation_id).toBe('Q21')
   expect(teams.find((t) => t.id === 'Q170043')!.nation_id).toBe('Q884')
+})
+
+// ---------------------------------------------------------------- 리그별 시즌 창 (설계 2026-11-01 §3.2·§3.3)
+
+const LL = LEAGUES.find((l) => l.id === 'Q324867')! // 라리가
+const CH = LEAGUES.find((l) => l.id === 'Q19510')! // 챔피언십
+
+test('league_table_seasons_and_teams', () => {
+  expect(PL.id).toBe('Q9448')
+  expect(PL.seasons).toBe(15)
+  for (const l of LEAGUES.filter((x) => x.id !== PL.id)) expect(l.seasons).toBe(10)
+  for (const l of LEAGUES) expect(l.teams).toBeGreaterThanOrEqual(10)
+  expect(new Set(LEAGUES.map((l) => l.id)).size).toBe(LEAGUES.length)
+})
+
+test('currentSeason_switches_in_july', () => {
+  expect(currentSeason(new Date(2026, 5, 30))).toBe(2025)
+  expect(currentSeason(new Date(2026, 6, 1))).toBe(2026)
+  expect(currentSeason(new Date(2026, 10, 1))).toBe(2026)
+})
+
+test('seasonWindows_per_league_and_override', () => {
+  const w = seasonWindows([PL, LL], 2026)
+  expect(w.get(PL.id)).toEqual({ from: 2012, to: 2026 })
+  expect(w.get(LL.id)).toEqual({ from: 2017, to: 2026 })
+  const o = seasonWindows([PL, LL], 2026, 3)
+  expect(o.get(PL.id)).toEqual({ from: 2024, to: 2026 })
+  expect(o.get(LL.id)).toEqual({ from: 2024, to: 2026 })
+})
+
+test('qSeasons_uses_each_league_window', () => {
+  const q = qSeasons(seasonWindows([PL, LL], 2026))
+  expect(q).toContain('(wd:Q9448 2012 2026)')
+  expect(q).toContain('(wd:Q324867 2017 2026)')
+  expect(q).toContain('YEAR(?start) >= ?from')
+  expect(q).toContain('wdt:P585') // 시작일이 없으면 시점으로 연도를 잡는다
+  expect(q).toContain('COALESCE(?s0, ?p0)')
+})
+
+test('teamStarts_earliest_window_of_its_leagues', () => {
+  const w = seasonWindows([PL, CH], 2026)
+  const tc = [
+    { team_id: 'Qa', competition_id: PL.id, season: '2013' }, { team_id: 'Qa', competition_id: CH.id, season: '2024' }, // EPL 시절이 있는 팀
+    { team_id: 'Qb', competition_id: CH.id, season: '2020' }, // 챔피언십만
+    { team_id: 'Qc', competition_id: PL.id, season: '2010' }, // 창 밖 기록만
+  ]
+  const s = teamStarts(tc, [{ league: PL.id, team: 'Qd' }, { league: CH.id, team: 'Qb' }], w)
+  expect(s.get('Qa')).toBe(2012)
+  expect(s.get('Qb')).toBe(2017)
+  expect(s.has('Qc')).toBe(false)
+  expect(s.get('Qd')).toBe(2012) // P118로만 잡힌 EPL 클럽
+  expect([...s.keys()]).toEqual(['Qa', 'Qb', 'Qd'])
+})
+
+test('coverage_warns_below_league_team_count', () => {
+  const small = { ...LL, id: 'Qk', teams: 12, seasons: 2 }
+  const big = { ...PL, seasons: 2 }
+  const rows = (comp: string, season: number, n: number) => Array.from({ length: n }, (_, i) => ({ team_id: `Q${comp}${season}${i}`, competition_id: comp, season: String(season) }))
+  const tc = [...rows('Qk', 2025, 12), ...rows('Qk', 2026, 11), ...rows(PL.id, 2025, 20), ...rows(PL.id, 2026, 19)]
+  const [k, p] = coverage(tc, [small, big], seasonWindows([small, big], 2026))
+  expect(k.counts).toEqual([12, 11])
+  expect(k.warn).toEqual([false, true])
+  expect(p.warn).toEqual([false, true])
+  const full = coverage([], LEAGUES, seasonWindows(LEAGUES, 2026))
+  expect(full.find((c) => c.league.id === PL.id)!.counts).toHaveLength(15)
+  expect(full.find((c) => c.league.id === LL.id)!.counts).toHaveLength(10)
+})
+
+test('mergeLegends_dedupes_and_drops_non_qids', () => {
+  const r = mergeLegends(['Q2', 'Q1'], [{ player_id: 'Q3', note: '앙리' }, { player_id: 'Q1', note: '' }, { player_id: 'x-abc', note: '' }, { player_id: ' Q4 ', note: '' }, { player_id: 'Q3', note: '' }])
+  expect(r.ids).toEqual(['Q1', 'Q2', 'Q3', 'Q4'])
+  expect(r.added).toEqual(['Q3', 'Q4'])
+  expect(r.invalid).toEqual(['x-abc'])
+})
+
+test('qOccupation_checks_footballer', () => {
+  const q = qOccupation(['Q1487', 'Q11571'])
+  expect(q).toContain('wd:Q937857')
+  expect(q).toContain('wd:Q1487 wd:Q11571')
+})
+
+// ---------------------------------------------------------------- 첫 시험 수집(2026-11-02)에서 나온 문제
+
+test('flat_drops_unknown_value_genid', () => {
+  expect(flat({
+    st: { type: 'uri', value: 'http://www.wikidata.org/entity/statement/Q1-A' },
+    apps: { type: 'uri', value: 'http://www.wikidata.org/.well-known/genid/fa1e758b47996787792335f7e190c6e6' },
+    goals: { type: 'literal', value: '12' },
+  })).toEqual({ st: 'Q1-A', goals: '12' })
+})
+
+test('countOf_accepts_non_negative_integers_only', () => {
+  expect(countOf('12')).toBe('12')
+  expect(countOf('7.0')).toBe('7')
+  expect(countOf('0')).toBe('0')
+  expect(countOf('1fe0d9169a7f6803dbc8ee7febe0982a')).toBe('')
+  expect(countOf('-3')).toBe('')
+  expect(countOf('2.5')).toBe('')
+  expect(countOf(undefined)).toBe('')
+})
+
+test('name_en_falls_back_to_mul_then_ko_label', () => {
+  expect(nameEnOf([{ en: 'Son Heung-min', l_mul: 'Son Heung-min' }])).toBe('Son Heung-min')
+  expect(nameEnOf([{ l_mul: 'Kylian Mbappé' }])).toBe('Kylian Mbappé')
+  expect(nameEnOf([{ ko: '수원 삼성 블루윙즈' }])).toBe('수원 삼성 블루윙즈') // 한국어 라벨만 있으면 마지막 수단
+  expect(nameEnOf([{}])).toBe('')
+  const { players } = buildPlayers([{ p: 'Q1', l_mul: 'Mul Name', ko: '멀' }], [], new Map())
+  expect(players[0].name_en).toBe('Mul Name')
+  expect(buildTeams([{ t: 'Q2', l_mul: 'Mul FC', type: 'Q476028' }])[0].name_en).toBe('Mul FC')
+  expect(buildTeams([{ t: 'Q3', l_mul: 'Mul FC B', type: 'Q476028' }])[0].kind).toBe('other') // 유스·2군 판별도 mul 이름으로
+  expect(buildNations([{ n: 'Q4', l_mul: 'Mulland' }])[0].name_en).toBe('Mulland')
+  expect(qPlayerDetails(['Q1'])).toContain('LANG(?l_mul) = "mul"')
+  expect(qAliases(['Q1'])).toContain('"mul"')
+})
+
+test('buildSpells_drops_reversed_dates_and_bad_counts', () => {
+  const teams = new Map<string, Team>([['Qc', { id: 'Qc', kind: 'club', name_ko: '', name_en: 'C', short_name: '', nation_id: '', colors: '', founded: '', retired: 'false' }]])
+  const { spells, dropped } = buildSpells([
+    { p: 'Q1', st: 's1', team: 'Qc', s: '2017-01-01T00:00:00Z', sprec: '9', e: '2015-01-01T00:00:00Z', eprec: '9' },
+    { p: 'Q1', st: 's2', team: 'Qc', s: '2018-07-01T00:00:00Z', sprec: '11', apps: 'abc', goals: '3' },
+    { p: 'Q1', st: 's3', team: 'Qc', s: '2019-01-01T00:00:00Z', sprec: '9', e: '2019-01-01T00:00:00Z', eprec: '9' },
+  ], teams)
+  expect(dropped).toBe(1)
+  expect(spells.map((s) => s.source_ref)).toEqual(['s2', 's3'])
+  expect(spells[0].apps).toBe('')
+  expect(spells[0].goals).toBe('3')
+})
+
+test('buildTeams_drops_team_without_any_name', () => {
+  const teams = buildTeams([{ t: 'Q9', type: 'Q476028', country: 'Q29' }, { t: 'Q8', ko: '수원 FC', type: 'Q476028' }])
+  expect(teams.find((t) => t.id === 'Q9')!.kind).toBe('other')
+  expect(teams.find((t) => t.id === 'Q8')).toMatchObject({ kind: 'club', name_en: '수원 FC' })
+  const { spells, dropped } = buildSpells([{ p: 'Q1', st: 's1', team: 'Q9', s: '2018-07-01T00:00:00Z', sprec: '11' }], new Map(teams.map((t) => [t.id, t])))
+  expect(spells).toEqual([])
+  expect(dropped).toBe(1)
+})
+
+// ---------------------------------------------------------------- 전체 수집(2026-11-02)에서 나온 문제
+
+test('name_en_language_order', () => {
+  expect(nameEnOf([{ l_pt: 'Pelé Jr', ko: '펠레' }])).toBe('Pelé Jr') // 라틴 문자 언어가 한국어보다 먼저
+  expect(nameEnOf([{ l_tr: 'Arda Güler', l_es: 'Arda Guler' }])).toBe('Arda Guler') // NAME_LANGS 순
+  expect(nameEnOf([{ ko: '김민수' }])).toBe('김민수')
+  const q = qTeams(['Q1'])
+  for (const l of ['mul', 'es', 'pt', 'fr', 'de', 'it', 'nl', 'tr']) expect(q).toContain(`?l_${l}`)
+})
+
+test('dateOf_rejects_implausible_years', () => {
+  expect(dateOf('0024-01-15T00:00:00Z', '11')).toBeNull() // 2024를 24로 적은 입력 오류
+  expect(dateOf('1849-12-31T00:00:00Z', '11')).toBeNull()
+  expect(dateOf('1850-01-01T00:00:00Z', '11')).toEqual({ date: '1850-01-01', precision: 'day' })
+})
+
+test('foundedOf_four_digit_plausible_years_only', () => {
+  expect(foundedOf('1882-01-01T00:00:00Z')).toBe('1882')
+  expect(foundedOf('-0600-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('+0000-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('0080-01-01T00:00:00Z')).toBe('')
+  expect(foundedOf('')).toBe('')
+})
+
+test('footballer_condition_sees_all_ranks', () => {
+  // 은퇴 후 감독이 우선 순위인 선수도 축구 선수로 본다: wdt:P106(최고 순위만) 대신 p:P106/ps:P106, 폐기된 진술만 제외
+  for (const q of [qPlayersAtTeams(['Q1'], 2017, 2026), qOccupation(['Q1'])]) {
+    expect(q).not.toContain('wdt:P106')
+    expect(q).toContain('ps:P106 wd:Q937857')
+    expect(q).toContain('wikibase:DeprecatedRank')
+  }
 })
