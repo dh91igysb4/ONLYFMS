@@ -40,10 +40,10 @@ test('footOf', () => {
 })
 
 test('youth_reserve_and_team_kind', () => {
-  for (const l of ['England national under-21 football team', 'Jong Ajax', 'Real Madrid B', 'FC Bayern Munich II', 'Juventus U23', 'Manchester United Reserves', "England women's national football team", 'Northern Ireland national Junior football team']) {
+  for (const l of ['England national under-21 football team', 'Jong Ajax', 'Real Madrid B', 'FC Bayern Munich II', 'Juventus U23', 'Manchester United Reserves', "England women's national football team", 'Northern Ireland national Junior football team', 'Willem II U19', "Willem II Women's"]) {
     expect(isYouthOrReserve(l)).toBe(true)
   }
-  for (const l of ['Borussia Mönchengladbach', 'Olympique de Marseille', 'Club Brugge KV', 'Tottenham Hotspur F.C.']) {
+  for (const l of ['Borussia Mönchengladbach', 'Olympique de Marseille', 'Club Brugge KV', 'Tottenham Hotspur F.C.', 'Willem II', 'Willem II Tilburg']) {
     expect(isYouthOrReserve(l)).toBe(false)
   }
   expect(teamKind(['Q6979593'], 'South Korea national football team')).toBe('national')

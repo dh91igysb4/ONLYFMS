@@ -283,8 +283,13 @@ export function footOf(labels: readonly string[]): string {
   return ''
 }
 
+// 이름에 2군 표시처럼 보이는 말이 들어 있지만 1군 클럽인 팀. 이 부분을 지운 뒤 검사한다(Willem II U19 같은 유스 팀은 그대로 걸러짐).
+// Willem II(Q332664)는 \bII\b에 걸려 2026-11-05까지 팀과 모든 선수의 경력이 빠졌다
+const REAL_CLUB_NAMES = /\bWillem II\b/gi
+
 /** 유스·2군·연령별·여자 팀 (경력에서 뺀다) */
 export function isYouthOrReserve(label: string): boolean {
+  label = label.replace(REAL_CLUB_NAMES, 'club')
   return /\bU-?\d{2}\b|under-?\s?\d{2}|\byouth\b|\bjunior\b|\breserves?\b|\bacademy\b|\bII\b|\bB\b|\bjuvenil\b|\bprimavera\b|\bjong\b|\bolympic\b|\bamateurs?\b|\bwomen'?s?\b|\bfemenino\b|\bféminin/i.test(label)
 }
 
