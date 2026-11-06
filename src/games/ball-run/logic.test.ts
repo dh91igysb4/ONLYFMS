@@ -39,7 +39,7 @@ describe('ball-run logic', () => {
   it('has version 1 and the spec manifest', () => {
     expect(logic.version).toBe(1)
     expect(manifest).toMatchObject({
-      id: 'ball-run', hidden: true, freeStats: 'score', scoreMax: 99999, scoreDecimals: 0,
+      id: 'ball-run', name: '볼 런', description: '굴러가는 공을 좌우로 움직여 장애물을 피한다', options: [], hidden: true, freeStats: 'score', scoreMax: 99999, scoreDecimals: 0,
       modes: { daily: false, contest: false, free: true }, puzzleSource: 'generate', dailyTimeLimitSec: null,
     })
   })
