@@ -224,7 +224,7 @@ describe('ball-run Game', () => {
     expect(lastCur().tick).toBe(tick + 6)
   })
 
-  test('does not catch up after the tab was hidden', async () => {
+  test('pauses when the tab is hidden and resumes only on tap', async () => {
     const onAction = vi.fn()
     await mount(props({ onAction }))
     fireEvent.pointerDown(canvas(), { clientX: 100, pointerId: 1 })
@@ -238,9 +238,45 @@ describe('ball-run Game', () => {
     expect(lastCur().tick).toBe(tick)
     visibility = 'visible'
     act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    // 돌아와도 탭하기 전에는 한 틱도 가지 않는다
+    expect(screen.getByText('계속하려면 누르기')).toBeInTheDocument()
+    advance(2000)
+    expect(lastCur().tick).toBe(tick)
+    fireEvent.click(screen.getByText('계속하려면 누르기'))
+    // 재개 직후 첫 프레임은 정확히 1틱 (acc가 초기화됐다)
     frame()
-    expect(lastCur().tick - tick).toBeLessThanOrEqual(MAX_CATCHUP)
-    expect(lastCur().tick - tick).toBeGreaterThanOrEqual(1)
+    expect(lastCur().tick - tick).toBe(1)
+  })
+
+  test('does not pause on hidden before the first touch or after death', async () => {
+    await mount(props())
+    visibility = 'hidden'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    visibility = 'visible'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(screen.queryByText('계속하려면 누르기')).not.toBeInTheDocument()
+    expect(screen.getByText('화면을 눌러 시작')).toBeInTheDocument()
+  })
+
+  test('window blur releases held keys and pauses', async () => {
+    const onAction = vi.fn()
+    await mount(props({ onAction }))
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    frames(5)
+    act(() => { window.dispatchEvent(new Event('blur')) })
+    const tick = lastCur().tick
+    expect(tick).toBeGreaterThanOrEqual(5)
+    expect(screen.getByText('계속하려면 누르기')).toBeInTheDocument()
+    // 멈추며 모아 둔 입력을 보냈고, 이후 움직임·틱이 없다
+    const held = lastValue(batches(onAction).at(-1)!)
+    expect(held).toBe(tick * KEY_STEP)
+    advance(2000)
+    expect(lastCur().tick).toBe(tick)
+    // 재개해도 키는 놓인 것으로 취급돼 타깃이 더 움직이지 않는다
+    fireEvent.click(screen.getByText('계속하려면 누르기'))
+    advance(1000)
+    expect(lastCur().tick).toBeGreaterThan(tick)
+    for (const d of batches(onAction).slice(1)) expect(decodeInputs(d)!.every((v) => v === held)).toBe(true)
   })
 
   test('never sends a batch over 120 ticks', async () => {
@@ -277,9 +313,9 @@ describe('ball-run Game', () => {
     // 첫 render 전에 resize
     const s = scene()
     expect(s.resize).toHaveBeenCalledWith(390, 600, expect.any(Number))
-    if (s.render.mock.calls.length > 0) {
-      expect(s.resize.mock.invocationCallOrder[0]).toBeLessThan(s.render.mock.invocationCallOrder[0])
-    }
+    frame()
+    expect(s.render).toHaveBeenCalled()
+    expect(s.resize.mock.invocationCallOrder[0]).toBeLessThan(s.render.mock.invocationCallOrder[0])
     rect = { left: 0, top: 0, width: 780, height: 500 }
     act(() => { window.dispatchEvent(new Event('resize')) })
     expect(s.resize).toHaveBeenLastCalledWith(780, 500, expect.any(Number))
@@ -353,5 +389,30 @@ describe('ball-run Game', () => {
     expect(screen.getByLabelText('점수')).toHaveTextContent('12')
     advance(1300)
     expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+  })
+
+  test.each([
+    ['hit', '장애물에 부딪혔어요'],
+    ['fall', '떨어졌어요'],
+    ['give_up', '포기했어요'],
+  ] as const)('shows the result overlay when finished (%s)', async (dead, reason) => {
+    const state: State = { ...INITIAL, sim: { ...INITIAL.sim, dead } }
+    const p = props()
+    const r = await mount(p)
+    expect(screen.queryByText('게임 끝')).not.toBeInTheDocument()
+    r.rerender(<Game {...p} publicState={logic.publicState(state)} finished score={137} />)
+    expect(screen.getByText('게임 끝')).toBeInTheDocument()
+    expect(screen.getByText('137점')).toBeInTheDocument()
+    expect(screen.getByText(reason)).toBeInTheDocument()
+    // 사망 연출을 그리는 캔버스는 그대로 있다
+    expect(canvas()).toBeInTheDocument()
+  })
+
+  test('result overlay rounds the score down to an integer', async () => {
+    const state: State = { ...INITIAL, sim: { ...INITIAL.sim, dead: 'hit' } }
+    const p = props()
+    const r = await mount(p)
+    r.rerender(<Game {...p} publicState={logic.publicState(state)} finished score={137.9} />)
+    expect(screen.getByText('137점')).toBeInTheDocument()
   })
 })

@@ -43,7 +43,24 @@ function sameSim(a: SimState, b: SimState): boolean {
   return (Object.keys(a) as (keyof SimState)[]).every((k) => a[k] === b[k])
 }
 
-export function Game({ publicState, finished, error, onAction }: GameProps) {
+const DEATH_TEXT: Record<'hit' | 'fall' | 'give_up', string> = {
+  hit: '장애물에 부딪혔어요',
+  fall: '떨어졌어요',
+  give_up: '포기했어요',
+}
+
+/** 끝난 판의 결과. 캔버스 위에 반투명으로 얹어 사망 연출이 비친다. */
+function Result({ score, reason }: { score: number; reason: SimState['dead'] }) {
+  return (
+    <div className="br-result" role="status">
+      <h2>게임 끝</h2>
+      <p className="br-result-score">{Math.floor(score)}점</p>
+      {reason !== null && <p className="br-result-reason">{DEATH_TEXT[reason]}</p>}
+    </div>
+  )
+}
+
+export function Game({ publicState, finished, score: finalScore, error, onAction }: GameProps) {
   const ps = publicState as PublicState
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engine = useRef<Engine | null>(null)
@@ -179,11 +196,20 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
       const hidden = document.visibilityState === 'hidden'
       if (hidden === isHidden) return
       isHidden = hidden
-      if (hidden) flush()
-      else {
+      if (hidden) {
+        flush()
+        setPaused(true) // 돌아왔을 때 바로 이어 달리지 않게 멈춰 둔다
+      } else {
         last = performance.now()
         acc = 0
       }
+    }
+
+    function onBlur() {
+      // 키를 누른 채 창이 포커스를 잃으면 keyup을 못 받는다
+      keyLeft = false
+      keyRight = false
+      setPaused(true)
     }
 
     const live = () => !!scene && cur.dead === null && !latest.current.finished && !isPaused
@@ -238,6 +264,7 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
         document.addEventListener('visibilitychange', onVisibility)
         window.addEventListener('keydown', onKeyDown)
         window.addEventListener('keyup', onKeyUp)
+        window.addEventListener('blur', onBlur)
         setPhase('ready')
         raf = requestAnimationFrame(loop)
       },
@@ -257,6 +284,7 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
       // 같은 캔버스로 다시 마운트될 수 있어(StrictMode) WebGL 컨텍스트는 강제로 잃게 하지 않는다.
       scene?.dispose()
       scene = null
@@ -285,8 +313,14 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
   if (phase === 'no-webgl') {
     return (
       <section className="br br-fallback">
-        <p>이 기기에서는 3D 화면을 지원하지 않아요</p>
-        <button type="button" className="btn" onClick={() => onAction({ type: 'give_up' })}>포기</button>
+        {finished ? (
+          <Result score={finalScore ?? score} reason={ps.sim.dead} />
+        ) : (
+          <>
+            <p>이 기기에서는 3D 화면을 지원하지 않아요</p>
+            <button type="button" className="btn" onClick={() => onAction({ type: 'give_up' })}>포기</button>
+          </>
+        )}
         {error && <p className="br-error" role="alert">{error}</p>}
       </section>
     )
@@ -315,7 +349,7 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
           onLostPointerCapture={onEnd}
         />
         <div className="br-hud">
-          <output className="br-score" aria-label="점수">{score}</output>
+          <output className="br-score" aria-label="점수" aria-live="off">{score}</output>
           {active && (
             <button
               type="button"
@@ -335,6 +369,7 @@ export function Game({ publicState, finished, error, onAction }: GameProps) {
             계속하려면 누르기
           </button>
         )}
+        {finished && <Result score={finalScore ?? score} reason={ps.sim.dead} />}
         {banner > 0 && !dead && <p key={banner} className="br-banner" aria-live="polite">속도 증가</p>}
       </div>
       {error && <p className="br-error" role="alert">{error}</p>}

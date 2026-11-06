@@ -76,6 +76,23 @@
 .br-hint { pointer-events: none; }
 .br-overlay { cursor: pointer; background: color-mix(in srgb, var(--bg) 65%, transparent); }
 
+.br-result {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  pointer-events: none;
+}
+.br-result h2 { margin: 0; font-size: 28px; font-weight: 800; }
+.br-result-score { margin: 0; font-size: 48px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.br-result-reason { margin: 0; font-size: 16px; color: var(--muted); }
+
 .br-banner {
   position: absolute;
   left: 0;

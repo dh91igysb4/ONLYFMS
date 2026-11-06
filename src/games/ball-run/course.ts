@@ -137,7 +137,8 @@ function bandWeights(m: number): readonly [number, number, number, number] {
   return w
 }
 
-function makeCourse(seed: string): Course {
+/** 캐시 없이 새 코스 인스턴스를 만든다 (테스트·getCourse용). */
+export function makeCourse(seed: string): Course {
   const next = u32Stream(seed, 'course')
   return buildCourse(seed, (placed, startRow) => {
     if (placed.length === 0) return { seg: START_PARSED, mirrored: false }

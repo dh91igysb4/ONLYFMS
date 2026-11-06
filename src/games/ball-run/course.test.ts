@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { COL_MAX, COL_MIN, TIER_WEIGHTS } from './constants.ts'
-import { courseFromSegments, decorRandom, getCourse, u32Stream } from './course.ts'
+import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
 import { PARSED, START_PARSED } from './segments.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
 const seedN = (n: number) => n.toString(16).padStart(2, '0').repeat(16)
 
 function allCells(seed: string, rows: number) {
-  const c = getCourse(seed)
+  const c = makeCourse(seed) // 캐시를 거치지 않는 새 인스턴스
   const out: unknown[] = []
   for (let r = 0; r < rows; r++) for (let col = COL_MIN; col <= COL_MAX; col++) out.push(c.cell(col, r))
   return JSON.stringify(out)
@@ -23,11 +23,32 @@ function segs(seed: string, count: number) {
   }
   return list
 }
+// id 뒤의 ~는 좌우 반전
+const GOLDEN = [
+  'start', 't1-gentle-down~', 't1-straight~', 't1-narrow3~', 't1-block-mid~',
+  't1-block-right~', 't1-straight', 't1-gentle-down~', 't1-block-left', 't1-narrow3~',
+]
 const bandW = (m: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromM <= m)!.w
 
 describe('course', () => {
   it('same seed same course', () => {
     expect(allCells(SEED, 3000)).toBe(allCells(SEED, 3000))
+    // 읽는 순서와 상관없다: 정방향으로 전부 읽은 인스턴스 vs 뒤에서부터(2500행 먼저) 읽은 인스턴스
+    const fwd = makeCourse(SEED)
+    const rev = makeCourse(SEED)
+    const cellsOf = (c: ReturnType<typeof makeCourse>, r: number) => {
+      const out: unknown[] = []
+      for (let col = COL_MIN; col <= COL_MAX; col++) out.push(c.cell(col, r))
+      return JSON.stringify(out)
+    }
+    const a: string[] = []
+    for (let r = 0; r <= 3000; r++) a.push(cellsOf(fwd, r))
+    const b: string[] = new Array(3001)
+    for (let r = 3000; r >= 0; r--) b[r] = cellsOf(rev, r)
+    expect(b).toEqual(a)
+    expect(JSON.stringify(rev.segmentsBetween(0, 3000))).toBe(JSON.stringify(fwd.segmentsBetween(0, 3000)))
+    expect(getCourse(SEED)).toBe(getCourse(SEED)) // 캐시는 같은 인스턴스
+    expect(makeCourse(SEED)).not.toBe(makeCourse(SEED))
     expect(allCells(seedN(1), 3000)).not.toBe(allCells(seedN(2), 3000))
   })
   it('starts with START', () => {
@@ -89,15 +110,26 @@ describe('course', () => {
   })
   it('decor stream is independent', () => {
     const s = 'fedcba9876543210fedcba9876543210'
+    const before = allCells(s, 2000)
     const r = decorRandom(s)
     for (let i = 0; i < 1000; i++) r()
-    const after = allCells(s, 2000)
-    const s2 = 'fedcba9876543210fedcba9876543211'
-    expect(after).toBe(allCells('fedcba9876543210fedcba9876543210', 2000))
-    expect(allCells(s2, 10)).not.toBe('')
+    expect(allCells(s, 2000)).toBe(before)
     const a = u32Stream(s, 'x')()
     expect(Number.isInteger(a) && a >= 0 && a < 2 ** 32).toBe(true)
     expect(u32Stream(s, 'decor')()).not.toBe(u32Stream(s, 'course')())
+  })
+  it('golden: first segments of a fixed seed', () => {
+    // 템플릿·가중치가 바뀌면 코스가 달라져 기존 기록이 재생되지 않는다. logic.version을 올리지 않고 이 값만
+    // 고치지 말 것 — 이 테스트가 깨지면 version 범프가 필요한지 먼저 확인한다.
+    const c = makeCourse(SEED)
+    const list = []
+    let row = 0
+    while (list.length < 10) {
+      const s = c.segmentAt(row)
+      list.push(`${s.id}${s.mirrored ? '~' : ''}`)
+      row = s.startRow + s.length
+    }
+    expect(list).toEqual(GOLDEN)
   })
   it('out of range cells are holes', () => {
     const c = getCourse(SEED)
