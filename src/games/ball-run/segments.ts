@@ -86,12 +86,14 @@ export const TEMPLATES: readonly SegmentTemplate[] = [
   { id: 't1-gentle-down', tier: 1, rows: [J, ...rep(F, 3), ...rep(DOWN, 2), ...rep(F, 5), J] },
   // ---- tier 2
   {
+    // 벽 사이 12행: 최고 속도에서 4칸 벽을 반대편으로 돌아가려면(약 1.85 m 옆 이동) 약 7.4 m가 든다.
+    // 첫 벽 앞 9행: 앞 조각이 공을 바깥으로 몰아도 첫 벽까지 건너올 거리.
     id: 't2-zigzag',
     tier: 2,
     rows: [
-      J, ...rep(F, 3),
-      ...rep('BBBB___', 2), ...rep(F, 8),
-      ...rep('___BBBB', 2), ...rep(F, 8),
+      J, ...rep(F, 9),
+      ...rep('BBBB___', 2), ...rep(F, 12),
+      ...rep('___BBBB', 2), ...rep(F, 12),
       ...rep('BBBB___', 2), ...rep(F, 3), J,
     ],
   },
@@ -106,15 +108,17 @@ export const TEMPLATES: readonly SegmentTemplate[] = [
     rows: [J, ...rep(F, 3), ...rep(UP, 3), ...rep(F, 2), ...rep(DOWN, 3), ...rep(F, 3), J],
   },
   {
+    // 블록 사이 12행: 8행이면 최고 속도에서 가운데로 건너가지 못해 바깥 열(±3)로만 빠지고, 다음 조각 첫 벽에 걸린다.
     id: 't2-tunnel-two-blocks',
     tier: 2,
     decor: 'tunnel',
-    rows: [J, ...rep(F, 4), ...rep('_BBB___', 2), ...rep(F, 8), ...rep('___BBB_', 2), ...rep(F, 4), J],
+    rows: [J, ...rep(F, 4), ...rep('_BBB___', 2), ...rep(F, 12), ...rep('___BBB_', 2), ...rep(F, 4), J],
   },
   {
+    // 바깥 틈(±3)으로 빠지면 다음 벽까지 크게 옮겨야 하므로 벽 사이 12행, 끝 평지 6행.
     id: 't2-double-block',
     tier: 2,
-    rows: [J, ...rep(F, 4), ...rep('_BB_BB_', 2), ...rep(F, 8), ...rep('__B_B__', 2), ...rep(F, 4), J],
+    rows: [J, ...rep(F, 4), ...rep('_BB_BB_', 2), ...rep(F, 12), ...rep('__B_B__', 2), ...rep(F, 6), J],
   },
   // ---- tier 3
   {
@@ -172,15 +176,17 @@ export const TEMPLATES: readonly SegmentTemplate[] = [
     ],
   },
   {
+    // 틈이 오른쪽 -> 왼쪽 -> 양 끝 -> 가운데로 옮겨 간다. 큰 옆 이동(약 1.85 m) 앞은 12행, 작은 이동 앞은 8~10행.
+    // 첫 벽 앞 9행은 t2-zigzag와 같은 이유.
     id: 't4-tunnel-dense',
     tier: 4,
     decor: 'tunnel',
     rows: [
-      J, ...rep(F, 3),
-      ...rep('BBBB___', 2), ...rep(F, 8),
-      ...rep('___BBBB', 2), ...rep(F, 8),
+      J, ...rep(F, 9),
+      ...rep('BBBB___', 2), ...rep(F, 12),
+      ...rep('___BBBB', 2), ...rep(F, 10),
       ...rep('__BBB__', 2), ...rep(F, 8),
-      ...rep('BBBB___', 2), ...rep(F, 3), J,
+      ...rep('BB___BB', 2), ...rep(F, 3), J,
     ],
   },
   {
