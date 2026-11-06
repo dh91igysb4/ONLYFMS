@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { G, R, SPEED_STEP_DIST, SPEED_TABLE, V0, VX_MAX } from './constants.ts'
+import { G, R, SPEED_STEP_DIST, SPEED_TABLE, V0, VX_MAX, X_LIMIT } from './constants.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
 import { JOINT, parseSegment } from './segments.ts'
@@ -65,6 +65,21 @@ describe('ball-run sim', () => {
     expect(states[0].x).toBe(VX_MAX)
     expect(states[29].x).toBe(Math.min(3000, 30 * VX_MAX))
     expect(states[29].dead).toBeNull()
+  })
+
+  it('both track edges are symmetric', () => {
+    // colOf(3500) = 4 (트랙 밖)이므로 오른쪽 끝은 X_LIMIT - 1까지만 간다.
+    const c = course(J, ...rep(F, 60), J)
+    const right = run(c, 200, X_LIMIT)
+    expect(right).toHaveLength(200)
+    expect(last(right).dead).toBeNull()
+    expect(last(right).x).toBe(X_LIMIT - 1)
+    const left = run(c, 200, -X_LIMIT)
+    expect(left).toHaveLength(200)
+    expect(last(left).dead).toBeNull()
+    expect(last(left).x).toBe(-X_LIMIT)
+    expect(colOf(X_LIMIT - 1)).toBe(3)
+    expect(colOf(-X_LIMIT)).toBe(-3)
   })
 
   it('side wall blocks', () => {

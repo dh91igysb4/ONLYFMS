@@ -1,7 +1,7 @@
 // 볼 런 시뮬레이션(설계 §3). 판정과 화면이 같은 함수를 쓰는 단일 기준.
 // 모든 상태는 정수(mm, mm/틱, 틱). 연산은 + - *, Math.floor(a / b), 비교만 쓴다.
 import {
-  BLOCK_H, DROP_TOL, FALL_DEPTH, G, R, ROW, SPEED_STEP_DIST, SPEED_TABLE, STEP_TOL, VX_MAX,
+  BLOCK_H, DROP_TOL, FALL_DEPTH, G, R, ROW, SPEED_STEP_DIST, SPEED_TABLE, STEP_TOL, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import type { Course } from './course.ts'
 import { clampX } from './input.ts'
@@ -80,7 +80,8 @@ export function step(s: SimState, targetX: number, course: Course): SimState {
   const vz = speedOf(speedLevel)
 
   // 3. 옆으로. 다른 열로 넘어가는데 그 열 바닥이 공 밑면보다 STEP_TOL 넘게 높으면 막힌다.
-  let x = clampX(s.x + Math.max(-VX_MAX, Math.min(VX_MAX, targetX - s.x)))
+  // colOf(X_LIMIT) = 4(트랙 밖)라서 오른쪽 끝은 X_LIMIT - 1. 좌우 끝이 모두 바깥 열(±3) 안에 머문다.
+  let x = Math.min(X_LIMIT - 1, clampX(s.x + Math.max(-VX_MAX, Math.min(VX_MAX, targetX - s.x))))
   if (colOf(x) !== colOf(s.x)) {
     const side = floorAt(course, x, z)
     if (side !== null && side > s.y - R + STEP_TOL) x = s.x
