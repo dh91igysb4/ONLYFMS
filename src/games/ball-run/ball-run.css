@@ -1,0 +1,106 @@
+/* 볼 런 화면. HUD·오버레이 색은 theme.css 토큰만 쓴다.
+   캔버스 안(3D 장면)의 색은 render/의 고정색이다 (CLAUDE.md 색 예외). */
+.br { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* 모바일 세로 기준 전체 폭. 넓은 화면에서는 화면 높이에 맞춘 세로 비율 상자를 가운데에 둔다. */
+.br-stage {
+  position: relative;
+  width: min(100%, calc(78vh * 9 / 14));
+  width: min(100%, calc(78svh * 9 / 14));
+  aspect-ratio: 9 / 14;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.br-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.br-hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  padding: 8px;
+  pointer-events: none;
+}
+.br-score {
+  grid-column: 2;
+  justify-self: center;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  text-shadow: 0 2px 8px var(--bg);
+}
+.br-pause {
+  grid-column: 3;
+  pointer-events: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.br-hint,
+.br-overlay {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  border: 0;
+}
+.br-hint { pointer-events: none; }
+.br-overlay { cursor: pointer; background: color-mix(in srgb, var(--bg) 65%, transparent); }
+
+.br-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 38%;
+  margin: 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent-strong);
+  text-shadow: 0 2px 10px var(--bg);
+  pointer-events: none;
+  animation: br-banner 1.2s ease-out forwards;
+}
+@keyframes br-banner {
+  0% { opacity: 0; transform: scale(0.8); }
+  15% { opacity: 1; transform: scale(1.05); }
+  25% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .br-banner { animation: none; }
+}
+
+.br-fallback { align-items: flex-start; }
+.br-fallback p { margin: 0; }
+.br-error { margin: 0; color: var(--lose-text); font-size: 14px; }

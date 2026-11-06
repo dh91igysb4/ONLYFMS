@@ -1,6 +1,6 @@
 -- 자유 플레이 점수 상한이 게임별이다 (20261107..._free_score_max)
 begin;
-select plan(9);
+select plan(11);
 
 insert into public.game_modes (game_id, daily, contest, free, score_max) values ('score-test', false, false, true, 1000);
 insert into public.game_modes (game_id, daily, contest, free) values ('test-guess', true, true, true);
@@ -38,6 +38,15 @@ select throws_ok(
   $$insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count)
     values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000e1', 'score-test', 1, false, -1, 0)$$,
   '23514', null, 'negative score rejected');
+
+select lives_ok(
+  $$insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count)
+    values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000e1', 'ball-run', 1, true, 583, 0)$$,
+  'ball-run accepts 583 (seeded score_max 99999)');
+select throws_ok(
+  $$insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count)
+    values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000e1', 'ball-run', 1, true, 100000, 0)$$,
+  '23514', null, 'ball-run rejects 100000');
 
 reset role;
 select ok(not has_function_privilege('authenticated', 'public._free_plays_score_max()', 'execute'),
