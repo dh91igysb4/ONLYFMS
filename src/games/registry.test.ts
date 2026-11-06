@@ -131,3 +131,15 @@ test('game_modes match registry manifests', () => {
   const fromRegistry = new Map([...games, ...duels].map((g) => [g.manifest.id, { ...g.manifest.modes }]))
   expect(Object.fromEntries(seeded)).toEqual(Object.fromEntries(fromRegistry))
 })
+
+test('scoreMax other than 10 requires a free-only score game', () => {
+  for (const { manifest: m } of games) {
+    if ((m.scoreMax ?? 10) !== 10) {
+      expect(m.freeStats, m.id).toBe('score')
+      expect(m.modes.daily, m.id).toBe(false)
+      expect(m.modes.contest, m.id).toBe(false)
+    }
+    if (m.scoreMax !== undefined) expect(Number.isFinite(m.scoreMax) && m.scoreMax > 0, m.id).toBe(true)
+    if (m.scoreDecimals !== undefined) expect([0, 1, 2], m.id).toContain(m.scoreDecimals)
+  }
+})

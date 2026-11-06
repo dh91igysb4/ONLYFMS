@@ -4,6 +4,7 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { games, getGame } from '../../games/index.ts'
 import { now } from '../../lib/serverTime.ts'
 import { kstDate, kstWeekStart } from '../../shared/kst.ts'
+import { formatFreeScore } from '../games/score.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { DuelBoard } from './DuelBoard.tsx'
 import { LbTable } from './LbTable.tsx'
@@ -145,7 +146,7 @@ export function LeaderboardPage() {
                 cols={[{ label: '아이디' }, { label: '플레이', num: true }, { label: '평균', num: true }, { label: '최고', num: true, sorted: true }]}
                 rows={freeRows.map((r, i) => ({
                   id: r.user_id, top: i < 3, me: r.user_id === myId,
-                  cells: [<Handle handle={r.handle} />, r.plays, Number(r.avg_score).toFixed(2), Number(r.best_score).toFixed(2)],
+                  cells: [<Handle handle={r.handle} />, r.plays, formatFreeScore(game, r.avg_score), formatFreeScore(game, r.best_score)],
                 }))}
               />
             ) : (
