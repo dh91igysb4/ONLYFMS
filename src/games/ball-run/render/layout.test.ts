@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { BLOCK_H, X_LIMIT } from '../constants.ts'
+import { BLOCK_H, GATE_H, PILLAR_H, R, X_LIMIT } from '../constants.ts'
 import { courseFromSegments } from '../course.ts'
 import { JOINT, parseSegment } from '../segments.ts'
-import { buildingsFor, segmentBoxes } from './layout.ts'
+import { CAM_BACK, CAM_UP, bankOffset, buildingsFor, cameraTarget, segmentBoxes } from './layout.ts'
+import { floorAt } from '../sim.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
 
@@ -59,6 +60,97 @@ describe('segmentBoxes', () => {
     const info = course.segmentAt(0)
     const boxes = segmentBoxes(course, info)
     expect(boxes.some((b) => b.cx === -3000 || b.cx === 3000)).toBe(false)
+  })
+})
+
+// v2: 기둥·문·기운 판. 행 1: 기둥과 문 기둥 둘(사이 2칸), 행 2: 기운 판.
+const V2 = parseSegment({ id: 'v2', kind: 'obstacle', tier: 1, rows: [JOINT, 'PG__G_.', '.<<_>>.', JOINT] })
+const v2course = courseFromSegments([{ seg: V2, mirrored: false }])
+
+describe('segmentBoxes v2', () => {
+  it('pillar height', () => {
+    const boxes = segmentBoxes(v2course, v2course.segmentAt(0))
+    const p = boxes.find((b) => b.kind === 'block' && b.cx === -3000)!
+    expect(p.h).toBe(PILLAR_H)
+    expect(p.cy).toBe(v2course.cell(-3, 1).floor!.h0 + PILLAR_H / 2)
+    const g = boxes.find((b) => b.kind === 'block' && b.cx === -2000)!
+    expect(g.h).toBe(GATE_H)
+  })
+
+  it('gate lintel', () => {
+    const boxes = segmentBoxes(v2course, v2course.segmentAt(0))
+    const lintels = boxes.filter((b) => b.kind === 'lintel')
+    expect(lintels).toHaveLength(1)
+    const l = lintels[0]
+    // 문 기둥 col -2와 col 1 사이(col -1, 0) 2칸 폭, 가운데는 -500.
+    expect(l.cx).toBe(-500)
+    expect(l.w).toBe(2000)
+    expect(l.cz).toBe(1 * 1000 + 500)
+    const floor = v2course.cell(-2, 1).floor!.h0
+    // 공 위(블록 높이)부터 기둥 꼭대기까지.
+    expect(l.cy - l.h / 2).toBe(floor + BLOCK_H)
+    expect(l.cy + l.h / 2).toBe(floor + GATE_H)
+  })
+
+  it('bank flag', () => {
+    const floors = segmentBoxes(v2course, v2course.segmentAt(0)).filter((b) => b.kind === 'floor' && b.cz === 2500)
+    expect(floors.find((b) => b.cx === -2000)!.bank).toBe(-1)
+    expect(floors.find((b) => b.cx === -1000)!.bank).toBe(-1)
+    expect(floors.find((b) => b.cx === 0)!.bank).toBeUndefined()
+    expect(floors.find((b) => b.cx === 1000)!.bank).toBe(1)
+    expect(floors.find((b) => b.cx === 2000)!.bank).toBe(1)
+  })
+})
+
+describe('bankOffset', () => {
+  it('follows the rolled plank', () => {
+    // 행 2: '.<<_>>.' → 왼쪽 판(col -2, -1, 가운데 -1500)은 왼쪽이 낮고, 오른쪽 판(1, 2, 가운데 1500)은 오른쪽이 낮다.
+    expect(bankOffset(v2course, -1500, 2500)).toBeCloseTo(0)
+    expect(bankOffset(v2course, -2000, 2500)).toBeLessThan(0)
+    expect(bankOffset(v2course, -1000, 2500)).toBeGreaterThan(0)
+    expect(bankOffset(v2course, 2000, 2500)).toBeLessThan(0)
+    expect(bankOffset(v2course, 2000, 2500)).toBeCloseTo(bankOffset(v2course, -2000, 2500))
+    expect(bankOffset(v2course, 0, 2500)).toBe(0)
+    expect(bankOffset(v2course, 0, 500)).toBe(0)
+  })
+})
+
+describe('cameraTarget', () => {
+  // 평지 10행 뒤 급경사 10행.
+  const DESC = parseSegment({
+    id: 'desc', kind: 'descent', tier: 1, rows: [JOINT, ...new Array<string>(10).fill('._____.'), ...new Array<string>(10).fill('.!!!!!.'), JOINT],
+  })
+  const c = courseFromSegments([{ seg: DESC, mirrored: false }])
+
+  it('cameraTarget looks down on descents', () => {
+    // 평지 위, 6 m 앞도 평지.
+    const flat = { x: 0, y: R, z: 2000 }
+    const t0 = cameraTarget(c, flat)
+    expect(t0.lookY).toBe(flat.y)
+    expect(t0.eyeY).toBeGreaterThan(flat.y)
+    // 6 m 앞이 급경사.
+    const edge = { x: 0, y: R, z: 9500 }
+    const t1 = cameraTarget(c, edge)
+    expect(t1.lookY).toBeLessThan(edge.y)
+    expect(t1.eyeY).toBeGreaterThan(edge.y)
+  })
+
+  it('eye stays above the floor behind on descents', () => {
+    // 급경사 중간: 공 뒤 CAM_BACK 바닥이 공 바닥보다 높아도 눈은 그 바닥 위에 있다.
+    const z = 15500
+    const ball = { x: 0, y: floorAt(c, 0, z)! + R, z }
+    const behind = floorAt(c, 0, z - CAM_BACK)!
+    expect(behind).toBeGreaterThan(ball.y)
+    const t = cameraTarget(c, ball)
+    expect(t.eyeY).toBeGreaterThanOrEqual(behind + R + CAM_UP)
+    // 평지에서는 공 위 CAM_UP.
+    expect(cameraTarget(c, { x: 0, y: R, z: 6000 }).eyeY).toBe(R + CAM_UP)
+  })
+
+  it('no floor ahead keeps ball height', () => {
+    // 바깥 열(구멍) 앞은 바닥이 없다.
+    const t = cameraTarget(c, { x: 3000, y: 1234, z: 2000 })
+    expect(t.lookY).toBe(1234)
   })
 })
 
