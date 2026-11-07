@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
 import { Game as ToothbrushGame } from './toothbrush/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
+import { Game as BallRunGame } from './ball-run/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
 export type GameProps = {
@@ -21,6 +22,7 @@ export type GameProps = {
 const components: Record<string, ComponentType<GameProps>> = {
   'who-are-ya': WhoAreYaGame,
   toothbrush: ToothbrushGame,
+  'ball-run': BallRunGame,
 }
 
 export function getGameComponent(id: string): ComponentType<GameProps> | undefined {

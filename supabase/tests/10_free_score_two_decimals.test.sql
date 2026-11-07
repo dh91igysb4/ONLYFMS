@@ -14,7 +14,7 @@ insert into auth.users (id, email) values
 update public.profiles set status = 'approved', handle = 'fox1' where id = '00000000-0000-0000-0000-0000000000f1';
 update public.profiles set status = 'approved', handle = 'fboss', is_admin = true where id = '00000000-0000-0000-0000-0000000000fd';
 
-select col_type_is('public', 'free_plays', 'score', 'numeric(4,2)', 'free_plays.score is numeric(4,2)');
+select col_type_is('public', 'free_plays', 'score', 'numeric(9,2)', 'free_plays.score is numeric(9,2)');
 
 -- 본인 insert(열 단위 권한·RLS)로 두 자리 점수를 저장한다
 set local role authenticated;

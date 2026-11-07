@@ -22,7 +22,7 @@ export interface GameLogic<Puzzle, Action, State, PublicState> {
     ctx: Ctx,
   ): { state: State } | { error: string }
   isFinished(state: State, ctx: Ctx): boolean
-  /** 0~10점, 소수 첫째 자리. 끝나지 않은 상태에서는 "지금 포기했다면 받을 점수"를 돌려준다 */
+  /** 0~scoreMax(기본 10)점. 끝나지 않은 상태에서는 "지금 포기했다면 받을 점수"를 돌려준다 */
   score(state: State, ctx: Ctx): number
   /** 동점 처리용 행동 수 (보통 추측 횟수) */
   actionCount(state: State): number
@@ -61,6 +61,13 @@ export type Manifest = {
    * 'score'는 점수 게임: 리더보드는 플레이·평균·최고만, 최고 점수 순으로 고정한다.
    */
   freeStats?: 'solve' | 'score'
+  /**
+   * 자유 플레이 점수의 상한(기본 10). 10이 아니면 자유 플레이 전용 점수 게임(`freeStats: 'score'`,
+   * 데일리·대회 끔)이어야 한다. DB `game_modes.score_max`와 같아야 하며 트리거가 상한을 지킨다.
+   */
+  scoreMax?: number
+  /** 자유 플레이 점수를 화면에 보일 소수 자릿수(기본 2). 거리처럼 정수 점수면 0 */
+  scoreDecimals?: 0 | 1 | 2
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

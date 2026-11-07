@@ -5,12 +5,20 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const rpcMock = vi.fn()
 let admin = true
 let onlyTest = false
+let withIntGame = false
+const intGame = {
+  manifest: {
+    id: 'int-score', name: '정수 점수', hidden: false, freeStats: 'score', scoreDecimals: 0,
+    modes: { daily: false, contest: false, free: true },
+  },
+}
 vi.mock('../../../games/index.ts', async (orig) => {
   const { withTestGame, testGuess } = await import('../../../test-fixtures/registry.ts')
   const full = withTestGame(await orig())
+  const list = () => (onlyTest ? [testGuess] : full.games).concat(withIntGame ? [intGame as never] : [])
   return {
-    get games() { return onlyTest ? [testGuess] : full.games },
-    getGame: (id: string) => (onlyTest ? [testGuess] : full.games).find((g) => g.manifest.id === id),
+    get games() { return list() },
+    getGame: (id: string) => list().find((g) => g.manifest.id === id),
   }
 })
 vi.mock('../../../lib/api.ts', async (orig) => ({
@@ -26,7 +34,7 @@ import { DailyBlock } from './DailyBlock.tsx'
 import { WeeklyBlock } from './WeeklyBlock.tsx'
 import { StreakBlock } from './StreakBlock.tsx'
 
-beforeEach(() => { rpcMock.mockReset(); admin = true; onlyTest = false })
+beforeEach(() => { rpcMock.mockReset(); admin = true; onlyTest = false; withIntGame = false })
 
 /** 테스트 게임 소제목 영역 (등록부에 다른 게임이 있어도 이 영역만 검사한다) */
 async function ngSection() {
@@ -132,6 +140,17 @@ describe('StreakBlock', () => {
     expect(tb.queryByText(/승률/)).not.toBeInTheDocument()
     const s = await ngSection()
     expect(await s.findByText('12판 · 승률 42% · 연속 3 (최고 5)')).toBeInTheDocument()
+  })
+
+  test('score game with zero decimals shows an integer best score', async () => {
+    withIntGame = true
+    const mineRow = { user_id: 'u1', handle: 'kane', plays: 3, wins: 0, win_rate: 0, current_streak: 0, best_streak: 0, avg_score: 400 }
+    rpcMock.mockImplementation(async (_fn: string, args: { p_game: string }) => (
+      args.p_game === 'int-score' ? [{ ...mineRow, best_score: 583 }] : []
+    ))
+    wrap(<StreakBlock title="내 기록" />)
+    const h = await screen.findByRole('heading', { name: '정수 점수', level: 4 })
+    expect(await within(h.parentElement as HTMLElement).findByText('3판 · 최고 583점')).toBeInTheDocument()
   })
 
   test('no row of mine', async () => {

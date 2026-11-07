@@ -24,6 +24,7 @@
 6. 문제없으면 `hidden`을 풀어 공개
 
 점수로 겨루는 게임은 manifest에 `freeStats: 'score'`를 둔다. 자유 플레이 리더보드가 플레이·평균·최고만 보여 주고 최고 점수 순으로 고정되며, 홈 블록도 최고 점수를 보여 준다.
+점수 상한이 10이 아닌 자유 플레이 점수 게임은 manifest `scoreMax`·`scoreDecimals`와 마이그레이션의 `game_modes.score_max`를 맞춘다 (`registry.test.ts`가 `scoreMax`와 `score_max`를 비교한다).
 
 대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):
 - manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).
@@ -66,7 +67,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
-- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색 예외).
+- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런 3D 장면 내부 색 예외).
 
 ## 비밀값 위치
 - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)

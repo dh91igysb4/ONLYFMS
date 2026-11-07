@@ -18,6 +18,7 @@ vi.mock('../../games/index.ts', () => {
     { manifest: { id: 'secret', name: '비밀 게임', hidden: true } },
     { manifest: { id: 'who-are-ya', name: '후알야', hidden: false } },
     { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeStats: 'score' } },
+    { manifest: { id: 'int-score', name: '정수 점수', hidden: true, freeStats: 'score', scoreDecimals: 0 } },
   ]
   return {
     games,
@@ -134,6 +135,19 @@ test('score_game_shows_plays_avg_best_sorted_by_best', async () => {
   // 점수 게임은 평균·최고를 소수 둘째 자리까지
   expect(within(screen.getByText('beta').closest('tr')!).getByText('9.50')).toBeTruthy()
   expect(within(screen.getByText('beta').closest('tr')!).getByText('5.00')).toBeTruthy()
+})
+
+test('score_game_with_zero_decimals_shows_integers', async () => {
+  admin = true
+  setup({ lb_free: [{ ...free('a', 'alpha', 4, 0, 0, 0, 0, 583), avg_score: 410.5 }] })
+  renderPage()
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'int-score' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'int-score' }))
+  const tr = (await screen.findByText('alpha')).closest('tr')!
+  expect(within(tr).getByText('583')).toBeTruthy()
+  expect(within(tr).queryByText('583.00')).toBeNull()
 })
 
 test('who_are_ya_keeps_wins_sort', async () => {
