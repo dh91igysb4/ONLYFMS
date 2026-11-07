@@ -18,6 +18,8 @@ export interface Course {
   cell(col: number, row: number): Cell
   segmentAt(row: number): SegmentInfo
   segmentsBetween(fromRow: number, toRow: number): SegmentInfo[]
+  /** 시작 행이 row 이하인 터널 조각 수. 첫 조각(시작 터널)은 세지 않는다(첫 조각이 터널이 아니면 빼지 않음). */
+  boostsBefore(row: number): number
 }
 
 const COLS = COL_MAX - COL_MIN + 1
@@ -64,9 +66,10 @@ export function decorRandom(seed: string): () => number {
   return u32Stream(seed, 'decor')
 }
 
-type Placed = SegmentInfo & { grid: Cell[][] }
+// tunnels: 이 조각까지(포함) 놓인 터널 조각 수.
+type Placed = SegmentInfo & { grid: Cell[][]; tunnels: number }
 
-function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: number): Placed {
+function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: number, tunnelsBefore: number): Placed {
   const grid: Cell[][] = []
   for (const row of seg.cells) {
     const out: Cell[] = new Array(COLS)
@@ -84,20 +87,22 @@ function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: nu
     }
     grid.push(out)
   }
-  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, kind: seg.kind, grid }
+  const tunnels = tunnelsBefore + (seg.kind === 'tunnel' ? 1 : 0)
+  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, kind: seg.kind, grid, tunnels }
 }
 
 function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) => { seg: ParsedSegment; mirrored: boolean }): Course {
   const placed: Placed[] = []
   const first = pick(placed, 0)
-  placed.push(place(first.seg, first.mirrored, 0, 0))
+  placed.push(place(first.seg, first.mirrored, 0, 0, 0))
+  const startBoost = first.seg.kind === 'tunnel' ? 1 : 0
   let endRow = first.seg.length
   let endBase = first.seg.dh
 
   const ensure = (row: number): void => {
     while (endRow <= row) {
       const p = pick(placed, endRow)
-      placed.push(place(p.seg, p.mirrored, endRow, endBase))
+      placed.push(place(p.seg, p.mirrored, endRow, endBase, placed[placed.length - 1].tunnels))
       endRow += p.seg.length
       endBase += p.seg.dh
     }
@@ -135,6 +140,11 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
       const out: SegmentInfo[] = []
       for (let i = placed.indexOf(find(from)); i < placed.length && placed[i].startRow <= toRow; i++) out.push(info(placed[i]))
       return out
+    },
+    boostsBefore(row) {
+      const r = Math.max(row, 0)
+      ensure(r)
+      return find(r).tunnels - startBoost
     },
   }
 }

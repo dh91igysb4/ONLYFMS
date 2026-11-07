@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi, type Mock } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, onTestFinished, test, vi, type Mock } from 'vitest'
 import { Game } from './Game.tsx'
 import { logic, type State } from './logic.ts'
 import { getCourse } from './course.ts'
 import { decodeInputs } from './input.ts'
-import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, SEND_TICKS, SPEED_STEP_DIST, TICK_HZ } from './constants.ts'
+import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, SEND_TICKS, TICK_HZ } from './constants.ts'
 import type { SimState } from './sim.ts'
 import { createScene } from './render/scene.ts'
 import { rngFromSeed } from '../../shared/rng.ts'
@@ -378,7 +378,11 @@ describe('ball-run Game', () => {
   })
 
   test('speed banner', async () => {
-    const near = { ...INITIAL, sim: { ...INITIAL.sim, z: SPEED_STEP_DIST - 300 } }
+    // 속도는 지나온 터널 수로 오른다. 화면과 같은 코스 인스턴스(getCourse 캐시)에서 120행부터 터널 하나를 지난 것으로 둔다.
+    const BOOST_ROW = 120
+    const boosts = vi.spyOn(getCourse(PUZZLE.seed), 'boostsBefore').mockImplementation((row) => (row >= BOOST_ROW ? 1 : 0))
+    onTestFinished(() => boosts.mockRestore())
+    const near = { ...INITIAL, sim: { ...INITIAL.sim, z: BOOST_ROW * 1000 - 300 } }
     await mount(props({ publicState: logic.publicState(near) }))
     expect(screen.getByLabelText('점수')).toHaveTextContent('11')
     fireEvent.pointerDown(canvas(), { clientX: 100, pointerId: 1 })

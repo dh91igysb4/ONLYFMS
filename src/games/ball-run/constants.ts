@@ -14,7 +14,6 @@ export const GATE_H = 2000 // 'G' 문 높이
 
 export const V0 = 200
 export const V_MAX = 467
-export const SPEED_STEP_DIST = 120000 // v2: Task 2에서 삭제
 // k번째 = min(V_MAX, floor(V0 * 106^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
 // V_MAX에 닿은 뒤 1개까지만 둔다.
 export const SPEED_TABLE: readonly number[] = [

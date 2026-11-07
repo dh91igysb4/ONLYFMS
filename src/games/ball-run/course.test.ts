@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { COL_MAX, COL_MIN, TIER_WEIGHTS_V1 } from './constants.ts'
 import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
-import { PARSED, START_PARSED } from './segments.ts'
+import { JOINT, PARSED, START_PARSED, parseSegment } from './segments.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
 const seedN = (n: number) => n.toString(16).padStart(2, '0').repeat(16)
@@ -130,6 +130,39 @@ describe('course', () => {
       row = s.startRow + s.length
     }
     expect(list).toEqual(GOLDEN)
+  })
+  it('boostsBefore counts tunnels after the start tunnel', () => {
+    const flat = (id: string, n: number) =>
+      parseSegment({ id, kind: 'obstacle', tier: 1, rows: [JOINT, ...new Array<string>(n).fill('_______'), JOINT] })
+    const tunnel = (id: string, n: number) =>
+      parseSegment({ id, kind: 'tunnel', tier: 1, rows: [JOINT, ...new Array<string>(n).fill('_______'), JOINT] })
+    const T0 = tunnel('t0', 8) // rows 0..9
+    const O1 = flat('o1', 10) // rows 10..21
+    const T1 = tunnel('t1', 4) // rows 22..27
+    const O2 = flat('o2', 3) // rows 28..32
+    const T2 = tunnel('t2', 4) // rows 33..38
+    const c = courseFromSegments([T0, O1, T1, O2, T2].map((seg) => ({ seg, mirrored: false })))
+    // 시작 터널은 세지 않는다.
+    for (const r of [-5, 0, 9, 10, 21]) expect(c.boostsBefore(r)).toBe(0)
+    for (const r of [22, 27, 28, 32]) expect(c.boostsBefore(r)).toBe(1)
+    for (const r of [33, 38, 39, 5000]) expect(c.boostsBefore(r)).toBe(2)
+    // 첫 조각이 터널이 아니면 빼지 않는다.
+    const d = courseFromSegments([O1, T1, O2].map((seg) => ({ seg, mirrored: false })))
+    expect(d.boostsBefore(0)).toBe(0)
+    expect(d.boostsBefore(11)).toBe(0)
+    expect(d.boostsBefore(12)).toBe(1)
+    expect(d.boostsBefore(1000)).toBe(1)
+    // 생성 코스: 시작 터널만 있으면 0이고 행이 늘어도 줄지 않는다.
+    const g = makeCourse(SEED)
+    expect(g.boostsBefore(0)).toBe(0)
+    let prev = 0
+    for (let r = 0; r <= 3000; r += 50) {
+      const b = g.boostsBefore(r)
+      expect(b).toBeGreaterThanOrEqual(prev)
+      prev = b
+    }
+    // 앞쪽부터 읽지 않아도 같은 값
+    expect(makeCourse(SEED).boostsBefore(3000)).toBe(prev)
   })
   it('out of range cells are holes', () => {
     const c = getCourse(SEED)
