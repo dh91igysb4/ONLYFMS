@@ -7,23 +7,33 @@ export const X_LIMIT = 3500
 export const R = 350
 export const BLOCK_H = 1000
 export const RAMP_STEP = 250
+export const STEEP_STEP = 500 // '!' 급경사 한 행의 하강
+export const LEDGE = 1000 // 'v' 단차(칸 시작에서 한 번에 내려가는 높이)
+export const PILLAR_H = 3000 // 'P' 기둥 높이
+export const GATE_H = 2000 // 'G' 문 높이
 
-export const V0 = 167
+export const V0 = 200
 export const V_MAX = 467
-export const SPEED_STEP_DIST = 120000
-// k번째 = min(V_MAX, floor(V0 * 108^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
+export const SPEED_STEP_DIST = 120000 // v2: Task 2에서 삭제
+// k번째 = min(V_MAX, floor(V0 * 106^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
 // V_MAX에 닿은 뒤 1개까지만 둔다.
 export const SPEED_TABLE: readonly number[] = [
-  167, 180, 194, 210, 227, 245, 265, 286, 309, 333, 360, 389, 420, 454, 467, 467,
+  200, 212, 224, 238, 252, 267, 283, 300, 318, 337, 358, 379, 402, 426, 452, 467, 467,
 ]
+
+export const LAT_K = 5
+export const LAT_ACC = 25
+export const BANK_PUSH = 60
 
 export const VX_MAX = 117
 export const G = 7
 export const STEP_TOL = 150
-export const DROP_TOL = 150
+export const DROP_TOL = 260
 export const FALL_DEPTH = 3000
 
-export const SCORE_DIV = 10000
+export const SCORE_DIV = 10000 // v2: Task 4에서 삭제
+export const SCORE_TICKS = 30
+export const OBST_PER_STAGE = 3
 export const SCORE_MAX = 99999
 
 export const DRAG_SPAN = 6000
@@ -32,10 +42,20 @@ export const SEND_TICKS = 30
 export const MAX_CATCHUP = 5
 export const MAX_ACTION_TICKS = 120
 
-export const TIER_WEIGHTS: readonly { fromM: number; w: readonly [number, number, number, number] }[] = [
+// v2: Task 3에서 삭제 (거리 기준 가중치, course.ts가 임시로 쓴다)
+export const TIER_WEIGHTS_V1: readonly { fromM: number; w: readonly [number, number, number, number] }[] = [
   { fromM: 0, w: [1, 0, 0, 0] },
   { fromM: 300, w: [3, 1, 0, 0] },
   { fromM: 800, w: [2, 2, 1, 0] },
   { fromM: 1500, w: [1, 2, 2, 1] },
   { fromM: 2500, w: [1, 1, 2, 2] },
+]
+
+// 장애물 tier 가중치는 지나온 터널 수(단계) 기준.
+export const TIER_WEIGHTS: readonly { fromStage: number; w: readonly [number, number, number, number] }[] = [
+  { fromStage: 0, w: [1, 0, 0, 0] },
+  { fromStage: 1, w: [3, 1, 0, 0] },
+  { fromStage: 3, w: [2, 2, 1, 0] },
+  { fromStage: 5, w: [1, 2, 2, 1] },
+  { fromStage: 8, w: [1, 1, 2, 2] },
 ]

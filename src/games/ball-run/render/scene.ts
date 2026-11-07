@@ -196,7 +196,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
       }))
     }
 
-    if (info.decor === 'tunnel') {
+    if (info.kind === 'tunnel') {
       // 아치 하나 = 기둥 2 + 들보 1. 터널 조각에는 구멍이 없어 가운데 열 바닥이 늘 있다.
       const rows: { z: number; y: number }[] = []
       for (let row = info.startRow + 1; row < info.startRow + info.length - 1; row += ARCH_EVERY) {

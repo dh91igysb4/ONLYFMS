@@ -7,8 +7,8 @@ import { buildingsFor, segmentBoxes } from './layout.ts'
 const SEED = '0123456789abcdef0123456789abcdef'
 
 // 첫 조각: 이음 행만 6행(행마다 바닥 5칸). 둘째: 블록·오르막.
-const STRAIGHT = parseSegment({ id: 'straight', tier: 1, rows: new Array<string>(6).fill(JOINT) })
-const MIXED = parseSegment({ id: 'mixed', tier: 1, rows: [JOINT, '___B___', '/______', 'B______', JOINT] })
+const STRAIGHT = parseSegment({ id: 'straight', kind: 'obstacle', tier: 1, rows: new Array<string>(6).fill(JOINT) })
+const MIXED = parseSegment({ id: 'mixed', kind: 'obstacle', tier: 1, rows: [JOINT, '___B___', '/______', 'B______', JOINT] })
 const course = courseFromSegments([
   { seg: STRAIGHT, mirrored: false },
   { seg: MIXED, mirrored: false },

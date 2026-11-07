@@ -1,7 +1,7 @@
 // 시드 기반 코스 생성기. 순수 정수 연산, 외부 의존 없음.
-import { COL_MAX, COL_MIN, TIER_WEIGHTS } from './constants.ts'
+import { COL_MAX, COL_MIN, TIER_WEIGHTS_V1 } from './constants.ts'
 import { JOINT, PARSED, START_PARSED, parseSegment } from './segments.ts'
-import type { Cell, ParsedSegment } from './segments.ts'
+import type { Cell, ParsedSegment, SegmentKind } from './segments.ts'
 
 export type SegmentInfo = {
   id: string
@@ -10,7 +10,7 @@ export type SegmentInfo = {
   length: number
   mirrored: boolean
   base: number
-  decor?: 'tunnel'
+  kind: SegmentKind
 }
 
 export interface Course {
@@ -72,11 +72,19 @@ function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: nu
     const out: Cell[] = new Array(COLS)
     for (let i = 0; i < COLS; i++) {
       const src = row[mirrored ? COLS - 1 - i : i]
-      out[i] = src.floor === null ? HOLE : { floor: { h0: src.floor.h0 + base, h1: src.floor.h1 + base }, block: src.block }
+      out[i] =
+        src.floor === null
+          ? HOLE
+          : {
+              floor: { h0: src.floor.h0 + base, h1: src.floor.h1 + base },
+              block: src.block,
+              ...(src.blockH !== undefined ? { blockH: src.blockH } : {}),
+              ...(src.bank !== undefined ? { bank: (mirrored ? -src.bank : src.bank) as -1 | 1 } : {}),
+            }
     }
     grid.push(out)
   }
-  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, decor: seg.decor, grid }
+  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, kind: seg.kind, grid }
 }
 
 function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) => { seg: ParsedSegment; mirrored: boolean }): Course {
@@ -106,7 +114,7 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
   }
   const info = (p: Placed): SegmentInfo => ({
     id: p.id, tier: p.tier, startRow: p.startRow, length: p.length, mirrored: p.mirrored, base: p.base,
-    ...(p.decor ? { decor: p.decor } : {}),
+    kind: p.kind,
   })
 
   return {
@@ -132,8 +140,8 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
 }
 
 function bandWeights(m: number): readonly [number, number, number, number] {
-  let w = TIER_WEIGHTS[0].w
-  for (const b of TIER_WEIGHTS) if (b.fromM <= m) w = b.w
+  let w = TIER_WEIGHTS_V1[0].w
+  for (const b of TIER_WEIGHTS_V1) if (b.fromM <= m) w = b.w
   return w
 }
 
@@ -162,6 +170,7 @@ export function makeCourse(seed: string): Course {
 
 const FLAT: ParsedSegment = parseSegment({
   id: 'flat',
+  kind: 'obstacle',
   tier: 1,
   rows: [JOINT, ...new Array<string>(62).fill('_______'), JOINT],
 })

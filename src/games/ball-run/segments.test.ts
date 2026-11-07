@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MIN } from './constants.ts'
+import { COL_MIN, GATE_H, PILLAR_H, SPEED_TABLE, V0, V_MAX } from './constants.ts'
 import { JOINT, PARSED, START, START_PARSED, TEMPLATES, parseSegment } from './segments.ts'
 
 const at = (col: number) => col - COL_MIN
@@ -8,6 +8,7 @@ describe('parseSegment', () => {
   it('parses ramps per column', () => {
     const p = parseSegment({
       id: 't',
+      kind: 'obstacle',
       tier: 1,
       rows: [JOINT, '._///_.', '._///_.', '._\\\\\\_.', '._\\\\\\_.', JOINT],
     })
@@ -25,6 +26,7 @@ describe('parseSegment', () => {
   it('holes keep column height', () => {
     const p = parseSegment({
       id: 't',
+      kind: 'obstacle',
       tier: 1,
       rows: [JOINT, '._/___.', '._.___.', '._\\___.', JOINT],
     })
@@ -33,14 +35,14 @@ describe('parseSegment', () => {
   })
 
   it('block cell has floor and block', () => {
-    const p = parseSegment({ id: 't', tier: 1, rows: [JOINT, '._B___.', JOINT] })
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows: [JOINT, '._B___.', JOINT] })
     expect(p.cells[1][at(-1)].floor).toEqual({ h0: 0, h1: 0 })
     expect(p.cells[1][at(-1)].block).toBe(true)
     expect(p.cells[1][at(0)].block).toBe(false)
   })
 
   it('rejects bad rows', () => {
-    const mk = (rows: string[]) => () => parseSegment({ id: 't', tier: 1, rows })
+    const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows })
     expect(mk([JOINT, '._____', JOINT])).toThrow()
     expect(mk([JOINT, '._x___.', JOINT])).toThrow()
     expect(mk(['_______', '._____.', JOINT])).toThrow()
@@ -48,10 +50,42 @@ describe('parseSegment', () => {
     expect(mk([JOINT, '._/___.', JOINT])).toThrow()
   })
 
-  it('rejects holes and ramps inside a tunnel', () => {
-    const mk = (rows: string[]) => () => parseSegment({ id: 't', tier: 2, decor: 'tunnel', rows })
-    expect(mk([JOINT, '._._.__', JOINT])).toThrow()
+  it('tunnel rule: only floor cells inside a tunnel', () => {
+    const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'tunnel', tier: 2, rows })
+    for (const ch of ['.', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
+      expect(mk([JOINT, `__${ch}____`, JOINT]), ch).toThrow()
+    }
     expect(mk([JOINT, '_______', JOINT])).not.toThrow()
+  })
+
+  it('steep and ledge', () => {
+    const J = JOINT
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows: [J, '.!!!!!.', '.vvvvv.', J] })
+    expect(p.cells[1][at(0)].floor).toEqual({ h0: 0, h1: -500 })
+    expect(p.cells[2][at(0)].floor).toEqual({ h0: -1500, h1: -1500 })
+    expect(p.dh).toBe(-1500)
+  })
+
+  it('bank cells', () => {
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows: [JOINT, '.<<_>>.', JOINT] })
+    const row = p.cells[1]
+    expect(row[at(-2)].bank).toBe(-1)
+    expect(row[at(-1)].bank).toBe(-1)
+    expect(row[at(0)].bank).toBeUndefined()
+    expect(row[at(1)].bank).toBe(1)
+    expect(row[at(2)].bank).toBe(1)
+    for (const c of [-2, -1, 0, 1, 2]) expect(row[at(c)].floor).toEqual({ h0: 0, h1: 0 })
+  })
+
+  it('pillar and gate heights', () => {
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows: [JOINT, '.P_G_G.', '.B____.', JOINT] })
+    const row = p.cells[1]
+    expect(row[at(-2)].block).toBe(true)
+    expect(row[at(-2)].blockH).toBe(PILLAR_H)
+    expect(row[at(0)].blockH).toBe(GATE_H)
+    expect(row[at(2)].blockH).toBe(GATE_H)
+    expect(p.cells[2][at(-2)].block).toBe(true)
+    expect(p.cells[2][at(-2)].blockH).toBeUndefined()
   })
 })
 
@@ -87,10 +121,10 @@ describe('templates', () => {
   })
 
   it('tunnel segments never leave the floor', () => {
-    const tunnels = TEMPLATES.filter((t) => t.decor === 'tunnel')
-    expect(tunnels.length).toBeGreaterThanOrEqual(2)
+    const tunnels = [START, ...TEMPLATES].filter((t) => t.kind === 'tunnel')
+    expect(tunnels.length).toBeGreaterThanOrEqual(1)
     for (const t of tunnels) {
-      for (const row of t.rows.slice(1, -1)) expect(row).not.toMatch(/[./]/)
+      for (const row of t.rows.slice(1, -1)) expect(row).toMatch(/^_+$/)
     }
   })
 
@@ -106,5 +140,19 @@ describe('templates', () => {
       }
     }
     expect(jumps).toBeGreaterThan(0)
+  })
+})
+
+describe('SPEED_TABLE', () => {
+  it('matches formula', () => {
+    expect(V0).toBe(200)
+    const last = SPEED_TABLE.length - 1
+    for (let k = 0; k <= last; k++) {
+      const v = Number((BigInt(V0) * 106n ** BigInt(k)) / 100n ** BigInt(k))
+      expect(SPEED_TABLE[k], `k=${k}`).toBe(Math.min(V_MAX, v))
+    }
+    expect(SPEED_TABLE[last]).toBe(V_MAX)
+    expect(SPEED_TABLE[last - 1]).toBe(V_MAX)
+    expect(SPEED_TABLE[last - 2]).toBeLessThan(V_MAX)
   })
 })

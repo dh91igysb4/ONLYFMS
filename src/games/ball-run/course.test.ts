@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MAX, COL_MIN, TIER_WEIGHTS } from './constants.ts'
+import { COL_MAX, COL_MIN, TIER_WEIGHTS_V1 } from './constants.ts'
 import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
 import { PARSED, START_PARSED } from './segments.ts'
 
@@ -28,7 +28,7 @@ const GOLDEN = [
   'start', 't1-gentle-down~', 't1-straight~', 't1-narrow3~', 't1-block-mid~',
   't1-block-right~', 't1-straight', 't1-gentle-down~', 't1-block-left', 't1-narrow3~',
 ]
-const bandW = (m: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromM <= m)!.w
+const bandW = (m: number) => [...TIER_WEIGHTS_V1].reverse().find((b) => b.fromM <= m)!.w
 
 describe('course', () => {
   it('same seed same course', () => {

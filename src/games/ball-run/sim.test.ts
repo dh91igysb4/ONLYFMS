@@ -10,7 +10,7 @@ const J = JOINT
 const F = '_______'
 const rep = (row: string, n: number): string[] => new Array<string>(n).fill(row)
 const course = (...rows: string[]): Course =>
-  courseFromSegments([{ seg: parseSegment({ id: 'test', tier: 1, rows }), mirrored: false }])
+  courseFromSegments([{ seg: parseSegment({ id: 'test', kind: 'obstacle', tier: 1, rows }), mirrored: false }])
 const straight = (): Course => course(...rep(J, 200))
 
 // target은 고정값 또는 상태를 보고 정하는 함수. dead가 되거나 n틱이 지나면 멈춘다.
@@ -86,8 +86,8 @@ describe('ball-run sim', () => {
     // 왼쪽 두 열(col -2, -1)만 오르막 4행 -> 1 m 높은 평지 6행 -> 내리막 4행.
     const c = course(J, ...rep(F, 2), ...rep('_//____', 4), ...rep(F, 6), ...rep('_\\\\____', 4), ...rep(F, 2), J)
     // 높은 평지 구간(row 7..12)에 들어선 뒤 왼쪽으로 민다.
-    const states = run(c, 72, (s) => (s.z >= 7000 ? -2000 : 0))
-    expect(states).toHaveLength(72)
+    const states = run(c, 60, (s) => (s.z >= 7000 ? -2000 : 0))
+    expect(states).toHaveLength(60)
     expect(last(states).z).toBeLessThan(13000)
     for (const s of states) {
       expect(colOf(s.x)).toBe(0)
