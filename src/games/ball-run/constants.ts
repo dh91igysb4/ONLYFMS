@@ -30,8 +30,7 @@ export const STEP_TOL = 150
 export const DROP_TOL = 260
 export const FALL_DEPTH = 3000
 
-export const SCORE_DIV = 10000 // v2: Task 4에서 삭제
-export const SCORE_TICKS = 30
+export const SCORE_TICKS = 30 // 점수 = floor(tick / SCORE_TICKS), 0.5초에 1점
 export const OBST_PER_STAGE = 3
 export const SCORE_MAX = 99999
 

@@ -36,8 +36,9 @@ describe('ball-run logic', () => {
     expect(logic.puzzleKey(p)).toBe(p.seed)
   })
 
-  it('has version 1 and the spec manifest', () => {
-    expect(logic.version).toBe(1)
+  it('has version 2 and the spec manifest', () => {
+    // v2: 코스·물리·점수 규칙이 모두 바뀌어 v1 기록은 재생되지 않는다.
+    expect(logic.version).toBe(2)
     expect(manifest).toMatchObject({
       id: 'ball-run', name: '볼 런', description: '굴러가는 공을 좌우로 움직여 장애물을 피한다', options: [], hidden: true, freeStats: 'score', scoreMax: 99999, scoreDecimals: 0,
       modes: { daily: false, contest: false, free: true }, puzzleSource: 'generate', dailyTimeLimitSec: null,
@@ -96,10 +97,17 @@ describe('ball-run logic', () => {
     expect(b).toEqual(a)
   })
 
-  it('score is floor(z / 10000) capped', () => {
+  it('score is tick based: floor(tick / 30) capped', () => {
     const s = fresh()
-    expect(logic.score({ ...s, sim: { ...s.sim, z: 5_839_999 } }, ctx)).toBe(583)
-    expect(logic.score({ ...s, sim: { ...s.sim, z: 1_000_000_000_000 } }, ctx)).toBe(99999)
+    const at = (tick: number, z = 0): number => logic.score({ ...s, sim: { ...s.sim, tick, z } }, ctx)
+    expect(at(0)).toBe(0)
+    expect(at(29)).toBe(0)
+    expect(at(59)).toBe(1)
+    expect(at(60)).toBe(2)
+    expect(at(59, 5_839_999)).toBe(1) // 거리는 점수에 쓰지 않는다
+    expect(at(30 * 99999 - 1)).toBe(99998)
+    expect(at(30 * 99999)).toBe(99999)
+    expect(at(1_000_000_000)).toBe(99999)
   })
 
   it('publicState is the state, reveal is null', () => {

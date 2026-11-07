@@ -382,7 +382,8 @@ describe('ball-run Game', () => {
     const BOOST_ROW = 120
     const boosts = vi.spyOn(getCourse(PUZZLE.seed), 'boostsBefore').mockImplementation((row) => (row >= BOOST_ROW ? 1 : 0))
     onTestFinished(() => boosts.mockRestore())
-    const near = { ...INITIAL, sim: { ...INITIAL.sim, z: BOOST_ROW * 1000 - 300 } }
+    // 점수는 틱으로 센다: 359틱 = 11점, 두 틱 뒤 361틱 = 12점.
+    const near = { ...INITIAL, sim: { ...INITIAL.sim, tick: 359, z: BOOST_ROW * 1000 - 300 } }
     await mount(props({ publicState: logic.publicState(near) }))
     expect(screen.getByLabelText('점수')).toHaveTextContent('11')
     fireEvent.pointerDown(canvas(), { clientX: 100, pointerId: 1 })

@@ -146,6 +146,24 @@ describe('templates', () => {
     }
     expect(jumps).toBeGreaterThan(0)
   })
+
+  it('banked boards push one way for at most 8 rows in a row', () => {
+    // 같은 쪽으로 미는 기운 판이 길게 이어지면 손을 거의 못 뗀다(설계 기준). 방향이 바뀌거나 평지가 끼면 끊는다.
+    let banked = 0
+    for (const t of TEMPLATES) {
+      let dir = ''
+      let run = 0
+      t.rows.forEach((row, r) => {
+        const d = row.includes('<') ? '<' : row.includes('>') ? '>' : ''
+        expect(row.includes('<') && row.includes('>'), `${t.id} row ${r} mixes < and >`).toBe(false)
+        run = d !== '' && d === dir ? run + 1 : d !== '' ? 1 : 0
+        dir = d
+        if (d !== '') banked++
+        expect(run, `${t.id} row ${r}`).toBeLessThanOrEqual(8)
+      })
+    }
+    expect(banked).toBeGreaterThan(0)
+  })
 })
 
 describe('pools', () => {

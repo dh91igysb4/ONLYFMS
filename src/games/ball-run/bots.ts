@@ -6,16 +6,22 @@ import { initSim, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 
 const DECIDE_EVERY = 6
-const STAGE_A = 30
-const STAGE_B = 60
-const HORIZON = STAGE_A + STAGE_B
+const HORIZON = 90
+// 계획 = 첫 목표를 A틱 유지한 뒤 둘째 목표를 HORIZON - A틱 유지. 긴 A(30)로 먼저 찾고, 끝까지 사는 계획이 없을 때만
+// 짧은 A(12)로 다시 찾는다. 관성 때문에 촘촘한 1칸 틈(12행 간격)을 연달아 지날 때는 30틱(속도 13에서 약 13행)
+// 동안 첫 목표를 붙들면 다음 틈에 늦는다(v2 o4-dense).
+const STAGE_AS = [30, 12]
 
 // target을 n틱 유지했을 때 끝 상태와 살아남은 틱 수. step은 새 객체를 돌려주므로 s는 그대로다.
+// 떨어져 죽으면 마지막으로 바닥을 딛은 틱까지만 산 것으로 센다. 낙하 도중(최대 약 30틱)을 생존으로 치면 바깥 구멍으로
+// 굴러 떨어지는 계획이 블록에 조금 늦게 부딪히는 계획보다 좋아 보인다.
 function hold(s: SimState, target: number, n: number, course: Course): { end: SimState; alive: number } {
   let cur = s
+  let lastGround = s.grounded ? 0 : -1
   for (let i = 0; i < n; i++) {
     const next = step(cur, target, course)
-    if (next.dead !== null) return { end: next, alive: i }
+    if (next.dead !== null) return { end: next, alive: next.dead === 'fall' ? Math.max(0, lastGround) : i }
+    if (next.grounded) lastGround = i + 1
     cur = next
   }
   return { end: cur, alive: n }
@@ -31,25 +37,27 @@ function decide(s: SimState, prev: number, course: Course): number {
 
   let best = prev
   let bestAlive = -1
-  // 현재 목표를 끝까지 유지하는 계획.
-  const keep = hold(s, prev, HORIZON, course).alive
   const consider = (target: number, alive: number): void => {
     if (alive > bestAlive || (alive === bestAlive && byAbs(target, best) < 0)) {
       best = target
       bestAlive = alive
     }
   }
-  consider(prev, keep)
-  for (const a of cands) {
-    if (bestAlive === HORIZON && byAbs(a, best) >= 0) break
-    const first = hold(s, a, STAGE_A, course)
-    if (first.alive < STAGE_A) {
-      consider(a, first.alive)
-      continue
-    }
-    for (const b of cands) {
-      consider(a, STAGE_A + hold(first.end, b, STAGE_B, course).alive)
-      if (bestAlive === HORIZON && best === a) break
+  // 현재 목표를 끝까지 유지하는 계획.
+  consider(prev, hold(s, prev, HORIZON, course).alive)
+  for (const stageA of STAGE_AS) {
+    if (bestAlive === HORIZON) break
+    for (const a of cands) {
+      if (bestAlive === HORIZON && byAbs(a, best) >= 0) break
+      const first = hold(s, a, stageA, course)
+      if (first.alive < stageA) {
+        consider(a, first.alive)
+        continue
+      }
+      for (const b of cands) {
+        consider(a, stageA + hold(first.end, b, HORIZON - stageA, course).alive)
+        if (bestAlive === HORIZON && best === a) break
+      }
     }
   }
   return best
