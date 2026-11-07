@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { COL_MIN, GATE_H, PILLAR_H, SPEED_TABLE, V0, V_MAX } from './constants.ts'
-import { JOINT, PARSED, START, START_PARSED, TEMPLATES, parseSegment } from './segments.ts'
+import {
+  DESCENTS, JOINT, OBSTACLES, PARSED, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START, START_PARSED, TEMPLATES,
+  TUNNELS, parseSegment,
+} from './segments.ts'
+import type { SegmentTemplate } from './segments.ts'
 
 const at = (col: number) => col - COL_MIN
 
@@ -99,7 +103,8 @@ describe('templates', () => {
       expect(TEMPLATES.filter((t) => t.tier === tier).length).toBeGreaterThanOrEqual(4)
     }
     expect(PARSED.length).toBe(TEMPLATES.length)
-    expect(START_PARSED.length).toBe(36)
+    expect(START_PARSED.length).toBe(24)
+    expect(START.kind).toBe('tunnel')
     expect(START.id).toBe('start')
     expect(START.tier).toBe(1)
   })
@@ -140,6 +145,66 @@ describe('templates', () => {
       }
     }
     expect(jumps).toBeGreaterThan(0)
+  })
+})
+
+describe('pools', () => {
+  const isFloor = (ch: string | undefined) => ch !== undefined && ch !== '.' && ch !== 'B' && ch !== 'P' && ch !== 'G'
+  // 바닥 칸이 양옆 모두 바닥이 아닌 1칸 폭 길이 둘 이상인 행
+  const railRow = (row: string) => {
+    let n = 0
+    for (let i = 0; i < row.length; i++) if (isFloor(row[i]) && !isFloor(row[i - 1]) && !isFloor(row[i + 1])) n++
+    return n >= 2
+  }
+  // 트랙 양끝(구멍이 아닌 첫·마지막 칸)이 블록이고 그 사이에 바닥이 있는 행
+  const wallRow = (row: string) => /^\.*[BPG]+[_<>]+[BPG]+\.*$/.test(row)
+  const runOf = (t: SegmentTemplate, f: (row: string) => boolean, n: number) => {
+    let run = 0
+    for (const row of t.rows) {
+      run = f(row) ? run + 1 : 0
+      if (run >= n) return true
+    }
+    return false
+  }
+
+  it('union and kinds', () => {
+    expect(TEMPLATES).toEqual([...TUNNELS, ...DESCENTS, ...OBSTACLES])
+    expect(PARSED.map((p) => p.id)).toEqual(TEMPLATES.map((t) => t.id))
+    expect(PARSED_TUNNELS.map((p) => p.id)).toEqual(TUNNELS.map((t) => t.id))
+    expect(PARSED_DESCENTS.map((p) => p.id)).toEqual(DESCENTS.map((t) => t.id))
+    expect(PARSED_OBSTACLES.map((p) => p.id)).toEqual(OBSTACLES.map((t) => t.id))
+    for (const t of TUNNELS) expect(t.kind).toBe('tunnel')
+    for (const t of DESCENTS) expect(t.kind).toBe('descent')
+    for (const t of OBSTACLES) expect(t.kind).toBe('obstacle')
+    expect(TEMPLATES.some((t) => t.id === START.id)).toBe(false)
+  })
+
+  it('tunnels: at least 2, 14..18 rows', () => {
+    expect(TUNNELS.length).toBeGreaterThanOrEqual(2)
+    for (const p of PARSED_TUNNELS) {
+      expect(p.length, p.id).toBeGreaterThanOrEqual(14)
+      expect(p.length, p.id).toBeLessThanOrEqual(18)
+    }
+  })
+
+  it('descents: at least 4, each drops 4 m or more', () => {
+    expect(DESCENTS.length).toBeGreaterThanOrEqual(4)
+    for (const p of PARSED_DESCENTS) expect(p.dh, p.id).toBeLessThanOrEqual(-4000)
+  })
+
+  it('obstacles: 4+ per tier, 20+ total, never climb overall', () => {
+    expect(OBSTACLES.length).toBeGreaterThanOrEqual(20)
+    for (const tier of [1, 2, 3, 4]) expect(OBSTACLES.filter((t) => t.tier === tier).length, `tier ${tier}`).toBeGreaterThanOrEqual(4)
+    for (const p of PARSED_OBSTACLES) expect(p.dh, p.id).toBeLessThanOrEqual(0)
+  })
+
+  it('obstacles use pillars, gates, banks, rails and walled corridors', () => {
+    const uses = (f: (t: SegmentTemplate) => boolean) => OBSTACLES.filter(f).map((t) => t.id)
+    expect(uses((t) => t.rows.some((r) => r.includes('P')))).not.toEqual([])
+    expect(uses((t) => t.rows.some((r) => r.includes('G')))).not.toEqual([])
+    expect(uses((t) => t.rows.some((r) => r.includes('<')) && t.rows.some((r) => r.includes('>')))).not.toEqual([])
+    expect(uses((t) => runOf(t, railRow, 6))).not.toEqual([])
+    expect(uses((t) => runOf(t, wallRow, 6))).not.toEqual([])
   })
 })
 

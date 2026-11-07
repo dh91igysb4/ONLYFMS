@@ -87,11 +87,12 @@ describe('ball-run logic', () => {
 
   it('batching does not change the result', () => {
     const targets: number[] = []
-    // 의사 입력 1200틱 (이 시드는 약 471틱에서 죽으므로 사망 틱도 같아야 한다)
+    // 의사 입력 1200틱 (이 시드는 약 209틱, 첫 내리막의 블록에서 죽으므로 사망 틱도 같아야 한다)
     for (let t = 0; t < 1200; t++) targets.push(Math.floor(t / 60) % 2 ? 1000 : -1000)
     const a = send(SEED, fresh(), targets, new Array(40).fill(30))
     const b = send(SEED, fresh(), targets, [7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120, 7, 120])
-    expect(a.sim.tick).toBeGreaterThan(300)
+    expect(a.sim.tick).toBeGreaterThan(150) // 시작 터널(120틱)을 지나 여러 묶음에 걸친다
+    expect(a.sim.dead).not.toBeNull()
     expect(b).toEqual(a)
   })
 

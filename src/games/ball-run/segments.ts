@@ -83,136 +83,202 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
 
 const J = JOINT
 const rep = (row: string, n: number): string[] => new Array<string>(n).fill(row)
-const F = '_______'
-const DOWN = '\\'.repeat(7)
-const UP = '///////'
-const HOLES = '.......'
+const F = '_______' // 7칸 평지(터널 안)
+const W = '._____.' // 5칸 평지(이음 행과 같은 폭)
+const S = '.!!!!!.' // 5칸 급경사 한 행(−500 mm)
+const L = '.vvvvv.' // 5칸 단차(−1000 mm)
+const N3 = '..___..' // 가운데 3칸
+const D5 = '.' + '\\'.repeat(5) + '.' // 5칸 완만한 내리막(−250 mm)
+const U5 = './////.' // 5칸 오르막(+250 mm)
 
-export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 34), J] }
+// 설계 기준(최고 속도 467 mm/틱, 옆 최고 117 mm/틱·가속 25 mm/틱²):
+// - 필요한 차선 변경 사이 빈 행: 1칸 7행 이상(1칸 틈으로 들어가면 10행), 2칸 12행, 3칸 16행.
+//   2칸 틈을 지난 공은 틈의 어느 칸에든 있을 수 있으니 먼 쪽 칸 기준으로 센다.
+// - 조각 첫 장애물은 이음 행 뒤 6~9행(앞 조각 끝에서 공이 어디 있든 건너올 거리).
+// - 단차 뒤 착지까지 최고 속도에서 약 8행 → 단차 뒤 9행 이상 평지.
+// - 칸 높이가 다른 열은 벽, 구멍 열은 높이가 그대로라 좁은 급경사는 바깥 열을 먼저 내려 보낸다('.!___!.' 뒤 '..!!!..').
 
-// 모든 조각은 이음 행으로 시작하고 끝난다. 점프 뒤에는 최고 속도(약 15 m 비행)에서도 착지할 평지를 둔다.
-export const TEMPLATES: readonly SegmentTemplate[] = [
-  // ---- tier 1
-  { id: 't1-straight', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 10), J] },
-  { id: 't1-block-left', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 4), ...rep('_BB____', 2), ...rep(F, 5), J] },
-  { id: 't1-block-mid', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 4), ...rep('__BBB__', 2), ...rep(F, 5), J] },
-  { id: 't1-block-right', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 4), ...rep('____BB_', 2), ...rep(F, 5), J] },
+// 시작 터널(속도 단계에 세지 않는다). 첫 화면이 터널 안이다.
+export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 22), J] }
+
+// 터널: 평평한 7칸 바닥(화면에 가속 화살표·마젠타 벽). 지날 때마다 속도 단계 +1.
+export const TUNNELS: readonly SegmentTemplate[] = [
+  { id: 'tunnel-14', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 12), J] },
+  { id: 'tunnel-16', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 14), J] },
+  { id: 'tunnel-18', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 16), J] },
+]
+
+// 내리막: 터널 출구 뒤 긴 급경사(녹화 3.0~4.5 s, 11.0~12.5 s, 23.0 s). 조각마다 4 m 이상 내려간다.
+export const DESCENTS: readonly SegmentTemplate[] = [
+  // 곧게 뻗은 긴 급경사.
+  { id: 'd-steep', kind: 'descent', tier: 1, rows: [J, W, W, ...rep(S, 10), ...rep(W, 6), J] },
+  // 급경사와 단차 계단 두 번.
   {
-    id: 't1-narrow3',
-    kind: 'obstacle', tier: 1,
-    rows: [J, ...rep(J, 2), ...rep('..___..', 8), ...rep(J, 2), J],
+    id: 'd-steps', kind: 'descent', tier: 1,
+    rows: [J, W, ...rep(S, 4), L, ...rep(W, 9), ...rep(S, 4), L, ...rep(W, 9), J],
   },
-  { id: 't1-gentle-down', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 3), ...rep(DOWN, 2), ...rep(F, 5), J] },
-  // ---- tier 2
+  // 양옆 판이 먼저 떨어지고 가운데 3칸만 남은 혀 모양 급경사(녹화 3.25 s, 12.0 s).
   {
-    // 벽 사이 12행: 최고 속도에서 4칸 벽을 반대편으로 돌아가려면(약 1.85 m 옆 이동) 약 7.4 m가 든다.
-    // 첫 벽 앞 9행: 앞 조각이 공을 바깥으로 몰아도 첫 벽까지 건너올 거리.
-    id: 't2-zigzag',
-    kind: 'obstacle', tier: 2,
-    rows: [
-      J, ...rep(F, 9),
-      ...rep('BBBB___', 2), ...rep(F, 12),
-      ...rep('___BBBB', 2), ...rep(F, 12),
-      ...rep('BBBB___', 2), ...rep(F, 3), J,
-    ],
+    id: 'd-ridge', kind: 'descent', tier: 1,
+    rows: [J, W, S, S, ...rep('.!___!.', 4), ...rep('..!!!..', 4), S, S, ...rep(W, 6), J],
   },
+  // 더 길게 좁아지는 급경사 끝에 단차.
   {
-    id: 't2-bridge2',
-    kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(J, 2), ...rep('..___..', 2), ...rep('...__..', 8), ...rep('..___..', 2), ...rep(J, 2), J],
+    id: 'd-narrow-long', kind: 'descent', tier: 1,
+    rows: [J, W, ...rep('.!___!.', 6), ...rep('..!!!..', 6), L, ...rep(W, 9), J],
   },
+  // 짧은 급경사 + 단차가 세 번 이어지는 계단식 판.
   {
-    id: 't2-hill',
-    kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(F, 3), ...rep(UP, 3), ...rep(F, 2), ...rep(DOWN, 3), ...rep(F, 3), J],
+    id: 'd-terraces', kind: 'descent', tier: 1,
+    rows: [J, W, S, S, L, ...rep(W, 9), S, S, L, ...rep(W, 9), S, S, L, ...rep(W, 7), J],
   },
+  // 급경사 아래 멀리 보이는 작은 블록(녹화 4.0~5.25 s). 가운데로 가면 닿지 않는다.
   {
-    // 블록 사이 12행: 8행이면 최고 속도에서 가운데로 건너가지 못해 바깥 열(±3)로만 빠지고, 다음 조각 첫 벽에 걸린다.
-    id: 't2-tunnel-two-blocks',
-    kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(F, 4), ...rep('_BBB___', 2), ...rep(F, 12), ...rep('___BBB_', 2), ...rep(F, 4), J],
-  },
-  {
-    // 바깥 틈(±3)으로 빠지면 다음 벽까지 크게 옮겨야 하므로 벽 사이 12행, 끝 평지 6행.
-    id: 't2-double-block',
-    kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(F, 4), ...rep('_BB_BB_', 2), ...rep(F, 12), ...rep('__B_B__', 2), ...rep(F, 6), J],
-  },
-  // ---- tier 3
-  {
-    // 왼쪽 4칸만 오르막 -> 높이가 다른 두 갈래. 각 갈래에 블록 하나.
-    id: 't3-two-branches',
-    kind: 'obstacle', tier: 3,
-    rows: [
-      J, ...rep(F, 3), ...rep('////___', 2), ...rep('____B__', 1), ...rep('_______', 5),
-      ...rep('_B_____', 1), ...rep('_______', 2), ...rep('\\\\\\\\___', 2), ...rep(F, 3), J,
-    ],
-  },
-  {
-    // 오르막 4행 끝에서 구멍 2행. 착지 바닥은 오르막 끝 높이.
-    id: 't3-jump',
-    kind: 'obstacle', tier: 3,
-    rows: [J, ...rep(F, 4), ...rep(UP, 4), ...rep(HOLES, 2), ...rep(F, 18), ...rep(DOWN, 4), ...rep(F, 3), J],
-  },
-  {
-    id: 't3-jump-short',
-    kind: 'obstacle', tier: 3,
-    rows: [J, ...rep(F, 4), ...rep(UP, 5), ...rep(HOLES, 1), ...rep(F, 18), ...rep(DOWN, 5), ...rep(F, 3), J],
-  },
-  {
-    id: 't3-bridge1',
-    kind: 'obstacle', tier: 3,
-    rows: [J, ...rep(J, 2), ...rep('..___..', 2), ...rep('..._...', 10), ...rep('..___..', 2), ...rep(J, 2), J],
-  },
-  {
-    // 블록 벽 사이 2칸 틈. 틈 위치가 한 칸 이동한다.
-    id: 't3-wall-gap',
-    kind: 'obstacle', tier: 3,
-    rows: [J, ...rep(F, 4), ...rep('BB__BBB', 2), ...rep(F, 8), ...rep('BBBB__B', 2), ...rep(F, 8), ...rep('BB__BBB', 2), ...rep(F, 4), J],
-  },
-  // ---- tier 4
-  {
-    // 1칸 다리가 0 -> 1 -> 0 -> -1 로 옮겨 간다. 갈아타는 곳은 2칸 폭.
-    id: 't4-bridge-zigzag',
-    kind: 'obstacle', tier: 4,
-    rows: [
-      J, ...rep(J, 2), ...rep('..___..', 2),
-      ...rep('..._...', 6), ...rep('...__..', 4),
-      ...rep('...._..', 6), ...rep('...__..', 4),
-      ...rep('..._...', 6), ...rep('..__...', 4),
-      ...rep('.._....', 6),
-      ...rep('..___..', 2), ...rep(J, 2), J,
-    ],
-  },
-  {
-    // 점프 직후 착지가 끝난 뒤(최고 속도 비행 약 15 m) 블록 벽.
-    id: 't4-jump-block',
-    kind: 'obstacle', tier: 4,
-    rows: [
-      J, ...rep(F, 4), ...rep(UP, 4), ...rep(HOLES, 2), ...rep(F, 17), ...rep('__BBB__', 2),
-      ...rep(F, 2), ...rep(DOWN, 4), ...rep(F, 3), J,
-    ],
-  },
-  {
-    // 틈이 오른쪽 -> 왼쪽 -> 양 끝 -> 가운데로 옮겨 간다. 큰 옆 이동(약 1.85 m) 앞은 12행, 작은 이동 앞은 8~10행.
-    // 첫 벽 앞 9행은 t2-zigzag와 같은 이유.
-    id: 't4-tunnel-dense',
-    kind: 'obstacle', tier: 4,
-    rows: [
-      J, ...rep(F, 9),
-      ...rep('BBBB___', 2), ...rep(F, 12),
-      ...rep('___BBBB', 2), ...rep(F, 10),
-      ...rep('__BBB__', 2), ...rep(F, 8),
-      ...rep('BB___BB', 2), ...rep(F, 3), J,
-    ],
-  },
-  {
-    // 긴 내리막 끝, 왼쪽 4칸이 구멍(오른쪽 3칸은 바닥).
-    id: 't4-downhill-hole',
-    kind: 'obstacle', tier: 4,
-    rows: [J, ...rep(F, 3), ...rep(DOWN, 5), ...rep(F, 2), ...rep('....___', 2), ...rep(F, 5), J],
+    id: 'd-steep-blocks', kind: 'descent', tier: 1,
+    rows: [J, W, ...rep(S, 6), L, ...rep(W, 9), '._B___.', ...rep(W, 6), '.___B_.', ...rep(W, 5), J],
   },
 ]
 
-export const PARSED: readonly ParsedSegment[] = TEMPLATES.map(parseSegment)
+// 장애물: 5칸 격자 위 블록·기둥·문·벽 통로·레일·기운 판·비스듬히 옮겨 가는 길. 전체로는 오르지 않는다.
+export const OBSTACLES: readonly SegmentTemplate[] = [
+  // ---- tier 1
+  // 흩어진 블록 1칸(녹화 17.0~19.5 s).
+  {
+    id: 'o1-scatter', kind: 'obstacle', tier: 1,
+    rows: [J, ...rep(W, 6), '.___B_.', ...rep(W, 7), '._B___.', ...rep(W, 7), '.__B__.', ...rep(W, 6), J],
+  },
+  // 가장자리 큰 기둥 사이 블록(녹화 17.75 s, 19.0 s).
+  {
+    id: 'o1-edge-pillars', kind: 'obstacle', tier: 1,
+    rows: [J, ...rep(W, 5), '.P___P.', '.P___P.', ...rep(W, 7), '.P_B_P.', ...rep(W, 7), '.P___P.', '.P___P.', ...rep(W, 5), J],
+  },
+  // 넓은 문(3칸) 뒤 마젠타 벽 통로.
+  {
+    id: 'o1-gate-wide', kind: 'obstacle', tier: 1,
+    rows: [J, ...rep(W, 6), '.G___G.', ...rep('.B___B.', 8), ...rep(W, 6), J],
+  },
+  // 가운데 3칸으로 좁아지는 판.
+  { id: 'o1-narrow3', kind: 'obstacle', tier: 1, rows: [J, ...rep(W, 3), ...rep(N3, 10), ...rep(W, 4), J] },
+  // 좌우로 번갈아 기운 3칸 판(녹화 4.5 s, 7.0 s의 맛보기).
+  {
+    id: 'o1-bank-intro', kind: 'obstacle', tier: 1,
+    rows: [J, ...rep(W, 4), ...rep('..>>>..', 5), ...rep(W, 5), ...rep('..<<<..', 5), ...rep(W, 5), J],
+  },
+  // 완만한 내리막 끝 가장자리 블록과 1칸 블록 둘.
+  {
+    id: 'o1-down-blocks', kind: 'obstacle', tier: 1,
+    rows: [J, W, W, ...rep(D5, 4), ...rep(W, 6), '.B___B.', ...rep(W, 6), '._B_B_.', ...rep(W, 6), J],
+  },
+  // ---- tier 2
+  // 2칸 문 뒤 2칸 벽 통로(녹화 27.0~27.5 s).
+  {
+    id: 'o2-gate-corridor', kind: 'obstacle', tier: 2,
+    rows: [J, ...rep(W, 8), '.G__GB.', ...rep('.B__BB.', 8), ...rep(W, 6), J],
+  },
+  // 구멍으로 갈라진 1칸 레일 두 줄.
+  { id: 'o2-rails', kind: 'obstacle', tier: 2, rows: [J, ...rep(W, 8), ...rep('.._._..', 10), ...rep(W, 6), J] },
+  // 틈이 좌우로 옮겨 가는 블록 벽. 반대쪽 2칸 틈 사이는 16행(틈 바깥쪽 칸에서 3칸 건너는 경우).
+  {
+    id: 'o2-zigzag', kind: 'obstacle', tier: 2,
+    rows: [J, ...rep(W, 8), '.BBB__.', ...rep(W, 16), '.__BBB.', ...rep(W, 16), '.BBB__.', ...rep(W, 5), J],
+  },
+  // 휘는 길 흉내: 3칸 길이 7행마다 한 칸씩 옆으로 옮겨 간다.
+  {
+    id: 'o2-shift-path', kind: 'obstacle', tier: 2,
+    rows: [
+      J, ...rep(W, 3), ...rep(N3, 3), ...rep('.___...', 7), ...rep('___....', 7), ...rep('.___...', 7),
+      ...rep(N3, 7), ...rep('...___.', 7), ...rep(N3, 3), ...rep(W, 3), J,
+    ],
+  },
+  // 기운 3칸 판이 좌우로 번갈아 기울며 옆으로 옮겨 간다(녹화 4.5~8.0 s).
+  {
+    id: 'o2-bank-alt', kind: 'obstacle', tier: 2,
+    rows: [
+      J, ...rep(W, 4), ...rep('..>>>..', 6), ...rep('.<<<...', 6), ...rep('..>>>..', 6), ...rep('...<<<.', 6),
+      ...rep(W, 4), J,
+    ],
+  },
+  // 가장자리 기둥과 블록(녹화 25.5 s 큰 블록, 35.25 s 높은 기둥).
+  {
+    id: 'o2-pillar-blocks', kind: 'obstacle', tier: 2,
+    rows: [J, ...rep(W, 7), '.P_B_P.', ...rep(W, 8), '.__BP_.', ...rep(W, 8), '.P___P.', '.P___P.', ...rep(W, 4), J],
+  },
+  // 단차로 내려선 판 위 블록.
+  {
+    id: 'o2-ledge-blocks', kind: 'obstacle', tier: 2,
+    rows: [J, W, W, L, ...rep(W, 10), '._B_B_.', ...rep(W, 8), '.B___B.', ...rep(W, 3), L, ...rep(W, 9), J],
+  },
+  // ---- tier 3
+  // 1칸 문(마젠타 기둥 둘 + 남색 가로대) 뒤 3칸 벽 통로(녹화 27.0 s, 30.0 s).
+  {
+    id: 'o3-gate-narrow', kind: 'obstacle', tier: 3,
+    rows: [J, ...rep(W, 8), '.BG_GB.', ...rep('.B___B.', 8), ...rep(W, 5), J],
+  },
+  // 마젠타 띠로 갈라진 1칸 레일 두 줄(녹화 28.5~29.0 s).
+  { id: 'o3-rails-strips', kind: 'obstacle', tier: 3, rows: [J, ...rep(W, 8), ...rep('.._B_..', 12), ...rep(W, 6), J] },
+  // 기운 판이 미는 쪽과 반대로도 옮겨 가는 굽은 길.
+  {
+    id: 'o3-bank-wind', kind: 'obstacle', tier: 3,
+    rows: [
+      J, ...rep(W, 4), ...rep('..<<<..', 6), ...rep('...>>>.', 6), ...rep('..<<<..', 6), ...rep('.>>>...', 6),
+      ...rep('..<<<..', 4), ...rep(W, 4), J,
+    ],
+  },
+  // 기둥 낀 블록 벽 사이로 지그재그, 끝은 1칸 틈.
+  {
+    id: 'o3-slalom', kind: 'obstacle', tier: 3,
+    rows: [J, ...rep(W, 8), '.PBB__.', ...rep(W, 16), '.__BBP.', ...rep(W, 13), '.PB_BP.', ...rep(W, 5), J],
+  },
+  // 오르막 끝 구멍 점프.
+  {
+    id: 'o3-jump', kind: 'obstacle', tier: 3,
+    rows: [J, ...rep(W, 4), ...rep(U5, 4), '.......', '.......', ...rep(W, 18), ...rep(D5, 4), ...rep(W, 3), J],
+  },
+  // 완만히 내려가 높은 기둥 통로, 통로 안 블록과 1칸 틈.
+  {
+    id: 'o3-down-corridor', kind: 'obstacle', tier: 3,
+    rows: [
+      J, W, W, ...rep(D5, 4), ...rep(W, 5), ...rep('.P___P.', 6), '.P_B_P.', ...rep('.P___P.', 8), '.PB_BP.',
+      ...rep('.P___P.', 4), ...rep(W, 4), J,
+    ],
+  },
+  // ---- tier 4
+  // 왼쪽 1칸 레일 → 3칸 건널목 → 오른쪽 1칸 레일.
+  {
+    id: 'o4-rails-switch', kind: 'obstacle', tier: 4,
+    rows: [J, ...rep(W, 7), ...rep('.._....', 8), ...rep(N3, 12), ...rep('...._..', 8), N3, N3, ...rep(W, 3), J],
+  },
+  // 1칸 문 → 벽 통로 → 벽 사이 1칸 레일.
+  {
+    id: 'o4-gate-rails', kind: 'obstacle', tier: 4,
+    rows: [J, ...rep(W, 8), '.BG_GB.', ...rep('.B___B.', 8), ...rep('.B_B_B.', 8), ...rep(W, 5), J],
+  },
+  // 기운 판이 미는 쪽으로 7행마다 옮겨 가는 굽은 3칸 길(바깥 열까지).
+  {
+    id: 'o4-bank-shift', kind: 'obstacle', tier: 4,
+    rows: [
+      J, ...rep(W, 4), ...rep('..>>>..', 7), ...rep('...>>>.', 7), ...rep('...<<<.', 7), ...rep('..<<<..', 7),
+      ...rep('.<<<...', 7), ...rep('.>>>...', 7), ...rep('..>>>..', 5), ...rep(W, 4), J,
+    ],
+  },
+  // 촘촘한 블록 벽, 틈이 옮겨 가다 1칸 틈으로 끝난다.
+  {
+    id: 'o4-dense', kind: 'obstacle', tier: 4,
+    rows: [
+      J, ...rep(W, 9), '.BBB__.', ...rep(W, 16), '.__BBB.', ...rep(W, 10), '._BB_B.', ...rep(W, 12), '.B_BBB.',
+      ...rep(W, 12), '.BB_BB.', ...rep(W, 4), J,
+    ],
+  },
+  // 단차로 내려서자마자 1칸 레일, 다시 단차.
+  {
+    id: 'o4-ledge-rails', kind: 'obstacle', tier: 4,
+    rows: [J, W, W, L, ...rep(W, 10), ...rep('.._._..', 10), ...rep(W, 3), L, ...rep(W, 9), J],
+  },
+]
+
+export const TEMPLATES: readonly SegmentTemplate[] = [...TUNNELS, ...DESCENTS, ...OBSTACLES]
+export const PARSED_TUNNELS: readonly ParsedSegment[] = TUNNELS.map(parseSegment)
+export const PARSED_DESCENTS: readonly ParsedSegment[] = DESCENTS.map(parseSegment)
+export const PARSED_OBSTACLES: readonly ParsedSegment[] = OBSTACLES.map(parseSegment)
+export const PARSED: readonly ParsedSegment[] = [...PARSED_TUNNELS, ...PARSED_DESCENTS, ...PARSED_OBSTACLES]
 export const START_PARSED: ParsedSegment = parseSegment(START)

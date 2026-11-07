@@ -1,6 +1,6 @@
 // 시드 기반 코스 생성기. 순수 정수 연산, 외부 의존 없음.
-import { COL_MAX, COL_MIN, TIER_WEIGHTS_V1 } from './constants.ts'
-import { JOINT, PARSED, START_PARSED, parseSegment } from './segments.ts'
+import { COL_MAX, COL_MIN, OBST_PER_STAGE, TIER_WEIGHTS } from './constants.ts'
+import { JOINT, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell, ParsedSegment, SegmentKind } from './segments.ts'
 
 export type SegmentInfo = {
@@ -149,32 +149,43 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
   }
 }
 
-function bandWeights(m: number): readonly [number, number, number, number] {
-  let w = TIER_WEIGHTS_V1[0].w
-  for (const b of TIER_WEIGHTS_V1) if (b.fromM <= m) w = b.w
+function stageWeights(stage: number): readonly [number, number, number, number] {
+  let w = TIER_WEIGHTS[0].w
+  for (const b of TIER_WEIGHTS) if (b.fromStage <= stage) w = b.w
   return w
 }
 
-/** 캐시 없이 새 코스 인스턴스를 만든다 (테스트·getCourse용). */
+const CYCLE = 2 + OBST_PER_STAGE // 내리막, 장애물 × OBST_PER_STAGE, 터널
+
+/**
+ * 캐시 없이 새 코스 인스턴스를 만든다 (테스트·getCourse용).
+ * 순서: 시작 터널 → 내리막 → 장애물 × OBST_PER_STAGE → 터널 → 내리막 → … (설계 v2 §3.3)
+ */
 export function makeCourse(seed: string): Course {
   const next = u32Stream(seed, 'course')
-  return buildCourse(seed, (placed, startRow) => {
+  return buildCourse(seed, (placed) => {
     if (placed.length === 0) return { seg: START_PARSED, mirrored: false }
-    const w = bandWeights(startRow) // 1 row = 1 m
-    const total = w[0] + w[1] + w[2] + w[3]
-    // 매번 난수 3개를 고정 순서로 뽑아 흐름이 후보 수에 흔들리지 않게 한다.
-    const rTier = next() % total
+    // 매번 난수 3개를 고정 순서로 뽑아 흐름이 조각 종류·후보 수에 흔들리지 않게 한다.
+    const rTier = next()
     const rPick = next()
     const rMirror = next()
+    const mirrored = (rMirror & 1) === 1
+    const pos = (placed.length - 1) % CYCLE
+    if (pos === 0) return { seg: PARSED_DESCENTS[rPick % PARSED_DESCENTS.length], mirrored }
+    if (pos === CYCLE - 1) return { seg: PARSED_TUNNELS[rPick % PARSED_TUNNELS.length], mirrored }
+
+    // 장애물: 단계(시작 터널 뒤 지나온 터널 수) 가중치로 tier를 고르고, 최근 장애물 3개는 피한다.
+    const w = stageWeights(placed[placed.length - 1].tunnels - 1)
+    const total = w[0] + w[1] + w[2] + w[3]
+    const r = rTier % total
     let tier = 0
-    for (let acc = w[0]; tier < 3 && rTier >= acc; ) acc += w[++tier]
+    for (let acc = w[0]; tier < 3 && r >= acc; ) acc += w[++tier]
     tier += 1
     const recent = new Set<string>()
-    for (let i = placed.length - 1; i >= 0 && recent.size < 3; i--) recent.add(placed[i].id)
-    let cands = PARSED.filter((p) => p.tier === tier && !recent.has(p.id))
-    if (cands.length === 0) cands = PARSED.filter((p) => w[p.tier - 1] > 0 && !recent.has(p.id))
-    const seg = cands[rPick % cands.length]
-    return { seg, mirrored: (rMirror & 1) === 1 }
+    for (let i = placed.length - 1; i >= 0 && recent.size < 3; i--) if (placed[i].kind === 'obstacle') recent.add(placed[i].id)
+    let cands = PARSED_OBSTACLES.filter((p) => p.tier === tier && !recent.has(p.id))
+    if (cands.length === 0) cands = PARSED_OBSTACLES.filter((p) => w[p.tier - 1] > 0 && !recent.has(p.id))
+    return { seg: cands[rPick % cands.length], mirrored }
   })
 }
 

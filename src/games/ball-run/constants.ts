@@ -41,15 +41,6 @@ export const SEND_TICKS = 30
 export const MAX_CATCHUP = 5
 export const MAX_ACTION_TICKS = 120
 
-// v2: Task 3에서 삭제 (거리 기준 가중치, course.ts가 임시로 쓴다)
-export const TIER_WEIGHTS_V1: readonly { fromM: number; w: readonly [number, number, number, number] }[] = [
-  { fromM: 0, w: [1, 0, 0, 0] },
-  { fromM: 300, w: [3, 1, 0, 0] },
-  { fromM: 800, w: [2, 2, 1, 0] },
-  { fromM: 1500, w: [1, 2, 2, 1] },
-  { fromM: 2500, w: [1, 1, 2, 2] },
-]
-
 // 장애물 tier 가중치는 지나온 터널 수(단계) 기준.
 export const TIER_WEIGHTS: readonly { fromStage: number; w: readonly [number, number, number, number] }[] = [
   { fromStage: 0, w: [1, 0, 0, 0] },

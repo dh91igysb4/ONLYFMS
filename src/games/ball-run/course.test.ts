@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MAX, COL_MIN, TIER_WEIGHTS_V1 } from './constants.ts'
+import { COL_MAX, COL_MIN, OBST_PER_STAGE, TIER_WEIGHTS } from './constants.ts'
 import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
-import { JOINT, PARSED, START_PARSED, parseSegment } from './segments.ts'
+import { JOINT, PARSED, PARSED_OBSTACLES, START_PARSED, parseSegment } from './segments.ts'
+import type { Cell } from './segments.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
 const seedN = (n: number) => n.toString(16).padStart(2, '0').repeat(16)
@@ -25,10 +26,11 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 't1-gentle-down~', 't1-straight~', 't1-narrow3~', 't1-block-mid~',
-  't1-block-right~', 't1-straight', 't1-gentle-down~', 't1-block-left', 't1-narrow3~',
+  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'o1-edge-pillars~', 'o1-narrow3~', 'tunnel-16~',
+  'd-narrow-long', 'o1-bank-intro~', 'o1-scatter', 'o1-down-blocks~', 'tunnel-14~', 'd-ridge~',
 ]
-const bandW = (m: number) => [...TIER_WEIGHTS_V1].reverse().find((b) => b.fromM <= m)!.w
+const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
+const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
 describe('course', () => {
   it('same seed same course', () => {
@@ -65,12 +67,23 @@ describe('course', () => {
       }
     }
   })
-  it('respects tier schedule', () => {
+  it('stage cycle: tunnel, descent, obstacle x3, tunnel, ...', () => {
+    for (const seed of [SEED, seedN(7), 'a1b2c3d4e5f60718293a4b5c6d7e8f90']) {
+      const kinds = segs(seed, 40).map((s) => s.kind)
+      expect(kinds[0]).toBe('tunnel')
+      const cycle = ['descent', ...new Array<string>(OBST_PER_STAGE).fill('obstacle'), 'tunnel']
+      for (let i = 1; i < kinds.length; i++) expect(kinds[i], `${seed} #${i}`).toBe(cycle[(i - 1) % cycle.length])
+    }
+  })
+  it('tier by stage: obstacle tiers follow the stage weights', () => {
     for (let n = 0; n < 10; n++) {
+      let tunnels = 0
       for (const s of segs(seedN(n + 30), 200)) {
-        if (s.id === 'start') continue
-        expect(bandW(s.startRow)[s.tier - 1]).toBeGreaterThan(0)
+        if (s.kind === 'tunnel') tunnels++
+        if (s.kind !== 'obstacle') continue
+        expect(stageW(tunnels - 1)[s.tier - 1], `${s.id} stage ${tunnels - 1}`).toBeGreaterThan(0)
       }
+      expect(tunnels).toBeGreaterThan(10)
     }
   })
   it('segments are contiguous and segmentsBetween covers range', () => {
@@ -81,15 +94,36 @@ describe('course', () => {
     for (let i = 1; i < list.length; i++) expect(list[i].startRow).toBe(list[i - 1].startRow + list[i - 1].length)
   })
   it('mirror is exact', () => {
-    const X = PARSED.find((p) => p.id === 't3-two-branches')!
+    const X = PARSED_OBSTACLES.find((p) => p.id === 'o2-gate-corridor')!
     const a = courseFromSegments([{ seg: X, mirrored: true }])
     const b = courseFromSegments([{ seg: X, mirrored: false }])
     for (let r = 0; r < X.length; r++) {
-      for (let col = COL_MIN; col <= COL_MAX; col++) expect(a.cell(col, r)).toEqual(b.cell(-col, r))
+      for (let col = COL_MIN; col <= COL_MAX; col++) expect(a.cell(col, r)).toEqual(flipBank(b.cell(-col, r)))
     }
     let asym = false
-    for (let r = 0; r < X.length; r++) if (JSON.stringify(a.cell(-3, r)) !== JSON.stringify(a.cell(3, r))) asym = true
+    for (let r = 0; r < X.length; r++) if (JSON.stringify(a.cell(-1, r)) !== JSON.stringify(a.cell(1, r))) asym = true
     expect(asym).toBe(true)
+  })
+  it('mirror flips bank', () => {
+    const banked = PARSED.filter((p) => p.cells.some((row) => row.some((c) => c.bank !== undefined)))
+    expect(banked.length).toBeGreaterThan(0)
+    for (const X of banked) {
+      const a = courseFromSegments([{ seg: X, mirrored: true }])
+      const b = courseFromSegments([{ seg: X, mirrored: false }])
+      let seen = 0
+      for (let r = 0; r < X.length; r++) {
+        for (let col = COL_MIN; col <= COL_MAX; col++) {
+          const orig = b.cell(col, r).bank
+          const flipped = a.cell(-col, r).bank
+          if (orig === undefined) expect(flipped, `${X.id} ${col},${r}`).toBeUndefined()
+          else {
+            seen++
+            expect(flipped, `${X.id} ${col},${r}`).toBe(-orig)
+          }
+        }
+      }
+      expect(seen, X.id).toBeGreaterThan(0)
+    }
   })
   it('heights are continuous at joints', () => {
     for (const seed of [SEED, seedN(5)]) {
@@ -124,7 +158,7 @@ describe('course', () => {
     const c = makeCourse(SEED)
     const list = []
     let row = 0
-    while (list.length < 10) {
+    while (list.length < 12) {
       const s = c.segmentAt(row)
       list.push(`${s.id}${s.mirrored ? '~' : ''}`)
       row = s.startRow + s.length
