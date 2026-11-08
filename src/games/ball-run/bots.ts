@@ -67,13 +67,18 @@ function decide(s: SimState, prev: number, course: Course): number {
 }
 
 // 죽거나, maxTicks가 지나거나, z >= untilZ가 되면 끝 상태를 돌려준다.
-export function runBot(course: Course, opts: { maxTicks: number; speedLevel?: number; untilZ?: number }): SimState {
+// onStep은 틱마다 새 상태를 받는다(테스트 관찰용).
+export function runBot(
+  course: Course,
+  opts: { maxTicks: number; speedLevel?: number; untilZ?: number; onStep?: (s: SimState) => void },
+): SimState {
   let s = initSim({ speedLevel: opts.speedLevel ?? 0 })
   let target = clampX(s.x - s.drift)
   const untilZ = opts.untilZ ?? Infinity
   while (s.dead === null && s.tick < opts.maxTicks && s.z < untilZ) {
     if (s.tick % DECIDE_EVERY === 0) target = decide(s, target, course)
     s = step(s, target, course)
+    opts.onStep?.(s)
   }
   return s
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MAX, COL_MIN, OBST_PER_STAGE, TIER_WEIGHTS } from './constants.ts'
+import { COL_MAX, COL_MIN, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
 import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
 import { JOINT, PARSED, PARSED_OBSTACLES, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell } from './segments.ts'
@@ -26,8 +26,8 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'o1-edge-pillars~', 'o1-narrow3~', 'tunnel-16~',
-  'd-narrow-long', 'o1-bank-intro~', 'o1-scatter', 'o1-down-blocks~', 'tunnel-14~', 'd-ridge~',
+  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-16~', 'd-terraces~', 'o2-zigzag~',
+  'tunnel-14', 'd-ridge~', 'o1-edge-pillars', 'o1-gate-wide~', 'tunnel-14~', 'd-ridge~',
 ]
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
@@ -59,21 +59,40 @@ describe('course', () => {
     expect(s.startRow).toBe(0)
     expect(s.length).toBe(START_PARSED.length)
   })
-  it('no repeat within last 3', () => {
+  it('no obstacle repeats within the last 3 obstacles', () => {
     for (let n = 0; n < 10; n++) {
-      const ids = segs(seedN(n + 10), 200).map((s) => s.id).filter((id) => id !== 'start')
+      const ids = segs(seedN(n + 10), 200).filter((s) => s.kind === 'obstacle').map((s) => s.id)
       for (let i = 0; i + 3 < ids.length; i++) {
         expect(new Set(ids.slice(i, i + 4)).size).toBe(4)
       }
     }
   })
-  it('stage cycle: tunnel, descent, obstacle x3, tunnel, ...', () => {
+  it('stage cycle: tunnel, descent, obstacle x obstaclesInStage(stage), tunnel, ...', () => {
+    // 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. 단계 1·2는 장애물 1개, 3부터 2개.
+    expect([0, 1, 2, 3, 4, 10, 50].map(obstaclesInStage)).toEqual([1, 1, 1, 2, 2, 2, 2])
     for (const seed of [SEED, seedN(7), 'a1b2c3d4e5f60718293a4b5c6d7e8f90']) {
-      const kinds = segs(seed, 40).map((s) => s.kind)
-      expect(kinds[0]).toBe('tunnel')
-      const cycle = ['descent', ...new Array<string>(OBST_PER_STAGE).fill('obstacle'), 'tunnel']
-      for (let i = 1; i < kinds.length; i++) expect(kinds[i], `${seed} #${i}`).toBe(cycle[(i - 1) % cycle.length])
+      const kinds = segs(seed, 60).map((s) => s.kind)
+      const want: string[] = ['tunnel']
+      for (let stage = 1; want.length < kinds.length; stage++) {
+        want.push('descent', ...new Array<string>(obstaclesInStage(stage)).fill('obstacle'), 'tunnel')
+      }
+      expect(kinds, seed).toEqual(want.slice(0, kinds.length))
     }
+  })
+  it('every segment after the start takes exactly 3 draws (mirror bit is the 3rd)', () => {
+    for (const seed of [SEED, seedN(9)]) {
+      const next = u32Stream(seed, 'course')
+      const list = segs(seed, 40)
+      for (let i = 1; i < list.length; i++) {
+        next()
+        next()
+        expect(list[i].mirrored, `${seed} #${i} ${list[i].kind}`).toBe((next() & 1) === 1)
+      }
+    }
+  })
+  it('tier weights by stage (rescaled for shorter stages)', () => {
+    expect(TIER_WEIGHTS.map((b) => b.fromStage)).toEqual([0, 2, 5, 8, 12])
+    expect(TIER_WEIGHTS.map((b) => b.w)).toEqual([[1, 0, 0, 0], [3, 1, 0, 0], [2, 2, 1, 0], [1, 2, 2, 1], [1, 1, 2, 2]])
   })
   it('tier by stage: obstacle tiers follow the stage weights', () => {
     for (let n = 0; n < 10; n++) {
@@ -81,9 +100,9 @@ describe('course', () => {
       for (const s of segs(seedN(n + 30), 200)) {
         if (s.kind === 'tunnel') tunnels++
         if (s.kind !== 'obstacle') continue
-        expect(stageW(tunnels - 1)[s.tier - 1], `${s.id} stage ${tunnels - 1}`).toBeGreaterThan(0)
+        expect(stageW(tunnels)[s.tier - 1], `${s.id} stage ${tunnels}`).toBeGreaterThan(0)
       }
-      expect(tunnels).toBeGreaterThan(10)
+      expect(tunnels).toBeGreaterThan(12)
     }
   })
   it('segments are contiguous and segmentsBetween covers range', () => {
@@ -165,7 +184,7 @@ describe('course', () => {
     }
     expect(list).toEqual(GOLDEN)
   })
-  it('boostsBefore counts tunnels after the start tunnel', () => {
+  it('boostsBefore counts every tunnel, the start tunnel included', () => {
     const flat = (id: string, n: number) =>
       parseSegment({ id, kind: 'obstacle', tier: 1, rows: [JOINT, ...new Array<string>(n).fill('_______'), JOINT] })
     const tunnel = (id: string, n: number) =>
@@ -176,20 +195,21 @@ describe('course', () => {
     const O2 = flat('o2', 3) // rows 28..32
     const T2 = tunnel('t2', 4) // rows 33..38
     const c = courseFromSegments([T0, O1, T1, O2, T2].map((seg) => ({ seg, mirrored: false })))
-    // 시작 터널은 세지 않는다.
-    for (const r of [-5, 0, 9, 10, 21]) expect(c.boostsBefore(r)).toBe(0)
-    for (const r of [22, 27, 28, 32]) expect(c.boostsBefore(r)).toBe(1)
-    for (const r of [33, 38, 39, 5000]) expect(c.boostsBefore(r)).toBe(2)
-    // 첫 조각이 터널이 아니면 빼지 않는다.
+    // 시작 터널도 한 번 센다(원작: 시작 직후 '속도 증가').
+    expect(c.boostsBefore(-5)).toBe(1)
+    for (const r of [0, 9, 10, 21]) expect(c.boostsBefore(r)).toBe(1)
+    for (const r of [22, 27, 28, 32]) expect(c.boostsBefore(r)).toBe(2)
+    for (const r of [33, 38, 39, 5000]) expect(c.boostsBefore(r)).toBe(3)
+    // 첫 조각이 터널이 아니면 첫 터널까지 0.
     const d = courseFromSegments([O1, T1, O2].map((seg) => ({ seg, mirrored: false })))
     expect(d.boostsBefore(0)).toBe(0)
     expect(d.boostsBefore(11)).toBe(0)
     expect(d.boostsBefore(12)).toBe(1)
     expect(d.boostsBefore(1000)).toBe(1)
-    // 생성 코스: 시작 터널만 있으면 0이고 행이 늘어도 줄지 않는다.
+    // 생성 코스: 시작 터널에서 1이고 행이 늘어도 줄지 않는다.
     const g = makeCourse(SEED)
-    expect(g.boostsBefore(0)).toBe(0)
-    let prev = 0
+    expect(g.boostsBefore(0)).toBe(1)
+    let prev = 1
     for (let r = 0; r <= 3000; r += 50) {
       const b = g.boostsBefore(r)
       expect(b).toBeGreaterThanOrEqual(prev)

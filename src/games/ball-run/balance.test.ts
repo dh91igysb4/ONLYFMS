@@ -1,7 +1,7 @@
 // 밸런스 게이트: 앞을 내다보는 봇이 모든 템플릿(터널·내리막·장애물)을 원본·반전으로, 시작·중간·최고 속도에서
 // 통과해야 한다(설계 §5, v1 §7). 실패하면 봇이 아니라 템플릿을 고친다.
 import { describe, expect, it } from 'vitest'
-import { ROW, SPEED_TABLE } from './constants.ts'
+import { ROW, SPEED_TABLE, TICK_HZ } from './constants.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import { PARSED, START_PARSED } from './segments.ts'
 import { runBot } from './bots.ts'
@@ -12,8 +12,10 @@ const TOP = SPEED_TABLE.length - 1
 const SPEEDS = SPEED_TABLE.map((_, k) => k)
 const cases = PARSED.flatMap((seg) => [false, true].map((mirrored) => ({ id: seg.id, seg, mirrored })))
 
-// 시드 코스에서 봇이 죽지 않고 지나야 하는 단계(지나온 터널 수, 시작 터널 제외).
-const STAGE_GOAL = 10
+// 시드 코스에서 봇이 죽지 않고 지나야 하는 단계(지나온 터널 수, 시작 터널 포함 = 속도 단계).
+// 전에는 시작 터널을 세지 않은 10(터널 11개째)이었다. 시작 터널을 세게 되며 같은 자리가 11이고, 마지막 tier 가중치
+// 구간(fromStage 12)까지 보려고 12로 둔다.
+const STAGE_GOAL = 12
 
 describe('ball-run balance', () => {
   it('gate covers start, middle and top speed', () => {
@@ -34,6 +36,29 @@ describe('ball-run balance', () => {
     }
     expect(failures).toEqual([])
   }, 30_000)
+
+  // 원작 녹화: '속도 증가'가 시작 ≈2.75초 뒤, 그다음 5~8초마다. 봇 주행 첫 60초 동안 단계가 오른 간격의 중앙값이 4~9초.
+  it.each(['0123456789abcdef0123456789abcdef', 'deadbeefdeadbeefdeadbeefdeadbeef', '5eed5eed5eed5eed5eed5eed5eed5eed'])(
+    'boosts come every 4-9 s over the first minute: %s',
+    (seed) => {
+      const rises: number[] = []
+      let level = 0
+      const end = runBot(getCourse(seed), {
+        maxTicks: 60 * TICK_HZ,
+        onStep: (s) => {
+          if (s.speedLevel > level) rises.push(s.tick)
+          level = s.speedLevel
+        },
+      })
+      expect(end.dead).toBeNull()
+      const gaps = rises.slice(1).map((t, i) => (t - rises[i]) / TICK_HZ).sort((a, b) => a - b)
+      expect(gaps.length, `rises at ${rises}`).toBeGreaterThanOrEqual(5)
+      const median = gaps.length % 2 === 1 ? gaps[(gaps.length - 1) / 2] : (gaps[gaps.length / 2 - 1] + gaps[gaps.length / 2]) / 2
+      expect(median, `gaps ${gaps.map((g) => g.toFixed(2))}`).toBeGreaterThanOrEqual(4)
+      expect(median, `gaps ${gaps.map((g) => g.toFixed(2))}`).toBeLessThanOrEqual(9)
+    },
+    30_000,
+  )
 
   const seeds = [
     '0123456789abcdef0123456789abcdef',

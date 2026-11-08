@@ -33,7 +33,6 @@ export const DROP_TOL = 260
 export const FALL_DEPTH = 3000
 
 export const SCORE_TICKS = 30 // 점수 = floor(tick / SCORE_TICKS), 0.5초에 1점
-export const OBST_PER_STAGE = 3
 export const SCORE_MAX = 99999
 
 export const DRAG_SPAN = 6000
@@ -42,11 +41,23 @@ export const SEND_TICKS = 30
 export const MAX_CATCHUP = 5
 export const MAX_ACTION_TICKS = 120
 
-// 장애물 tier 가중치는 지나온 터널 수(단계) 기준.
+// 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. 시작 터널 뒤가 단계 1이다.
+// 터널 사이 장애물 조각 수: 단계 0~2는 1개, 3부터 2개(원작 녹화: '속도 증가'가 5~8초마다).
+export const OBSTACLES_BY_STAGE: readonly { fromStage: number; n: number }[] = [
+  { fromStage: 0, n: 1 },
+  { fromStage: 3, n: 2 },
+]
+export function obstaclesInStage(stage: number): number {
+  let n = OBSTACLES_BY_STAGE[0].n
+  for (const b of OBSTACLES_BY_STAGE) if (b.fromStage <= stage) n = b.n
+  return n
+}
+
+// 장애물 tier 가중치도 단계 기준.
 export const TIER_WEIGHTS: readonly { fromStage: number; w: readonly [number, number, number, number] }[] = [
   { fromStage: 0, w: [1, 0, 0, 0] },
-  { fromStage: 1, w: [3, 1, 0, 0] },
-  { fromStage: 3, w: [2, 2, 1, 0] },
-  { fromStage: 5, w: [1, 2, 2, 1] },
-  { fromStage: 8, w: [1, 1, 2, 2] },
+  { fromStage: 2, w: [3, 1, 0, 0] },
+  { fromStage: 5, w: [2, 2, 1, 0] },
+  { fromStage: 8, w: [1, 2, 2, 1] },
+  { fromStage: 12, w: [1, 1, 2, 2] },
 ]

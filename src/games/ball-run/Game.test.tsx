@@ -422,6 +422,24 @@ describe('ball-run Game', () => {
     expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
   })
 
+  test('speed banner shows once at the start (the start tunnel counts, never twice)', async () => {
+    await mount(props())
+    fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
+    frames(1)
+    expect(lastCur().speedLevel).toBe(1)
+    expect(screen.getByText('속도 증가')).toBeInTheDocument()
+    advance(1300)
+    expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+    // 시작 터널 끝을 지나 다음 조각에 들어설 때까지 다시 뜨지 않는다.
+    for (let k = 0; k < 600 && lastCur().z < (START_LEN + 2) * 1000; k++) {
+      frame()
+      expect(lastCur().dead).toBeNull()
+      expect(lastCur().speedLevel).toBe(1)
+      expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+    }
+    expect(lastCur().z).toBeGreaterThanOrEqual((START_LEN + 2) * 1000)
+  })
+
   test('speed banner on tunnel', async () => {
     // 가짜 없이 실제 코스: 시작 터널 다음 첫 터널 바로 앞에 공을 두고 굴리면 터널에 들어서며 속도 단계가 오른다.
     const course = getCourse(PUZZLE.seed)
@@ -429,17 +447,18 @@ describe('ball-run Game', () => {
     while (seg.kind !== 'tunnel') seg = course.segmentAt(seg.startRow + seg.length)
     const z = seg.startRow * 1000 - 300
     const h = floorAt(course, 0, z)!
-    expect(course.boostsBefore(rowOf(z))).toBe(0)
-    expect(course.boostsBefore(seg.startRow)).toBe(1)
-    const near = { ...INITIAL, sim: { ...INITIAL.sim, z, y: h + R, lastFloor: h } }
+    // 시작 터널이 1단계라 첫 터널 앞은 1, 터널에 들어서면 2.
+    expect(course.boostsBefore(rowOf(z))).toBe(1)
+    expect(course.boostsBefore(seg.startRow)).toBe(2)
+    const near = { ...INITIAL, sim: { ...INITIAL.sim, z, y: h + R, lastFloor: h, speedLevel: 1, vz: SPEED_TABLE[1] } }
     await mount(props({ publicState: logic.publicState(near) }))
     fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
     frames(1)
-    expect(lastCur().speedLevel).toBe(0)
+    expect(lastCur().speedLevel).toBe(1)
     expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
     frames(2)
     expect(lastCur().dead).toBeNull()
-    expect(lastCur().speedLevel).toBe(1)
+    expect(lastCur().speedLevel).toBe(2)
     expect(screen.getByText('속도 증가')).toBeInTheDocument()
     advance(1300)
     expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()

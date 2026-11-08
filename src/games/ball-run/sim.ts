@@ -78,7 +78,7 @@ export function step(s: SimState, targetX: number, course: Course): SimState {
   // 1. 앞으로
   const z = s.z + s.vz
 
-  // 2. 속도 단계 = 지나온 터널 수(시작 터널 제외). 다음 틱부터 적용.
+  // 2. 속도 단계 = 지나온 터널 수(시작 터널 포함, 첫 틱에 1). 다음 틱부터 적용.
   const speedLevel = Math.max(s.speedLevel, course.boostsBefore(rowOf(z)))
   const vz = speedOf(speedLevel)
 

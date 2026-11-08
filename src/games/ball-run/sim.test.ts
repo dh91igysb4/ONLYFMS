@@ -306,7 +306,7 @@ describe('ball-run sim', () => {
     expect(last(states).y - R).toBe(1500)
   })
 
-  it('speed rises at tunnels, start tunnel does not count', () => {
+  it('speed rises at tunnels, the start tunnel boosts exactly once', () => {
     const obst = parseSegment({ id: 'o', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 30), J] })
     const c = courseFromSegments([
       { seg: START_PARSED, mirrored: false }, { seg: obst, mirrored: false },
@@ -315,18 +315,29 @@ describe('ball-run sim', () => {
     const t2 = START_PARSED.length + obst.length
     expect(c.segmentAt(t2).kind).toBe('tunnel')
     const states = run(c, 2000, 0)
+    // 첫 틱에 시작 터널로 1단계(이번 틱은 V0로 왔고 다음 틱부터 빨라진다), 두 번째 터널 전까지 그대로.
+    expect(states[0].speedLevel).toBe(1)
+    expect(states[0].z).toBe(SPEED_TABLE[0])
+    expect(states[1].z - states[0].z).toBe(SPEED_TABLE[1])
     const i = states.findIndex((s) => rowOf(s.z) >= t2)
     expect(i).toBeGreaterThan(0)
     for (const s of states.slice(0, i)) {
-      expect(s.speedLevel).toBe(0)
-      expect(s.vz).toBe(SPEED_TABLE[0])
+      expect(s.speedLevel).toBe(1)
+      expect(s.vz).toBe(SPEED_TABLE[1])
     }
-    expect(states[i].speedLevel).toBe(1)
-    expect(states[i].vz).toBe(SPEED_TABLE[1])
-    // 이번 틱은 V0로 왔고, 다음 틱부터 빨라진다.
-    expect(states[i].z - states[i - 1].z).toBe(SPEED_TABLE[0])
-    expect(states[i + 1].z - states[i].z).toBe(SPEED_TABLE[1])
-    expect(last(states).speedLevel).toBe(1)
+    expect(states[i].speedLevel).toBe(2)
+    expect(states[i].vz).toBe(SPEED_TABLE[2])
+    expect(states[i].z - states[i - 1].z).toBe(SPEED_TABLE[1])
+    expect(states[i + 1].z - states[i].z).toBe(SPEED_TABLE[2])
+    expect(last(states).speedLevel).toBe(2)
+    // 단계가 오르는 틱은 정확히 두 번(시작 터널 한 번, 두 번째 터널 한 번).
+    let rises = 0
+    let prev = 0
+    for (const s of states) {
+      if (s.speedLevel > prev) rises++
+      prev = s.speedLevel
+    }
+    expect(rises).toBe(2)
     // 이미 더 빠른 단계면 낮추지 않는다.
     expect(step(initSim({ speedLevel: 5 }), 0, c).speedLevel).toBe(5)
   })
