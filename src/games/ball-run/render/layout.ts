@@ -62,7 +62,7 @@ export function segmentBoxes(course: Course, info: SegmentInfo): Box[] {
   return out
 }
 
-// 카메라(mm). 카메라는 공 뒤 CAM_BACK, x는 공 x. 눈 목표는 공 위 CAM_UP이고, 급경사·단차에서 카메라와 공 사이(공의 열)
+// 카메라(mm). 카메라는 공 뒤 CAM_BACK(내리막에서는 CAM_BACK_FAR 쪽으로), x는 공 x. 눈 목표는 공 위 CAM_UP이고, 급경사·단차에서 카메라와 공 사이(공의 열)
 // 바닥이 더 높으면 그 바닥 기준으로 올린다(판 속에 묻히지 않게). 앞 바닥은 보지 않는다(가장자리를 넘을 때 계단이 생겨서).
 // 시선 각은 눈→공 방향에서 고정 각만큼 위라 공이 늘 화면 위에서 BALL_FRAC에 온다. 눈이 뒤처져 높이 떠 있으면 더 숙인다.
 export const CAM_UP = 850
@@ -75,23 +75,75 @@ export const EYE_LAG_MAX = 3000 // 눈이 목표보다 이만큼 넘게 높이 �
 const EYE_PROBE = 500
 const EYE_CLEAR = 300 // 카메라~공 사이 바닥 위 최소 여유
 
-export function cameraTarget(course: Course, ball: { x: number; y: number; z: number }): { eyeY: number; minEyeY: number } {
+// 내리막 카메라(녹화 f_045·f_047·f_064·f_069·f_092): 내리막과 터널 직후에는 카메라가 더 뒤·위로 물러나 공이 화면 폭의 약 1/5로
+// 작아지고 좁은 능선과 그 아래 낙차가 보인다. 0(평지 리그)~1(먼 리그) "내리막 정도"로 뒤 거리·눈 높이·최소 숙임 각을 섞는다.
+export const CAM_BACK_FAR = 7000
+export const CAM_UP_FAR = 3000
+export const MIN_DOWN_FAR = (20 * Math.PI) / 180 // 먼 리그의 최소 숙임 각(rad, 세계 기준)
+const DESCENT_BEHIND = 3000 // 공 뒤 이 거리까지의 가장 높은 바닥과
+const DESCENT_AHEAD = 6000 // 공 앞 이 거리까지의 가장 낮은 바닥의 차이로 내리막 정도를 잰다.
+const DESCENT_FULL = 3000 // 이만큼 내려가면 1(급경사 '!' 6 m)
+const DESCENT_RATE_UP = 3 // 1/s, 내리막에 들어서면 약 0.5초에 대부분 물러난다
+const DESCENT_RATE_DOWN = 0.8 // 1/s, 내리막 뒤 능선에서는 천천히 돌아온다
+export const BOOST_PULL = 0.6 // 가속 직후 물러나는 정도(내리막보다 덜)
+export const BOOST_PULL_S = 2.5 // 가속 뒤 이 시간 동안 선형으로 줄어든다
+
+// 공 열의 바닥으로 잰 내리막 정도(0..1). 구멍 위면 0. 프레임마다 smoothDescent로 보간해 쓴다(앞 바닥을 보므로 계단이 생긴다).
+export function descentTarget(course: Course, ball: { x: number; z: number }): number {
+  let hi = -Infinity
+  let lo = Infinity
+  for (let dz = -DESCENT_BEHIND; dz <= DESCENT_AHEAD; dz += EYE_PROBE) {
+    const f = floorAt(course, ball.x, ball.z + dz)
+    if (f === null) continue
+    if (dz <= 0 && f > hi) hi = f
+    if (dz >= 0 && f < lo) lo = f
+  }
+  if (hi === -Infinity || lo === Infinity) return 0
+  return Math.min(1, Math.max(0, (hi - lo) / DESCENT_FULL))
+}
+
+export function smoothDescent(cur: number, target: number, dt: number): number {
+  const rate = target > cur ? DESCENT_RATE_UP : DESCENT_RATE_DOWN
+  return cur + (target - cur) * (1 - Math.exp(-dt * rate))
+}
+
+// 가속(속도 단계 상승) 뒤 sinceS초의 물러남. 시작 터널(단계 1)은 당기지 않는다(녹화 f_016은 가까운 리그).
+export function boostPull(sinceS: number, level: number): number {
+  if (level <= 1 || !(sinceS >= 0) || sinceS >= BOOST_PULL_S) return 0
+  return BOOST_PULL * (1 - sinceS / BOOST_PULL_S)
+}
+
+export type CameraRig = { back: number; up: number; minDown: number }
+export function cameraRig(f: number): CameraRig {
+  const k = Math.min(1, Math.max(0, f))
+  if (k === 0) return { back: CAM_BACK, up: CAM_UP, minDown: 0 }
+  return { back: CAM_BACK + (CAM_BACK_FAR - CAM_BACK) * k, up: CAM_UP + (CAM_UP_FAR - CAM_UP) * k, minDown: MIN_DOWN_FAR * k }
+}
+
+const FLAT_RIG: CameraRig = cameraRig(0)
+
+export function cameraTarget(
+  course: Course,
+  ball: { x: number; y: number; z: number },
+  rig: CameraRig = FLAT_RIG,
+): { eyeY: number; minEyeY: number } {
   let base = ball.y
   let floorMax = -Infinity
-  for (let dz = EYE_PROBE; dz < CAM_BACK + EYE_PROBE; dz += EYE_PROBE) {
-    const f = floorAt(course, ball.x, ball.z - Math.min(dz, CAM_BACK))
+  for (let dz = EYE_PROBE; dz < rig.back + EYE_PROBE; dz += EYE_PROBE) {
+    const f = floorAt(course, ball.x, ball.z - Math.min(dz, rig.back))
     if (f === null) continue
     if (f + R > base) base = f + R
     if (f > floorMax) floorMax = f
   }
-  const eyeY = base + CAM_UP
+  const eyeY = base + rig.up
   return { eyeY, minEyeY: Math.min(eyeY, floorMax + EYE_CLEAR) }
 }
 
-// 시선 각(rad, 음수면 아래). eye·ball은 (y, z) mm, z는 앞쪽이 +.
+// 시선 각(rad, 음수면 아래). eye·ball은 (y, z) mm, z는 앞쪽이 +. minDown(rad)이 있으면 적어도 그만큼 숙인다(세계 기준).
 const BALL_OFF = Math.atan((BALL_FRAC - 0.5) * 2 * Math.tan(((VFOV / 2) * Math.PI) / 180))
-export function lookPitch(eye: { y: number; z: number }, ball: { y: number; z: number }): number {
-  return Math.atan2(ball.y - eye.y, ball.z - eye.z) + BALL_OFF
+export function lookPitch(eye: { y: number; z: number }, ball: { y: number; z: number }, minDown = 0): number {
+  const p = Math.atan2(ball.y - eye.y, ball.z - eye.z) + BALL_OFF
+  return minDown > 0 ? Math.min(p, -minDown) : p
 }
 
 // 눈 높이 한 프레임 보간(mm). 내려갈 때는 천천히, 올라갈 때는 빨리. 목표보다 EYE_LAG_MAX 넘게 높지 않고 minEye 아래로 가지 않는다.

@@ -5,6 +5,7 @@ import { JOINT, parseSegment } from '../segments.ts'
 import {
   BALL_FRAC, BANK_ANGLE, BANK_EASE, CAM_BACK, CAM_UP, EYE_LAG_MAX, LINTEL_H, VFOV, bankEase, bankOffset, buildingsFor, cameraTarget,
   BANK_FLOAT_MAX, bankFollow, lookPitch, segmentBoxes, smoothEye,
+  BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent,
 } from './layout.ts'
 import { floorAt } from '../sim.ts'
 
@@ -262,6 +263,103 @@ describe('cameraTarget', () => {
     // 바깥 열(구멍) 위: 바닥이 없으니 공 높이 기준.
     const t = cameraTarget(c, { x: 3000, y: 1234, z: 2000 })
     expect(t.eyeY).toBe(1234 + CAM_UP)
+  })
+})
+
+describe('descent camera (pull back and up on descents)', () => {
+  // 평지 12행 → 급경사 10행 → 평지 20행, 그리고 완만한 내리막 8행.
+  const rows = [
+    JOINT, ...new Array<string>(12).fill('._____.'), ...new Array<string>(10).fill('.!!!!!.'), ...new Array<string>(20).fill('._____.'),
+    ...new Array<string>(8).fill('.\\\\\\\\\\.'), ...new Array<string>(20).fill('._____.'), JOINT,
+  ]
+  const c = courseFromSegments([{ seg: parseSegment({ id: 'd', kind: 'descent', tier: 1, rows }), mirrored: false }])
+  const at = (z: number, x = 0) => ({ x, y: (floorAt(c, x, z) ?? 0) + R, z })
+
+  it('descentTarget is ~0 on flat ground and rises to 1 on a steep descent', () => {
+    expect(descentTarget(c, at(3000))).toBe(0)
+    expect(descentTarget(c, at(18000))).toBe(1) // 급경사 중간
+    expect(descentTarget(c, at(9000))).toBeGreaterThan(0) // 급경사 앞(앞을 내다본다)
+    expect(descentTarget(c, at(33000))).toBe(0) // 급경사 뒤 평지(앞 6 m도 평지)
+    const gentle = descentTarget(c, at(47000)) // 완만한 내리막(-250 mm/행)
+    expect(gentle).toBeGreaterThan(0.2)
+    expect(gentle).toBeLessThan(1)
+    // 구멍 위(바깥 열)는 0.
+    expect(descentTarget(c, { x: 3000, z: 18000 })).toBe(0)
+    for (let z = 0; z < 70000; z += 250) {
+      const f = descentTarget(c, at(z))
+      expect(f).toBeGreaterThanOrEqual(0)
+      expect(f).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('smoothDescent rises in about half a second and falls more slowly', () => {
+    const dt = 1 / 60
+    let f = 0
+    for (let i = 0; i < 30; i++) f = smoothDescent(f, 1, dt)
+    expect(f).toBeGreaterThan(0.6)
+    expect(f).toBeLessThan(1)
+    let g = 1
+    for (let i = 0; i < 30; i++) g = smoothDescent(g, 0, dt)
+    expect(1 - g).toBeLessThan(f) // 내려올 때가 더 느리다
+    expect(g).toBeGreaterThan(0)
+    expect(smoothDescent(0.5, 0.5, dt)).toBe(0.5)
+  })
+
+  it('boostPull: brief pull after a boost, none for the start boost', () => {
+    expect(boostPull(0.1, 1)).toBe(0) // 시작 터널(단계 1)은 당기지 않는다(녹화 f_016)
+    expect(boostPull(0.1, 2)).toBeGreaterThan(0)
+    expect(boostPull(BOOST_PULL_S, 5)).toBe(0)
+    expect(boostPull(-1, 5)).toBe(0)
+    expect(boostPull(Number.POSITIVE_INFINITY, 5)).toBe(0)
+    expect(boostPull(BOOST_PULL_S / 2, 5)).toBeLessThan(boostPull(0, 5))
+  })
+
+  it('cameraRig blends from the close flat rig to the far, high descent rig', () => {
+    expect(cameraRig(0)).toEqual({ back: CAM_BACK, up: CAM_UP, minDown: 0 })
+    const far = cameraRig(1)
+    expect(far.back).toBe(CAM_BACK_FAR)
+    expect(far.up).toBe(CAM_UP_FAR)
+    expect(CAM_BACK_FAR).toBeGreaterThanOrEqual(6500)
+    expect(CAM_BACK_FAR).toBeLessThanOrEqual(7000)
+    expect(CAM_UP_FAR).toBeGreaterThanOrEqual(2500)
+    expect(CAM_UP_FAR).toBeLessThanOrEqual(3000)
+    expect(far.minDown).toBe(MIN_DOWN_FAR)
+    const mid = cameraRig(0.5)
+    expect(mid.back).toBeGreaterThan(CAM_BACK)
+    expect(mid.back).toBeLessThan(CAM_BACK_FAR)
+    expect(cameraRig(-1)).toEqual(cameraRig(0))
+    expect(cameraRig(2)).toEqual(cameraRig(1))
+  })
+
+  it('cameraTarget uses the rig: higher eye, probes the floor further back', () => {
+    const flat = cameraTarget(c, at(3000))
+    expect(flat.eyeY).toBe(R + CAM_UP)
+    const far = cameraRig(1)
+    expect(cameraTarget(c, at(3000), far).eyeY).toBe(R + CAM_UP_FAR)
+    // 급경사 끝 아래 평지: 뒤 CAM_BACK_FAR 안의 높은 바닥 위로 눈을 올린다.
+    const z = 23500
+    const behind = floorAt(c, 0, z - CAM_BACK_FAR + 500)!
+    expect(behind).toBeGreaterThan(at(z).y)
+    expect(cameraTarget(c, at(z), far).eyeY).toBeGreaterThanOrEqual(behind + R + CAM_UP_FAR)
+  })
+
+  it('minimum downward pitch keeps slopes reading as slopes; inactive on the flat rig', () => {
+    const ball = { y: R, z: 10000 }
+    const eye = { y: R + CAM_UP, z: 10000 - CAM_BACK }
+    expect(lookPitch(eye, ball, 0)).toBe(lookPitch(eye, ball))
+    // 눈이 공보다 낮아도(오르막 끝) 먼 리그에서는 최소 MIN_DOWN_FAR만큼 숙인다.
+    const low = { y: R - 500, z: 10000 - CAM_BACK_FAR }
+    expect(lookPitch(low, ball, MIN_DOWN_FAR)).toBeCloseTo(-MIN_DOWN_FAR, 9)
+    // 먼 리그로 평지를 볼 때는 조금 더 숙여 공이 BALL_FRAC보다 약간 위(0.55 이상)에 온다(녹화 내리막 ≈0.60).
+    const farEye = { y: R + CAM_UP_FAR, z: 10000 - CAM_BACK_FAR }
+    const pitch = lookPitch(farEye, ball, MIN_DOWN_FAR)
+    expect(pitch).toBeLessThanOrEqual(lookPitch(farEye, ball))
+    const ndc = Math.tan(Math.atan2(ball.y - farEye.y, ball.z - farEye.z) - pitch) / Math.tan(((VFOV / 2) * Math.PI) / 180)
+    expect(0.5 - ndc / 2).toBeGreaterThan(0.55)
+    expect(0.5 - ndc / 2).toBeLessThanOrEqual(BALL_FRAC + 1e-9)
+    // 눈이 공보다 충분히 높으면(내리막에서 눈이 뒤처질 때) 최소 각은 걸리지 않는다.
+    const highEye = { y: R + CAM_UP_FAR + 2000, z: 10000 - CAM_BACK_FAR }
+    expect(lookPitch(highEye, ball, MIN_DOWN_FAR)).toBe(lookPitch(highEye, ball))
   })
 })
 

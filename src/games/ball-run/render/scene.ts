@@ -30,7 +30,8 @@ import type { Course, SegmentInfo } from '../course.ts'
 import type { SimState } from '../sim.ts'
 import { colOf, floorAt, rowOf } from '../sim.ts'
 import {
-  BANK_ANGLE, CAM_BACK, FLOOR_T, VFOV, bankOffset, buildingsFor, cameraTarget, lookPitch, plankAt, plankEase, segmentBoxes,
+  BANK_ANGLE, FLOOR_T, VFOV, bankOffset, boostPull, buildingsFor, cameraRig, cameraTarget, descentTarget, lookPitch, plankAt,
+  plankEase, segmentBoxes, smoothDescent,
   bankFollow, smoothEye,
 } from './layout.ts'
 import type { Box, Plank } from './layout.ts'
@@ -540,12 +541,16 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   // ---- 카메라·연출 상태
   let camEyeY = Number.NaN // mm
   let camPitch = 0
+  let camDesc = 0 // 내리막 정도(0 평지 리그 ~ 1 먼 리그)
+  let camBack = cameraRig(0).back // mm
   let bankDy = Number.NaN // mm, 화면에 쓰는 기운 판 높이 보정
   let bankVy = 0 // mm/s
   let lastT = Number.NaN
   let lastLevel = Number.NaN
   let boostAt = Number.NEGATIVE_INFINITY
-  let death: null | { kind: 'hit' | 'fall' | 'give_up'; t0: number; from: SimState; eyeY: number; pitch: number; shards: Shard[] } = null
+  let death: null | {
+    kind: 'hit' | 'fall' | 'give_up'; t0: number; from: SimState; eyeY: number; pitch: number; back: number; shards: Shard[]
+  } = null
 
   function render(prev: SimState, cur: SimState, alpha: number): void {
     const now = performance.now()
@@ -568,8 +573,9 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
       const dy = Number.isNaN(bankDy) ? 0 : bankDy
       death = {
         kind: cur.dead, t0: now, from: cur,
-        eyeY: Number.isNaN(camEyeY) ? cameraTarget(course, cur).eyeY : camEyeY,
+        eyeY: Number.isNaN(camEyeY) ? cameraTarget(course, cur, cameraRig(camDesc)).eyeY : camEyeY,
         pitch: camPitch,
+        back: camBack,
         shards: cur.dead === 'hit' ? makeShards(cur.tick + 1, [cur.x * M, (cur.y + dy) * M, -cur.z * M]) : [],
       }
     }
@@ -643,16 +649,24 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
 
     // 카메라: x는 공 x 그대로, 눈 높이만 시간 기준으로 보간한다(내려갈 때 천천히). 시선 각은 눈→공 방향에서 고정 각만큼 위라
     // 공이 늘 화면 위에서 BALL_FRAC에 온다. 낙하 중에는 높이·각을 고정한다.
+    // 내리막과 가속 직후에는 카메라가 뒤·위로 물러난다(cameraRig). 내리막 정도는 시간 기준으로 보간한다.
     if (death?.kind === 'fall') {
       camEyeY = death.eyeY
       camPitch = death.pitch
+      camBack = death.back
     } else {
-      const t = cameraTarget(course, { x, y, z })
+      if (death === null) {
+        const want = Math.max(descentTarget(course, { x, z }), boostPull((now - boostAt) / 1000, cur.speedLevel))
+        camDesc = Number.isNaN(camEyeY) ? want : smoothDescent(camDesc, want, dt)
+      }
+      const rig = cameraRig(camDesc)
+      camBack = rig.back
+      const t = cameraTarget(course, { x, y, z }, rig)
       camEyeY = Number.isNaN(camEyeY) ? t.eyeY : smoothEye(camEyeY, t.eyeY, t.minEyeY, dt)
-      camPitch = lookPitch({ y: camEyeY, z: z - CAM_BACK }, { y: y + bankDy, z })
+      camPitch = lookPitch({ y: camEyeY, z: z - camBack }, { y: y + bankDy, z }, rig.minDown)
     }
     const ey = camEyeY * M
-    const ez = bz + CAM_BACK * M
+    const ez = bz + camBack * M
     camera.position.set(bx, ey, ez)
     camera.lookAt(bx, ey + Math.tan(camPitch) * LOOK_DIST, ez - LOOK_DIST)
 
