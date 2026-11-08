@@ -378,6 +378,17 @@ describe('ball-run Game', () => {
     expect(onAction).toHaveBeenCalledWith({ type: 'give_up' })
   })
 
+  test('resumes holding the ball where it is when the bank drift is not zero', async () => {
+    // 실효 목표는 target + drift. 이어 하기에서 target을 공 x로 두면 drift만큼 옆으로 쏠린다.
+    const onAction = vi.fn()
+    const drifted = { ...INITIAL, sim: { ...INITIAL.sim, x: 1000, drift: 1000 } }
+    await mount(props({ onAction, publicState: logic.publicState(drifted) }))
+    fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
+    frames(SEND_TICKS)
+    expect(lastCur().x).toBe(1000)
+    expect(lastValue(batches(onAction)[0])).toBe(0)
+  })
+
   test('keyboard moves target', async () => {
     const onAction = vi.fn()
     await mount(props({ onAction }))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANK_PUSH, BLOCK_H, G, GATE_H, LAT_ACC, PILLAR_H, R, SPEED_TABLE, V0, VX_MAX, X_LIMIT,
+  BANK_DRIFT, BLOCK_H, G, GATE_H, KEY_STEP, LAT_ACC, PILLAR_H, R, SPEED_TABLE, V0, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
@@ -47,7 +47,7 @@ describe('ball-run sim', () => {
 
   it('initSim', () => {
     expect(initSim()).toEqual({
-      tick: 0, x: 0, vx: 0, y: R, z: 0, vy: 0, vz: V0, grounded: true, lastFloor: 0, speedLevel: 0, dead: null,
+      tick: 0, x: 0, vx: 0, drift: 0, y: R, z: 0, vy: 0, vz: V0, grounded: true, lastFloor: 0, speedLevel: 0, dead: null,
     })
     expect(initSim({ speedLevel: 3 }).vz).toBe(SPEED_TABLE[3])
     expect(initSim({ speedLevel: 99 }).vz).toBe(SPEED_TABLE[SPEED_TABLE.length - 1])
@@ -96,42 +96,75 @@ describe('ball-run sim', () => {
     expect(Math.abs(last(left).x + 3000)).toBeLessThan(50)
   })
 
-  it('bank pushes downhill', () => {
-    const c = course(J, ...rep(F, 2), ...rep('_<<<<<_', 20), ...rep(F, 10), J)
-    // 기운 판 위(row 3..22)에서 목표를 시작 x(0)로 고정
-    const states = run(c, 160, 0)
-    const onBank = states.filter((s) => rowOf(s.z) >= 3 && rowOf(s.z) <= 22)
-    expect(onBank.length).toBeGreaterThan(20)
-    expect(onBank[19].x).toBeLessThan(0)
-    // 첫 틱은 vx 0에서 판이 BANK_PUSH만큼 민다.
-    const first = states.findIndex((s) => rowOf(s.z) === 3)
-    expect(states[first].x - states[first - 1].x).toBe(states[first].vx - BANK_PUSH)
-    // 손가락을 고정하면 목표보다 약 0.3 m 아래쪽에 머문다.
-    const settled = onBank[onBank.length - 1].x
-    expect(settled).toBeLessThan(-250)
-    expect(settled).toBeGreaterThan(-350)
-    // 반전된 판(>)은 오른쪽으로 민다.
-    const m = courseFromSegments([
-      { seg: parseSegment({ id: 'm', kind: 'obstacle', tier: 1, rows: [J, ...rep(F, 2), ...rep('_<<<<<_', 20), ...rep(F, 10), J] }), mirrored: true },
-    ])
-    const ms = run(m, 160, 0).filter((s) => rowOf(s.z) >= 3 && rowOf(s.z) <= 22)
-    expect(ms[ms.length - 1].x).toBe(-settled)
+  // 기운 판 밀림은 쌓이는 drift(설계 v2 §2.1): 판 위 한 틱마다 drift += bank × BANK_DRIFT, 줄지 않는다.
+  // 실효 목표 = clampX(target + drift). 3칸 판 가운데에서 손을 떼면 6행 안에 판 밖으로 밀려난다.
+  const plank = (ch: string, n: number, after = 12): Course =>
+    course(J, ...rep('..___..', 4), ...rep(`..${ch.repeat(3)}..`, n), ...rep('..___..', after), J)
+  const RUN0 = 5 // 기운 판 첫 행
+
+  it('bank drift: a hands-off ball slides off a 3-wide plank within a 6-row run (speed 1)', () => {
+    const c = plank('>', 6)
+    const states = run(c, 200, 0, initSim({ speedLevel: 1 }))
+    const off = states.findIndex((s) => s.dead === 'fall' || colOf(s.x) > 1)
+    expect(off, 'never left the plank').toBeGreaterThan(0)
+    expect(rowOf(states[off].z), `left at row ${rowOf(states[off].z)}`).toBeLessThanOrEqual(RUN0 + 5)
+    expect(last(states).dead).toBe('fall')
+    // 판 위에서 drift는 틱마다 BANK_DRIFT씩 쌓이고, 판 전에는 0이다.
+    for (let i = 1; i < states.length; i++) {
+      const d = states[i].drift - states[i - 1].drift
+      expect([0, BANK_DRIFT]).toContain(d)
+    }
+    for (const s of states.filter((s) => rowOf(s.z) < RUN0)) expect(s.drift).toBe(0)
+    expect(states.some((s) => s.drift > 0)).toBe(true)
   })
 
-  it('bank push stops off the bank', () => {
-    const c = course(J, ...rep(F, 2), ...rep('_<<<<<_', 10), ...rep(F, 20), J)
-    const states = run(c, 160, (s) => s.x)
-    for (const s of states) expect(s.dead).toBeNull()
-    const enter = states.findIndex((s) => rowOf(s.z) >= 13)
-    expect(enter).toBeGreaterThan(30)
-    const before = Math.abs(states[enter - 1].x - states[enter - 31].x)
-    const after = Math.abs(states[enter + 29].x - states[enter - 1].x)
-    expect(before).toBeGreaterThan(0)
-    expect(after).toBeLessThan(before)
-    for (const s of states.slice(enter + 2)) {
-      expect(s.vx).toBe(0)
-      expect(s.x).toBe(states[enter + 1].x)
+  it('bank drift: steering uphill as fast as the push holds the ball on the plank', () => {
+    for (const [speedLevel, n] of [[1, 6], [1, 8], [8, 8], [16, 8]]) {
+      const c = plank('>', n)
+      // 판 위에 있는 틱마다 손가락을 위쪽(왼쪽)으로 BANK_DRIFT만큼 옮긴다(키보드 KEY_STEP보다 느리다).
+      let tgt = 0
+      const states = run(c, 400, (s) => {
+        if (rowOf(s.z) >= RUN0 && rowOf(s.z) < RUN0 + n) tgt -= BANK_DRIFT
+        return tgt
+      }, initSim({ speedLevel }))
+      const where = `speed ${speedLevel} rows ${n}`
+      for (const s of states) {
+        expect(s.dead, where).toBeNull()
+        expect(Math.abs(s.x), `${where} x=${s.x} at row ${rowOf(s.z)}`).toBeLessThan(500)
+      }
+      expect(Math.abs(tgt)).toBeLessThanOrEqual(X_LIMIT)
     }
+    expect(BANK_DRIFT).toBeLessThan(KEY_STEP)
+  })
+
+  it('bank drift does not decay after the plank and is zero on flat ground', () => {
+    const flat = run(course(J, ...rep(F, 60), J), 200, (s) => ((s.tick * 977) % 6000) - 3000)
+    for (const s of flat) expect(s.drift).toBe(0)
+    const c = course(J, ...rep(F, 4), ...rep('.<<<<<.', 3), ...rep(F, 30), J)
+    const states = run(c, 200, 0)
+    for (const s of states) expect(s.dead).toBeNull()
+    const exit = states.findIndex((s) => rowOf(s.z) >= RUN0 + 3)
+    const d = states[exit].drift
+    expect(d).toBeLessThan(0)
+    // 판을 지난 뒤 drift는 그대로이고, 공은 실효 목표(0 + drift)에 멈춘다(되돌아오지 않는다).
+    for (const s of states.slice(exit)) expect(s.drift).toBe(d)
+    const end = last(states)
+    expect(Math.abs(end.x - d)).toBeLessThan(5)
+    expect(end.vx).toBe(0)
+  })
+
+  it('bank drift is mirrored, integer and clamped', () => {
+    const rows = [J, ...rep('..___..', 4), ...rep('..<<<..', 5), ...rep('..___..', 20), J]
+    const seg = parseSegment({ id: 'm', kind: 'obstacle', tier: 1, rows })
+    const a = run(courseFromSegments([{ seg, mirrored: false }]), 150, 0)
+    const b = run(courseFromSegments([{ seg, mirrored: true }]), 150, 0)
+    expect(b.map((s) => [0 - s.x, 0 - s.drift])).toEqual(a.map((s) => [s.x, s.drift]))
+    for (const s of a) expect(Number.isInteger(s.drift)).toBe(true)
+    expect(a.some((s) => s.drift < 0)).toBe(true)
+    // ±2·X_LIMIT에서 멈춘다.
+    const onPlank = { ...initSim(), z: RUN0 * 1000 + 100 }
+    expect(step({ ...onPlank, drift: -2 * X_LIMIT + 1 }, 0, plank('<', 6)).drift).toBe(-2 * X_LIMIT)
+    expect(step({ ...onPlank, drift: 2 * X_LIMIT - 1 }, 0, plank('>', 6)).drift).toBe(2 * X_LIMIT)
   })
 
   it('bank does not push in the air', () => {
@@ -140,7 +173,10 @@ describe('ball-run sim', () => {
     const states = run(c, 120, (s) => s.x)
     const airOnBank = states.filter((s, i) => i > 0 && !states[i - 1].grounded && rowOf(s.z) >= 12 && rowOf(s.z) <= 15)
     expect(airOnBank.length).toBeGreaterThan(0)
-    for (const s of airOnBank) expect(s.x).toBe(0)
+    for (const s of airOnBank) {
+      expect(s.x).toBe(0)
+      expect(s.drift).toBe(0)
+    }
     for (const s of states) expect(s.dead).toBeNull()
   })
 

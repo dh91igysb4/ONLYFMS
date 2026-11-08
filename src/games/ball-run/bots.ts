@@ -2,6 +2,7 @@
 // 시뮬 내부 상태를 직접 바꾸지 않는다. 외부 의존 없음.
 import { COL_MAX, COL_MIN } from './constants.ts'
 import type { Course } from './course.ts'
+import { clampX } from './input.ts'
 import { initSim, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 
@@ -30,9 +31,11 @@ function hold(s: SimState, target: number, n: number, course: Course): { end: Si
 // |목표|가 작은 순, 같으면 값이 작은 순. 이 순서로 보면 "처음 찾은 최장 생존"이 곧 동률 규칙의 답이다.
 const byAbs = (a: number, b: number): number => Math.abs(a) - Math.abs(b) || a - b
 
+// 후보는 "지금 자리"와 열 가운데를 겨누는 목표다. 기운 판이 쌓은 drift만큼 실효 목표가 옮겨 가므로(sim 설계 §2.1) 목표에서
+// drift를 빼서 겨눈다(사람도 화면의 공 자리를 보고 손가락을 옮긴다).
 function decide(s: SimState, prev: number, course: Course): number {
-  const set = new Set<number>([s.x])
-  for (let col = COL_MIN; col <= COL_MAX; col++) set.add(col * 1000)
+  const set = new Set<number>([clampX(s.x - s.drift)])
+  for (let col = COL_MIN; col <= COL_MAX; col++) set.add(clampX(col * 1000 - s.drift))
   const cands = [...set].sort(byAbs)
 
   let best = prev
@@ -66,7 +69,7 @@ function decide(s: SimState, prev: number, course: Course): number {
 // 죽거나, maxTicks가 지나거나, z >= untilZ가 되면 끝 상태를 돌려준다.
 export function runBot(course: Course, opts: { maxTicks: number; speedLevel?: number; untilZ?: number }): SimState {
   let s = initSim({ speedLevel: opts.speedLevel ?? 0 })
-  let target = s.x
+  let target = clampX(s.x - s.drift)
   const untilZ = opts.untilZ ?? Infinity
   while (s.dead === null && s.tick < opts.maxTicks && s.z < untilZ) {
     if (s.tick % DECIDE_EVERY === 0) target = decide(s, target, course)

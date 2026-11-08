@@ -87,7 +87,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
 
     let cur: SimState = latest.current.ps.sim
     let prev: SimState = cur
-    let target = clampX(cur.x)
+    let target = clampX(cur.x - cur.drift) // 실효 목표 = target + drift(기운 판). 이어 하기에서 공을 제자리에 둔다.
     let pending: number[] = []
     let acc = 0
     let last = 0

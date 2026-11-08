@@ -22,7 +22,9 @@ export const SPEED_TABLE: readonly number[] = [
 
 export const LAT_K = 5
 export const LAT_ACC = 25
-export const BANK_PUSH = 60
+// 기운 판 위 한 틱마다 drift(실효 목표 이동량)에 더하는 값. drift는 줄지 않고 ±BANK_DRIFT_MAX에서 멈춘다.
+export const BANK_DRIFT = 80
+export const BANK_DRIFT_MAX = 2 * X_LIMIT
 
 export const VX_MAX = 117
 export const G = 7

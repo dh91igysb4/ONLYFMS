@@ -170,6 +170,16 @@ describe('templates', () => {
     }
     expect(banked).toBeGreaterThan(0)
   })
+
+  it('banked boards push both ways equally in every template (drift never decays)', () => {
+    // 기운 판이 쌓은 drift는 줄지 않고, 손가락 목표는 ±X_LIMIT 안이라 drift가 크게 남으면 반대쪽 끝에 못 간다.
+    // 조각 안에서는 속도가 같으니 '<' 행 수와 '>' 행 수가 같으면 조각을 지난 뒤 drift가 거의 0으로 돌아온다.
+    for (const t of TEMPLATES) {
+      const left = t.rows.filter((row) => row.includes('<')).length
+      const right = t.rows.filter((row) => row.includes('>')).length
+      expect(left, t.id).toBe(right)
+    }
+  })
 })
 
 describe('pools', () => {
