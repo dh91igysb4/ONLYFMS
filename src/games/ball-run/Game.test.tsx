@@ -5,8 +5,10 @@ import { Game } from './Game.tsx'
 import { logic, type State } from './logic.ts'
 import { getCourse } from './course.ts'
 import { decodeInputs } from './input.ts'
-import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, SEND_TICKS, TICK_HZ } from './constants.ts'
+import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, R, SCORE_TICKS, SEND_TICKS, SPEED_TABLE, TICK_HZ } from './constants.ts'
+import { floorAt, rowOf } from './sim.ts'
 import type { SimState } from './sim.ts'
+import { START_PARSED } from './segments.ts'
 import { createScene } from './render/scene.ts'
 import { rngFromSeed } from '../../shared/rng.ts'
 import type { GameProps } from '../ui.ts'
@@ -32,9 +34,10 @@ afterAll(() => {
 })
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
-// 시드 1: 첫 블록이 col 1, row 55 (그 열로 가면 328틱에 hit). 120 m 근처에서도 30틱은 산다.
+// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 84(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
 const PUZZLE = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(1)), {})
 const INITIAL: State = logic.initState(PUZZLE, ctx)
+const START_LEN = START_PARSED.length
 
 function props(over: Partial<GameProps> = {}): GameProps {
   return {
@@ -155,11 +158,23 @@ describe('ball-run Game', () => {
 
   test('flushes on death', async () => {
     const course = getCourse(PUZZLE.seed)
+    // 그 열로 곧게 가서 닿는 첫 블록: 앞 행마다 그 열이 가운데 열과 같은 높이의 바닥이어야 한다
+    // (내리막 능선 옆 열은 떨어져 나가 구멍이 되므로 그 열 블록에는 가기 전에 떨어진다).
+    const sameFloor = (col: number, row: number) => {
+      const a = course.cell(col, row)
+      const m = course.cell(0, row)
+      return a.floor !== null && !a.block && m.floor !== null && a.floor.h0 === m.floor.h0 && a.floor.h1 === m.floor.h1
+    }
     let block: [number, number] | null = null
     for (let row = 0; row < 400 && !block; row++) {
-      for (let col = -3; col <= 3; col++) if (course.cell(col, row).block) { block = [col, row]; break }
+      for (let col = -3; col <= 3; col++) {
+        if (!course.cell(col, row).block) continue
+        let open = true
+        for (let r = 0; r < row && open; r++) open = sameFloor(col, r)
+        if (open) { block = [col, row]; break }
+      }
     }
-    expect(block).not.toBeNull()
+    expect(block).toEqual([-1, 84])
     const onAction = vi.fn()
     await mount(props({ onAction }))
     // 블록 열 중심으로: dx = col * 1000 / DRAG_SPAN(6000) * 폭(390)
@@ -394,6 +409,50 @@ describe('ball-run Game', () => {
     expect(screen.getByLabelText('점수')).toHaveTextContent('12')
     advance(1300)
     expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+  })
+
+  test('speed banner on tunnel', async () => {
+    // 가짜 없이 실제 코스: 시작 터널 다음 첫 터널 바로 앞에 공을 두고 굴리면 터널에 들어서며 속도 단계가 오른다.
+    const course = getCourse(PUZZLE.seed)
+    let seg = course.segmentAt(START_LEN)
+    while (seg.kind !== 'tunnel') seg = course.segmentAt(seg.startRow + seg.length)
+    const z = seg.startRow * 1000 - 300
+    const h = floorAt(course, 0, z)!
+    expect(course.boostsBefore(rowOf(z))).toBe(0)
+    expect(course.boostsBefore(seg.startRow)).toBe(1)
+    const near = { ...INITIAL, sim: { ...INITIAL.sim, z, y: h + R, lastFloor: h } }
+    await mount(props({ publicState: logic.publicState(near) }))
+    fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
+    frames(1)
+    expect(lastCur().speedLevel).toBe(0)
+    expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+    frames(2)
+    expect(lastCur().dead).toBeNull()
+    expect(lastCur().speedLevel).toBe(1)
+    expect(screen.getByText('속도 증가')).toBeInTheDocument()
+    advance(1300)
+    expect(screen.queryByText('속도 증가')).not.toBeInTheDocument()
+  })
+
+  test('score HUD follows time: +1 every 0.5 s (SCORE_TICKS) regardless of distance', async () => {
+    expect(SCORE_TICKS).toBe(TICK_HZ / 2)
+    // 빠른 속도(단계 8)로 시작해 거리와 시간이 갈리게 한다(단계 0의 200 mm/틱이면 30틱 = 6 m라 거리 점수와 우연히 같다).
+    const fast = { ...INITIAL, sim: { ...INITIAL.sim, speedLevel: 8, vz: SPEED_TABLE[8] } }
+    await mount(props({ publicState: logic.publicState(fast) }))
+    expect(screen.getByLabelText('점수')).toHaveTextContent('0')
+    fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
+    const seen: number[] = []
+    for (let k = 1; k <= 4 * SCORE_TICKS; k++) {
+      frame()
+      const { tick } = lastCur()
+      expect(Number(screen.getByLabelText('점수').textContent), `tick ${tick}`).toBe(Math.floor(tick / SCORE_TICKS))
+      if (tick % SCORE_TICKS === 0) seen.push(Number(screen.getByLabelText('점수').textContent))
+    }
+    expect(lastCur().dead).toBeNull()
+    expect(seen).toEqual([1, 2, 3, 4])
+    // 2초 = 4점. 같은 시간에 더 멀리 가도(속도가 올라도) 점수는 틱으로만 센다.
+    expect(lastCur().tick).toBe(4 * SCORE_TICKS)
+    expect(lastCur().z).toBe(4 * SCORE_TICKS * SPEED_TABLE[8])
   })
 
   test.each([
