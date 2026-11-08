@@ -54,11 +54,16 @@ describe('parseSegment', () => {
     expect(mk([JOINT, '._/___.', JOINT])).toThrow()
   })
 
-  it('tunnel rule: only floor cells inside a tunnel', () => {
+  it('tunnel rule: only floor cells inside a tunnel, holes allowed in the outer columns', () => {
     const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'tunnel', tier: 2, rows })
     for (const ch of ['.', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
+      expect(mk([JOINT, `.${ch}____.`, JOINT]), ch).toThrow()
       expect(mk([JOINT, `__${ch}____`, JOINT]), ch).toThrow()
     }
+    for (const ch of ['/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
+      expect(mk([JOINT, `${ch}_____.`, JOINT]), `outer ${ch}`).toThrow()
+    }
+    expect(mk([JOINT, '._____.', JOINT])).not.toThrow()
     expect(mk([JOINT, '_______', JOINT])).not.toThrow()
   })
 
@@ -129,7 +134,8 @@ describe('templates', () => {
     const tunnels = [START, ...TEMPLATES].filter((t) => t.kind === 'tunnel')
     expect(tunnels.length).toBeGreaterThanOrEqual(1)
     for (const t of tunnels) {
-      for (const row of t.rows.slice(1, -1)) expect(row).toMatch(/^_+$/)
+      // 가운데 5칸 바닥만(터널 벽이 ±2.5 m에 서므로 바깥 열은 구멍).
+      for (const row of t.rows.slice(1, -1)) expect(row, t.id).toBe('._____.')
     }
   })
 
@@ -195,6 +201,23 @@ describe('pools', () => {
     for (const t of DESCENTS) expect(t.kind).toBe('descent')
     for (const t of OBSTACLES) expect(t.kind).toBe('obstacle')
     expect(TEMPLATES.some((t) => t.id === START.id)).toBe(false)
+  })
+
+  it('gates are 1-cell doorways: G pairs with exactly one floor cell between (lintel above the gap)', () => {
+    let gates = 0
+    for (const t of OBSTACLES) {
+      for (const row of t.rows) {
+        const cols = [...row].flatMap((ch, i) => (ch === 'G' ? [i] : []))
+        if (cols.length === 0) continue
+        expect(cols.length % 2, `${t.id} ${row}`).toBe(0)
+        for (let k = 0; k < cols.length; k += 2) {
+          expect(cols[k + 1] - cols[k], `${t.id} ${row}`).toBe(2)
+          expect(row[cols[k] + 1], `${t.id} ${row}`).toBe('_')
+          gates++
+        }
+      }
+    }
+    expect(gates).toBeGreaterThanOrEqual(3)
   })
 
   it('tunnels: at least 2, 14..18 rows', () => {

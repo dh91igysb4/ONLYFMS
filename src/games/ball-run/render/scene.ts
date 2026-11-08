@@ -5,7 +5,6 @@
 import {
   BoxGeometry,
   BufferGeometry,
-  CircleGeometry,
   Color,
   DirectionalLight,
   DoubleSide,
@@ -26,19 +25,22 @@ import {
   WebGLRenderer,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { G, R, ROW } from '../constants.ts'
+import { BLOCK_H, G, R, ROW } from '../constants.ts'
 import type { Course, SegmentInfo } from '../course.ts'
 import type { SimState } from '../sim.ts'
 import { colOf, floorAt, rowOf } from '../sim.ts'
-import { BANK_ANGLE, CAM_BACK, LOOK_AHEAD, bankOffset, buildingsFor, cameraTarget, segmentBoxes } from './layout.ts'
-import type { Box } from './layout.ts'
+import {
+  BANK_ANGLE, CAM_BACK, FLOOR_T, VFOV, bankOffset, buildingsFor, cameraTarget, lookPitch, plankAt, plankEase, segmentBoxes,
+  bankFollow, smoothEye,
+} from './layout.ts'
+import type { Box, Plank } from './layout.ts'
 import {
   BALL_COLOR, CHEVRON_P, CHEVRON_W, FLOOR_COLOR, FLOOR_LINE, WINDOW_H, WINDOW_W, ballEnvTexture, blockTexture, buildingTexture,
-  chevronTexture, gridTexture, shadowTexture, wallTexture,
+  chevronTexture, gridTexture, wallTexture,
 } from './textures.ts'
 
 const BG = '#000000'
-const BEAM_COLOR = '#e258f4'
+const BEAM_COLOR = '#f27cff'
 const SHARD_COLORS = ['#ff4fd8', '#ff8be6', '#4fd8ff', '#9ff0ff', '#ffffff']
 
 const M = 1 / 1000
@@ -46,21 +48,24 @@ const AHEAD_ROWS = 90
 const BEHIND_ROWS = 10
 const FOG_NEAR = 25
 const FOG_FAR = 90
-const CAM_Y_RATE = 9 // 카메라 높이 보간(1/s). 단차·낙하에서 덜컹이지 않게.
-const VFOV = 48 // 세로 시야각(°)
+const LOOK_DIST = 10 // 시선 점까지 거리(m). 방향만 쓴다.
 const FALL_MAX_TICKS = 180
 const BUILDING_DEPTH = 60 // 건물은 조각 base에서 이만큼(m) 아래부터 세운다.
 const BUILDING_LEAN = (7 * Math.PI) / 180 // 건물 윗부분이 바깥으로 기우는 각
-const WALL_H = 2.2 // 터널 마젠타 벽 높이(m)
-const WALL_OUT = 0.9 // 벽 위 가장자리가 바깥으로 기우는 정도(m)
+const TUNNEL_HALF = 2.5 // 터널 벽 아래 가장자리(m). 바닥 5칸 끝.
+const WALL_H = 3.2 // 터널 마젠타 벽 높이(m). 눈보다 높아 화면 양옆을 위까지 채운다(녹화 f_009).
+const WALL_OUT = 0.8 // 벽 위 가장자리가 바깥으로 기우는 정도(m)
 const ARCH_SIDES = 7 // 아치 다각형 변 수
 const ARCH_RIB = 1.5 // 아치 판 격자 길이(m)
 const BEAM_SECONDS = 2
 const BEAM_FADE = 0.5
 const BEAM_LEN = 9
-const BEAM_W = 1.0 // 공 지름보다 조금 넓게(녹화)
+const BEAM_W0 = 0.7 // 공 쪽 폭(공 지름)
+const BEAM_W1 = 1.8 // 카메라 쪽 폭(녹화: 뒤로 갈수록 벌어진다)
+const BEAM_OPACITY = 0.8
+const BEAM_SEGS = 18
 const SHARDS = 24
-const SHARD_SECONDS = 1
+const SHARD_G = 9.8
 const MAX_DPR = 2
 
 export type SceneHandle = {
@@ -107,6 +112,78 @@ function extrude(points: [number, number][], z0: number, z1: number, uLen: numbe
   return g
 }
 
+// 기운 판 묶음 하나(장면 m). 행 묶음 [r0, r1)을 STEP마다 끊어, 각 z에서 굴림 각(판 처음·끝에서 0으로 줄어든다)만큼 판 윗면
+// 가운데를 축으로 굴린 단면을 잇는다. 그룹 0 윗면(격자, u는 칸 1 m, v는 행 1 m), 그룹 1 옆면·앞뒤 면.
+const PLANK_STEP = 125
+function plankGeometry(p: Plank): BufferGeometry {
+  const pos: number[] = []
+  const uv: number[] = []
+  const side: number[] = []
+  const W = (p.hi - p.lo + 1) * 1000
+  const pc = ((p.lo + p.hi) * 1000) / 2
+  const S: number[] = []
+  for (let k = 0; k <= p.hi - p.lo + 1; k++) S.push(-W / 2 + k * 1000)
+  // z에서 단면: 윗면 점들과 아래 점들(mm).
+  const section = (z: number): { top: [number, number][]; bot: [number, number][] } => {
+    const roll = -p.bank * BANK_ANGLE * plankEase(p, z)
+    const c = Math.cos(roll)
+    const sn = Math.sin(roll)
+    const top = S.map((s): [number, number] => [pc + s * c, p.h + s * sn])
+    const bot = top.map(([x, y]): [number, number] => [x + FLOOR_T * sn, y - FLOOR_T * c])
+    return { top, bot }
+  }
+  const zs: number[] = []
+  for (let z = p.r0 * ROW; z < p.r1 * ROW; z += PLANK_STEP) zs.push(z)
+  zs.push(p.r1 * ROW)
+  const v3 = (out: number[], [x, y]: [number, number], z: number) => out.push(x * M, y * M, -z * M)
+  const quad = (out: number[], a: number[], b: number[], c: number[], d: number[]) => out.push(...a, ...b, ...c, ...a, ...c, ...d)
+  for (let i = 0; i + 1 < zs.length; i++) {
+    const za = zs[i]
+    const zb = zs[i + 1]
+    const A = section(za)
+    const B = section(zb)
+    const va = (za - p.r0 * ROW) / ROW
+    const vb = (zb - p.r0 * ROW) / ROW
+    for (let k = 0; k + 1 < S.length; k++) {
+      const pts: number[][] = [[], [], [], []]
+      v3(pts[0], A.top[k], za)
+      v3(pts[1], A.top[k + 1], za)
+      v3(pts[2], B.top[k + 1], zb)
+      v3(pts[3], B.top[k], zb)
+      quad(pos, pts[0], pts[1], pts[2], pts[3])
+      const ua = k
+      const ub = k + 1
+      uv.push(ua, va, ub, va, ub, vb, ua, va, ub, vb, ua, vb)
+    }
+    for (const k of [0, S.length - 1]) {
+      const pts: number[][] = [[], [], [], []]
+      v3(pts[0], A.top[k], za)
+      v3(pts[1], A.bot[k], za)
+      v3(pts[2], B.bot[k], zb)
+      v3(pts[3], B.top[k], zb)
+      quad(side, pts[0], pts[1], pts[2], pts[3])
+    }
+  }
+  for (const z of [p.r0 * ROW, p.r1 * ROW]) {
+    const X = section(z)
+    for (let k = 0; k + 1 < S.length; k++) {
+      const pts: number[][] = [[], [], [], []]
+      v3(pts[0], X.top[k], z)
+      v3(pts[1], X.top[k + 1], z)
+      v3(pts[2], X.bot[k + 1], z)
+      v3(pts[3], X.bot[k], z)
+      quad(side, pts[0], pts[1], pts[2], pts[3])
+    }
+  }
+  const g = new BufferGeometry()
+  const topCount = pos.length / 3
+  g.setAttribute('position', new Float32BufferAttribute([...pos, ...side], 3))
+  g.setAttribute('uv', new Float32BufferAttribute([...uv, ...new Array<number>((side.length / 3) * 2).fill(0)], 2))
+  g.addGroup(0, topCount, 0)
+  g.addGroup(topCount, side.length / 3, 1)
+  return g
+}
+
 // 결정적 난수(화면 연출용). [0, 1).
 function lcg(seed: number): () => number {
   let s = seed >>> 0 || 1
@@ -130,12 +207,12 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   scene.background = new Color(BG)
   scene.fog = new Fog(BG, FOG_NEAR, FOG_FAR)
 
-  const camera = new PerspectiveCamera(VFOV, 1, 0.1, FOG_FAR + 20)
+  const camera = new PerspectiveCamera(VFOV, 1, 0.05, FOG_FAR + 20)
 
   // 바닥·건물·블록은 조명 없는 평면색(원작처럼). 조명은 공 광택에만 쓴다.
-  scene.add(new HemisphereLight('#ffd0f4', '#20103a', 0.3))
-  const sun = new DirectionalLight('#ffffff', 0.9)
-  sun.position.set(-3, 6, 8)
+  scene.add(new HemisphereLight('#ffd0f4', '#100620', 0.15))
+  const sun = new DirectionalLight('#ffffff', 0.3)
+  sun.position.set(0, 3, -10) // 앞 위에서 비춰 반사점이 공 윗면 너머에 숨는다(녹화에 점 하이라이트 없음)
   scene.add(sun)
 
   // ---- 공유 자원(조각마다 다시 만들지 않는다)
@@ -155,7 +232,6 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   const chevronTex = tex(chevronTexture())
   chevronTex.anisotropy = aniso
   const envTex = tex(ballEnvTexture())
-  const shadowTex = tex(shadowTexture())
 
   // 바닥 상자: 윗면(+y, 인덱스 12..17)만 격자, 나머지 면은 라벤더 옆면.
   const unitBox = new BoxGeometry(1, 1, 1)
@@ -167,6 +243,8 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
 
   const floorSideMat = new MeshBasicMaterial({ color: FLOOR_LINE })
   const floorTopMat = new MeshBasicMaterial({ map: grid })
+  const plankTopMat = new MeshBasicMaterial({ map: grid, side: DoubleSide })
+  const plankSideMat = new MeshBasicMaterial({ color: FLOOR_LINE, side: DoubleSide })
   // 터널 바닥은 격자 없이 남색(위에 화살표). 옆면도 같은 색이라 칸 사이 이음매가 비치지 않는다.
   const tunnelTopMat = new MeshBasicMaterial({ color: FLOOR_COLOR })
   const blockMat = new MeshBasicMaterial({ map: blockTex })
@@ -178,24 +256,33 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     map: chevronTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   })
   const ballMat = new MeshStandardMaterial({
-    color: BALL_COLOR, metalness: 0.45, roughness: 0.2, envMap: envTex, envMapIntensity: 1.3,
+    color: BALL_COLOR, metalness: 0.65, roughness: 0.07, envMap: envTex, envMapIntensity: 1.2,
   })
-  const shadowMat = new MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
   const beamMat = new MeshBasicMaterial({
     color: BEAM_COLOR, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide,
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
   })
   const shardMat = new MeshBasicMaterial({ color: '#ffffff' })
   const materials: Material[] = [
-    floorSideMat, floorTopMat, tunnelTopMat, blockMat, lintelMat, buildingMat, archMat, wallMat, chevronMat, ballMat, shadowMat, beamMat, shardMat,
+    floorSideMat, floorTopMat, plankTopMat, plankSideMat, tunnelTopMat, blockMat, lintelMat, buildingMat, archMat, wallMat, chevronMat,
+    ballMat, beamMat, shardMat,
   ]
 
   const ballGeo = new SphereGeometry(R * M, 40, 28)
-  const shadowGeo = new CircleGeometry(R * M * 1.2, 24)
-  const beamGeo = new PlaneGeometry(BEAM_W, BEAM_LEN)
-  beamGeo.rotateX(-Math.PI / 2)
-  beamGeo.translate(0, 0, BEAM_LEN / 2) // 공 바닥에서 뒤(+z, 카메라 쪽)로 바닥에 깔린다(공이 앞쪽 끝을 가린다)
-  const geometries: BufferGeometry[] = [unitBox, floorBox, ballGeo, shadowGeo, beamGeo]
+  // 빛줄기: 공 바닥에서 뒤(카메라 쪽)로 바닥을 따라 깔린 띠(공 쪽 BEAM_W0 → 끝 BEAM_W1). 공이 앞쪽 끝을 가린다.
+  // 매 프레임 뒤 바닥 높이를 따라 꼭짓점을 옮긴다(내리막·단차에서 판 속에 묻히거나 카메라 앞을 가로막지 않게).
+  const beamGeo = new BufferGeometry()
+  const beamPos = new Float32BufferAttribute(new Float32Array((BEAM_SEGS + 1) * 2 * 3), 3)
+  beamGeo.setAttribute('position', beamPos)
+  {
+    const idx: number[] = []
+    for (let i = 0; i < BEAM_SEGS; i++) {
+      const a = i * 2
+      idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3)
+    }
+    beamGeo.setIndex(idx)
+  }
+  const geometries: BufferGeometry[] = [unitBox, floorBox, ballGeo, beamGeo]
 
   // 블록 높이별 상자(1 m 무늬가 세로로 반복되게). 기둥 3 m, 문 2 m, 블록 1 m.
   const blockGeos = new Map<number, BoxGeometry>()
@@ -211,12 +298,9 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
 
   const ball = new Mesh(ballGeo, ballMat)
   scene.add(ball)
-  const shadow = new Mesh(shadowGeo, shadowMat)
-  shadow.renderOrder = 1
-  shadow.rotation.order = 'ZXY' // 눕힌(X) 다음 기운 판만큼 굴린다(Z).
-  scene.add(shadow)
   const beam = new Mesh(beamGeo, beamMat)
   beam.visible = false
+  beam.frustumCulled = false
   beam.renderOrder = 2
   scene.add(beam)
   const shards = new InstancedMesh(unitBox, shardMat, SHARDS)
@@ -248,27 +332,8 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     return mesh
   }
 
-  // 기운 판: 같은 행에서 이어진 같은 방향 칸들을 한 판으로 보고, 판 윗면 가운데를 축으로 ±BANK_ANGLE 굴린다.
-  // 칸 상자는 굴린 면을 따라 늘어놓는다. 반환: 칸 상자마다 [판 가운데 x(mm), 굴림 각(rad, three z축)].
-  function bankPlanks(floors: Box[]): Map<Box, [number, number]> {
-    const out = new Map<Box, [number, number]>()
-    const banked = floors.filter((b) => b.bank !== undefined).sort((a, b) => a.cz - b.cz || a.cx - b.cx)
-    for (let i = 0; i < banked.length; ) {
-      let j = i + 1
-      while (
-        j < banked.length && banked[j].cz === banked[i].cz && banked[j].bank === banked[i].bank &&
-        banked[j].cy === banked[i].cy && banked[j].cx === banked[j - 1].cx + 1000
-      ) j++
-      const pc = (banked[i].cx + banked[j - 1].cx) / 2
-      const roll = -(banked[i].bank as number) * BANK_ANGLE // bank +1(오른쪽이 낮음) → +x가 내려가게
-      for (let k = i; k < j; k++) out.set(banked[k], [pc, roll])
-      i = j
-    }
-    return out
-  }
-
   function buildTunnel(info: SegmentInfo, meshes: Mesh[], geos: BufferGeometry[]): void {
-    // 터널 안쪽 행(이음 행 제외)은 평평한 7칸이다.
+    // 터널 안쪽 행(이음 행 제외)은 평평한 5칸이고 벽은 그 끝(±2.5 m)에 선다.
     const r0 = info.startRow + 1
     const r1 = info.startRow + info.length - 1
     const f = course.cell(0, r0).floor
@@ -276,7 +341,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     const y = f.h0 * M
     const z0 = -r0 * ROW * M
     const z1 = -r1 * ROW * M
-    const half = 3.5
+    const half = TUNNEL_HALF
     const topX = half + WALL_OUT
     const topY = y + WALL_H
     for (const s of [-1, 1]) {
@@ -288,7 +353,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     const pts: [number, number][] = []
     for (let i = 0; i <= ARCH_SIDES; i++) {
       const a = Math.PI - (i * Math.PI) / ARCH_SIDES
-      pts.push([Math.cos(a) * topX, topY + Math.sin(a) * topX * 0.85])
+      pts.push([Math.cos(a) * topX, topY + Math.sin(a) * topX * 0.6])
     }
     const arch = extrude(pts, z0, z1, ARCH_RIB, 1)
     geos.push(arch)
@@ -313,24 +378,27 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     const floors = boxes.filter((b) => b.kind === 'floor')
     const blocks = boxes.filter((b) => b.kind === 'block')
     const lintels = boxes.filter((b) => b.kind === 'lintel')
-    const planks = bankPlanks(floors)
+    // 기운 칸은 판 묶음 메시로 따로 그린다(처음·끝 행에서 비틀어 평평한 이웃과 맞춘다).
+    const flat = floors.filter((b) => b.bank === undefined)
+    const plankKeys = new Set<string>()
+    for (const b of floors) {
+      if (b.bank === undefined) continue
+      const p = plankAt(course, Math.round(b.cx / 1000), Math.floor(b.cz / ROW))
+      if (p === null) continue
+      const key = `${p.lo},${p.hi},${p.r0}`
+      if (plankKeys.has(key)) continue
+      plankKeys.add(key)
+      const g = plankGeometry(p)
+      geos.push(g)
+      meshes.push(new Mesh(g, [plankTopMat, plankSideMat]))
+    }
 
-    if (floors.length > 0) {
+    if (flat.length > 0) {
       const floorMats = info.kind === 'tunnel' ? [tunnelTopMat, tunnelTopMat] : [floorSideMat, floorTopMat]
-      meshes.push(instanced(floorBox, floorMats, floors.length, (i) => {
-        const b = floors[i]
+      meshes.push(instanced(floorBox, floorMats, flat.length, (i) => {
+        const b = flat[i]
         const half = (b.h / 2) * M
         const top = b.cy * M + half
-        const plank = planks.get(b)
-        if (plank) {
-          // 판 가운데 윗면을 축으로 굴린 면 위에 칸을 놓는다(윗면 가운데가 굴린 면 위, 상자 중심은 법선 반대로 두께 절반).
-          const [pc, roll] = plank
-          const off = (b.cx - pc) * M
-          tmp.rotation.z = roll
-          tmp.position.set(pc * M + off * Math.cos(roll) + Math.sin(roll) * half, top + off * Math.sin(roll) - Math.cos(roll) * half, -b.cz * M)
-          tmp.scale.set(b.w * M, b.h * M, b.d * M)
-          return
-        }
         // 경사 칸: 윗면 가운데가 칸 가운데 바닥 높이에 오도록, 기울인 법선 방향으로 두께 절반만큼 내린다.
         const angle = Math.atan2(b.slope, ROW)
         tmp.rotation.x = angle
@@ -414,36 +482,70 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     for (const info of want) if (!segments.has(info.startRow)) segments.set(info.startRow, buildSegment(info))
   }
 
-  // ---- 깨짐 조각: 공 자리에서 바깥·위로 흩어지고 1초 뒤 멈춘다.
-  type Shard = { p: [number, number, number]; v: [number, number, number]; s: number; spin: [number, number] }
-  function makeShards(seed: number, vz: number): Shard[] {
+  // ---- 깨짐 조각: 공 자리에서 옆·뒤(카메라 쪽)로 낮게 흩어지고, 각자 아래 바닥에 떨어져 멈춘다. 아래가 구멍이면 계속 떨어진다.
+  // 위치·속도는 장면 m. 블록 칸으로 들어가려 하면 옆 속도를 잃는다.
+  type Shard = { p: [number, number, number]; v: [number, number, number]; s: number; spin: [number, number]; rot: [number, number]; rest: boolean }
+  function makeShards(seed: number, at: [number, number, number]): Shard[] {
     const rnd = lcg(seed * 2654435761)
     const out: Shard[] = []
     for (let i = 0; i < SHARDS; i++) {
-      // 구 안 무작위 방향
-      const th = rnd() * Math.PI * 2
-      const ph = Math.acos(2 * rnd() - 1)
-      const dir: [number, number, number] = [Math.sin(ph) * Math.cos(th), Math.abs(Math.cos(ph)), Math.sin(ph) * Math.sin(th)]
-      const sp = 1.5 + rnd() * 3.5
-      const r = R * M * (0.3 + rnd() * 0.6)
+      const th = rnd() * Math.PI // 0..π: 옆과 뒤쪽 반원
+      const sp = 0.8 + rnd() * 2.6
+      const r = R * M * (0.2 + rnd() * 0.6)
+      const dx = Math.cos(th)
+      const dz = Math.sin(th) // 뒤(+z)
       out.push({
-        p: [dir[0] * r, dir[1] * r, dir[2] * r],
-        // 진행 방향(-z) 속도는 부딪혀 거의 잃고 조금만 남긴다.
-        v: [dir[0] * sp, 1 + dir[1] * sp, dir[2] * sp - vz * 0.15],
-        s: 0.12 + rnd() * 0.16,
-        spin: [rnd() * 12 - 6, rnd() * 12 - 6],
+        p: [at[0] + dx * r, at[1] - R * M * 0.3 + rnd() * R * M * 0.9, at[2] + dz * r * 0.5],
+        v: [dx * sp, 0.4 + rnd() * 1.6, dz * sp * 0.7],
+        s: 0.05 + rnd() * 0.09,
+        spin: [rnd() * 14 - 7, rnd() * 14 - 7],
+        rot: [rnd() * 6, rnd() * 6],
+        rest: false,
       })
     }
     return out
   }
 
+  function stepShards(list: Shard[], dt: number): void {
+    for (const sh of list) {
+      if (sh.rest || dt <= 0) continue
+      const [px, py, pz] = sh.p
+      sh.v[1] -= SHARD_G * dt
+      let nx = px + sh.v[0] * dt
+      let nz = pz + sh.v[2] * dt
+      const ny = py + sh.v[1] * dt
+      // 블록 칸 안(블록 꼭대기 아래)으로는 들어가지 않는다.
+      const cell = course.cell(colOf(nx / M), rowOf(-nz / M))
+      if (cell.block && cell.floor !== null && ny * 1000 < Math.max(cell.floor.h0, cell.floor.h1) + (cell.blockH ?? BLOCK_H)) {
+        nx = px
+        nz = pz
+        sh.v[0] = 0
+        sh.v[2] = 0
+      }
+      const f = floorAt(course, nx / M, -nz / M)
+      const half = sh.s / 2
+      const fy = f === null ? null : f * M
+      if (fy !== null && ny - half <= fy && py - half >= fy - 0.05) {
+        // 바닥에 닿음: 조금 튀고, 느려지면 멈춘다.
+        sh.p = [nx, fy + half, nz]
+        sh.v = [sh.v[0] * 0.45, -sh.v[1] * 0.25, sh.v[2] * 0.45]
+        if (Math.abs(sh.v[1]) < 0.35) sh.rest = true
+        continue
+      }
+      sh.p = [nx, ny, nz]
+      sh.rot = [sh.rot[0] + sh.spin[0] * dt, sh.rot[1] + sh.spin[1] * dt]
+    }
+  }
+
   // ---- 카메라·연출 상태
-  let camEyeY = Number.NaN
-  let camLookY = Number.NaN
+  let camEyeY = Number.NaN // mm
+  let camPitch = 0
+  let bankDy = Number.NaN // mm, 화면에 쓰는 기운 판 높이 보정
+  let bankVy = 0 // mm/s
   let lastT = Number.NaN
   let lastLevel = Number.NaN
   let boostAt = Number.NEGATIVE_INFINITY
-  let death: null | { kind: 'hit' | 'fall' | 'give_up'; t0: number; from: SimState; eyeY: number; lookY: number; shards: Shard[] } = null
+  let death: null | { kind: 'hit' | 'fall' | 'give_up'; t0: number; from: SimState; eyeY: number; pitch: number; shards: Shard[] } = null
 
   function render(prev: SimState, cur: SimState, alpha: number): void {
     const now = performance.now()
@@ -463,11 +565,12 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
 
     if (cur.dead === null) death = null
     else if (death === null || death.kind !== cur.dead) {
+      const dy = Number.isNaN(bankDy) ? 0 : bankDy
       death = {
         kind: cur.dead, t0: now, from: cur,
-        eyeY: Number.isNaN(camEyeY) ? (cur.y + R) * M : camEyeY,
-        lookY: Number.isNaN(camLookY) ? cur.y * M : camLookY,
-        shards: cur.dead === 'hit' ? makeShards(cur.tick + 1, cur.vz * M * 60) : [],
+        eyeY: Number.isNaN(camEyeY) ? cameraTarget(course, cur).eyeY : camEyeY,
+        pitch: camPitch,
+        shards: cur.dead === 'hit' ? makeShards(cur.tick + 1, [cur.x * M, (cur.y + dy) * M, -cur.z * M]) : [],
       }
     }
     let showBall = true
@@ -487,9 +590,16 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
 
     updateSegments(z)
 
-    // 기운 판 위에서는 굴린 면 높이에 맞춰 공을 그린다(시뮬 바닥은 칸 높이 그대로).
+    // 기운 판 위에서는 굴린 면 높이에 맞춰 공을 그린다(시뮬 바닥은 칸 높이 그대로). 판 이음은 비틀어 이어지고, 면이
+    // 내려가면 중력으로 떨어져 닿는다(빠를 때 한 프레임에 크게 튀지 않게).
     const grounded = death === null ? cur.grounded : death.kind !== 'fall'
-    const bankDy = grounded ? bankOffset(course, x, z) : 0
+    const dyTarget = grounded ? bankOffset(course, x, z) : 0
+    if (Number.isNaN(bankDy)) bankDy = dyTarget
+    else {
+      const b = bankFollow({ dy: bankDy, vy: bankVy }, dyTarget, dt)
+      bankDy = b.dy
+      bankVy = b.vy
+    }
     const bx = x * M
     const by = (y + bankDy) * M
     const bz = -z * M
@@ -497,31 +607,13 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     ball.rotation.x = -z / R // 굴러간 거리 / 반지름 (진행 방향 -z)
     ball.visible = showBall
 
-    // 그림자: 바닥 위에서만, 높이 뜰수록 옅게. 경사·기운 판만큼 기울인다.
-    const fy = floorAt(course, x, z)
-    const lift = fy === null ? Infinity : y - R - fy
-    if (fy === null || lift > 2500 || lift < -R || !showBall) shadow.visible = false
-    else {
-      const c = course.cell(colOf(x), rowOf(z))
-      const f = c.floor
-      const angle = f ? Math.atan2(f.h1 - f.h0, ROW) : 0
-      shadow.visible = true
-      shadow.position.set(bx, (fy + bankDy) * M + 0.005, bz)
-      shadow.rotation.set(angle - Math.PI / 2, 0, c.bank !== undefined ? -c.bank * BANK_ANGLE : 0)
-      shadowMat.opacity = Math.min(1, Math.max(0, 1 - lift / 2500))
-    }
-
     // 깨짐 조각
     if (death?.kind === 'hit') {
-      const t = Math.min(SHARD_SECONDS, (now - death.t0) / 1000)
-      const floorY = fy === null ? -Infinity : fy * M
+      stepShards(death.shards, dt)
       shards.visible = true
       death.shards.forEach((sh, i) => {
-        const px = bx + sh.p[0] + sh.v[0] * t
-        const py = Math.max(floorY + sh.s / 2, by + sh.p[1] + sh.v[1] * t - 4.9 * t * t)
-        const pz = bz + sh.p[2] + sh.v[2] * t
-        tmp.position.set(px, py, pz)
-        tmp.rotation.set(sh.spin[0] * t, sh.spin[1] * t, 0)
+        tmp.position.set(sh.p[0], sh.p[1], sh.p[2])
+        tmp.rotation.set(sh.rot[0], sh.rot[1], 0)
         tmp.scale.setScalar(sh.s)
         tmp.updateMatrix()
         shards.setMatrixAt(i, tmp.matrix)
@@ -529,29 +621,40 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
       shards.instanceMatrix.needsUpdate = true
     } else shards.visible = false
 
-    // 가속 빛줄기
+    // 가속 빛줄기: 공 뒤 바닥(기운 판 면 포함)을 따라 깐다. 구멍 위는 앞 꼭짓점 높이를 잇는다.
     const bt = (now - boostAt) / 1000
     if (bt >= 0 && bt < BEAM_SECONDS && showBall && death === null) {
+      let h = by - R * M
+      for (let i = 0; i <= BEAM_SEGS; i++) {
+        const d = (i / BEAM_SEGS) * BEAM_LEN
+        const zs = z - d / M
+        if (i > 0) {
+          const f = floorAt(course, x, zs)
+          if (f !== null) h = (f + bankOffset(course, x, zs)) * M
+        }
+        const w = (BEAM_W0 + ((BEAM_W1 - BEAM_W0) * i) / BEAM_SEGS) / 2
+        beamPos.setXYZ(i * 2, bx - w, h + 0.02, -zs * M)
+        beamPos.setXYZ(i * 2 + 1, bx + w, h + 0.02, -zs * M)
+      }
+      beamPos.needsUpdate = true
       beam.visible = true
-      beam.position.set(bx, by - R * M + 0.01, bz)
-      beamMat.opacity = 0.65 * Math.min(1, (BEAM_SECONDS - bt) / BEAM_FADE)
+      beamMat.opacity = BEAM_OPACITY * Math.min(1, (BEAM_SECONDS - bt) / BEAM_FADE)
     } else beam.visible = false
 
-    // 카메라: x는 공 x 그대로, 높이(눈·시선)만 시간 기준으로 보간한다. 낙하 중에는 높이를 고정한다.
-    // 시선은 공 앞 LOOK_AHEAD의 바닥 높이 쪽이라 내리막에서 아래로 숙인다.
-    const target = cameraTarget(course, { x, y, z })
-    const eyeT = death?.kind === 'fall' ? death.eyeY : target.eyeY * M
-    const lookT = death?.kind === 'fall' ? death.lookY : target.lookY * M
-    if (Number.isNaN(camEyeY)) {
-      camEyeY = eyeT
-      camLookY = lookT
+    // 카메라: x는 공 x 그대로, 눈 높이만 시간 기준으로 보간한다(내려갈 때 천천히). 시선 각은 눈→공 방향에서 고정 각만큼 위라
+    // 공이 늘 화면 위에서 BALL_FRAC에 온다. 낙하 중에는 높이·각을 고정한다.
+    if (death?.kind === 'fall') {
+      camEyeY = death.eyeY
+      camPitch = death.pitch
     } else {
-      const k = 1 - Math.exp(-dt * CAM_Y_RATE)
-      camEyeY += (eyeT - camEyeY) * k
-      camLookY += (lookT - camLookY) * k
+      const t = cameraTarget(course, { x, y, z })
+      camEyeY = Number.isNaN(camEyeY) ? t.eyeY : smoothEye(camEyeY, t.eyeY, t.minEyeY, dt)
+      camPitch = lookPitch({ y: camEyeY, z: z - CAM_BACK }, { y: y + bankDy, z })
     }
-    camera.position.set(bx, camEyeY, bz + CAM_BACK * M)
-    camera.lookAt(bx, camLookY, bz - LOOK_AHEAD * M)
+    const ey = camEyeY * M
+    const ez = bz + CAM_BACK * M
+    camera.position.set(bx, ey, ez)
+    camera.lookAt(bx, ey + Math.tan(camPitch) * LOOK_DIST, ez - LOOK_DIST)
 
     renderer.render(scene, camera)
   }

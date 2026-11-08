@@ -30,8 +30,9 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
     const out: Cell[] = []
     for (let i = 0; i < COLS; i++) {
       const ch = row[i]
-      if (t.kind === 'tunnel' && r > 0 && r < rows.length - 1 && ch !== '_') {
-        fail(`row ${r}: tunnel allows only '_'`)
+      // 터널 안은 바닥 '_'만. 바깥 열(벽 바깥)은 구멍이어도 된다.
+      if (t.kind === 'tunnel' && r > 0 && r < rows.length - 1 && ch !== '_' && !(ch === '.' && (i === 0 || i === COLS - 1))) {
+        fail(`row ${r}: tunnel allows only '_' (and '.' in the outer columns)`)
       }
       switch (ch) {
         case '_':
@@ -83,7 +84,6 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
 
 const J = JOINT
 const rep = (row: string, n: number): string[] => new Array<string>(n).fill(row)
-const F = '_______' // 7칸 평지(터널 안)
 const W = '._____.' // 5칸 평지(이음 행과 같은 폭)
 const S = '.!!!!!.' // 5칸 급경사 한 행(−500 mm)
 const L = '.vvvvv.' // 5칸 단차(−1000 mm)
@@ -100,13 +100,13 @@ const U5 = './////.' // 5칸 오르막(+250 mm)
 // - 칸 높이가 다른 열은 벽, 구멍 열은 높이가 그대로라 좁은 급경사는 바깥 열을 먼저 내려 보낸다('.!___!.' 뒤 '..!!!..').
 
 // 시작 터널(속도 단계에 세지 않는다). 첫 화면이 터널 안이다.
-export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 22), J] }
+export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 22), J] }
 
-// 터널: 평평한 7칸 바닥(화면에 가속 화살표·마젠타 벽). 지날 때마다 속도 단계 +1.
+// 터널: 평평한 5칸 바닥(화면에 가속 화살표, ±2.5 m에 마젠타 벽). 지날 때마다 속도 단계 +1.
 export const TUNNELS: readonly SegmentTemplate[] = [
-  { id: 'tunnel-14', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 12), J] },
-  { id: 'tunnel-16', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 14), J] },
-  { id: 'tunnel-18', kind: 'tunnel', tier: 1, rows: [J, ...rep(F, 16), J] },
+  { id: 'tunnel-14', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 12), J] },
+  { id: 'tunnel-16', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 14), J] },
+  { id: 'tunnel-18', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 16), J] },
 ]
 
 // 내리막: 터널 출구 뒤 긴 급경사(녹화 3.0~4.5 s, 11.0~12.5 s, 23.0 s). 조각마다 4 m 이상 내려간다.
@@ -153,10 +153,10 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     id: 'o1-edge-pillars', kind: 'obstacle', tier: 1,
     rows: [J, ...rep(W, 5), '.P___P.', '.P___P.', ...rep(W, 7), '.P_B_P.', ...rep(W, 7), '.P___P.', '.P___P.', ...rep(W, 5), J],
   },
-  // 넓은 문(3칸) 뒤 마젠타 벽 통로.
+  // 3칸으로 좁아진 판 끝 가운데 1칸 문(마젠타 큐브 둘 + 위 남색 가로대, 녹화 27.0 s) 뒤 넓은 판, 가장자리 블록.
   {
     id: 'o1-gate-wide', kind: 'obstacle', tier: 1,
-    rows: [J, ...rep(W, 6), '.G___G.', ...rep('.B___B.', 8), ...rep(W, 6), J],
+    rows: [J, ...rep(W, 7), ...rep(N3, 4), '..G_G..', ...rep(W, 10), '.B___B.', ...rep(W, 6), J],
   },
   // 가운데 3칸으로 좁아지는 판.
   { id: 'o1-narrow3', kind: 'obstacle', tier: 1, rows: [J, ...rep(W, 3), ...rep(N3, 10), ...rep(W, 4), J] },
@@ -171,10 +171,10 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     rows: [J, W, W, ...rep(D5, 4), ...rep(W, 6), '.B___B.', ...rep(W, 6), '._B_B_.', ...rep(W, 6), J],
   },
   // ---- tier 2
-  // 2칸 문 뒤 2칸 벽 통로(녹화 27.0~27.5 s).
+  // 왼쪽 가운데 1칸 문 뒤 2칸 벽 통로(녹화 27.0~27.5 s).
   {
     id: 'o2-gate-corridor', kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(W, 8), '.G__GB.', ...rep('.B__BB.', 8), ...rep(W, 6), J],
+    rows: [J, ...rep(W, 8), '.G_GBB.', ...rep('.B__BB.', 8), ...rep(W, 6), J],
   },
   // 구멍으로 갈라진 1칸 레일 두 줄.
   { id: 'o2-rails', kind: 'obstacle', tier: 2, rows: [J, ...rep(W, 8), ...rep('.._._..', 10), ...rep(W, 6), J] },
@@ -210,10 +210,10 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     rows: [J, W, W, L, ...rep(W, 10), '._B_B_.', ...rep(W, 8), '.B___B.', ...rep(W, 3), L, ...rep(W, 9), J],
   },
   // ---- tier 3
-  // 1칸 문(마젠타 기둥 둘 + 남색 가로대) 뒤 3칸 벽 통로(녹화 27.0 s, 30.0 s).
+  // 3칸 판 끝 1칸 문(마젠타 큐브 둘 + 남색 가로대) 뒤 3칸 벽 통로(녹화 27.0 s, 30.0 s).
   {
     id: 'o3-gate-narrow', kind: 'obstacle', tier: 3,
-    rows: [J, ...rep(W, 8), '.BG_GB.', ...rep('.B___B.', 8), ...rep(W, 5), J],
+    rows: [J, ...rep(W, 5), ...rep(N3, 4), '..G_G..', ...rep('.B___B.', 8), ...rep(W, 5), J],
   },
   // 마젠타 띠로 갈라진 1칸 레일 두 줄(녹화 28.5~29.0 s).
   { id: 'o3-rails-strips', kind: 'obstacle', tier: 3, rows: [J, ...rep(W, 8), ...rep('.._B_..', 12), ...rep(W, 6), J] },

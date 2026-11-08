@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANK_PUSH, BLOCK_H, G, LAT_ACC, PILLAR_H, R, SPEED_TABLE, V0, VX_MAX, X_LIMIT,
+  BANK_PUSH, BLOCK_H, G, GATE_H, LAT_ACC, PILLAR_H, R, SPEED_TABLE, V0, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
@@ -331,14 +331,15 @@ describe('ball-run sim', () => {
     const js = run(jump, 120, 0)
     expect(last(js).dead).toBe('hit')
     expect(rowOf(last(js).z + R)).toBe(12)
-    // 블록 높이는 칸의 blockH: 바닥 위 1.2 m로 지나가면 블록(1 m)은 넘고 기둥(3 m)·문(2 m)에는 걸린다.
+    // 블록 높이는 칸의 blockH: 바닥 위 1.2 m로 지나가면 블록(1 m)·문 기둥(1 m, 위 가로대는 화면용)은 넘고 기둥(3 m)에는 걸린다.
     const over = (row: string) => {
       const c = course(J, ...rep(F, 4), row, ...rep(F, 5), J)
       return step({ ...initSim(), z: 5000 - R - 100, y: R + BLOCK_H + 200, vy: 0, grounded: false }, 0, c)
     }
     expect(over('___B___').dead).toBeNull()
     expect(over('___P___').dead).toBe('hit')
-    expect(over('___G___').dead).toBe('hit')
+    expect(over('___G___').dead).toBeNull()
+    expect(GATE_H).toBe(BLOCK_H)
     expect(PILLAR_H).toBeGreaterThan(BLOCK_H + 200)
   })
 

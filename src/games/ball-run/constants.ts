@@ -10,7 +10,7 @@ export const RAMP_STEP = 250
 export const STEEP_STEP = 500 // '!' 급경사 한 행의 하강
 export const LEDGE = 1000 // 'v' 단차(칸 시작에서 한 번에 내려가는 높이)
 export const PILLAR_H = 3000 // 'P' 기둥 높이
-export const GATE_H = 2000 // 'G' 문 높이
+export const GATE_H = 1000 // 'G' 문 기둥 높이(블록과 같은 1 m 큐브, 위 가로대는 화면용)
 
 export const V0 = 200
 export const V_MAX = 467

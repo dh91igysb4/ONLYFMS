@@ -7,7 +7,7 @@ export const BUILDING_COLOR = '#1f2050'
 export const BUILDING_LINE = '#5f78f0'
 export const BLOCK_COLOR = '#ab24fb'
 export const BLOCK_EDGE = '#ea6cff'
-export const BALL_COLOR = '#9a0478'
+export const BALL_COLOR = '#c0109a'
 export const WALL_COLOR = '#8818d0'
 export const WALL_LINE = '#c45cff'
 export const WALL_TOP = '#ff7cf4'
@@ -88,20 +88,23 @@ export function wallTexture(): CanvasTexture {
 }
 
 // 터널 바닥 가속 화살표: 투명 바탕에 앞(캔버스 위쪽)을 가리키는 하늘색 갈매기 하나. 한 장 = 폭 CHEVRON_W × 길이 CHEVRON_P(m).
-export const CHEVRON_W = 7
-export const CHEVRON_P = 2.5
+// 녹화(f_009, f_090)처럼 공 깊이에서 화살표 하나가 통째로 보이는 폭(3.5 m), 팔은 가로에서 CHEVRON_DEG만큼 올라간다.
+export const CHEVRON_W = 3.5
+export const CHEVRON_P = 2.6
+const CHEVRON_DEG = 27
 export function chevronTexture(): CanvasTexture {
-  const PX = 100 // m당 픽셀
-  const W = CHEVRON_W * PX
-  const H = CHEVRON_P * PX
+  const PX = 160 // m당 픽셀
+  const W = Math.round(CHEVRON_W * PX)
+  const H = Math.round(CHEVRON_P * PX)
   const [c, ctx] = canvas(W, H)
   ctx.strokeStyle = CHEVRON_COLOR
-  ctx.lineWidth = 0.42 * PX
+  ctx.lineWidth = 0.5 * PX
   ctx.lineCap = 'round'
   ctx.lineJoin = 'miter'
-  const pad = 0.35 * PX
-  const tip = 0.6 * PX
-  const foot = tip + 0.9 * PX
+  ctx.miterLimit = 10
+  const pad = 0.25 * PX
+  const tip = 0.45 * PX
+  const foot = tip + (W / 2 - pad) * Math.tan((CHEVRON_DEG * Math.PI) / 180)
   ctx.beginPath()
   ctx.moveTo(pad, foot)
   ctx.lineTo(W / 2, tip)
@@ -118,27 +121,16 @@ export function ballEnvTexture(): CanvasTexture {
   const H = 128
   const [c, ctx] = canvas(W, H)
   const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, '#ffffff')
-  g.addColorStop(0.22, '#ffb8f4')
-  g.addColorStop(0.4, '#c04cc8')
-  g.addColorStop(0.5, '#3a1050')
-  g.addColorStop(0.62, '#20184a')
-  g.addColorStop(1, '#333877')
+  // 위쪽 절반 가까이를 밝게 둬 녹화의 넓은 광택 띠(공 윗부분 가로 띠)가 생기게 한다.
+  g.addColorStop(0, '#ffe6fc')
+  g.addColorStop(0.3, '#ff9cf0')
+  g.addColorStop(0.33, '#e23cc8')
+  g.addColorStop(0.5, '#a0148a')
+  g.addColorStop(0.64, '#2c0c44')
+  g.addColorStop(1, '#2a2f68')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, W, H)
   const t = finish(c)
   t.mapping = EquirectangularReflectionMapping
   return t
-}
-
-// 공 그림자: 가운데가 진한 원형 그라데이션(투명 바탕).
-export function shadowTexture(): CanvasTexture {
-  const S = 64
-  const [c, ctx] = canvas(S, S)
-  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2)
-  g.addColorStop(0, 'rgba(0,0,0,0.7)')
-  g.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, S, S)
-  return finish(c)
 }
