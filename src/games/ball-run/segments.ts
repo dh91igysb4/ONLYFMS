@@ -92,7 +92,7 @@ const D5 = '.' + '\\'.repeat(5) + '.' // 5칸 완만한 내리막(−250 mm)
 const U5 = './////.' // 5칸 오르막(+250 mm)
 
 // 설계 기준(최고 속도 467 mm/틱, 옆 최고 117 mm/틱·가속 25 mm/틱²):
-// - 필요한 차선 변경 사이 빈 행: 1칸 7행 이상(1칸 틈으로 들어가면 10행), 2칸 12행, 3칸 16행.
+// - 필요한 차선 변경 사이 빈 행: 1칸 7행 이상, 2칸 12행, 3칸 16행. 1칸 틈으로 들어가면 +3행(1칸 10행, 2칸 15행).
 //   2칸 틈을 지난 공은 틈의 어느 칸에든 있을 수 있으니 먼 쪽 칸 기준으로 센다.
 // - 조각 첫 장애물은 이음 행 뒤 6~9행(앞 조각 끝에서 공이 어디 있든 건너올 거리).
 // - 단차 뒤 착지까지 최고 속도에서 약 8행 → 단차 뒤 9행 이상 평지.
@@ -185,7 +185,7 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
   // 가장자리 큰 기둥 사이 블록(녹화 17.75 s, 19.0 s).
   {
     id: 'o1-edge-pillars', kind: 'obstacle', tier: 1,
-    rows: [J, ...rep(W, 5), '.P___P.', '.P___P.', ...rep(W, 7), '.P_B_P.', ...rep(W, 7), '.P___P.', '.P___P.', ...rep(W, 5), J],
+    rows: [J, ...rep(W, 5), '.P___P.', '.P___P.', ...rep(W, 10), '.P_B_P.', ...rep(W, 7), '.P___P.', '.P___P.', ...rep(W, 5), J],
   },
   // 3칸으로 좁아진 판 끝 가운데 1칸 문(마젠타 큐브 둘 + 위 남색 가로대, 녹화 27.0 s) 뒤 넓은 판, 가장자리 블록.
   {
@@ -202,7 +202,7 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
   // 완만한 내리막 끝 가장자리 블록과 1칸 블록 둘.
   {
     id: 'o1-down-blocks', kind: 'obstacle', tier: 1,
-    rows: [J, W, W, ...rep(D5, 4), ...rep(W, 6), '.B___B.', ...rep(W, 6), '._B_B_.', ...rep(W, 6), J],
+    rows: [J, W, W, ...rep(D5, 4), ...rep(W, 6), '.B___B.', ...rep(W, 10), '._B_B_.', ...rep(W, 6), J],
   },
   // ---- tier 2
   // 왼쪽 가운데 1칸 문 뒤 2칸 벽 통로(녹화 27.0~27.5 s).
@@ -236,7 +236,7 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
   // 가장자리 기둥과 블록(녹화 25.5 s 큰 블록, 35.25 s 높은 기둥).
   {
     id: 'o2-pillar-blocks', kind: 'obstacle', tier: 2,
-    rows: [J, ...rep(W, 7), '.P_B_P.', ...rep(W, 8), '.__BP_.', ...rep(W, 8), '.P___P.', '.P___P.', ...rep(W, 4), J],
+    rows: [J, ...rep(W, 7), '.P_B_P.', ...rep(W, 10), '.__BP_.', ...rep(W, 8), '.P___P.', '.P___P.', ...rep(W, 4), J],
   },
   // 단차로 내려선 판 위 블록.
   {
@@ -302,7 +302,7 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
   {
     id: 'o4-dense', kind: 'obstacle', tier: 4,
     rows: [
-      J, ...rep(W, 9), '.BBB__.', ...rep(W, 16), '.__BBB.', ...rep(W, 10), '._BB_B.', ...rep(W, 12), '.B_BBB.',
+      J, ...rep(W, 9), '.BBB__.', ...rep(W, 16), '.__BBB.', ...rep(W, 10), '._BB_B.', ...rep(W, 15), '.B_BBB.',
       ...rep(W, 12), '.BB_BB.', ...rep(W, 4), J,
     ],
   },

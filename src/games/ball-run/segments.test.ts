@@ -171,6 +171,44 @@ describe('templates', () => {
     expect(banked).toBeGreaterThan(0)
   })
 
+  it('lane changes between block walls leave enough rows for a human (design spacing)', () => {
+    // 블록 행 묶음(B·P·G가 있는 연속 행) 사이 빈 행 수. 앞 묶음 마지막 행의 어느 통과 칸에서든 다음 묶음 첫 행의 통과 칸까지
+    // 필요한 행: 1칸 7, 2칸 12, 3칸 16(4칸 20), 1칸 틈으로 들어가면 +3(최고 속도에서 사람이 맞출 여유).
+    const NEED = [0, 7, 12, 16, 20]
+    const passable = (row: string): number[] => {
+      const out: number[] = []
+      for (let i = 0; i < row.length; i++) if (!'.BPG'.includes(row[i])) out.push(i)
+      return out
+    }
+    const width = (cells: number[], i: number): number => {
+      let w = 1
+      for (let k = i - 1; cells.includes(k); k--) w++
+      for (let k = i + 1; cells.includes(k); k++) w++
+      return w
+    }
+    const walled = (row: string) => /[BPG]/.test(row)
+    const bad: string[] = []
+    for (const t of TEMPLATES) {
+      let prevEnd = -1
+      t.rows.forEach((row, r) => {
+        if (!walled(row) || walled(t.rows[r - 1] ?? '')) return
+        if (prevEnd >= 0) {
+          const from = passable(t.rows[prevEnd])
+          const to = passable(row)
+          const need = Math.max(
+            ...from.map((a) => Math.min(...to.map((b) => NEED[Math.abs(a - b)] + (a !== b && width(to, b) === 1 ? 3 : 0)))),
+          )
+          const gap = r - prevEnd - 1
+          if (gap < need) bad.push(`${t.id} row ${r}: ${gap} rows, needs ${need}`)
+        }
+        let end = r
+        while (walled(t.rows[end + 1] ?? '')) end++
+        prevEnd = end
+      })
+    }
+    expect(bad).toEqual([])
+  })
+
   it('banked boards push both ways equally in every template (drift never decays)', () => {
     // 기운 판이 쌓은 drift는 줄지 않고, 손가락 목표는 ±X_LIMIT 안이라 drift가 크게 남으면 반대쪽 끝에 못 간다.
     // 조각 안에서는 속도가 같으니 '<' 행 수와 '>' 행 수가 같으면 조각을 지난 뒤 drift가 거의 0으로 돌아온다.

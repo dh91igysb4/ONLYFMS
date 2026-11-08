@@ -34,7 +34,7 @@ afterAll(() => {
 })
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
-// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 84(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
+// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 88(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
 const PUZZLE = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(1)), {})
 const INITIAL: State = logic.initState(PUZZLE, ctx)
 const START_LEN = START_PARSED.length
@@ -174,7 +174,7 @@ describe('ball-run Game', () => {
         if (open) { block = [col, row]; break }
       }
     }
-    expect(block).toEqual([-1, 84])
+    expect(block).toEqual([-1, 88])
     const onAction = vi.fn()
     await mount(props({ onAction }))
     // 블록 열 중심으로: dx = col * 1000 / DRAG_SPAN(6000) * 폭(390)
