@@ -12,7 +12,7 @@ import type { SceneHandle } from './render/scene.ts'
 import './ball-run.css'
 
 const BANNER_MS = 1200
-// 사망 뒤에도 장면의 연출(hit 축소 0.4초, fall 낙하)을 그리는 시간. 그 뒤 rAF를 멈춘다.
+// 사망 뒤에도 장면의 연출(hit 깨짐 조각이 흩어져 바닥에 내려앉음, fall 낙하)을 그리는 시간. 그 뒤 rAF를 멈춘다.
 const DEATH_RENDER_MS = 3000
 const EPS = 1e-6
 
@@ -87,7 +87,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
 
     let cur: SimState = latest.current.ps.sim
     let prev: SimState = cur
-    let target = clampX(cur.x)
+    let target = clampX(cur.x - cur.drift) // 실효 목표 = target + drift(기운 판). 이어 하기에서 공을 제자리에 둔다.
     let pending: number[] = []
     let acc = 0
     let last = 0

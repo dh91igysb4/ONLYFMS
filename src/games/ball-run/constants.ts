@@ -7,23 +7,32 @@ export const X_LIMIT = 3500
 export const R = 350
 export const BLOCK_H = 1000
 export const RAMP_STEP = 250
+export const STEEP_STEP = 500 // '!' 급경사 한 행의 하강
+export const LEDGE = 1000 // 'v' 단차(칸 시작에서 한 번에 내려가는 높이)
+export const PILLAR_H = 3000 // 'P' 기둥 높이
+export const GATE_H = 1000 // 'G' 문 기둥 높이(블록과 같은 1 m 큐브, 위 가로대는 화면용)
 
-export const V0 = 167
+export const V0 = 200
 export const V_MAX = 467
-export const SPEED_STEP_DIST = 120000
-// k번째 = min(V_MAX, floor(V0 * 108^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
+// k번째 = min(V_MAX, floor(V0 * 106^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
 // V_MAX에 닿은 뒤 1개까지만 둔다.
 export const SPEED_TABLE: readonly number[] = [
-  167, 180, 194, 210, 227, 245, 265, 286, 309, 333, 360, 389, 420, 454, 467, 467,
+  200, 212, 224, 238, 252, 267, 283, 300, 318, 337, 358, 379, 402, 426, 452, 467, 467,
 ]
+
+export const LAT_K = 5
+export const LAT_ACC = 25
+// 기운 판 위 한 틱마다 drift(실효 목표 이동량)에 더하는 값. drift는 줄지 않고 ±BANK_DRIFT_MAX에서 멈춘다.
+export const BANK_DRIFT = 80
+export const BANK_DRIFT_MAX = 2 * X_LIMIT
 
 export const VX_MAX = 117
 export const G = 7
 export const STEP_TOL = 150
-export const DROP_TOL = 150
+export const DROP_TOL = 260
 export const FALL_DEPTH = 3000
 
-export const SCORE_DIV = 10000
+export const SCORE_TICKS = 30 // 점수 = floor(tick / SCORE_TICKS), 0.5초에 1점
 export const SCORE_MAX = 99999
 
 export const DRAG_SPAN = 6000
@@ -32,10 +41,23 @@ export const SEND_TICKS = 30
 export const MAX_CATCHUP = 5
 export const MAX_ACTION_TICKS = 120
 
-export const TIER_WEIGHTS: readonly { fromM: number; w: readonly [number, number, number, number] }[] = [
-  { fromM: 0, w: [1, 0, 0, 0] },
-  { fromM: 300, w: [3, 1, 0, 0] },
-  { fromM: 800, w: [2, 2, 1, 0] },
-  { fromM: 1500, w: [1, 2, 2, 1] },
-  { fromM: 2500, w: [1, 1, 2, 2] },
+// 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. 시작 터널 뒤가 단계 1이다.
+// 터널 사이 장애물 조각 수: 단계 0~2는 1개, 3부터 2개(원작 녹화: '속도 증가'가 5~8초마다).
+export const OBSTACLES_BY_STAGE: readonly { fromStage: number; n: number }[] = [
+  { fromStage: 0, n: 1 },
+  { fromStage: 3, n: 2 },
+]
+export function obstaclesInStage(stage: number): number {
+  let n = OBSTACLES_BY_STAGE[0].n
+  for (const b of OBSTACLES_BY_STAGE) if (b.fromStage <= stage) n = b.n
+  return n
+}
+
+// 장애물 tier 가중치도 단계 기준.
+export const TIER_WEIGHTS: readonly { fromStage: number; w: readonly [number, number, number, number] }[] = [
+  { fromStage: 0, w: [1, 0, 0, 0] },
+  { fromStage: 2, w: [3, 1, 0, 0] },
+  { fromStage: 5, w: [2, 2, 1, 0] },
+  { fromStage: 8, w: [1, 2, 2, 1] },
+  { fromStage: 12, w: [1, 1, 2, 2] },
 ]

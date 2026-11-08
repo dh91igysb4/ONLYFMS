@@ -1,7 +1,7 @@
 // 볼 런 게임 로직. 시뮬(sim.ts)을 플랫폼 GameLogic 약속으로 감싼다. 시간은 ctx가 아니라 틱으로 센다.
 // 순수 함수만, 외부 의존 없음 (Deno 호환).
 import type { Ctx, GameLogic, PlatformAction } from '../types.ts'
-import { SCORE_DIV, SCORE_MAX } from './constants.ts'
+import { SCORE_MAX, SCORE_TICKS } from './constants.ts'
 import { getCourse } from './course.ts'
 import { decodeInputs } from './input.ts'
 import { initSim, step } from './sim.ts'
@@ -18,7 +18,8 @@ const ERR_DONE = 'finished'
 const hex8 = (n: number): string => (n >>> 0).toString(16).padStart(8, '0')
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 1,
+  // v2: 코스(단계 주기)·물리(관성·기운 판·단차·터널 가속)·점수(시간) 규칙이 모두 바뀌었다.
+  version: 2,
 
   pickPuzzle(rng, _options) {
     let seed = ''
@@ -59,8 +60,9 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
     return state.sim.dead !== null
   },
 
+  // 살아 있던 시간으로 센다(0.5초에 1점). 거리는 속도 단계에 따라 달라 쓰지 않는다.
   score(state) {
-    return Math.min(SCORE_MAX, Math.floor(state.sim.z / SCORE_DIV))
+    return Math.min(SCORE_MAX, Math.floor(state.sim.tick / SCORE_TICKS))
   },
 
   actionCount(state) {
