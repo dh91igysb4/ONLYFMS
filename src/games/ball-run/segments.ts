@@ -97,7 +97,7 @@ const U5 = './////.' // 5칸 오르막(+250 mm)
 // - 조각 첫 장애물은 이음 행 뒤 6~9행(앞 조각 끝에서 공이 어디 있든 건너올 거리).
 // - 단차 뒤 착지까지 최고 속도에서 약 8행 → 단차 뒤 9행 이상 평지.
 // - 같은 쪽으로 미는 기운 판은 연속 8행 이하. 길게 이으려면 평지를 끼우거나 방향을 바꾼다.
-// - 칸 높이가 다른 열은 벽, 구멍 열은 높이가 그대로라 좁은 급경사는 바깥 열을 먼저 내려 보낸다('.!___!.' 뒤 '..!!!..').
+// - 칸 높이가 다른 열은 벽, 구멍 열은 높이가 그대로라 좁은 능선이 내려갈 만큼 바깥 열을 먼저 떨어뜨린 뒤 끊는다(fallAway).
 
 // 시작 터널(속도 단계에 세지 않는다). 첫 화면이 터널 안이다.
 export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 22), J] }
@@ -109,34 +109,68 @@ export const TUNNELS: readonly SegmentTemplate[] = [
   { id: 'tunnel-18', kind: 'tunnel', tier: 1, rows: [J, ...rep(W, 16), J] },
 ]
 
-// 내리막: 터널 출구 뒤 긴 급경사(녹화 3.0~4.5 s, 11.0~12.5 s, 23.0 s). 조각마다 4 m 이상 내려간다.
+// 내리막: 터널 출구 뒤 좁은 능선(녹화 11.0~12.5 s, 15.75~16.75 s, 22.75~23.75 s, 31.5~32.25 s). 조각마다 4 m 이상 내려간다.
+// 앞 6행은 5칸 그대로(공이 어디서 오든 옆으로 비킬 거리), 그다음 바깥 판이 한쪽씩 떨어져 나가 3칸 능선이 되고,
+// 능선은 급경사·단차로 내려가며 군데군데 2칸·1칸까지 좁아진다. 구멍 열은 높이가 그대로라서, 능선이 앞으로 내려갈 만큼
+// 바깥 판이 미리 단차('v')로 떨어진 뒤 끊긴다(fallAway). 능선 옆 열이 끊길 때도 같다('..__v..').
+const RS = '..!!!..' // 3칸 능선 급경사(−500 mm)
+const RL = '..vvv..' // 3칸 능선 단차(−1000 mm)
+const N2 = '..__...' // 2칸 능선
+const N1 = '..._...' // 1칸 능선
+// 5칸 → 4칸 → 3칸. 오른쪽(+2) 판이 drop만큼 단차로 떨어진 뒤 끊기고, 4행 뒤 왼쪽(−2) 판이 같은 식으로 끊긴다.
+// 가운데 3칸은 평평하다. 첫 행은 조각의 7행째 이후에 둔다(최고 속도에서 1칸 비키는 7행).
+const fallAway = (drop: number): string[] => {
+  const k = Math.floor(drop / 1000)
+  const out: string[] = []
+  for (let i = 0; i < 4 + k; i++) {
+    const right = i < k ? 'v' : '.'
+    const left = i < 4 ? '_' : i - 4 < k ? 'v' : '.'
+    out.push(`.${left}___${right}.`)
+  }
+  return out
+}
+
 export const DESCENTS: readonly SegmentTemplate[] = [
-  // 곧게 뻗은 긴 급경사.
-  { id: 'd-steep', kind: 'descent', tier: 1, rows: [J, W, W, ...rep(S, 10), ...rep(W, 6), J] },
-  // 급경사와 단차 계단 두 번.
+  // 곧게 뻗은 3칸 능선 급경사(녹화 31.5~32.25 s).
+  {
+    id: 'd-steep', kind: 'descent', tier: 1,
+    rows: [J, W, ...rep(S, 5), ...fallAway(3000), ...rep(RS, 6), ...rep(N3, 16), J],
+  },
+  // 급경사와 단차 계단 두 번. 두 번째 단차 뒤 착지한 능선이 잠깐 2칸으로 좁아진다.
   {
     id: 'd-steps', kind: 'descent', tier: 1,
-    rows: [J, W, ...rep(S, 4), L, ...rep(W, 9), ...rep(S, 4), L, ...rep(W, 9), J],
+    rows: [
+      J, W, S, S, S, L, W, ...fallAway(2000), N3, N3, RS, RS, RL, ...rep(N3, 6), ...rep(N2, 4), ...rep(N3, 5), J,
+    ],
   },
-  // 양옆 판이 먼저 떨어지고 가운데 3칸만 남은 혀 모양 급경사(녹화 3.25 s, 12.0 s).
+  // 혀 모양 능선: 3칸 급경사 뒤 평평한 능선이 2칸 → 1칸 → 2칸 → 3칸(녹화 12.0 s, 16.0 s).
   {
     id: 'd-ridge', kind: 'descent', tier: 1,
-    rows: [J, W, S, S, ...rep('.!___!.', 4), ...rep('..!!!..', 4), S, S, ...rep(W, 6), J],
+    rows: [
+      J, W, ...rep(S, 5), ...fallAway(2000), ...rep(RS, 4), ...rep(N3, 4), ...rep(N2, 4), ...rep(N1, 4), ...rep(N2, 4),
+      ...rep(N3, 4), J,
+    ],
   },
-  // 더 길게 좁아지는 급경사 끝에 단차.
+  // 더 길게 좁아지는 능선: 3칸 급경사 → 2칸 급경사 끝에 단차 → 1칸 능선.
   {
     id: 'd-narrow-long', kind: 'descent', tier: 1,
-    rows: [J, W, ...rep('.!___!.', 6), ...rep('..!!!..', 6), L, ...rep(W, 9), J],
+    rows: [
+      J, W, ...rep(S, 5), ...fallAway(3000), RS, RS, N3, N3, '..__v..', '..__v..', '..!!...', '..!!...', '..vv...',
+      ...rep(N2, 7), ...rep(N1, 4), N2, N2, J,
+    ],
   },
-  // 짧은 급경사 + 단차가 세 번 이어지는 계단식 판.
+  // 짧은 급경사 + 단차가 세 번 이어지는 계단식 능선(녹화 22.75~23.75 s).
   {
     id: 'd-terraces', kind: 'descent', tier: 1,
-    rows: [J, W, S, S, L, ...rep(W, 9), S, S, L, ...rep(W, 9), S, S, L, ...rep(W, 7), J],
+    rows: [J, W, S, S, L, W, W, ...fallAway(4000), RS, RS, RL, ...rep(N3, 9), RS, RS, RL, ...rep(N3, 9), J],
   },
-  // 급경사 아래 멀리 보이는 작은 블록(녹화 4.0~5.25 s). 가운데로 가면 닿지 않는다.
+  // 급경사 능선 아래 멀리 보이는 작은 블록(녹화 4.0~5.25 s, 16.0~16.75 s). 가운데로 가면 닿지 않는다.
   {
     id: 'd-steep-blocks', kind: 'descent', tier: 1,
-    rows: [J, W, ...rep(S, 6), L, ...rep(W, 9), '._B___.', ...rep(W, 6), '.___B_.', ...rep(W, 5), J],
+    rows: [
+      J, W, ...rep(S, 5), ...fallAway(2000), ...rep(RS, 4), ...rep(N3, 6), '..B__..', ...rep(N3, 7), '..__B..',
+      ...rep(N3, 6), J,
+    ],
   },
 ]
 

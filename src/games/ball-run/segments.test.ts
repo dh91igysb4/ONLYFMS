@@ -233,6 +233,36 @@ describe('pools', () => {
     for (const p of PARSED_DESCENTS) expect(p.dh, p.id).toBeLessThanOrEqual(-4000)
   })
 
+  // 녹화(11~12.5 s, 15.75~16.75 s, 22.75~23.75 s, 31.5~32.25 s)의 터널 뒤 내리막은 3칸 폭 능선이 대부분이고 군데군데
+  // 1~2칸까지 좁아진다. 가운데 5열(벽 안쪽)의 바닥 칸 수로 잰다(블록·구멍은 바닥이 아니다).
+  const floorCells = (row: string) => [...row.slice(1, 6)].filter((ch) => isFloor(ch)).length
+  const holes = (row: string) => new Set([...row.slice(1, 6)].flatMap((ch, i) => (ch === '.' ? [i] : [])))
+
+  it('descents are narrow ridges: 60%+ of interior rows have at most 3 floor cells', () => {
+    for (const t of DESCENTS) {
+      const inner = t.rows.slice(1, -1)
+      const narrow = inner.filter((row) => floorCells(row) <= 3).length
+      expect(narrow / inner.length, `${t.id} ${narrow}/${inner.length}`).toBeGreaterThanOrEqual(0.6)
+    }
+    const minW = DESCENTS.map((t) => Math.min(...t.rows.map(floorCells)))
+    expect(minW.filter((w) => w <= 2).length, 'some descents narrow to 1-2 cells').toBeGreaterThanOrEqual(2)
+    expect(minW).toContain(1)
+  })
+
+  it('descents narrow smoothly: one more hole column at a time, at least 4 rows apart', () => {
+    for (const t of DESCENTS) {
+      let last = -Infinity
+      for (let r = 1; r < t.rows.length; r++) {
+        const before = holes(t.rows[r - 1])
+        const added = [...holes(t.rows[r])].filter((c) => !before.has(c)).length
+        expect(added, `${t.id} row ${r}`).toBeLessThanOrEqual(1)
+        if (added === 0) continue
+        expect(r - last, `${t.id} row ${r}`).toBeGreaterThanOrEqual(4)
+        last = r
+      }
+    }
+  })
+
   it('obstacles: 4+ per tier, 20+ total, never climb overall', () => {
     expect(OBSTACLES.length).toBeGreaterThanOrEqual(20)
     for (const tier of [1, 2, 3, 4]) expect(OBSTACLES.filter((t) => t.tier === tier).length, `tier ${tier}`).toBeGreaterThanOrEqual(4)
