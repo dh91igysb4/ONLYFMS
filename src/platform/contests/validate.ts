@@ -21,7 +21,8 @@ export function validateContest(input: ContestInput, nowMs: number): Record<stri
 
   const start = input.startsAt.getTime()
   if (!Number.isFinite(start)) errors.startsAt = '시작 시각을 정해 주세요'
-  else if (start < nowMs + 5 * MIN) errors.startsAt = '시작은 지금부터 5분 뒤 이후로 정해 주세요'
+  // 입력이 분 단위라 기준도 분으로 자른다: 지금이 04:53:30이면 04:54부터 고를 수 있다 (서버와 같은 규칙).
+  else if (start < Math.floor(nowMs / MIN) * MIN + MIN) errors.startsAt = '시작은 지금부터 1분 뒤 이후로 정해 주세요'
   else if (start > nowMs + 30 * DAY) errors.startsAt = '시작은 30일 안으로 정해 주세요'
 
   const d = input.durationMin

@@ -89,16 +89,16 @@ select lives_ok(format($$select * from public.create_contest('  가 ', now() + i
   'create_validations: 1-char title after trim ok');
 
 -- 시작 시각
-select throws_ok(format($$select * from public.create_contest('t', now() + interval '4 minutes', 30, 'public', %L, false)$$, :'OK1'),
-  'P0001', 'start_too_soon', 'create_validations: start now+4min');
+select throws_ok(format($$select * from public.create_contest('t', date_trunc('minute', now()) + interval '59 seconds', 30, 'public', %L, false)$$, :'OK1'),
+  'P0001', 'start_too_soon', 'create_validations: start before the next minute');
 select throws_ok(format($$select * from public.create_contest('t', now() - interval '1 hour', 30, 'public', %L, false)$$, :'OK1'),
   'P0001', 'start_too_soon', 'create_validations: start in the past');
 select throws_ok(format($$select * from public.create_contest('t', null, 30, 'public', %L, false)$$, :'OK1'),
   'P0001', 'start_too_soon', 'create_validations: null start');
 select throws_ok(format($$select * from public.create_contest('t', now() + interval '31 days', 30, 'public', %L, false)$$, :'OK1'),
   'P0001', 'start_too_far', 'create_validations: start now+31d');
-select lives_ok(format($$select * from public.create_contest('t', now() + interval '5 minutes', 30, 'public', %L, false)$$, :'OK1'),
-  'create_validations: start exactly now+5min ok');
+select lives_ok(format($$select * from public.create_contest('t', date_trunc('minute', now()) + interval '1 minute', 30, 'public', %L, false)$$, :'OK1'),
+  'create_validations: start at the next minute ok');
 select lives_ok(format($$select * from public.create_contest('t', now() + interval '30 days', 30, 'public', %L, false)$$, :'OK1'),
   'create_validations: start exactly now+30d ok');
 
@@ -223,7 +223,7 @@ select is((select count(*)::int from public.contest_entries where contest_id = :
 
 select throws_ok(format($$select public.update_contest(%L, repeat('a', 41), now() + interval '1 hour', 30, 'public', %L)$$, :'c_pub', :'OK1'),
   'P0001', 'title_invalid', 'update: title validation');
-select throws_ok(format($$select public.update_contest(%L, 'x', now() + interval '4 minutes', 30, 'public', %L)$$, :'c_pub', :'OK1'),
+select throws_ok(format($$select public.update_contest(%L, 'x', date_trunc('minute', now()) + interval '59 seconds', 30, 'public', %L)$$, :'c_pub', :'OK1'),
   'P0001', 'start_too_soon', 'update: start validation');
 select throws_ok(format($$select public.update_contest(%L, 'x', now() + interval '1 hour', 181, 'public', %L)$$, :'c_pub', :'OK1'),
   'P0001', 'duration_invalid', 'update: duration validation');
