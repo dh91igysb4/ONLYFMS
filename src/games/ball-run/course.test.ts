@@ -26,8 +26,8 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-16~', 'd-terraces~', 'o2-zigzag~',
-  'tunnel-14', 'd-ridge~', 'o1-edge-pillars', 'o1-gate-wide~', 'tunnel-14~', 'd-ridge~',
+  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-27~', 'd-terraces~', 'o2-zigzag~',
+  'tunnel-24', 'd-ridge~', 'o1-edge-pillars', 'o1-gate-wide~', 'tunnel-24~', 'd-ridge~',
 ]
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
@@ -188,7 +188,7 @@ describe('course', () => {
     const flat = (id: string, n: number) =>
       parseSegment({ id, kind: 'obstacle', tier: 1, rows: [JOINT, ...new Array<string>(n).fill('_______'), JOINT] })
     const tunnel = (id: string, n: number) =>
-      parseSegment({ id, kind: 'tunnel', tier: 1, rows: [JOINT, ...new Array<string>(n).fill('_______'), JOINT] })
+      parseSegment({ id, kind: 'tunnel', tier: 1, rows: [JOINT, ...new Array<string>(n).fill(JOINT), JOINT] })
     const T0 = tunnel('t0', 8) // rows 0..9
     const O1 = flat('o1', 10) // rows 10..21
     const T1 = tunnel('t1', 4) // rows 22..27

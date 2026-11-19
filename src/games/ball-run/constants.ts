@@ -12,12 +12,13 @@ export const LEDGE = 1000 // 'v' 단차(칸 시작에서 한 번에 내려가는
 export const PILLAR_H = 3000 // 'P' 기둥 높이
 export const GATE_H = 1000 // 'G' 문 기둥 높이(블록과 같은 1 m 큐브, 위 가로대는 화면용)
 
-export const V0 = 200
-export const V_MAX = 467
+// v3: v2(200 → 467)의 1.7배.
+export const V0 = 340
+export const V_MAX = 794
 // k번째 = min(V_MAX, floor(V0 * 106^k / 100^k)). 큰 수 곱셈 오차를 피하려고 미리 계산해 둔다.
 // V_MAX에 닿은 뒤 1개까지만 둔다.
 export const SPEED_TABLE: readonly number[] = [
-  200, 212, 224, 238, 252, 267, 283, 300, 318, 337, 358, 379, 402, 426, 452, 467, 467,
+  340, 360, 382, 404, 429, 454, 482, 511, 541, 574, 608, 645, 684, 725, 768, 794, 794,
 ]
 
 export const LAT_K = 5
@@ -29,7 +30,7 @@ export const BANK_DRIFT_MAX = 2 * X_LIMIT
 export const VX_MAX = 117
 export const G = 7
 export const STEP_TOL = 150
-export const DROP_TOL = 260
+export const DROP_TOL = 440 // v3: 급경사 최고 속도 한 틱 하강 ≈ 397 mm보다 크게(단차 1000은 여전히 난다)
 export const FALL_DEPTH = 3000
 
 export const SCORE_TICKS = 30 // 점수 = floor(tick / SCORE_TICKS), 0.5초에 1점

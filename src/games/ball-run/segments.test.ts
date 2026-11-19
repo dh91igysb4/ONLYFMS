@@ -54,17 +54,26 @@ describe('parseSegment', () => {
     expect(mk([JOINT, '._/___.', JOINT])).toThrow()
   })
 
-  it('tunnel rule: only floor cells inside a tunnel, holes allowed in the outer columns', () => {
+  it('tunnel rule: tunnel rows are exactly the 3-wide joint row (walls at ±1.5 m)', () => {
     const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'tunnel', tier: 2, rows })
     for (const ch of ['.', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
-      expect(mk([JOINT, `.${ch}____.`, JOINT]), ch).toThrow()
-      expect(mk([JOINT, `__${ch}____`, JOINT]), ch).toThrow()
+      expect(mk([JOINT, `..${ch}__..`, JOINT]), ch).toThrow()
+      expect(mk([JOINT, `..__${ch}..`, JOINT]), ch).toThrow()
     }
-    for (const ch of ['/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
-      expect(mk([JOINT, `${ch}_____.`, JOINT]), `outer ${ch}`).toThrow()
+    for (const ch of ['_', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
+      expect(mk([JOINT, `.${ch}___..`, JOINT]), `outer ${ch}`).toThrow()
+      expect(mk([JOINT, `..___.${ch}`, JOINT]), `outer ${ch}`).toThrow()
     }
-    expect(mk([JOINT, '._____.', JOINT])).not.toThrow()
-    expect(mk([JOINT, '_______', JOINT])).not.toThrow()
+    expect(mk([JOINT, '..___..', JOINT])).not.toThrow()
+    expect(mk([JOINT, '._____.', JOINT])).toThrow()
+  })
+
+  it('center 3 columns must end level; outer columns may differ', () => {
+    const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows })
+    expect(mk([JOINT, '.v_____', JOINT])).not.toThrow()
+    expect(mk([JOINT, '..v__..', JOINT])).toThrow()
+    expect(mk([JOINT, '..__v..', JOINT])).toThrow()
+    expect(parseSegment({ id: 't', kind: 'obstacle', tier: 1, rows: [JOINT, '.vvvvv.', JOINT] }).dh).toBe(-1000)
   })
 
   it('steep and ledge', () => {
@@ -108,10 +117,23 @@ describe('templates', () => {
       expect(TEMPLATES.filter((t) => t.tier === tier).length).toBeGreaterThanOrEqual(4)
     }
     expect(PARSED.length).toBe(TEMPLATES.length)
-    expect(START_PARSED.length).toBe(24)
+    expect(START_PARSED.length).toBe(40)
     expect(START.kind).toBe('tunnel')
     expect(START.id).toBe('start')
     expect(START.tier).toBe(1)
+  })
+
+  it('no row has more than 3 floor cells (road at most 3 wide, joints and tunnels included)', () => {
+    // v3: 길 폭은 어디서나 3칸 이하. 블록·기둥·문 칸도 바닥이 있으니 센다(구멍 '.'만 빼고).
+    expect(JOINT).toBe('..___..')
+    for (const t of [START, ...TEMPLATES]) {
+      t.rows.forEach((row, r) => {
+        expect([...row].filter((ch) => ch !== '.').length, `${t.id} row ${r} '${row}'`).toBeLessThanOrEqual(3)
+      })
+    }
+    for (const p of [START_PARSED, ...PARSED]) {
+      p.cells.forEach((row, r) => expect(row.filter((c) => c.floor !== null).length, `${p.id} row ${r}`).toBeLessThanOrEqual(3))
+    }
   })
 
   it('every template starts and ends with the joint', () => {
@@ -123,7 +145,7 @@ describe('templates', () => {
 
   it('start has no blocks or holes in the track', () => {
     for (const row of START_PARSED.cells) {
-      for (let c = -2; c <= 2; c++) {
+      for (let c = -1; c <= 1; c++) {
         expect(row[at(c)].floor).not.toBeNull()
         expect(row[at(c)].block).toBe(false)
       }
@@ -134,8 +156,8 @@ describe('templates', () => {
     const tunnels = [START, ...TEMPLATES].filter((t) => t.kind === 'tunnel')
     expect(tunnels.length).toBeGreaterThanOrEqual(1)
     for (const t of tunnels) {
-      // 가운데 5칸 바닥만(터널 벽이 ±2.5 m에 서므로 바깥 열은 구멍).
-      for (const row of t.rows.slice(1, -1)) expect(row, t.id).toBe('._____.')
+      // 가운데 3칸 바닥만(터널 벽이 ±1.5 m에 서므로 바깥 열은 구멍).
+      for (const row of t.rows.slice(1, -1)) expect(row, t.id).toBe('..___..')
     }
   })
 
@@ -153,8 +175,9 @@ describe('templates', () => {
     expect(jumps).toBeGreaterThan(0)
   })
 
-  it('banked boards push one way for at most 8 rows in a row', () => {
+  it('banked boards push one way for at most 13 rows in a row', () => {
     // 같은 쪽으로 미는 기운 판이 길게 이어지면 손을 거의 못 뗀다(설계 기준). 방향이 바뀌거나 평지가 끼면 끊는다.
+    // v3: 속도가 1.7배라 v2의 8행이 13행(같은 시간).
     let banked = 0
     for (const t of TEMPLATES) {
       let dir = ''
@@ -165,48 +188,81 @@ describe('templates', () => {
         run = d !== '' && d === dir ? run + 1 : d !== '' ? 1 : 0
         dir = d
         if (d !== '') banked++
-        expect(run, `${t.id} row ${r}`).toBeLessThanOrEqual(8)
+        expect(run, `${t.id} row ${r}`).toBeLessThanOrEqual(13)
       })
     }
     expect(banked).toBeGreaterThan(0)
   })
 
-  it('lane changes between block walls leave enough rows for a human (design spacing)', () => {
-    // 블록 행 묶음(B·P·G가 있는 연속 행) 사이 빈 행 수. 앞 묶음 마지막 행의 어느 통과 칸에서든 다음 묶음 첫 행의 통과 칸까지
-    // 필요한 행: 1칸 7, 2칸 12, 3칸 16(4칸 20), 1칸 틈으로 들어가면 +3(최고 속도에서 사람이 맞출 여유).
-    const NEED = [0, 7, 12, 16, 20]
-    const passable = (row: string): number[] => {
-      const out: number[] = []
-      for (let i = 0; i < row.length; i++) if (!'.BPG'.includes(row[i])) out.push(i)
-      return out
-    }
-    const width = (cells: number[], i: number): number => {
-      let w = 1
-      for (let k = i - 1; cells.includes(k); k--) w++
-      for (let k = i + 1; cells.includes(k); k++) w++
-      return w
-    }
-    const walled = (row: string) => /[BPG]/.test(row)
+  // 길을 막거나 좁히는 행 = 블록 행이거나 구멍이 새로 생기는 행(길이 좁아지거나 옆으로 옮겨 감). 이음 행(가운데 3칸)도 센다.
+  // 바닥이 하나도 없는 행(점프 구멍)은 공이 날아 넘으니 세지 않는다.
+  // 그런 행 r1 다음 그런 행 r2: r1의 어느 통과 칸 a에서든 r2의 통과 칸 b까지 옮길 빈 행이 있어야 한다.
+  // 필요한 행(v3, 최고 속도 794 mm/틱): 1칸 12, 2칸 21, 3칸 28, 4칸 34, 1칸 틈으로 들어가면 +5(v2 7·12·16·20, +3의 1.7배).
+  // a와 b 사이 칸이 구멍·블록으로 끊긴 행(레일 등)은 세지 않는다: 빈 행은 그 마지막 끊긴 행 다음부터 센다.
+  const NEED = [0, 12, 21, 28, 34, 40, 46]
+  const ENTRY1 = 5
+  const pass = (row: string): number[] => [...row].flatMap((ch, i) => ('.BPG'.includes(ch) ? [] : [i]))
+  const floorOf = (row: string): number[] => [...row].flatMap((ch, i) => (ch === '.' ? [] : [i]))
+  const widthAt = (cells: number[], i: number): number => {
+    let w = 1
+    for (let k = i - 1; cells.includes(k); k--) w++
+    for (let k = i + 1; cells.includes(k); k++) w++
+    return w
+  }
+  function spacingProblems(t: SegmentTemplate): { bad: string[]; checked: number } {
     const bad: string[] = []
-    for (const t of TEMPLATES) {
-      let prevEnd = -1
-      t.rows.forEach((row, r) => {
-        if (!walled(row) || walled(t.rows[r - 1] ?? '')) return
-        if (prevEnd >= 0) {
-          const from = passable(t.rows[prevEnd])
-          const to = passable(row)
-          const need = Math.max(
-            ...from.map((a) => Math.min(...to.map((b) => NEED[Math.abs(a - b)] + (a !== b && width(to, b) === 1 ? 3 : 0)))),
-          )
-          const gap = r - prevEnd - 1
-          if (gap < need) bad.push(`${t.id} row ${r}: ${gap} rows, needs ${need}`)
-        }
-        let end = r
-        while (walled(t.rows[end + 1] ?? '')) end++
-        prevEnd = end
-      })
+    let checked = 0
+    const isConstraint = (r: number): boolean =>
+      floorOf(t.rows[r]).length > 0 &&
+      (/[BPG]/.test(t.rows[r]) || floorOf(t.rows[r - 1]).some((c) => !floorOf(t.rows[r]).includes(c)))
+    let r1 = 0
+    for (let r2 = 1; r2 < t.rows.length; r2++) {
+      if (!isConstraint(r2)) continue
+      const to = pass(t.rows[r2])
+      for (const a of pass(t.rows[r1])) {
+        const ok = to.some((b) => {
+          const lo = Math.min(a, b)
+          const hi = Math.max(a, b)
+          let start = r1
+          for (let r = r1; r < r2; r++) {
+            const p = pass(t.rows[r])
+            if (p.length === 0) continue // 점프 구멍 위로는 날아서 옮긴다
+            for (let c = lo; c <= hi; c++) if (!p.includes(c)) start = r
+          }
+          const need = NEED[hi - lo] + (a !== b && widthAt(to, b) === 1 ? ENTRY1 : 0)
+          return r2 - start - 1 >= need
+        })
+        checked++
+        if (!ok) bad.push(`${t.id} rows ${r1}->${r2} from col ${a - 3}`)
+      }
+      r1 = r2
     }
-    expect(bad).toEqual([])
+    return { bad, checked }
+  }
+
+  it('lane changes leave enough rows for a human (design spacing at top speed)', () => {
+    const all = TEMPLATES.map(spacingProblems)
+    expect(all.flatMap((x) => x.bad)).toEqual([])
+    expect(all.reduce((n, x) => n + x.checked, 0)).toBeGreaterThan(100)
+  })
+
+  it('the spacing rule catches lane changes that come too soon', () => {
+    const mk = (rows: string[]): SegmentTemplate => ({ id: 'x', kind: 'obstacle', tier: 1, rows: [JOINT, ...rows, JOINT] })
+    const n = (k: number) => new Array<string>(k).fill('..___..')
+    // 1칸 틈에서 반대쪽 1칸 틈(2칸 + 5 = 26행)
+    expect(spacingProblems(mk([...n(26), '..BB_..', ...n(26), '.._BB..'])).bad).toEqual([])
+    expect(spacingProblems(mk([...n(26), '..BB_..', ...n(25), '.._BB..'])).bad).not.toEqual([])
+    // 이음 행에서 첫 블록까지 12행
+    expect(spacingProblems(mk([...n(11), '..B__..'])).bad).not.toEqual([])
+    // 레일 위에서는 건너편으로 못 옮기니 레일이 끝난 뒤부터 센다.
+    const rail = (k: number) => new Array<string>(k).fill('.._....')
+    expect(spacingProblems(mk([...n(26), ...rail(14), ...n(26), '...._..'])).bad).toEqual([])
+    expect(spacingProblems(mk([...n(26), ...rail(14), ...n(25), '...._..'])).bad).not.toEqual([])
+    // 길이 한 칸 옮겨 가면 12행 뒤에야 다음으로 옮긴다.
+    const road = (row: string, k: number) => new Array<string>(k).fill(row)
+    const back = [...road('___....', 13), ...road('.___...', 13)]
+    expect(spacingProblems(mk([...n(12), ...road('.___...', 12), ...back])).bad).not.toEqual([])
+    expect(spacingProblems(mk([...n(12), ...road('.___...', 13), ...back])).bad).toEqual([])
   })
 
   it('banked boards push both ways equally in every template (drift never decays)', () => {
@@ -268,11 +324,11 @@ describe('pools', () => {
     expect(gates).toBeGreaterThanOrEqual(3)
   })
 
-  it('tunnels: at least 2, 14..18 rows', () => {
+  it('tunnels: at least 2, 24..30 rows (v2 14..18 rows x1.7 speed)', () => {
     expect(TUNNELS.length).toBeGreaterThanOrEqual(2)
     for (const p of PARSED_TUNNELS) {
-      expect(p.length, p.id).toBeGreaterThanOrEqual(14)
-      expect(p.length, p.id).toBeLessThanOrEqual(18)
+      expect(p.length, p.id).toBeGreaterThanOrEqual(24)
+      expect(p.length, p.id).toBeLessThanOrEqual(30)
     }
   })
 
@@ -329,7 +385,10 @@ describe('pools', () => {
 
 describe('SPEED_TABLE', () => {
   it('matches formula', () => {
-    expect(V0).toBe(200)
+    // v3: 원작보다 빠르게 ×1.7(V0 200 → 340, V_MAX 467 → 794).
+    expect(V0).toBe(340)
+    expect(V_MAX).toBe(794)
+    expect(SPEED_TABLE).toHaveLength(17)
     const last = SPEED_TABLE.length - 1
     for (let k = 0; k <= last; k++) {
       const v = Number((BigInt(V0) * 106n ** BigInt(k)) / 100n ** BigInt(k))

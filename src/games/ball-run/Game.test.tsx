@@ -34,7 +34,7 @@ afterAll(() => {
 })
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
-// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 88(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
+// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 115(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
 const PUZZLE = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(1)), {})
 const INITIAL: State = logic.initState(PUZZLE, ctx)
 const START_LEN = START_PARSED.length
@@ -174,7 +174,7 @@ describe('ball-run Game', () => {
         if (open) { block = [col, row]; break }
       }
     }
-    expect(block).toEqual([-1, 88])
+    expect(block).toEqual([-1, 115])
     const onAction = vi.fn()
     await mount(props({ onAction }))
     // 블록 열 중심으로: dx = col * 1000 / DRAG_SPAN(6000) * 폭(390)
@@ -445,7 +445,8 @@ describe('ball-run Game', () => {
     const course = getCourse(PUZZLE.seed)
     let seg = course.segmentAt(START_LEN)
     while (seg.kind !== 'tunnel') seg = course.segmentAt(seg.startRow + seg.length)
-    const z = seg.startRow * 1000 - 300
+    // 1단계(360 mm/틱)에서 두 틱째에 터널에 들어서는 자리.
+    const z = seg.startRow * 1000 - 500
     const h = floorAt(course, 0, z)!
     // 시작 터널이 1단계라 첫 터널 앞은 1, 터널에 들어서면 2.
     expect(course.boostsBefore(rowOf(z))).toBe(1)

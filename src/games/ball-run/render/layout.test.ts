@@ -11,7 +11,7 @@ import { floorAt } from '../sim.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
 
-// 첫 조각: 이음 행만 6행(행마다 바닥 5칸). 둘째: 블록·오르막.
+// 첫 조각: 이음 행만 6행(행마다 바닥 3칸). 둘째: 블록·오르막.
 const STRAIGHT = parseSegment({ id: 'straight', kind: 'obstacle', tier: 1, rows: new Array<string>(6).fill(JOINT) })
 const MIXED = parseSegment({ id: 'mixed', kind: 'obstacle', tier: 1, rows: [JOINT, '___B___', '/______', 'B______', JOINT] })
 const course = courseFromSegments([
@@ -23,9 +23,9 @@ describe('segmentBoxes', () => {
   it('floor boxes match cells', () => {
     const info = course.segmentAt(0)
     const floors = segmentBoxes(course, info).filter((b) => b.kind === 'floor')
-    expect(floors).toHaveLength(info.length * 5)
+    expect(floors).toHaveLength(info.length * 3)
     for (let row = info.startRow; row < info.startRow + info.length; row++) {
-      for (let col = -2; col <= 2; col++) {
+      for (let col = -1; col <= 1; col++) {
         const b = floors.find((f) => f.cx === col * 1000 && f.cz === row * 1000 + 500)
         expect(b).toBeDefined()
         expect(b!.w).toBe(1000)
