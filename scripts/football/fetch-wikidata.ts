@@ -19,6 +19,7 @@ import {
 } from './wikidata.ts'
 import { batched, log, query } from './wdqs.ts'
 import { combineTeamComps, completeSeasons, type SeasonInfo } from './openfootball.ts'
+import { applyManualSpells } from './manualSpells.ts'
 
 // ---------------------------------------------------------------- 인자
 
@@ -110,9 +111,15 @@ async function main() {
   const teams = buildTeams(await batched('팀', teamIds, 150, qTeams, o.cacheDir))
   applyLeagueNations(teams, teamComps, o.leagues)
   const teamMap = new Map<string, Team>(teams.map((t) => [t.id, t]))
-  const { spells, national, dropped } = buildSpells(spellRows, teamMap)
+  const { spells: wdSpells, national, dropped } = buildSpells(spellRows, teamMap)
   const caps = buildCaps(national)
-  log(`경력 ${spells.length}개, 국가대표 ${caps.length}개 (유스·2군·이름 없는 팀·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
+  log(`경력 ${wdSpells.length}개, 국가대표 ${caps.length}개 (유스·2군·이름 없는 팀·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
+  // 4-1. 직접 입력 경력(manual/spells.csv, 설계 §5.3). 선수·팀 존재는 9번 CSV 검사가 본다
+  const manualSpells = applyManualSpells(wdSpells, readManual(o.out, 'spells.csv'))
+  const spells = manualSpells.spells
+  log(`직접 입력 경력: 추가 ${manualSpells.added}, 수정 ${manualSpells.fixed}, 삭제 ${manualSpells.deleted}`)
+  for (const m of manualSpells.problems) log(`  ${m}`)
+  if (manualSpells.problems.length) process.exitCode = 1
 
   // 5. 선수 정보·수상
   const built = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cacheDir), caps, teamMap)
