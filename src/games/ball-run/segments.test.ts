@@ -136,6 +136,33 @@ describe('templates', () => {
     }
   })
 
+  it('no upward step along a column: the sim never has to pop a fast ball onto a higher floor', () => {
+    // 시뮬의 접지 스냅에는 위쪽 한도가 없다(vz > R이면 한 틱에 중심이 턱을 넘을 수 있다). 그래서 코스에는 앞쪽으로 높아지는 턱이
+    // 없어야 한다: 같은 열에서 바닥 칸의 h0은 앞 행 바닥의 h1보다 높지 않고, 구멍 뒤 다시 나타난 바닥은 그 열에서 마지막으로
+    // 본 바닥보다 높지 않다. 오르막 '/'는 이어지므로 통과한다.
+    // 지금 DSL에서는 열 높이가 그 열의 기호로만 바뀌어(구멍은 높이 유지) 구조적으로 지켜진다. 규칙이 바뀌어도 깨지지 않게 둔다.
+    const upSteps = (p: { id: string; cells: { floor: null | { h0: number; h1: number } }[][] }): string[] => {
+      const bad: string[] = []
+      for (let i = 0; i < p.cells[0].length; i++) {
+        let last: number | null = null
+        p.cells.forEach((row, r) => {
+          const f = row[i].floor
+          if (f === null) return
+          if (last !== null && f.h0 > last) bad.push(`${p.id} col ${i + COL_MIN} row ${r}: ${f.h0} > ${last}`)
+          last = f.h1
+        })
+      }
+      return bad
+    }
+    expect([START_PARSED, ...PARSED].flatMap(upSteps)).toEqual([])
+    // 자기 점검: 바로 앞 행보다 높은 바닥, 구멍 뒤 더 높은 바닥을 잡는다.
+    const fl = (h0: number, h1 = h0) => ({ floor: { h0, h1 } })
+    const hole = { floor: null }
+    expect(upSteps({ id: 'a', cells: [[fl(0)], [fl(500)]] })).toHaveLength(1)
+    expect(upSteps({ id: 'b', cells: [[fl(0)], [hole], [fl(250)]] })).toHaveLength(1)
+    expect(upSteps({ id: 'c', cells: [[fl(0, 250)], [hole], [fl(250, 500)], [fl(500)]] })).toEqual([])
+  })
+
   it('every template starts and ends with the joint', () => {
     for (const t of [START, ...TEMPLATES]) {
       expect(t.rows[0]).toBe(JOINT)
