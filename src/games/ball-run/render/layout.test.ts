@@ -5,7 +5,7 @@ import { JOINT, parseSegment } from '../segments.ts'
 import {
   BALL_FRAC, BANK_ANGLE, BANK_EASE, CAM_BACK, CAM_UP, EYE_LAG_MAX, LINTEL_H, VFOV, bankEase, bankOffset, buildingsFor, cameraTarget,
   BANK_FLOAT_MAX, bankFollow, lookPitch, segmentBoxes, smoothEye,
-  BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent,
+  BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent, rollQuat,
 } from './layout.ts'
 import { floorAt } from '../sim.ts'
 
@@ -388,5 +388,59 @@ describe('buildingsFor', () => {
 
   it('different seeds differ', () => {
     expect(buildingsFor(SEED, 0, 300)).not.toEqual(buildingsFor('f'.repeat(32), 0, 300))
+  })
+})
+
+describe('rollQuat (rolling without slipping)', () => {
+  // 사원수 q로 점 p를 돌린다(테스트용).
+  const rotate = (q: number[], p: [number, number, number]): [number, number, number] => {
+    const [x, y, z, w] = q
+    const [px, py, pz] = p
+    const ix = w * px + y * pz - z * py
+    const iy = w * py + z * px - x * pz
+    const iz = w * pz + x * py - y * px
+    const iw = -x * px - y * py - z * pz
+    return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x]
+  }
+
+  it('no displacement is the identity and writes into the given array', () => {
+    const out = [9, 9, 9, 9]
+    expect(rollQuat(0, 0, out)).toBe(out)
+    expect(out).toEqual([0, 0, 0, 1])
+  })
+
+  it('forward roll matches the old rotation.x = -z / R', () => {
+    const q = rollQuat(0, 100, [0, 0, 0, 0])
+    expect(q[0]).toBeCloseTo(Math.sin(-100 / R / 2), 12)
+    expect(q[1]).toBe(0)
+    expect(q[2]).toBeCloseTo(0, 12)
+    expect(q[3]).toBeCloseTo(Math.cos(100 / R / 2), 12)
+    // 반 바퀴(πR)면 -x축으로 180°
+    const half = rollQuat(0, Math.PI * R, [0, 0, 0, 0])
+    expect(half[0]).toBeCloseTo(-1, 12)
+    expect(half[3]).toBeCloseTo(0, 12)
+  })
+
+  it('sideways roll turns about the z axis, mirrored for the other side', () => {
+    const r = rollQuat(100, 0, [0, 0, 0, 0])
+    const l = rollQuat(-100, 0, [0, 0, 0, 0])
+    expect(r[0]).toBeCloseTo(0, 12)
+    expect(r[2]).toBeCloseTo(-Math.sin(100 / R / 2), 12)
+    expect(l[2]).toBeCloseTo(-r[2], 12)
+    expect(l[3]).toBeCloseTo(r[3], 12)
+  })
+
+  it('unit quaternion; the contact point moves backwards by the displacement (no slip)', () => {
+    for (const [dx, dz] of [[3, 7], [-40, 25], [12, -5], [117, 794], [-117, 340]]) {
+      const q = rollQuat(dx, dz, [0, 0, 0, 0])
+      expect(Math.hypot(...q)).toBeCloseTo(1, 12)
+      // 장면 좌표: x = 시뮬 x, z = -시뮬 z. 바닥 접점(0, -R, 0)은 공 중심에 대해 진행 반대쪽으로 움직인다.
+      const scale = 1e-3 // 작은 변위로 선형 근사를 확인한다
+      const s = rollQuat(dx * scale, dz * scale, [0, 0, 0, 0])
+      const p = rotate(s, [0, -R, 0])
+      expect(p[0] / scale).toBeCloseTo(-dx, 1)
+      expect(p[2] / scale).toBeCloseTo(dz, 1)
+      expect(p[1]).toBeCloseTo(-R, 2)
+    }
   })
 })

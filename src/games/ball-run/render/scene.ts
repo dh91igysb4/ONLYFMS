@@ -19,6 +19,7 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   Scene,
   SphereGeometry,
   Texture,
@@ -32,11 +33,11 @@ import { colOf, floorAt, rowOf } from '../sim.ts'
 import {
   BANK_ANGLE, FLOOR_T, VFOV, bankOffset, boostPull, buildingsFor, cameraRig, cameraTarget, descentTarget, lookPitch, plankAt,
   plankEase, segmentBoxes, smoothDescent,
-  bankFollow, smoothEye,
+  bankFollow, rollQuat, smoothEye,
 } from './layout.ts'
 import type { Box, Plank } from './layout.ts'
 import {
-  BALL_COLOR, CHEVRON_P, CHEVRON_W, FLOOR_COLOR, FLOOR_LINE, WINDOW_H, WINDOW_W, ballEnvTexture, blockTexture, buildingTexture,
+  CHEVRON_P, CHEVRON_W, FLOOR_COLOR, FLOOR_LINE, WINDOW_H, WINDOW_W, ballEnvTexture, ballTexture, blockTexture, buildingTexture,
   chevronTexture, gridTexture, wallTexture,
 } from './textures.ts'
 
@@ -45,15 +46,16 @@ const BEAM_COLOR = '#f27cff'
 const SHARD_COLORS = ['#ff4fd8', '#ff8be6', '#4fd8ff', '#9ff0ff', '#ffffff']
 
 const M = 1 / 1000
-const AHEAD_ROWS = 90
+// v3: 공이 1.7배 빨라져 앞을 보는 시간이 v2(90행·안개 25~90 m)와 비슷하도록 약 1.6배로 늘렸다.
+const AHEAD_ROWS = 145
 const BEHIND_ROWS = 10
-const FOG_NEAR = 25
-const FOG_FAR = 90
+const FOG_NEAR = 40
+const FOG_FAR = 145
 const LOOK_DIST = 10 // 시선 점까지 거리(m). 방향만 쓴다.
 const FALL_MAX_TICKS = 180
 const BUILDING_DEPTH = 60 // 건물은 조각 base에서 이만큼(m) 아래부터 세운다.
 const BUILDING_LEAN = (7 * Math.PI) / 180 // 건물 윗부분이 바깥으로 기우는 각
-const TUNNEL_HALF = 2.5 // 터널 벽 아래 가장자리(m). 바닥 5칸 끝.
+const TUNNEL_HALF = 1.5 // 터널 벽 아래 가장자리(m). 바닥 3칸 끝(v3).
 const WALL_H = 3.2 // 터널 마젠타 벽 높이(m). 눈보다 높아 화면 양옆을 위까지 채운다(녹화 f_009).
 const WALL_OUT = 0.8 // 벽 위 가장자리가 바깥으로 기우는 정도(m)
 const ARCH_SIDES = 7 // 아치 다각형 변 수
@@ -68,6 +70,7 @@ const BEAM_SEGS = 18
 const SHARDS = 24
 const SHARD_G = 9.8
 const MAX_DPR = 2
+const ROLL_MAX_STEP = 3000 // 한 프레임에 이보다 멀리 옮겨 가면(이어 하기·상태 교체) 굴리지 않는다(mm)
 
 export type SceneHandle = {
   render(prev: SimState, cur: SimState, alpha: number): void
@@ -233,6 +236,8 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   const chevronTex = tex(chevronTexture())
   chevronTex.anisotropy = aniso
   const envTex = tex(ballEnvTexture())
+  const ballTex = tex(ballTexture())
+  ballTex.anisotropy = aniso
 
   // 바닥 상자: 윗면(+y, 인덱스 12..17)만 격자, 나머지 면은 라벤더 옆면.
   const unitBox = new BoxGeometry(1, 1, 1)
@@ -256,8 +261,9 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   const chevronMat = new MeshBasicMaterial({
     map: chevronTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   })
+  // 무늬 텍스처가 바탕색(BALL_COLOR)을 담고 있어 color는 흰색(곱해도 그대로).
   const ballMat = new MeshStandardMaterial({
-    color: BALL_COLOR, metalness: 0.65, roughness: 0.07, envMap: envTex, envMapIntensity: 1.2,
+    color: '#ffffff', map: ballTex, metalness: 0.65, roughness: 0.07, envMap: envTex, envMapIntensity: 1.2,
   })
   const beamMat = new MeshBasicMaterial({
     color: BEAM_COLOR, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide,
@@ -298,7 +304,14 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   }
 
   const ball = new Mesh(ballGeo, ballMat)
+  // 무늬 극이 카메라 쪽을 곧게 보지 않게 처음 자세를 조금 기울여 둔다.
+  ball.quaternion.set(0.3, 0.2, 0.15, 0.92).normalize()
   scene.add(ball)
+  // 굴림: 프레임마다 보간한 공 중심 변위로 사원수를 쌓는다(rollQuat). 프레임마다 새 객체를 만들지 않는다.
+  const rollStep = [0, 0, 0, 1]
+  const rollQ = new Quaternion()
+  let rollX = Number.NaN
+  let rollZ = Number.NaN
   const beam = new Mesh(beamGeo, beamMat)
   beam.visible = false
   beam.frustumCulled = false
@@ -610,7 +623,18 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     const by = (y + bankDy) * M
     const bz = -z * M
     ball.position.set(bx, by, bz)
-    ball.rotation.x = -z / R // 굴러간 거리 / 반지름 (진행 방향 -z)
+    // 굴림: 살아 있는 동안만 이번 프레임 변위(앞뒤 → x축, 좌우 → z축)만큼 구른다. 죽으면 멈춘다.
+    if (death === null && !Number.isNaN(rollX)) {
+      const dx = x - rollX
+      const dz = z - rollZ
+      if (dx * dx + dz * dz < ROLL_MAX_STEP * ROLL_MAX_STEP) {
+        rollQuat(dx, dz, rollStep)
+        rollQ.set(rollStep[0], rollStep[1], rollStep[2], rollStep[3])
+        ball.quaternion.premultiply(rollQ).normalize()
+      }
+    }
+    rollX = x
+    rollZ = z
     ball.visible = showBall
 
     // 깨짐 조각
