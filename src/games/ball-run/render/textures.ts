@@ -8,6 +8,8 @@ export const BUILDING_LINE = '#5f78f0'
 export const BLOCK_COLOR = '#ab24fb'
 export const BLOCK_EDGE = '#ea6cff'
 export const BALL_COLOR = '#c0109a'
+export const BALL_SPOT = '#ffc4f4' // 공 둥근 무늬(흰빛 분홍)
+export const BALL_PANEL = '#ff6fe2' // 공 무늬(밝은 분홍 반쪽 경도 띠). 바탕은 BALL_COLOR 그대로라 전체 색은 녹화의 마젠타 공과 같다.
 export const WALL_COLOR = '#8818d0'
 export const WALL_LINE = '#c45cff'
 export const WALL_TOP = '#ff7cf4'
@@ -88,8 +90,8 @@ export function wallTexture(): CanvasTexture {
 }
 
 // 터널 바닥 가속 화살표: 투명 바탕에 앞(캔버스 위쪽)을 가리키는 하늘색 갈매기 하나. 한 장 = 폭 CHEVRON_W × 길이 CHEVRON_P(m).
-// 녹화(f_009, f_090)처럼 공 깊이에서 화살표 하나가 통째로 보이는 폭(3.5 m), 팔은 가로에서 CHEVRON_DEG만큼 올라간다.
-export const CHEVRON_W = 3.5
+// 녹화(f_009, f_090)처럼 공 깊이에서 화살표 하나가 통째로 보인다(3칸 터널이라 폭 2.4 m), 팔은 가로에서 CHEVRON_DEG만큼 올라간다.
+export const CHEVRON_W = 2.4 // v3: 3칸 터널(벽 ±1.5 m) 안에 들어가게
 export const CHEVRON_P = 2.6
 const CHEVRON_DEG = 27
 export function chevronTexture(): CanvasTexture {
@@ -133,4 +135,24 @@ export function ballEnvTexture(): CanvasTexture {
   const t = finish(c)
   t.mapping = EquirectangularReflectionMapping
   return t
+}
+
+// 공 표면(등장방형, 구의 u = 경도, v = 위도). 마젠타 바탕에 밝은 분홍 반쪽 경도 띠 하나(극에서 극까지, 한쪽 면에만)와
+// 반대쪽 면의 흰빛 분홍 둥근 무늬 하나. 회전 대칭이 없어 빨리 굴러도 무늬가 거꾸로 도는 듯 보이지 않는다(v3).
+// 무늬가 없으면 광택 공이 굴러도 돌아가는 게 보이지 않는다. 가장자리는 살짝 흐리게 해 광택 공처럼 보이게 한다.
+export function ballTexture(): CanvasTexture {
+  const W = 256
+  const H = 128
+  const [c, ctx] = canvas(W, H)
+  ctx.fillStyle = BALL_COLOR
+  ctx.fillRect(0, 0, W, H)
+  ctx.filter = 'blur(1.5px)'
+  ctx.fillStyle = BALL_PANEL
+  ctx.fillRect(W * 0.2, 0, W * 0.1, H)
+  ctx.fillStyle = BALL_SPOT
+  ctx.beginPath()
+  ctx.ellipse(W * 0.68, H * 0.38, W * 0.09, H * 0.16, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.filter = 'none'
+  return finish(c)
 }

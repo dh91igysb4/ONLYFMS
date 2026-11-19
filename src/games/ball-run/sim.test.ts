@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANK_DRIFT, BLOCK_H, G, GATE_H, KEY_STEP, LAT_ACC, PILLAR_H, R, SPEED_TABLE, V0, VX_MAX, X_LIMIT,
+  BANK_DRIFT, BLOCK_H, DROP_TOL, G, GATE_H, KEY_STEP, LAT_ACC, LEDGE, PILLAR_H, R, ROW, SPEED_TABLE, STEEP_STEP, V0, V_MAX, VX_MAX,
+  X_LIMIT,
 } from './constants.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
@@ -102,12 +103,13 @@ describe('ball-run sim', () => {
     course(J, ...rep('..___..', 4), ...rep(`..${ch.repeat(3)}..`, n), ...rep('..___..', after), J)
   const RUN0 = 5 // 기운 판 첫 행
 
-  it('bank drift: a hands-off ball slides off a 3-wide plank within a 6-row run (speed 1)', () => {
-    const c = plank('>', 6)
+  // v3: 속도가 1.7배라 같은 밀림(틱당 BANK_DRIFT)이 1.7배 긴 행에 걸친다. 템플릿의 기운 판 묶음도 6 → 10행으로 늘렸다.
+  it('bank drift: a hands-off ball slides off a 3-wide plank within a 10-row run (speed 1)', () => {
+    const c = plank('>', 10)
     const states = run(c, 200, 0, initSim({ speedLevel: 1 }))
     const off = states.findIndex((s) => s.dead === 'fall' || colOf(s.x) > 1)
     expect(off, 'never left the plank').toBeGreaterThan(0)
-    expect(rowOf(states[off].z), `left at row ${rowOf(states[off].z)}`).toBeLessThanOrEqual(RUN0 + 5)
+    expect(rowOf(states[off].z), `left at row ${rowOf(states[off].z)}`).toBeLessThanOrEqual(RUN0 + 9)
     expect(last(states).dead).toBe('fall')
     // 판 위에서 drift는 틱마다 BANK_DRIFT씩 쌓이고, 판 전에는 0이다.
     for (let i = 1; i < states.length; i++) {
@@ -119,7 +121,7 @@ describe('ball-run sim', () => {
   })
 
   it('bank drift: steering uphill as fast as the push holds the ball on the plank', () => {
-    for (const [speedLevel, n] of [[1, 6], [1, 8], [8, 8], [16, 8]]) {
+    for (const [speedLevel, n] of [[1, 10], [1, 13], [8, 13], [16, 13]]) {
       const c = plank('>', n)
       // 판 위에 있는 틱마다 손가락을 위쪽(왼쪽)으로 BANK_DRIFT만큼 옮긴다(키보드 KEY_STEP보다 느리다).
       let tgt = 0
@@ -208,8 +210,8 @@ describe('ball-run sim', () => {
     // 왼쪽 두 열(col -2, -1)만 오르막 4행 -> 1 m 높은 평지 6행 -> 내리막 4행.
     const c = course(J, ...rep(F, 2), ...rep('_//____', 4), ...rep(F, 6), ...rep('_\\\\____', 4), ...rep(F, 2), J)
     // 높은 평지 구간(row 7..12)에 들어선 뒤 왼쪽으로 민다.
-    const states = run(c, 60, (s) => (s.z >= 7000 ? -2000 : 0))
-    expect(states).toHaveLength(60)
+    const states = run(c, 36, (s) => (s.z >= 7000 ? -2000 : 0))
+    expect(states).toHaveLength(36)
     expect(last(states).z).toBeLessThan(13000)
     for (const s of states) {
       expect(colOf(s.x)).toBe(0)
@@ -356,6 +358,38 @@ describe('ball-run sim', () => {
     expect(states[landed].lastFloor).toBe(-1000)
     expect(last(states).y - R).toBe(-1000)
     expect(last(states).grounded).toBe(true)
+  })
+
+  it('DROP_TOL covers the per-tick floor drop on steep at top speed', () => {
+    // 급경사 한 틱 바닥 하강 = STEEP_STEP × V_MAX / ROW(v3: 500 × 794 / 1000 ≈ 397 mm). 단차(LEDGE)는 여전히 날아야 한다.
+    expect(DROP_TOL).toBeGreaterThan(Math.ceil((STEEP_STEP * V_MAX) / ROW))
+    expect(DROP_TOL).toBeLessThan(LEDGE)
+  })
+
+  it('cannot tunnel through a block or a pillar at top speed', () => {
+    // vz 794 > 2R: 한 틱에 공 지름보다 멀리 가도 블록 칸(1 m)과 겹치는 구간(1 m + 2R)을 건너뛰지 못한다.
+    for (const ch of ['B', 'P', 'G']) {
+      for (let off = 0; off < 800; off += 37) {
+        const c = course(J, ...rep(F, 4), `___${ch}___`, ...rep(F, 10), J)
+        const s0 = { ...initSim({ speedLevel: SPEED_TABLE.length - 1 }), z: 2000 + off }
+        const end = last(run(c, 30, 0, s0))
+        expect(end.dead, `${ch} off ${off}`).toBe('hit')
+        expect(end.z, `${ch} off ${off}`).toBeLessThan(6000 + R)
+      }
+    }
+  })
+
+  it('cannot climb onto a higher floor at top speed', () => {
+    // 오른쪽 열만 1 m 높은 평지(옆에서 오르는 오르막 없이 행 시작에서 높아짐)는 만들 수 없으니, 구멍 아래(-1 m)에서 앞의 판으로
+    // 빠르게 들어가는 경우를 본다: 앞끝과 중심이 한 틱에 함께 턱을 넘어도 착지가 아니라 정면 충돌.
+    const c = course(J, ...rep('_....._', 3), ...rep(F, 10), J)
+    for (let z = 3000; z < 3700; z += 50) {
+      const s0: SimState = { ...initSim({ speedLevel: SPEED_TABLE.length - 1 }), z, y: R - 400, vy: -10, grounded: false }
+      if (floorAt(c, 0, s0.z + R) !== null) continue
+      const s = step(s0, 0, c)
+      if (floorAt(c, 0, s.z + R) === null) continue
+      expect(s.dead, `z ${z}`).toBe('hit')
+    }
   })
 
   it('stays grounded on steep at top speed', () => {

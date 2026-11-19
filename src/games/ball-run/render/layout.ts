@@ -253,3 +253,28 @@ export function buildingsFor(seed: string, fromRow: number, toRow: number): Buil
   }
   return out
 }
+
+// 굴러가는 공(v3): 한 프레임 동안 공 중심이 (dx, dz) mm(시뮬 좌표) 옮겨 갔을 때 미끄러짐 없이 구른 회전을 장면 좌표(x = 시뮬 x,
+// z = -시뮬 z)의 세계 기준 사원수 [x, y, z, w]로 out에 쓴다. 각속도 = 위(0, 1, 0) × 장면 속도(dx, 0, -dz) / R
+// = (-dz, 0, -dx) / R, 회전각 = 거리 / R. 앞으로는 x축, 옆으로는 z축으로 구른다. 장면은 기존 자세에 왼쪽에서 곱한다.
+// 매 프레임 부르므로 새 배열을 만들지 않는다.
+// 회전각은 프레임당 ROLL_MAX_ANGLE까지만(최고 속도 한 틱 794 mm = 2.27 rad를 그대로 돌리면 60 Hz에서 무늬가 거꾸로 도는 듯
+// 깜박인다). 작은 변위는 그대로 d / R이다.
+export const ROLL_MAX_ANGLE = 1
+export function rollQuat(dx: number, dz: number, out: number[]): number[] {
+  const d = Math.hypot(dx, dz)
+  if (d === 0) {
+    out[0] = 0
+    out[1] = 0
+    out[2] = 0
+    out[3] = 1
+    return out
+  }
+  const half = Math.min(d / R, ROLL_MAX_ANGLE) / 2
+  const k = Math.sin(half) / d
+  out[0] = -dz * k
+  out[1] = 0
+  out[2] = -dx * k
+  out[3] = Math.cos(half)
+  return out
+}

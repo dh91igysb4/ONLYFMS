@@ -19,7 +19,8 @@ const hex8 = (n: number): string => (n >>> 0).toString(16).padStart(8, '0')
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   // v2: 코스(단계 주기)·물리(관성·기운 판·단차·터널 가속)·점수(시간) 규칙이 모두 바뀌었다.
-  version: 2,
+  // v3: 공 속도 ×1.7(DROP_TOL 함께), 길 폭 최대 3칸으로 모든 조각을 다시 짰다.
+  version: 3,
 
   pickPuzzle(rng, _options) {
     let seed = ''
