@@ -128,7 +128,7 @@ export function ContestNewPage() {
       <label className="field">
         <span>시작 시각 (한국 시간 기준)</span>
         <input className="input" type="datetime-local" value={start} onChange={(e) => { setStartTouched(true); setStart(e.target.value) }} />
-        <span className="muted">지금부터 5분 뒤 ~ 30일 안</span>
+        <span className="muted">지금부터 1분 뒤 ~ 30일 안</span>
         {errors.startsAt && <span className="form-error">{errors.startsAt}</span>}
       </label>
 

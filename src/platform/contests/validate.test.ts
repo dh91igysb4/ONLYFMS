@@ -33,8 +33,12 @@ describe('validateContest', () => {
   })
 
   test('start must be now+5min .. now+30d', () => {
-    expect(errs({ startsAt: new Date(NOW + 5 * MIN - 1) }).startsAt).toBeTruthy()
-    expect(errs({ startsAt: new Date(NOW + 5 * MIN) }).startsAt).toBeUndefined()
+    // 하한은 다음 분(분으로 자른 지금 + 1분)
+    const floorMin = Math.floor(NOW / MIN) * MIN
+    expect(errs({ startsAt: new Date(floorMin + MIN - 1) }).startsAt).toBeTruthy()
+    expect(errs({ startsAt: new Date(floorMin + MIN) }).startsAt).toBeUndefined()
+    expect(validateContest(input({ startsAt: new Date(floorMin + MIN) }), floorMin + 30_000).startsAt).toBeUndefined()
+    expect(validateContest(input({ startsAt: new Date(floorMin) }), floorMin + 30_000).startsAt).toBeTruthy()
     expect(errs({ startsAt: new Date(NOW + 30 * DAY) }).startsAt).toBeUndefined()
     expect(errs({ startsAt: new Date(NOW + 30 * DAY + 1) }).startsAt).toBeTruthy()
     expect(errs({ startsAt: new Date(NOW - MIN) }).startsAt).toBeTruthy()
