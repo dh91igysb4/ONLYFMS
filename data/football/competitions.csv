@@ -1,0 +1,12 @@
+id,name_ko,name_en,kind,nation_id,tier
+Q13394,리그 1,Ligue 1,league,Q142,1
+Q15804,세리에 A,Serie A,league,Q38,1
+Q167541,에레디비시,Eredivisie,league,Q55,1
+Q182994,프리메이라리가,Primeira Liga,league,Q45,1
+Q19510,EFL 챔피언십,EFL Championship,league,Q21,2
+Q216022,벨기에 프로리그,Belgian Pro League,league,Q31,1
+Q2386334,K리그1,K League 1,league,Q884,1
+Q324867,라리가,LaLiga,league,Q29,1
+Q485568,쉬페르리그,Süper Lig,league,Q43,1
+Q82595,분데스리가,Bundesliga,league,Q183,1
+Q9448,프리미어리그,Premier League,league,Q21,1

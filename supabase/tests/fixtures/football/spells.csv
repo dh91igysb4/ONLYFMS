@@ -1,0 +1,5 @@
+player_id,team_id,start_date,end_date,date_precision,loan,apps,goals,source_ref
+Q21621995,Q8682,2024-07-01,,day,false,,,fx-3
+Q439722,x-hamburger-sv,2010-07-01,2013-06-30,day,false,73,20,fx-1
+Q439722,Q18741,2015-08-28,2025-08-06,day,false,333,127,fx-2
+x-kim-minsu-1995,x-hamburger-sv,2016,2018,year,true,,,fx-4

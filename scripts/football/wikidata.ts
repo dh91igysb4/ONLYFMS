@@ -11,6 +11,8 @@ export type Row = Record<string, string>
 export function flat(b: Binding): Row {
   const r: Row = {}
   for (const [k, v] of Object.entries(b)) {
+    // '알 수 없는 값'(somevalue)은 .well-known/genid/<해시> 주소로 온다. 값이 없는 것으로 친다
+    if (v.type === 'uri' && v.value.startsWith('http://www.wikidata.org/.well-known/genid/')) continue
     r[k] = v.type === 'uri' && v.value.startsWith('http://www.wikidata.org/')
       ? v.value.slice(v.value.lastIndexOf('/') + 1)
       : v.value
@@ -22,6 +24,11 @@ export function flat(b: Binding): Row {
 
 /** 직업: 축구 선수 */
 const FOOTBALLER = 'Q937857'
+/**
+ * "직업이 축구 선수" 조건 (변수 ?p). wdt:P106은 가장 높은 순위의 값만 보므로, 은퇴 후 '감독'이 우선 순위(preferred)인
+ * 선수(사비·마테우스·박지성 등)가 빠진다. 모든 순위의 진술을 보되 폐기(deprecated)된 것만 뺀다 (2026-11-02 확인).
+ */
+export const IS_FOOTBALLER = `?p p:P106 ?occ . ?occ ps:P106 wd:${FOOTBALLER} ; wikibase:rank ?occRank . FILTER(?occRank != wikibase:DeprecatedRank)`
 /** 이적 방식(P1642) 값: 임대 */
 export const LOAN = 'Q2914547'
 /** 인스턴스(P31): 축구 클럽 (하위 분류 포함) */
@@ -38,12 +45,19 @@ const day = (year: number, md: string) => `"${year}-${md}T00:00:00Z"^^xsd:dateTi
 
 // ---------------------------------------------------------------- 질의
 
-/** 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 시즌은 시작일(P580)의 연도 */
-export function qSeasons(leagues: readonly League[], from: number, to: number): string {
+/**
+ * 리그의 시즌별 참가팀(P1923)과 우승팀(P1346). 리그마다 자기 창 안의 시즌만 받는다.
+ * 시즌 연도는 시작일(P580), 없으면 시점(P585)의 연도. K리그1 2023·2024·2026 시즌 항목은 P585만 있다(2026-11-02 확인).
+ */
+export function qSeasons(windows: ReadonlyMap<string, Window>): string {
+  const rows = [...windows].map(([id, w]) => `(wd:${id} ${w.from} ${w.to})`).join(' ')
   return `SELECT ?league ?season ?start ?team ?winner WHERE {
-  VALUES ?league { ${ids(leagues.map((l) => l.id))} }
-  ?season wdt:P3450 ?league ; wdt:P580 ?start .
-  FILTER(?start >= ${day(from, '01-01')} && ?start <= ${day(to, '12-31')})
+  VALUES (?league ?from ?to) { ${rows} }
+  ?season wdt:P3450 ?league .
+  OPTIONAL { ?season wdt:P580 ?s0 }
+  OPTIONAL { ?season wdt:P585 ?p0 }
+  BIND(COALESCE(?s0, ?p0) AS ?start)
+  FILTER(BOUND(?start) && YEAR(?start) >= ?from && YEAR(?start) <= ?to)
   OPTIONAL { ?season wdt:P1923 ?team . ?team wdt:P31/wdt:P279* wd:${CLUB} }
   OPTIONAL { ?season wdt:P1346 ?winner }
 }`
@@ -66,7 +80,7 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
   return `SELECT DISTINCT ?p WHERE {
   VALUES ?team { ${ids(teams)} }
   ?p p:P54 ?st . ?st ps:P54 ?team .
-  ?p wdt:P106 wd:${FOOTBALLER} .
+  ${IS_FOOTBALLER}
   OPTIONAL { ?st pq:P580 ?s } OPTIONAL { ?st pq:P582 ?e }
   FILTER(BOUND(?s) || BOUND(?e))
   FILTER(!BOUND(?e) || ?e >= ${day(from, '07-01')})
@@ -76,11 +90,27 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
 }`
 }
 
+/** 레전드 명단 확인: 직업이 축구 선수(P106)인 항목만 돌려준다 */
+export function qOccupation(players: readonly string[]): string {
+  return `SELECT DISTINCT ?p WHERE {
+  VALUES ?p { ${ids(players)} }
+  ${IS_FOOTBALLER}
+}`
+}
+
+/** 영문 표시 이름 후보 언어(이 순서로 고른다). 한국어는 마지막 수단 */
+export const NAME_LANGS = ['en', 'mul', 'es', 'pt', 'fr', 'de', 'it', 'nl', 'tr', 'ko'] as const
+/** 영어·한국어 말고 이름 후보로 받는 라벨: 변수 ?l_<lang> (값이 하나씩이라 줄이 늘지 않는다) */
+const EXTRA_NAME_LANGS = NAME_LANGS.filter((l) => l !== 'en' && l !== 'ko')
+const extraLabels = (s: string) => EXTRA_NAME_LANGS.map((l) => `  OPTIONAL { ?${s} rdfs:label ?l_${l} FILTER(LANG(?l_${l}) = "${l}") }`).join('\n')
+const extraVars = EXTRA_NAME_LANGS.map((l) => `?l_${l}`).join(' ')
+
 /** 선수 기본 정보. 값이 여럿인 속성 때문에 선수당 여러 줄이 나온다 (buildPlayers가 합친다) */
 export function qPlayerDetails(players: readonly string[]): string {
-  return `SELECT ?p ?en ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
+  return `SELECT ?p ?en ${extraVars} ?ko ?birth ?bprec ?sport ?cit ?posLabel ?footLabel ?height ?links ?tm WHERE {
   VALUES ?p { ${ids(players)} }
   OPTIONAL { ?p rdfs:label ?en FILTER(LANG(?en) = "en") }
+${extraLabels('p')}
   OPTIONAL { ?p rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?p p:P569/psv:P569 [ wikibase:timeValue ?birth ; wikibase:timePrecision ?bprec ] }
   OPTIONAL { ?p wdt:P1532 ?sport }
@@ -93,11 +123,11 @@ export function qPlayerDetails(players: readonly string[]): string {
 }`
 }
 
-/** 검색용 다른 이름(한국어·영어) */
+/** 검색용 다른 이름(한국어·영어·다국어 mul) */
 export function qAliases(entities: readonly string[]): string {
   return `SELECT ?x ?alias ?lang WHERE {
   VALUES ?x { ${ids(entities)} }
-  ?x skos:altLabel ?alias . BIND(LANG(?alias) AS ?lang) FILTER(?lang IN ("ko", "en"))
+  ?x skos:altLabel ?alias . BIND(LANG(?alias) AS ?lang) FILTER(?lang IN ("ko", "en", "mul"))
 }`
 }
 
@@ -116,9 +146,10 @@ export function qSpells(players: readonly string[]): string {
 
 /** 팀 정보와 분류용 인스턴스(P31), 엠블럼 색(P6364 → sRGB P465) */
 export function qTeams(teams: readonly string[]): string {
-  return `SELECT ?t ?en ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
+  return `SELECT ?t ?en ${extraVars} ?ko ?short ?type ?country ?sport ?hex ?founded WHERE {
   VALUES ?t { ${ids(teams)} }
   OPTIONAL { ?t rdfs:label ?en FILTER(LANG(?en) = "en") }
+${extraLabels('t')}
   OPTIONAL { ?t rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?t wdt:P1813 ?short FILTER(LANG(?short) = "en") }
   OPTIONAL { ?t wdt:P31 ?type }
@@ -131,9 +162,10 @@ export function qTeams(teams: readonly string[]): string {
 
 /** 국가 이름과 국기용 코드. ISO 3166-1(P297)이 없으면 3166-2(P300, 예: GB-ENG) */
 export function qNations(nations: readonly string[]): string {
-  return `SELECT ?n ?en ?ko ?iso2 ?iso3166_2 WHERE {
+  return `SELECT ?n ?en ${extraVars} ?ko ?iso2 ?iso3166_2 WHERE {
   VALUES ?n { ${ids(nations)} }
   OPTIONAL { ?n rdfs:label ?en FILTER(LANG(?en) = "en") }
+${extraLabels('n')}
   OPTIONAL { ?n rdfs:label ?ko FILTER(LANG(?ko) = "ko") }
   OPTIONAL { ?n wdt:P297 ?iso2 }
   OPTIONAL { ?n wdt:P300 ?iso3166_2 }
@@ -149,15 +181,66 @@ export function qAwards(players: readonly string[]): string {
 }`
 }
 
+// ---------------------------------------------------------------- 시즌 창 (설계 2026-11-01 §3.2·§3.3)
+
+/** 수집할 시즌 범위(시작 연도 기준, 양끝 포함) */
+export type Window = { from: number; to: number }
+
+/** 현재 시즌: 7월 이후면 올해, 아니면 작년 (시즌 = 시작 연도) */
+export function currentSeason(now: Date): number {
+  return now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+}
+
+/** 리그별 창 [to − seasons + 1, to]. override가 있으면 모든 리그를 그 시즌 수로 */
+export function seasonWindows(leagues: readonly League[], to: number, override?: number): Map<string, Window> {
+  return new Map(leagues.map((l) => [l.id, { from: to - (override ?? l.seasons) + 1, to }]))
+}
+
+/**
+ * 팀별 선수 수집 시작 연도: 창 안에서 그 팀이 참가한 리그들, 그리고 지금 소속(P118)으로 적힌 리그들의
+ * 창 시작 중 가장 이른 해. 창 밖 참가 기록만 있는 팀은 빠진다. 키는 QID 순.
+ */
+export function teamStarts(teamComps: readonly TeamCompetition[], leagueClubs: readonly { league: string; team: string }[], windows: ReadonlyMap<string, Window>): Map<string, number> {
+  const m = new Map<string, number>()
+  const add = (team: string, from: number) => { const cur = m.get(team); if (cur === undefined || from < cur) m.set(team, from) }
+  for (const t of teamComps) {
+    const w = windows.get(t.competition_id)
+    const season = Number(t.season)
+    if (w && season >= w.from && season <= w.to) add(t.team_id, w.from)
+  }
+  for (const r of leagueClubs) {
+    const w = windows.get(r.league)
+    if (w && r.team) add(r.team, w.from)
+  }
+  return new Map([...m].sort((a, b) => cmp(a[0], b[0])))
+}
+
+/** 레전드 수동 명단(manual/legends.csv)을 찾은 선수에 더한다. QID가 아닌 값은 invalid로 돌려준다 */
+export function mergeLegends(found: readonly string[], legends: readonly Row[]): { ids: string[]; added: string[]; invalid: string[] } {
+  const have = new Set(found)
+  const added = new Set<string>(), invalid = new Set<string>()
+  for (const r of legends) {
+    const id = (r.player_id ?? '').trim()
+    if (!id) continue
+    if (!/^Q\d+$/.test(id)) { invalid.add(id); continue }
+    if (!have.has(id)) added.add(id)
+  }
+  const sort = (xs: Iterable<string>) => [...xs].sort(cmp)
+  return { ids: sort(new Set([...found, ...added])), added: sort(added), invalid: sort(invalid) }
+}
+
 // ---------------------------------------------------------------- 값 해석
 
 export type Precision = 'day' | 'year'
 export type DateValue = { date: string; precision: Precision }
 
 /** 위키데이터 시각값과 정밀도(11 = 일, 9·10 = 연·월)를 CSV 날짜로. 일 단위가 아니면 연도만 쓴다 */
+/** 이보다 이른 연도는 입력 오류로 본다(예: 2024를 24로 적어 0024-01-15가 된 경력) */
+export const MIN_YEAR = 1850
+
 export function dateOf(time: string | undefined, prec: string | undefined): DateValue | null {
   const m = time?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/)
-  if (!m) return null
+  if (!m || Number(m[1]) < MIN_YEAR) return null
   const p = Number(prec ?? 11)
   if (p < 9) return null
   return p >= 11 ? { date: `${m[1]}-${m[2]}-${m[3]}`, precision: 'day' } : { date: m[1], precision: 'year' }
@@ -200,8 +283,13 @@ export function footOf(labels: readonly string[]): string {
   return ''
 }
 
+// 이름에 2군 표시처럼 보이는 말이 들어 있지만 1군 클럽인 팀. 이 부분을 지운 뒤 검사한다(Willem II U19 같은 유스 팀은 그대로 걸러짐).
+// Willem II(Q332664)는 \bII\b에 걸려 2026-11-05까지 팀과 모든 선수의 경력이 빠졌다
+const REAL_CLUB_NAMES = /\bWillem II\b/gi
+
 /** 유스·2군·연령별·여자 팀 (경력에서 뺀다) */
 export function isYouthOrReserve(label: string): boolean {
+  label = label.replace(REAL_CLUB_NAMES, 'club')
   return /\bU-?\d{2}\b|under-?\s?\d{2}|\byouth\b|\bjunior\b|\breserves?\b|\bacademy\b|\bII\b|\bB\b|\bjuvenil\b|\bprimavera\b|\bjong\b|\bolympic\b|\bamateurs?\b|\bwomen'?s?\b|\bfemenino\b|\bféminin/i.test(label)
 }
 
@@ -242,23 +330,46 @@ export function valuesOf(rows: readonly Row[], v: string): string[] {
   return [...new Set(rows.map((r) => r[v]).filter((x): x is string => !!x))].sort()
 }
 const firstOf = (rows: readonly Row[], v: string) => valuesOf(rows, v)[0] ?? ''
+/**
+ * 영문 표시 이름(name_en, DB에서 필수): NAME_LANGS 순(영어 → 다국어 mul → 라틴 문자 주요 언어 → 마지막 수단 한국어).
+ * 위키데이터는 2024년부터 여러 언어에서 같은 이름(주로 인명)을 mul 하나로 합치고 영어 라벨을 지우고 있다.
+ * 영어·mul 없이 스페인어·포르투갈어·튀르키예어 라벨만 있는 선수, 한국어 라벨만 있는 K리그 하부 클럽도 있다.
+ */
+export function nameEnOf(rows: readonly Row[]): string {
+  for (const l of NAME_LANGS) {
+    const v = firstOf(rows, l === 'en' || l === 'ko' ? l : `l_${l}`)
+    if (v) return v
+  }
+  return ''
+}
+/** 출전·골 같은 횟수: 0 이상 정수만(소수점 아래 0은 허용). 그 밖은 빈 값 */
+export function countOf(v: string | undefined): string {
+  return v && /^\d+(\.0+)?$/.test(v) ? String(parseInt(v, 10)) : ''
+}
 
 // ---------------------------------------------------------------- CSV 행 만들기
+
+/** 창단 연도: MIN_YEAR 이후의 4자리 연도만(기원전·0년 같은 값은 빈 값) */
+export function foundedOf(v: string): string {
+  const m = /^\+?(\d{4})-/.exec(v)
+  return m && Number(m[1]) >= MIN_YEAR ? m[1] : ''
+}
 
 export type Team = { id: string; kind: TeamKind; name_ko: string; name_en: string; short_name: string; nation_id: string; colors: string; founded: string; retired: string }
 
 export function buildTeams(rows: readonly Row[]): Team[] {
   const out: Team[] = []
   for (const [id, rs] of groupBy(rows, 't')) {
-    const en = firstOf(rs, 'en')
-    const kind = teamKind(valuesOf(rs, 'type'), en)
+    const en = nameEnOf(rs)
+    // 영어·mul·한국어 라벨이 모두 없는 팀(합쳐져 빈 항목만 남은 리다이렉트 등)은 이름을 붙일 수 없어 유스·2군처럼 뺀다
+    const kind = en ? teamKind(valuesOf(rs, 'type'), en) : 'other'
     const hex = valuesOf(rs, 'hex')
     out.push({
       id, kind, name_ko: firstOf(rs, 'ko'), name_en: en, short_name: firstOf(rs, 'short'),
       nation_id: kind === 'national' ? firstOf(rs, 'sport') || firstOf(rs, 'country') : firstOf(rs, 'country'),
       // 비율 정보가 없어 같은 비율로 나눈다 (Who Ate All the Pies용은 직접 보정)
       colors: hex.length ? JSON.stringify(hex.map((h) => ({ hex: `#${h.toUpperCase()}`, share: +(1 / hex.length).toFixed(3) }))) : '',
-      founded: firstOf(rs, 'founded').slice(0, 4).replace(/^0+/, ''),
+      founded: foundedOf(firstOf(rs, 'founded')),
       retired: 'false',
     })
   }
@@ -267,7 +378,7 @@ export function buildTeams(rows: readonly Row[]): Team[] {
 
 export type Spell = { player_id: string; team_id: string; start_date: string; end_date: string; date_precision: Precision; loan: string; apps: string; goals: string; source_ref: string }
 
-/** 팀 경력. 유스·2군(other)과 날짜 없는 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
+/** 팀 경력. 유스·2군·이름 없는 팀(other), 날짜 없는 구간, 종료일이 시작일보다 앞인 구간은 뺀다. 국가대표 구간은 caps로 따로 모은다 */
 export function buildSpells(rows: readonly Row[], teams: ReadonlyMap<string, Team>): { spells: Spell[]; national: Spell[]; dropped: number } {
   const spells: Spell[] = [], national: Spell[] = []
   let dropped = 0
@@ -279,9 +390,11 @@ export function buildSpells(rows: readonly Row[], teams: ReadonlyMap<string, Tea
     const sp: Spell = {
       player_id: r.p, team_id: r.team, start_date: s.date, end_date: e?.date ?? '',
       date_precision: s.precision === 'day' && (!e || e.precision === 'day') ? 'day' : 'year',
-      loan: valuesOf(rs, 'loan').length ? 'true' : 'false', apps: firstOf(rs, 'apps'), goals: firstOf(rs, 'goals'), source_ref: st,
+      loan: valuesOf(rs, 'loan').length ? 'true' : 'false', apps: countOf(firstOf(rs, 'apps')), goals: countOf(firstOf(rs, 'goals')), source_ref: st,
     }
     if (sp.date_precision === 'year') { sp.start_date = sp.start_date.slice(0, 4); sp.end_date = sp.end_date.slice(0, 4) }
+    // 종료일이 시작일보다 앞인 구간은 원본 오류라 뺀다
+    if (sp.end_date && cmp(sp.end_date, sp.start_date) < 0) { dropped++; continue }
     ;(team.kind === 'national' ? national : spells).push(sp)
   }
   return { spells: spells.sort(bySpell), national: national.sort(bySpell), dropped }
@@ -336,7 +449,7 @@ export function buildPlayers(rows: readonly Row[], caps: readonly Cap[], teams: 
     const tm = firstOf(rs, 'tm')
     if (tm) transfermarkt.set(id, tm)
     players.push({
-      id, name_ko: firstOf(rs, 'ko'), name_en: firstOf(rs, 'en'),
+      id, name_ko: firstOf(rs, 'ko'), name_en: nameEnOf(rs),
       birth_date: births[0]?.date ?? '', birth_precision: births[0]?.precision ?? '',
       nation_id: pickNation(capsBy.get(id) ?? [], teams, valuesOf(rs, 'sport'), valuesOf(rs, 'cit')),
       position: pos.group ?? '', position_detail: pos.detail, foot: footOf(valuesOf(rs, 'footLabel')),
@@ -354,7 +467,7 @@ export type Nation = { id: string; name_ko: string; name_en: string; iso2: strin
 
 export function buildNations(rows: readonly Row[]): Nation[] {
   return [...groupBy(rows, 'n')].map(([id, rs]) => ({
-    id, name_ko: firstOf(rs, 'ko'), name_en: firstOf(rs, 'en'),
+    id, name_ko: firstOf(rs, 'ko'), name_en: nameEnOf(rs),
     iso2: (firstOf(rs, 'iso2') || firstOf(rs, 'iso3166_2')).toLowerCase(),
     confederation: '',
   })).sort(byId)
@@ -434,13 +547,14 @@ export function applyLeagueNations(teams: readonly Team[], teamComps: readonly T
   return n
 }
 
-/** 리그·시즌별 참가팀 수. 비었거나 16팀 미만인 칸이 직접 채울 대상이다 */
-export function coverage(teamComps: readonly TeamCompetition[], leagues: readonly League[], from: number, to: number): { league: League; counts: number[] }[] {
-  return leagues.map((league) => ({
-    league,
-    counts: Array.from({ length: to - from + 1 }, (_, i) =>
-      teamComps.filter((t) => t.competition_id === league.id && Number(t.season) === from + i).length),
-  }))
+/** 리그별 창 안의 시즌별 참가팀 수. 비었거나 리그 정원(teams)보다 적은 칸(warn)이 직접 채울 대상이다 */
+export function coverage(teamComps: readonly TeamCompetition[], leagues: readonly League[], windows: ReadonlyMap<string, Window>): { league: League; from: number; counts: number[]; warn: boolean[] }[] {
+  return leagues.map((league) => {
+    const w = windows.get(league.id) ?? { from: 0, to: -1 }
+    const counts = Array.from({ length: w.to - w.from + 1 }, (_, i) =>
+      teamComps.filter((t) => t.competition_id === league.id && Number(t.season) === w.from + i).length)
+    return { league, from: w.from, counts, warn: counts.map((n) => n < league.teams) }
+  })
 }
 
 // ---------------------------------------------------------------- CSV
