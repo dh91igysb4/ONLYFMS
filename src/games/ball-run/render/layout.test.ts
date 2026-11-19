@@ -5,7 +5,7 @@ import { JOINT, parseSegment } from '../segments.ts'
 import {
   BALL_FRAC, BANK_ANGLE, BANK_EASE, CAM_BACK, CAM_UP, EYE_LAG_MAX, LINTEL_H, VFOV, bankEase, bankOffset, buildingsFor, cameraTarget,
   BANK_FLOAT_MAX, bankFollow, lookPitch, segmentBoxes, smoothEye,
-  BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent, rollQuat,
+  BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent, rollQuat, ROLL_MAX_ANGLE,
 } from './layout.ts'
 import { floorAt } from '../sim.ts'
 
@@ -415,10 +415,24 @@ describe('rollQuat (rolling without slipping)', () => {
     expect(q[1]).toBe(0)
     expect(q[2]).toBeCloseTo(0, 12)
     expect(q[3]).toBeCloseTo(Math.cos(100 / R / 2), 12)
-    // 반 바퀴(πR)면 -x축으로 180°
-    const half = rollQuat(0, Math.PI * R, [0, 0, 0, 0])
-    expect(half[0]).toBeCloseTo(-1, 12)
-    expect(half[3]).toBeCloseTo(0, 12)
+  })
+
+  it('caps the per-frame roll angle so fast rolling never strobes backwards', () => {
+    // 최고 속도 한 틱(794 mm)이면 2.27 rad인데, 화면에서는 프레임당 ROLL_MAX_ANGLE(1 rad)까지만 돌린다. 방향은 그대로.
+    expect(ROLL_MAX_ANGLE).toBeLessThanOrEqual(1)
+    const angle = (q: number[]) => 2 * Math.atan2(Math.hypot(q[0], q[1], q[2]), q[3])
+    for (const [dx, dz] of [[0, 794], [117, 794], [-117, 794], [0, 340], [117, 0]]) {
+      const q = rollQuat(dx, dz, [0, 0, 0, 0])
+      const d = Math.hypot(dx, dz)
+      expect(angle(q), `${dx},${dz}`).toBeCloseTo(Math.min(d / R, ROLL_MAX_ANGLE), 12)
+      expect(angle(q)).toBeLessThanOrEqual(1 + 1e-12)
+      // 축 방향(-dz, 0, -dx)은 같다.
+      const s = Math.hypot(q[0], q[2])
+      expect(q[0] / s).toBeCloseTo(-dz / d, 12)
+      expect(q[2] / s).toBeCloseTo(-dx / d, 12)
+    }
+    // 작은 변위는 그대로 d / R.
+    expect(angle(rollQuat(0, 200, [0, 0, 0, 0]))).toBeCloseTo(200 / R, 12)
   })
 
   it('sideways roll turns about the z axis, mirrored for the other side', () => {

@@ -258,6 +258,9 @@ export function buildingsFor(seed: string, fromRow: number, toRow: number): Buil
 // z = -시뮬 z)의 세계 기준 사원수 [x, y, z, w]로 out에 쓴다. 각속도 = 위(0, 1, 0) × 장면 속도(dx, 0, -dz) / R
 // = (-dz, 0, -dx) / R, 회전각 = 거리 / R. 앞으로는 x축, 옆으로는 z축으로 구른다. 장면은 기존 자세에 왼쪽에서 곱한다.
 // 매 프레임 부르므로 새 배열을 만들지 않는다.
+// 회전각은 프레임당 ROLL_MAX_ANGLE까지만(최고 속도 한 틱 794 mm = 2.27 rad를 그대로 돌리면 60 Hz에서 무늬가 거꾸로 도는 듯
+// 깜박인다). 작은 변위는 그대로 d / R이다.
+export const ROLL_MAX_ANGLE = 1
 export function rollQuat(dx: number, dz: number, out: number[]): number[] {
   const d = Math.hypot(dx, dz)
   if (d === 0) {
@@ -267,7 +270,7 @@ export function rollQuat(dx: number, dz: number, out: number[]): number[] {
     out[3] = 1
     return out
   }
-  const half = d / R / 2
+  const half = Math.min(d / R, ROLL_MAX_ANGLE) / 2
   const k = Math.sin(half) / d
   out[0] = -dz * k
   out[1] = 0

@@ -8,7 +8,8 @@ export const BUILDING_LINE = '#5f78f0'
 export const BLOCK_COLOR = '#ab24fb'
 export const BLOCK_EDGE = '#ea6cff'
 export const BALL_COLOR = '#c0109a'
-export const BALL_PANEL = '#ff6fe2' // 공 무늬(밝은 분홍 조각). 바탕은 BALL_COLOR 그대로라 전체 색은 녹화의 마젠타 공과 같다.
+export const BALL_SPOT = '#ffc4f4' // 공 둥근 무늬(흰빛 분홍)
+export const BALL_PANEL = '#ff6fe2' // 공 무늬(밝은 분홍 반쪽 경도 띠). 바탕은 BALL_COLOR 그대로라 전체 색은 녹화의 마젠타 공과 같다.
 export const WALL_COLOR = '#8818d0'
 export const WALL_LINE = '#c45cff'
 export const WALL_TOP = '#ff7cf4'
@@ -136,19 +137,22 @@ export function ballEnvTexture(): CanvasTexture {
   return t
 }
 
-// 공 표면(등장방형, 구의 u = 경도, v = 위도). 마젠타 바탕에 밝은 분홍 세로 조각(경도 띠) 넷과 적도 띠 하나.
-// 무늬가 없으면 광택 공이 굴러도 돌아가는 게 보이지 않는다(v3). 띠 가장자리는 살짝 흐리게 해 광택 공처럼 보이게 한다.
+// 공 표면(등장방형, 구의 u = 경도, v = 위도). 마젠타 바탕에 밝은 분홍 반쪽 경도 띠 하나(극에서 극까지, 한쪽 면에만)와
+// 반대쪽 면의 흰빛 분홍 둥근 무늬 하나. 회전 대칭이 없어 빨리 굴러도 무늬가 거꾸로 도는 듯 보이지 않는다(v3).
+// 무늬가 없으면 광택 공이 굴러도 돌아가는 게 보이지 않는다. 가장자리는 살짝 흐리게 해 광택 공처럼 보이게 한다.
 export function ballTexture(): CanvasTexture {
   const W = 256
   const H = 128
   const [c, ctx] = canvas(W, H)
   ctx.fillStyle = BALL_COLOR
   ctx.fillRect(0, 0, W, H)
-  ctx.fillStyle = BALL_PANEL
   ctx.filter = 'blur(1.5px)'
-  const gore = W / 8
-  for (let k = 0; k < 8; k += 2) ctx.fillRect(k * gore + gore * 0.15, H * 0.08, gore * 0.7, H * 0.84)
-  ctx.fillRect(0, H * 0.46, W, H * 0.08)
+  ctx.fillStyle = BALL_PANEL
+  ctx.fillRect(W * 0.2, 0, W * 0.1, H)
+  ctx.fillStyle = BALL_SPOT
+  ctx.beginPath()
+  ctx.ellipse(W * 0.68, H * 0.38, W * 0.09, H * 0.16, 0, 0, Math.PI * 2)
+  ctx.fill()
   ctx.filter = 'none'
   return finish(c)
 }

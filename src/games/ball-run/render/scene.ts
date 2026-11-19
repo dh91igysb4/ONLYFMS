@@ -70,7 +70,7 @@ const BEAM_SEGS = 18
 const SHARDS = 24
 const SHARD_G = 9.8
 const MAX_DPR = 2
-const ROLL_MAX_STEP = 3000 // 한 프레임에 이보다 멀리 옮겨 가면(이어 하기·상태 교체) 굴리지 않는다(mm)
+const ROLL_JUMP = 20000 // 한 프레임에 이보다 멀리 옮겨 가면 상태 교체로 보고 굴리지 않는다(mm). 최고 속도 끊김(0.1초 ≈ 5 m)보다 훨씬 크다.
 
 export type SceneHandle = {
   render(prev: SimState, cur: SimState, alpha: number): void
@@ -312,6 +312,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   const rollQ = new Quaternion()
   let rollX = Number.NaN
   let rollZ = Number.NaN
+  let rollTick = -1
   const beam = new Mesh(beamGeo, beamMat)
   beam.visible = false
   beam.frustumCulled = false
@@ -624,10 +625,11 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     const bz = -z * M
     ball.position.set(bx, by, bz)
     // 굴림: 살아 있는 동안만 이번 프레임 변위(앞뒤 → x축, 좌우 → z축)만큼 구른다. 죽으면 멈춘다.
-    if (death === null && !Number.isNaN(rollX)) {
+    // 틱이 줄었으면(새 판·상태 교체) 이번 프레임은 굴리지 않는다. 한 프레임 회전각은 rollQuat이 1 rad로 묶는다.
+    if (death === null && !Number.isNaN(rollX) && cur.tick >= rollTick) {
       const dx = x - rollX
       const dz = z - rollZ
-      if (dx * dx + dz * dz < ROLL_MAX_STEP * ROLL_MAX_STEP) {
+      if (dx * dx + dz * dz < ROLL_JUMP * ROLL_JUMP) {
         rollQuat(dx, dz, rollStep)
         rollQ.set(rollStep[0], rollStep[1], rollStep[2], rollStep[3])
         ball.quaternion.premultiply(rollQ).normalize()
@@ -635,6 +637,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     }
     rollX = x
     rollZ = z
+    rollTick = cur.tick
     ball.visible = showBall
 
     // 깨짐 조각
