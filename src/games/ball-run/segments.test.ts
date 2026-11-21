@@ -56,7 +56,7 @@ describe('parseSegment', () => {
 
   it('tunnel rule: tunnel rows are exactly the 3-wide joint row (walls at ±1.5 m)', () => {
     const mk = (rows: string[]) => () => parseSegment({ id: 't', kind: 'tunnel', tier: 2, rows })
-    for (const ch of ['.', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G']) {
+    for (const ch of ['.', '/', '\\', '!', 'v', '<', '>', 'B', 'P', 'G', 'J', 'M']) {
       expect(mk([JOINT, `..${ch}__..`, JOINT]), ch).toThrow()
       expect(mk([JOINT, `..__${ch}..`, JOINT]), ch).toThrow()
     }
@@ -104,6 +104,48 @@ describe('parseSegment', () => {
     expect(row[at(2)].blockH).toBe(GATE_H)
     expect(p.cells[2][at(-2)].block).toBe(true)
     expect(p.cells[2][at(-2)].blockH).toBeUndefined()
+  })
+
+  // v4: 기믹. 'J' 점프대(평평한 바닥 + pad), 'M' 좌우 왕복 블록 행(평평한 바닥 + 그 행의 움직이는 1 m 큐브).
+  it('jump pad cells are flat floor flagged pad', () => {
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 2, rows: [JOINT, '..JJJ..', '..___..', JOINT] })
+    for (const c of [-1, 0, 1]) {
+      expect(p.cells[1][at(c)].floor).toEqual({ h0: 0, h1: 0 })
+      expect(p.cells[1][at(c)].pad).toBe(true)
+      expect(p.cells[1][at(c)].block).toBe(false)
+      expect(p.cells[2][at(c)].pad).toBeUndefined()
+    }
+    expect(p.cells[1][at(-2)].floor).toBeNull()
+  })
+
+  it('shuttle rows: flat floor plus one mover between the outermost M cell centres', () => {
+    const p = parseSegment({ id: 't', kind: 'obstacle', tier: 2, rows: [JOINT, '..MMM..', '..___..', '.MMM...', JOINT] })
+    for (const c of [-1, 0, 1]) {
+      expect(p.cells[1][at(c)].floor).toEqual({ h0: 0, h1: 0 })
+      expect(p.cells[1][at(c)].block).toBe(false)
+    }
+    expect(p.movers).toHaveLength(p.length)
+    expect(p.movers[1]).toEqual({ x0: -1000, x1: 1000 })
+    expect(p.movers[2]).toBeNull()
+    expect(p.movers[3]).toEqual({ x0: -2000, x1: 0 })
+    expect(p.movers[0]).toBeNull()
+  })
+
+  it('shuttle rows must be exactly 3 contiguous M cells and the whole road of the row', () => {
+    const mk = (row: string) => () => parseSegment({ id: 't', kind: 'obstacle', tier: 2, rows: [JOINT, row, JOINT] })
+    expect(mk('..MMM..')).not.toThrow()
+    expect(mk('MMM....')).not.toThrow()
+    expect(mk('....MMM')).not.toThrow()
+    for (const bad of ['..MM...', '...M...', '.M_M...', '.MM_...', '..MMM_.', '.BMMM..', '.MMMM..', '.M.MM..', '..MM_..']) {
+      expect(mk(bad), bad).toThrow()
+    }
+  })
+
+  it('no pads or movers in tunnels', () => {
+    const mk = (row: string) => () => parseSegment({ id: 't', kind: 'tunnel', tier: 1, rows: [JOINT, row, JOINT] })
+    expect(mk('..JJJ..')).toThrow()
+    expect(mk('..MMM..')).toThrow()
+    expect(mk('..J__..')).toThrow()
   })
 })
 
@@ -239,9 +281,11 @@ describe('templates', () => {
   function spacingProblems(t: SegmentTemplate): { bad: string[]; checked: number } {
     const bad: string[] = []
     let checked = 0
+    // v4: 지나갈 칸이 하나도 없는 행(점프대 뒤 'BBB' 벽)은 구멍 행처럼 날아 넘는다(점프 규칙은 따로 본다).
+    // 왕복 블록 행('M')은 막는 행으로 센다(빈 쪽으로 옮겨야 한다, 앞뒤 여유는 따로 본다).
     const isConstraint = (r: number): boolean =>
-      floorOf(t.rows[r]).length > 0 &&
-      (/[BPG]/.test(t.rows[r]) || floorOf(t.rows[r - 1]).some((c) => !floorOf(t.rows[r]).includes(c)))
+      floorOf(t.rows[r]).length > 0 && pass(t.rows[r]).length > 0 &&
+      (/[BPGM]/.test(t.rows[r]) || floorOf(t.rows[r - 1]).some((c) => !floorOf(t.rows[r]).includes(c)))
     let r1 = 0
     for (let r2 = 1; r2 < t.rows.length; r2++) {
       if (!isConstraint(r2)) continue
@@ -290,6 +334,104 @@ describe('templates', () => {
     const back = [...road('___....', 13), ...road('.___...', 13)]
     expect(spacingProblems(mk([...n(12), ...road('.___...', 12), ...back])).bad).not.toEqual([])
     expect(spacingProblems(mk([...n(12), ...road('.___...', 13), ...back])).bad).toEqual([])
+  })
+
+  // ---- v4 기믹(점프대 'J', 왕복 블록 'M')
+  const padRows = (t: SegmentTemplate): number[] => t.rows.flatMap((row, r) => (row.includes('J') ? [r] : []))
+  const moverRows = (t: SegmentTemplate): number[] => t.rows.flatMap((row, r) => (row.includes('M') ? [r] : []))
+  const plain = (row: string): boolean => /^\.*___\.*$/.test(row) // 평평한 3칸 길 한 줄
+
+  it('gimmicks: tier 1 has none; 3+ jump-pad, 3+ shuttle and 1+ combined templates over tiers 2-4', () => {
+    for (const t of [START, ...TEMPLATES]) {
+      if (t.kind !== 'obstacle' || t.tier === 1) {
+        expect(padRows(t), t.id).toEqual([])
+        expect(moverRows(t), t.id).toEqual([])
+      }
+    }
+    const jumps = OBSTACLES.filter((t) => padRows(t).length > 0)
+    const shuttles = OBSTACLES.filter((t) => moverRows(t).length > 0)
+    expect(jumps.filter((t) => moverRows(t).length === 0).length).toBeGreaterThanOrEqual(3)
+    expect(shuttles.filter((t) => padRows(t).length === 0).length).toBeGreaterThanOrEqual(3)
+    expect(jumps.filter((t) => moverRows(t).length > 0).length).toBeGreaterThanOrEqual(1)
+    expect(new Set([...jumps, ...shuttles].map((t) => t.tier))).toEqual(new Set([2, 3, 4]))
+    // 'BBB'처럼 길 전체를 막는 벽, 길 전체 구멍, 섬 건너기가 모두 있다.
+    expect(jumps.some((t) => t.rows.some((row) => /^\.*BBB\.*$/.test(row)))).toBe(true)
+    expect(jumps.some((t) => padRows(t).length >= 2)).toBe(true)
+    expect(shuttles.some((t) => moverRows(t).length >= 2)).toBe(true)
+  })
+
+  it('pads span the whole road of their row (a required jump cannot be half-missed)', () => {
+    for (const t of OBSTACLES) {
+      for (const r of padRows(t)) expect(t.rows[r], `${t.id} row ${r}`).toMatch(/^\.*JJJ\.*$/)
+    }
+  })
+
+  // 점프(JUMP_VY, G): 가장 느린 1단계(360 mm/틱)에서 약 16 m, 최고 속도(794)에서 약 36 m 난다(sim 테스트가 재 본다).
+  // 점프대 뒤 JUMP_FLIGHT행 안은 날아 넘는 자리(구멍, 'BBB' 벽 또는 평지), 그 뒤 착지 평지가 점프대에서 JUMP_LAND행까지 이어진다.
+  // 'BBB' 벽은 모든 속도에서 공 밑면이 1 m 위에 있는 동안 지나가는 자리(점프대 + WALL_AT행)에만 둔다.
+  const JUMP_FLIGHT = 11
+  const JUMP_LAND = 42
+  const WALL_AT = [8, 9, 10]
+  it('every pad is followed by a flight zone and a long flat landing; walls only where every speed clears them', () => {
+    let walls = 0
+    for (const t of OBSTACLES) {
+      const pads = padRows(t)
+      for (const r of pads) {
+        const cols = floorOf(t.rows[r])
+        for (let k = 1; k <= JUMP_LAND; k++) {
+          const row = t.rows[r + k]
+          const where = `${t.id} pad row ${r} +${k} '${row}'`
+          expect(row, where).toBeDefined()
+          if (k <= JUMP_FLIGHT) {
+            const holes = /^\.+$/.test(row)
+            const wall = /^\.*BBB\.*$/.test(row)
+            expect(holes || wall || plain(row), where).toBe(true)
+            if (wall) {
+              walls++
+              expect(WALL_AT, where).toContain(k)
+            }
+            if (!holes) expect(floorOf(row), where).toEqual(cols)
+          } else if (r + k < t.rows.length - 1) {
+            expect(plain(row), where).toBe(true)
+            expect(floorOf(row), where).toEqual(cols)
+          }
+        }
+      }
+    }
+    expect(walls).toBeGreaterThan(0)
+    // 막힌 행(지나갈 칸이 없는 'BBB')과 길 전체 구멍은 점프대 비행 구간에만 있다(오르막 끝 점프 '/' 뒤 구멍은 따로).
+    for (const t of OBSTACLES) {
+      const pads = padRows(t)
+      t.rows.forEach((row, r) => {
+        const blocked = floorOf(row).length > 0 && pass(row).length === 0
+        const gap = floorOf(row).length === 0 && !t.rows[r - 1].includes('/') && !t.rows[r - 1].startsWith('.......')
+        if (!blocked && !(gap && pads.length > 0)) return
+        expect(pads.some((p) => r - p >= 1 && r - p <= JUMP_FLIGHT), `${t.id} row ${r}`).toBe(true)
+      })
+    }
+  })
+
+  // 왕복 블록: 앞뒤로 다른 피할 것 없이 평평한 3칸 길(2칸 옮김 + 1칸 틈 = 26행 이상), 점프 착지 구간 안에는 두지 않는다.
+  const MOVER_CLEAR = 26
+  it('shuttle rows: whole 3-wide road, 26+ plain rows before and after, never inside a jump landing', () => {
+    let n = 0
+    for (const t of OBSTACLES) {
+      const pads = padRows(t)
+      for (const r of moverRows(t)) {
+        n++
+        const cols = floorOf(t.rows[r])
+        expect(t.rows[r], `${t.id} row ${r}`).toMatch(/^\.*MMM\.*$/)
+        for (const k of [...Array(MOVER_CLEAR).keys()].map((i) => i + 1)) {
+          for (const rr of [r - k, r + k]) {
+            const row = t.rows[rr]
+            expect(rr > 0 && rr < t.rows.length - 1, `${t.id} mover row ${r}: ${rr} outside the segment`).toBe(true)
+            expect(plain(row) && floorOf(row).join() === cols.join(), `${t.id} mover row ${r}: row ${rr} '${row}'`).toBe(true)
+          }
+        }
+        for (const p of pads) expect(r - p > JUMP_LAND + MOVER_CLEAR || p > r, `${t.id} mover row ${r} pad ${p}`).toBe(true)
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(4)
   })
 
   it('banked boards push both ways equally in every template (drift never decays)', () => {

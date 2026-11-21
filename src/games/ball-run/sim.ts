@@ -1,10 +1,11 @@
 // 볼 런 시뮬레이션(설계 §3). 판정과 화면이 같은 함수를 쓰는 단일 기준.
 // 모든 상태는 정수(mm, mm/틱, 틱). 연산은 + - *, Math.floor(a / b), 비교만 쓴다.
 import {
-  BANK_DRIFT, BANK_DRIFT_MAX, BLOCK_H, DROP_TOL, FALL_DEPTH, G, LAT_ACC, LAT_K, R, ROW, SPEED_TABLE, STEP_TOL, VX_MAX, X_LIMIT,
+  BANK_DRIFT, BANK_DRIFT_MAX, BLOCK_H, DROP_TOL, FALL_DEPTH, G, JUMP_VY, LAT_ACC, LAT_K, R, ROW, SPEED_TABLE, STEP_TOL, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import type { Course } from './course.ts'
 import { clampX } from './input.ts'
+import { moverX } from './mover.ts'
 
 export type SimState = {
   tick: number
@@ -50,28 +51,35 @@ export function initSim(opts?: { speedLevel?: number }): SimState {
   }
 }
 
-function hitsBlock(course: Course, x: number, y: number, z: number): boolean {
+// 원(공 중심, 반지름 R)과 x·z 직사각형 [left, right] × [near, far]가 겹치는지(경계에 딱 닿으면 겹치지 않음).
+function overlaps(x: number, z: number, left: number, right: number, near: number, far: number): boolean {
+  const dx = Math.max(left - x, 0, x - right)
+  const dz = Math.max(near - z, 0, z - far)
+  return dx * dx + dz * dz < R2
+}
+
+// tick: 이번 틱(새 상태)의 틱. 왕복 블록은 그 틱 위치(moverX)로 본다 — 화면도 같은 함수로 그린다.
+function hitsBlock(course: Course, x: number, y: number, z: number, tick: number): boolean {
   const bottom = y - R
   for (let row = rowOf(z - R); row <= rowOf(z + R); row++) {
+    const m = course.moverAt(row)
+    if (m !== null && bottom < m.h + BLOCK_H) {
+      const mx = moverX(m, tick)
+      if (overlaps(x, z, mx - 500, mx + 500, row * ROW, row * ROW + ROW)) return true
+    }
     for (let col = colOf(x - R); col <= colOf(x + R); col++) {
       const c = course.cell(col, row)
       if (!c.block || c.floor === null) continue
       // 블록 꼭대기는 칸에서 높은 쪽 바닥 + 블록 높이(기둥·문은 blockH, 블록 칸은 평평하다).
       if (bottom >= Math.max(c.floor.h0, c.floor.h1) + (c.blockH ?? BLOCK_H)) continue
-      const left = col * 1000 - 500
-      const right = left + 1000
-      const near = row * ROW
-      const far = near + ROW
-      const dx = Math.max(left - x, 0, x - right)
-      const dz = Math.max(near - z, 0, z - far)
-      if (dx * dx + dz * dz < R2) return true
+      if (overlaps(x, z, col * 1000 - 500, col * 1000 + 500, row * ROW, row * ROW + ROW)) return true
     }
   }
   return false
 }
 
 // 한 틱 진행. 새 객체를 돌려준다. 죽은 상태는 그대로 돌려준다.
-// 순서: 앞으로 -> 속도 단계 -> 옆으로(관성·기운 판·옆면 막힘) -> 위아래 -> 충돌(정면·블록, 그다음 낙하).
+// 순서: 앞으로 -> 속도 단계 -> 옆으로(관성·기운 판·옆면 막힘) -> 위아래(점프대) -> 충돌(정면·블록·왕복 블록, 그다음 낙하).
 export function step(s: SimState, targetX: number, course: Course): SimState {
   if (s.dead !== null) return s
 
@@ -127,11 +135,16 @@ export function step(s: SimState, targetX: number, course: Course): SimState {
       lastFloor = hf
     }
   }
+  // 점프대: 이번 틱 끝에 바닥에 있고 공 중심 칸이 점프대면 튀어 오른다(다음 틱부터 기존 중력·착지 규칙). 공중이면 아무 일 없다.
+  if (grounded && course.cell(colOf(x), rowOf(z)).pad === true) {
+    vy = JUMP_VY
+    grounded = false
+  }
 
   // 5. 충돌·사망 (이번 틱 최종 위치 기준)
   let dead: SimState['dead'] = null
   const front = floorAt(course, x, z + R)
-  if ((front !== null && front > y - R + STEP_TOL) || hitsBlock(course, x, y, z)) dead = 'hit'
+  if ((front !== null && front > y - R + STEP_TOL) || hitsBlock(course, x, y, z, s.tick + 1)) dead = 'hit'
   else if (y - R < lastFloor - FALL_DEPTH) dead = 'fall'
 
   return { tick: s.tick + 1, x, vx, drift, y, z, vy, vz, grounded, lastFloor, speedLevel, dead }

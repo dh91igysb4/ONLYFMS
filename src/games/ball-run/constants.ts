@@ -12,6 +12,15 @@ export const LEDGE = 1000 // 'v' 단차(칸 시작에서 한 번에 내려가는
 export const PILLAR_H = 3000 // 'P' 기둥 높이
 export const GATE_H = 1000 // 'G' 문 기둥 높이(블록과 같은 1 m 큐브, 위 가로대는 화면용)
 
+// v4 기믹. 전진 속도는 입력과 무관하므로 도로 전체를 막는 시간 기믹은 두지 않고, 움직이는 장애물은 늘 지나갈 칸을 남긴다.
+// 'J' 점프대: 바닥에 있는 공의 중심이 점프대 칸에 오면 vy = JUMP_VY로 뜬다. 정점 = Σ(JUMP_VY − kG) = 1683 mm(1 m 블록은 넘고
+// 3 m 기둥은 못 넘는다), 체공 약 45틱(1단계 360 mm/틱에서 약 16 m, 최고 속도 794에서 약 36 m).
+export const JUMP_VY = 157
+// 'M' 좌우 왕복 블록: 그 행 바깥 'M' 칸 가운데 사이(2 m)를 오가는 1 m 큐브. 주기 MOVER_PERIOD틱의 정수 삼각파(반 주기 64틱에
+// 2 m = 약 31 mm/틱, 공 옆 최고 117의 1/3 아래). 위상 = 조각 위상(조각 추첨 셋째 난수의 위 비트) + 조각 안 행 × MOVER_ROW_OFFSET.
+export const MOVER_PERIOD = 128
+export const MOVER_ROW_OFFSET = 53 // 홀수(주기와 서로소). 35행 떨어진 두 행이면 63틱 ≈ 반 주기 어긋난다.
+
 // v3: v2(200 → 467)의 1.7배.
 export const V0 = 340
 export const V_MAX = 794

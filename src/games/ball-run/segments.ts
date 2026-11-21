@@ -1,6 +1,7 @@
 import { COL_MAX, COL_MIN, GATE_H, LEDGE, PILLAR_H, RAMP_STEP, STEEP_STEP } from './constants.ts'
 
-export type Cell = { floor: null | { h0: number; h1: number }; block: boolean; blockH?: number; bank?: -1 | 1 }
+// pad: 점프대('J'). 왕복 블록('M') 칸은 평평한 바닥이고 큐브는 행 단위(ParsedSegment.movers, Course.moverAt)로 따로 둔다.
+export type Cell = { floor: null | { h0: number; h1: number }; block: boolean; blockH?: number; bank?: -1 | 1; pad?: true }
 export type SegmentKind = 'tunnel' | 'descent' | 'obstacle'
 export type SegmentTemplate = { id: string; kind: SegmentKind; tier: 1 | 2 | 3 | 4; rows: string[] }
 export type ParsedSegment = {
@@ -9,6 +10,7 @@ export type ParsedSegment = {
   tier: 1 | 2 | 3 | 4
   length: number
   cells: Cell[][] // cells[rowIndex][col - COL_MIN], 높이는 조각 시작 기준 상대값(mm)
+  movers: (null | { x0: number; x1: number })[] // 행마다 왕복 블록이 오가는 범위(바깥 'M' 칸 가운데 x, mm). 없으면 null.
   dh: number
 }
 
@@ -29,8 +31,16 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
 
   const h: number[] = new Array(COLS).fill(0)
   const cells: Cell[][] = []
+  const movers: ParsedSegment['movers'] = []
   rows.forEach((row, r) => {
     if (row.length !== COLS) fail(`row ${r} must have ${COLS} chars`)
+    // 왕복 블록 행: 'M'이 정확히 3칸 이어져 있고 그 행의 길 전부여야 한다(큐브 1 m가 어디 있든 한쪽에 1 m 이상 빈 칸).
+    const m0 = row.indexOf('M')
+    if (m0 < 0) movers.push(null)
+    else {
+      if (!/^\.*MMM\.*$/.test(row)) fail(`row ${r}: a shuttle row must be exactly 3 contiguous 'M' cells and nothing else`)
+      movers.push({ x0: (m0 + COL_MIN) * 1000, x1: (m0 + 2 + COL_MIN) * 1000 })
+    }
     const out: Cell[] = []
     for (let i = 0; i < COLS; i++) {
       const ch = row[i]
@@ -40,7 +50,11 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
       }
       switch (ch) {
         case '_':
+        case 'M':
           out.push({ floor: { h0: h[i], h1: h[i] }, block: false })
+          break
+        case 'J':
+          out.push({ floor: { h0: h[i], h1: h[i] }, block: false, pad: true })
           break
         case 'B':
           out.push({ floor: { h0: h[i], h1: h[i] }, block: true })
@@ -83,7 +97,7 @@ export function parseSegment(t: SegmentTemplate): ParsedSegment {
 
   const mid = h.slice(MID_LO, MID_HI + 1)
   if (mid.some((v) => v !== mid[0])) fail('center columns must end at the same height')
-  return { id: t.id, kind: t.kind, tier: t.tier, length: rows.length, cells, dh: mid[0] }
+  return { id: t.id, kind: t.kind, tier: t.tier, length: rows.length, cells, movers, dh: mid[0] }
 }
 
 const J = JOINT
@@ -99,6 +113,11 @@ const D3 = '..' + '\\'.repeat(3) + '..' // 3칸 완만한 내리막(−250 mm)
 const U3 = '..///..' // 3칸 오르막(+250 mm)
 const N2 = '..__...' // 2칸(열 -1, 0)
 const N1 = '..._...' // 1칸(열 0)
+// v4 기믹
+const PAD = '..JJJ..' // 3칸 점프대(길 전체라 반만 밟고 지나칠 수 없다)
+const GAP = '.......' // 길 전체 구멍
+const WALL = '..BBB..' // 길 전체 1 m 블록 벽(점프로만 넘는다)
+const SHUT = '..MMM..' // 3칸 길 위 좌우 왕복 블록
 
 // 설계 기준(v3, 최고 속도 794 mm/틱 = v2의 1.7배, 옆 최고 117 mm/틱·가속 25 mm/틱²는 그대로):
 // - 길을 막거나 좁히는 행(블록 행, 구멍이 새로 생기는 행 = 길이 좁아지거나 옆으로 옮겨 가는 행) 사이 빈 행:
@@ -110,6 +129,11 @@ const N1 = '..._...' // 1칸(열 0)
 // - 구멍 열은 높이가 그대로라 3칸 길은 모든 열이 같은 높이인 평지에서만 옆으로 옮겨 간다(단차·경사는 가운데 3칸에서만).
 //   능선은 다 내려간 뒤에 좁힌다(끊긴 열이 끝 이음에서 같은 높이로 돌아와야 하므로). 한 열만 따로 떨어지는 숨은 턱은 두지 않는다.
 // - 오르막 끝 구멍 점프는 최고 속도에서 약 45행 난다(오르막 기울기 × 속도가 두 배 가까이 커져서) → 착지 평지 50행.
+// v4 기믹(전진 속도는 입력과 무관 → 길 전체를 막는 시간 기믹은 없다. 움직이는 장애물은 늘 지나갈 칸을 남긴다):
+// - 점프대 'J'는 길 전체 3칸. 1단계(360)에서 점프대 뒤 약 15행, 최고 속도에서 약 35행에 내린다. 점프대 뒤 11행 안은 날아 넘는 자리
+//   (구멍은 14행까지 모든 속도에서 넘지만 8행만 쓴다), 'BBB' 벽은 모든 속도에서 넘는 +7..+10행 가운데 +9행, 착지 평지는 +42행까지.
+// - 왕복 블록 'M' 행은 3칸 길 전체. 앞뒤 26행(2칸 옮김 21 + 1칸 틈 5)은 평평한 3칸 길만, 점프 착지 구간(+42행) 안에는 두지 않는다.
+//   tier 1에는 기믹이 없다(첫 단계는 기본기).
 
 // 시작 터널(속도 단계 1로 센다 — 시작 직후 '속도 증가' 한 번). 첫 화면이 터널 안이다.
 export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(N3, 38), J] }
@@ -222,7 +246,20 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     id: 'o2-ledge-blocks', kind: 'obstacle', tier: 2,
     rows: [J, N3, N3, RL, ...rep(N3, 15), '..B_B..', ...rep(N3, 12), '..__B..', ...rep(N3, 6), RL, ...rep(N3, 15), J],
   },
+  // 점프대 → 길 전체 구멍 8행 → 긴 착지 평지(v4).
+  { id: 'j2-pad-gap', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, 20), PAD, ...rep(GAP, 8), ...rep(N3, 44), J] },
+  // 왕복 블록 하나(v4). 큐브 반대쪽으로 비켜 지난다.
+  { id: 'm2-shuttle', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, 30), SHUT, ...rep(N3, 30), J] },
   // ---- tier 3
+  // 점프대 → 길 전체 1 m 블록 벽(점프로만 넘는다, v4).
+  { id: 'j3-pad-wall', kind: 'obstacle', tier: 3, rows: [J, ...rep(N3, 20), PAD, ...rep(N3, 8), WALL, ...rep(N3, 44), J] },
+  // 2칸으로 좁아졌다가 왼쪽으로 옮겨 간 3칸 길 위 왕복 블록(v4).
+  {
+    id: 'm3-narrow-shuttle', kind: 'obstacle', tier: 3,
+    rows: [J, ...rep(N3, 12), ...rep(N2, 14), ...rep(L3, 30), '.MMM...', ...rep(L3, 26), ...rep(N3, 14), J],
+  },
+  // 멀리 떨어진 왕복 블록 둘(행 위상이 35 × MOVER_ROW_OFFSET ≈ 반 주기 어긋난다, v4).
+  { id: 'm3-two-shuttles', kind: 'obstacle', tier: 3, rows: [J, ...rep(N3, 30), SHUT, ...rep(N3, 34), SHUT, ...rep(N3, 30), J] },
   // 1칸 문(마젠타 큐브 둘 + 남색 가로대) 뒤 벽 통로, 왼쪽으로 옮겨 간 둘째 문과 통로(녹화 27.0 s, 30.0 s).
   {
     id: 'o3-gate-narrow', kind: 'obstacle', tier: 3,
@@ -256,6 +293,16 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     ],
   },
   // ---- tier 4
+  // 섬 건너기: 점프대 → 구멍 → 37행 섬(최고 속도에서도 섬 위에 내린다) → 점프대 → 구멍 → 착지(v4).
+  {
+    id: 'j4-islands', kind: 'obstacle', tier: 4,
+    rows: [J, ...rep(N3, 16), PAD, ...rep(GAP, 8), ...rep(N3, 37), PAD, ...rep(GAP, 8), ...rep(N3, 44), J],
+  },
+  // 점프대로 구멍을 넘고 한참 뒤 왕복 블록(v4).
+  {
+    id: 'mj4-pad-shuttle', kind: 'obstacle', tier: 4,
+    rows: [J, ...rep(N3, 16), PAD, ...rep(GAP, 8), ...rep(N3, 70), SHUT, ...rep(N3, 30), J],
+  },
   // 왼쪽 1칸 레일 → 3칸 건널목 → 오른쪽 1칸 레일.
   {
     id: 'o4-rails-switch', kind: 'obstacle', tier: 4,

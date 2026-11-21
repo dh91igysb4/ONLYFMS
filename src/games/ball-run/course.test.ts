@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MAX, COL_MIN, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
+import { COL_MAX, COL_MIN, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
 import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
 import { JOINT, PARSED, PARSED_OBSTACLES, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell } from './segments.ts'
@@ -26,9 +26,12 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-27~', 'd-terraces~', 'o2-zigzag~',
+  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-27~', 'd-terraces~', 'o2-rails~',
   'tunnel-24', 'd-ridge~', 'o1-edge-pillars', 'o1-gate-wide~', 'tunnel-24~', 'd-ridge~',
+  'o1-bank-intro~', 'o1-scatter', 'tunnel-30', 'd-steps~', 'o1-narrow2~', 'o2-ledge-blocks',
+  'tunnel-30~', 'd-terraces~', 'o3-rails-strips', 'o2-shift-path', 'tunnel-24~', 'd-steep',
 ]
+const GOLDEN_GIMMICK: unknown[] = ['mj4-pad-shuttle', 1448, true, '96:1000..-1000@24']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
@@ -177,12 +180,20 @@ describe('course', () => {
     const c = makeCourse(SEED)
     const list = []
     let row = 0
-    while (list.length < 12) {
+    while (list.length < GOLDEN.length) {
       const s = c.segmentAt(row)
       list.push(`${s.id}${s.mirrored ? '~' : ''}`)
       row = s.startRow + s.length
     }
     expect(list).toEqual(GOLDEN)
+    // v4: 첫 기믹 조각과 그 왕복 블록(위치·위상)도 고정한다.
+    const gim = c.segmentsBetween(0, 6000).find((x) => /^[jm]/.test(x.id))!
+    const movers: string[] = []
+    for (let r = gim.startRow; r < gim.startRow + gim.length; r++) {
+      const m = c.moverAt(r)
+      if (m) movers.push(`${r - gim.startRow}:${m.x0}..${m.x1}@${m.phase}`)
+    }
+    expect([gim.id, gim.startRow, gim.mirrored, ...movers]).toEqual(GOLDEN_GIMMICK)
   })
   it('boostsBefore counts every tunnel, the start tunnel included', () => {
     const flat = (id: string, n: number) =>
@@ -217,6 +228,59 @@ describe('course', () => {
     }
     // 앞쪽부터 읽지 않아도 같은 값
     expect(makeCourse(SEED).boostsBefore(3000)).toBe(prev)
+  })
+  // v4 기믹
+  const GIM = parseSegment({
+    id: 'gim', kind: 'obstacle', tier: 2,
+    rows: [JOINT, '..___..', '..JJJ..', '..___..', '..MMM..', '..___..', '.MMM...', '..___..', JOINT],
+  })
+  it('pads survive placement and mirroring', () => {
+    const a = courseFromSegments([{ seg: GIM, mirrored: false }])
+    const b = courseFromSegments([{ seg: GIM, mirrored: true }])
+    for (const col of [-1, 0, 1]) {
+      expect(a.cell(col, 2).pad).toBe(true)
+      expect(b.cell(col, 2).pad).toBe(true)
+    }
+    expect(a.cell(0, 1).pad).toBeUndefined()
+    expect(a.cell(0, 4)).toEqual({ floor: { h0: 0, h1: 0 }, block: false })
+  })
+  it('moverAt: mover rows carry x range, floor height and phase = segment phase + row offset', () => {
+    const a = courseFromSegments([{ seg: GIM, mirrored: false, phase: 5 }])
+    expect(a.moverAt(3)).toBeNull()
+    expect(a.moverAt(-1)).toBeNull()
+    expect(a.moverAt(4)).toEqual({ x0: -1000, x1: 1000, h: 0, phase: (5 + 4 * MOVER_ROW_OFFSET) % MOVER_PERIOD })
+    expect(a.moverAt(6)).toEqual({ x0: -2000, x1: 0, h: 0, phase: (5 + 6 * MOVER_ROW_OFFSET) % MOVER_PERIOD })
+    expect(a.moverAt(4)!.phase).not.toBe(a.moverAt(6)!.phase)
+    // 반전: x 범위를 뒤집어 움직임도 거울상이 된다(같은 위상).
+    const b = courseFromSegments([{ seg: GIM, mirrored: true, phase: 5 }])
+    expect(b.moverAt(4)).toEqual({ x0: 1000, x1: -1000, h: 0, phase: a.moverAt(4)!.phase })
+    expect(b.moverAt(6)).toEqual({ x0: 2000, x1: 0, h: 0, phase: a.moverAt(6)!.phase })
+    // 위상 기본값 0, 두 번째 조각에서는 조각 시작 기준 행으로 센다.
+    const c = courseFromSegments([{ seg: GIM, mirrored: false }, { seg: GIM, mirrored: false, phase: 100 }])
+    expect(c.moverAt(4)!.phase).toBe((4 * MOVER_ROW_OFFSET) % MOVER_PERIOD)
+    expect(c.moverAt(GIM.length + 4)).toEqual({ x0: -1000, x1: 1000, h: 0, phase: (100 + 4 * MOVER_ROW_OFFSET) % MOVER_PERIOD })
+  })
+  it('generated segment phase comes from the mirror draw (still 3 draws per segment)', () => {
+    for (const seed of [SEED, seedN(9), seedN(33)]) {
+      const next = u32Stream(seed, 'course')
+      const list = segs(seed, 60)
+      const phases = new Set<number>()
+      const c = getCourse(seed)
+      for (let i = 1; i < list.length; i++) {
+        next()
+        next()
+        const r3 = next()
+        const want = (r3 >>> 1) % MOVER_PERIOD
+        const seg = list[i]
+        for (let row = seg.startRow; row < seg.startRow + seg.length; row++) {
+          const m = c.moverAt(row)
+          if (m === null) continue
+          expect(m.phase).toBe((want + (row - seg.startRow) * MOVER_ROW_OFFSET) % MOVER_PERIOD)
+          phases.add(want)
+        }
+      }
+      expect(phases.size, seed).toBeGreaterThan(0)
+    }
   })
   it('out of range cells are holes', () => {
     const c = getCourse(SEED)
