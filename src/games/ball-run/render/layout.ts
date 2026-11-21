@@ -2,12 +2,15 @@
 import { BLOCK_H, GATE_H, COL_MAX, COL_MIN, G, R, ROW, TICK_HZ, X_LIMIT } from '../constants.ts'
 import { decorRandom } from '../course.ts'
 import type { Course, SegmentInfo } from '../course.ts'
+import { moverX } from '../mover.ts'
+import type { Mover } from '../mover.ts'
 import { floorAt } from '../sim.ts'
 
 // cx·cy·cz는 상자 중심. 바닥 상자의 slope = h1 - h0이고, cy는 칸 가운데 바닥 높이에서 두께 절반 아래.
 // bank는 기운 판(바닥 상자만). lintel은 같은 행 문 기둥(G) 둘 사이 위를 잇는 화면용 가로대(충돌 없음).
+// pad는 점프대 칸 위에 살짝 얹은 판(행에서 이어진 점프대 칸마다 하나), track은 왕복 블록이 오가는 자리의 바닥 선(v4, 충돌 없음).
 export type Box = {
-  kind: 'floor' | 'block' | 'lintel'
+  kind: 'floor' | 'block' | 'lintel' | 'pad' | 'track'
   cx: number
   cy: number
   cz: number
@@ -27,10 +30,39 @@ export const FLOOR_T = 200
 // 가로대는 기둥 꼭대기부터 LINTEL_H 위까지 솟은 남색 상자다(녹화 27.0 s: 마젠타 큐브 둘 사이 문 위의 더 높은 남색 상자).
 export const LINTEL_H = 1000
 
+// 점프대 판 두께(바닥 위, mm). 공(바닥 + R)이 거의 묻히지 않게 얇게 둔다. 칸 가장자리에서 PAD_INSET만큼 들여 바닥 격자선이 비친다.
+export const PAD_T = 40
+const PAD_INSET = 80
+// 점프대 판은 화면에서 앞쪽 끝이 PAD_RISE만큼 솟은 쐐기(발판)로 그린다. 낮은 카메라에서 얇은 판은 한 줄로 보여 멀리서 안 읽히고,
+// 카메라 쪽으로 기운 윗면은 잘 보인다. 시뮬 바닥은 평평하다: 공은 점프대 칸에 들어서는 틱에 뜨고 다음 틱 JUMP_VY − G만큼 오르는데,
+// 최고 속도에서 한 틱 동안 지나는 쐐기 높이(PAD_RISE × V_MAX / ROW)가 그보다 낮아 공이 쐐기에 묻혀 보이지 않는다.
+export const PAD_RISE = 180
+// 왕복 블록 바닥 선: 폭(앞뒤) TRACK_D, 두께 TRACK_T. 오가는 칸 전체 너비.
+export const TRACK_D = 300
+const TRACK_T = 20
+
 export function segmentBoxes(course: Course, info: SegmentInfo): Box[] {
   const out: Box[] = []
   for (let row = info.startRow; row < info.startRow + info.length; row++) {
     const cz = row * ROW + ROW / 2
+    const m = course.moverAt(row)
+    if (m !== null) {
+      out.push({
+        kind: 'track', cx: (m.x0 + m.x1) / 2, cy: m.h + TRACK_T / 2, cz, w: Math.abs(m.x1 - m.x0) + 1000, h: TRACK_T, d: TRACK_D,
+        slope: 0,
+      })
+    }
+    // 점프대: 같은 높이로 이어진 점프대 칸을 한 판으로.
+    for (let col = COL_MIN; col <= COL_MAX; col++) {
+      const c = course.cell(col, row)
+      if (c.pad !== true || c.floor === null || course.cell(col - 1, row).pad === true) continue
+      let hi = col
+      while (hi + 1 <= COL_MAX && course.cell(hi + 1, row).pad === true) hi++
+      out.push({
+        kind: 'pad', cx: ((col + hi) * 1000) / 2, cy: c.floor.h0 + PAD_T / 2, cz, w: (hi - col + 1) * 1000 - PAD_INSET, h: PAD_T,
+        d: ROW - PAD_INSET, slope: 0,
+      })
+    }
     const gates: { col: number; base: number; top: number }[] = []
     for (let col = COL_MIN; col <= COL_MAX; col++) {
       const c = course.cell(col, row)
@@ -60,6 +92,24 @@ export function segmentBoxes(course: Course, info: SegmentInfo): Box[] {
     }
   }
   return out
+}
+
+// 조각 안 왕복 블록 큐브(1 m). x는 프레임마다 moverSceneX로 정한다.
+export type MoverBox = { row: number; mover: Mover; cy: number; cz: number }
+export function moverBoxes(course: Course, info: SegmentInfo): MoverBox[] {
+  const out: MoverBox[] = []
+  for (let row = info.startRow; row < info.startRow + info.length; row++) {
+    const mover = course.moverAt(row)
+    if (mover !== null) out.push({ row, mover, cy: mover.h + BLOCK_H / 2, cz: row * ROW + ROW / 2 })
+  }
+  return out
+}
+
+// 화면의 큐브 x(mm): 시뮬과 같은 moverX를 직전 틱·지금 틱에서 구해 공과 같은 alpha로 보간한다.
+export function moverSceneX(m: Mover, prevTick: number, curTick: number, alpha: number): number {
+  const a = moverX(m, prevTick)
+  if (curTick === prevTick) return a
+  return a + (moverX(m, curTick) - a) * alpha
 }
 
 // 카메라(mm). 카메라는 공 뒤 CAM_BACK(내리막에서는 CAM_BACK_FAR 쪽으로), x는 공 x. 눈 목표는 공 위 CAM_UP이고, 급경사·단차에서 카메라와 공 사이(공의 열)

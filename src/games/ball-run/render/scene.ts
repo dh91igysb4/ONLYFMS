@@ -20,25 +20,27 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   Quaternion,
+  RingGeometry,
   Scene,
   SphereGeometry,
   Texture,
   WebGLRenderer,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { BLOCK_H, G, R, ROW } from '../constants.ts'
+import { BLOCK_H, G, JUMP_VY, R, ROW } from '../constants.ts'
 import type { Course, SegmentInfo } from '../course.ts'
+import type { Mover } from '../mover.ts'
 import type { SimState } from '../sim.ts'
 import { colOf, floorAt, rowOf } from '../sim.ts'
 import {
   BANK_ANGLE, FLOOR_T, VFOV, bankOffset, boostPull, buildingsFor, cameraRig, cameraTarget, descentTarget, lookPitch, plankAt,
-  plankEase, segmentBoxes, smoothDescent,
-  bankFollow, rollQuat, smoothEye,
+  plankEase, segmentBoxes, smoothDescent, PAD_RISE,
+  bankFollow, rollQuat, smoothEye, moverBoxes, moverSceneX,
 } from './layout.ts'
 import type { Box, Plank } from './layout.ts'
 import {
-  CHEVRON_P, CHEVRON_W, FLOOR_COLOR, FLOOR_LINE, WINDOW_H, WINDOW_W, ballEnvTexture, ballTexture, blockTexture, buildingTexture,
-  chevronTexture, gridTexture, wallTexture,
+  CHEVRON_P, CHEVRON_W, FLOOR_COLOR, FLOOR_LINE, PAD_COLOR, TRACK_COLOR, WINDOW_H, WINDOW_W, ballEnvTexture, ballTexture, blockTexture,
+  buildingTexture, chevronTexture, gridTexture, moverTexture, padTexture, wallTexture,
 } from './textures.ts'
 
 const BG = '#000000'
@@ -70,6 +72,10 @@ const BEAM_SEGS = 18
 const SHARDS = 24
 const SHARD_G = 9.8
 const MAX_DPR = 2
+// 점프 연출: 점프대에서 뜨는 순간 그 자리에 노란 고리가 퍼지며 사라진다.
+const JUMP_RING_S = 0.45
+const JUMP_RING_GROW = 3.2
+const JUMP_RING_OPACITY = 0.9
 const ROLL_JUMP = 20000 // 한 프레임에 이보다 멀리 옮겨 가면 상태 교체로 보고 굴리지 않는다(mm). 최고 속도 끊김(0.1초 ≈ 5 m)보다 훨씬 크다.
 
 export type SceneHandle = {
@@ -78,7 +84,8 @@ export type SceneHandle = {
   dispose(): void
 }
 
-type SegmentMeshes = { meshes: Mesh[]; geometries: BufferGeometry[] }
+type LiveMover = { mesh: Mesh; mover: Mover }
+type SegmentMeshes = { meshes: Mesh[]; geometries: BufferGeometry[]; movers: LiveMover[] }
 
 // 면마다 UV를 실제 길이 ÷ 무늬 한 장 크기로 늘린 상자(텍스처는 RepeatWrapping). BoxGeometry 면 순서: +x, -x, +y, -y, +z, -z.
 function tiledBox(w: number, h: number, d: number, cu: number, cv: number): BoxGeometry {
@@ -238,6 +245,9 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
   const envTex = tex(ballEnvTexture())
   const ballTex = tex(ballTexture())
   ballTex.anisotropy = aniso
+  const padTex = tex(padTexture())
+  padTex.anisotropy = aniso
+  const moverTex = tex(moverTexture())
 
   // 바닥 상자: 윗면(+y, 인덱스 12..17)만 격자, 나머지 면은 라벤더 옆면.
   const unitBox = new BoxGeometry(1, 1, 1)
@@ -270,9 +280,14 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
   })
   const shardMat = new MeshBasicMaterial({ color: '#ffffff' })
+  // v4 기믹: 점프대 판(노랑·주황 갈매기), 왕복 블록(주황 큐브), 그 바닥 선, 점프 고리.
+  const padMat = new MeshBasicMaterial({ map: padTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+  const moverMat = new MeshBasicMaterial({ map: moverTex })
+  const trackMat = new MeshBasicMaterial({ color: TRACK_COLOR, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+  const ringMat = new MeshBasicMaterial({ color: PAD_COLOR, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide })
   const materials: Material[] = [
     floorSideMat, floorTopMat, plankTopMat, plankSideMat, tunnelTopMat, blockMat, lintelMat, buildingMat, archMat, wallMat, chevronMat,
-    ballMat, beamMat, shardMat,
+    ballMat, beamMat, shardMat, padMat, moverMat, trackMat, ringMat,
   ]
 
   const ballGeo = new SphereGeometry(R * M, 40, 28)
@@ -289,7 +304,10 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     }
     beamGeo.setIndex(idx)
   }
-  const geometries: BufferGeometry[] = [unitBox, floorBox, ballGeo, beamGeo]
+  const moverGeo = tiledBox(1, BLOCK_H * M, 1, 1, 1)
+  const ringGeo = new RingGeometry(0.36, 0.5, 40)
+  ringGeo.rotateX(-Math.PI / 2)
+  const geometries: BufferGeometry[] = [unitBox, floorBox, ballGeo, beamGeo, moverGeo, ringGeo]
 
   // 블록 높이별 상자(1 m 무늬가 세로로 반복되게). 기둥 3 m, 문 2 m, 블록 1 m.
   const blockGeos = new Map<number, BoxGeometry>()
@@ -326,6 +344,12 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     for (let i = 0; i < SHARDS; i++) shards.setColorAt(i, c.set(SHARD_COLORS[i % SHARD_COLORS.length]))
   }
   scene.add(shards)
+  const ring = new Mesh(ringGeo, ringMat)
+  ring.visible = false
+  ring.renderOrder = 2
+  scene.add(ring)
+  let ringAt = Number.NEGATIVE_INFINITY // 마지막 점프 시각(ms)
+  let lastJumpTick = -1
 
   // ---- 조각 메시
   const tmp = new Object3D()
@@ -436,6 +460,37 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
       geos.push(g)
       meshes.push(new Mesh(g, lintelMat))
     }
+    // 점프대 판·왕복 블록 바닥 선은 조각마다 하나로 합친다(드물어서 개수가 적다).
+    const pads: BufferGeometry[] = []
+    const tracks: BufferGeometry[] = []
+    for (const b of boxes) {
+      if (b.kind !== 'pad' && b.kind !== 'track') continue
+      const g = tiledBox(b.w * M, b.h * M, b.d * M, 1, 1)
+      if (b.kind === 'pad') {
+        // 쐐기: 윗면 앞쪽(장면 -z) 꼭짓점을 PAD_RISE만큼 올린다.
+        const pos = g.getAttribute('position')
+        for (let i = 0; i < pos.count; i++) if (pos.getY(i) > 0 && pos.getZ(i) < 0) pos.setY(i, pos.getY(i) + PAD_RISE * M)
+      }
+      g.translate(b.cx * M, b.cy * M, -b.cz * M)
+      ;(b.kind === 'pad' ? pads : tracks).push(g)
+    }
+    for (const [parts, mat] of [[pads, padMat], [tracks, trackMat]] as const) {
+      if (parts.length === 0) continue
+      const merged = mergeGeometries(parts)
+      for (const p of parts) p.dispose()
+      if (merged) {
+        geos.push(merged)
+        meshes.push(new Mesh(merged, mat))
+      }
+    }
+    // 왕복 블록 큐브: 공유 geometry, x는 render에서 프레임마다 정한다.
+    const movers: LiveMover[] = []
+    for (const mb of moverBoxes(course, info)) {
+      const mesh = new Mesh(moverGeo, moverMat)
+      mesh.position.set(mb.mover.x0 * M, mb.cy * M, -mb.cz * M)
+      meshes.push(mesh)
+      movers.push({ mesh, mover: mb.mover })
+    }
 
     const buildings = buildingsFor(course.seed, info.startRow, info.startRow + info.length)
     if (buildings.length > 0) {
@@ -469,7 +524,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     if (info.kind === 'tunnel') buildTunnel(info, meshes, geos)
 
     for (const m of meshes) scene.add(m)
-    return { meshes, geometries: geos }
+    return { meshes, geometries: geos, movers }
   }
 
   function dropSegment(s: SegmentMeshes): void {
@@ -481,6 +536,8 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     for (const g of s.geometries) g.dispose()
   }
 
+  // 지금 장면에 있는 왕복 블록(조각이 바뀔 때만 다시 모은다. 프레임마다 새 배열을 만들지 않는다).
+  const liveMovers: LiveMover[] = []
   let lastRow = Number.NaN
   function updateSegments(z: number): void {
     const row = rowOf(z)
@@ -488,13 +545,24 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     lastRow = row
     const want = course.segmentsBetween(row - BEHIND_ROWS, row + AHEAD_ROWS)
     const keep = new Set(want.map((s) => s.startRow))
+    let changed = false
     for (const [start, s] of segments) {
       if (!keep.has(start)) {
         dropSegment(s)
         segments.delete(start)
+        changed = true
       }
     }
-    for (const info of want) if (!segments.has(info.startRow)) segments.set(info.startRow, buildSegment(info))
+    for (const info of want) {
+      if (!segments.has(info.startRow)) {
+        segments.set(info.startRow, buildSegment(info))
+        changed = true
+      }
+    }
+    if (changed) {
+      liveMovers.length = 0
+      for (const s of segments.values()) for (const m of s.movers) liveMovers.push(m)
+    }
   }
 
   // ---- 깨짐 조각: 공 자리에서 옆·뒤(카메라 쪽)로 낮게 흩어지고, 각자 아래 바닥에 떨어져 멈춘다. 아래가 구멍이면 계속 떨어진다.
@@ -609,6 +677,37 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
     }
 
     updateSegments(z)
+
+    // 왕복 블록: 시뮬과 같은 moverX를 직전·지금 틱에서 구해 공과 같은 alpha로 보간한다. 죽으면 그 틱에 멈춘다.
+    const mt0 = death === null ? prev.tick : death.from.tick
+    const mt1 = death === null ? cur.tick : death.from.tick
+    for (let i = 0; i < liveMovers.length; i++) {
+      const lm = liveMovers[i]
+      lm.mesh.position.x = moverSceneX(lm.mover, mt0, mt1, a) * M
+    }
+
+    // 점프 고리: 점프대에서 뜬 틱(vy = JUMP_VY, 그 뒤 틱마다 G씩 준다)을 찾아 한 번만 띄운다(한 프레임에 여러 틱이 지나가도).
+    if (death === null && !cur.grounded && cur.vy <= JUMP_VY && (JUMP_VY - cur.vy) % G === 0) {
+      const k = (JUMP_VY - cur.vy) / G
+      const t0 = cur.tick - k
+      if (k < 8 && t0 > lastJumpTick) {
+        const lz = cur.z - k * cur.vz
+        const c = course.cell(colOf(cur.x), rowOf(lz))
+        if (c.pad === true && c.floor !== null) {
+          lastJumpTick = t0
+          ringAt = now
+          ring.position.set(cur.x * M, (c.floor.h0 + 30) * M, -lz * M)
+        }
+      }
+    }
+    if (cur.tick < lastJumpTick) lastJumpTick = -1
+    const rt = (now - ringAt) / 1000
+    if (rt >= 0 && rt < JUMP_RING_S) {
+      const k = rt / JUMP_RING_S
+      ring.visible = true
+      ring.scale.setScalar(1 + (JUMP_RING_GROW - 1) * k)
+      ringMat.opacity = JUMP_RING_OPACITY * (1 - k)
+    } else ring.visible = false
 
     // 기운 판 위에서는 굴린 면 높이에 맞춰 공을 그린다(시뮬 바닥은 칸 높이 그대로). 판 이음은 비틀어 이어지고, 면이
     // 내려가면 중력으로 떨어져 닿는다(빠를 때 한 프레임에 크게 튀지 않게).

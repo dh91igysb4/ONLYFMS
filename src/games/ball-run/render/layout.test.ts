@@ -6,7 +6,10 @@ import {
   BALL_FRAC, BANK_ANGLE, BANK_EASE, CAM_BACK, CAM_UP, EYE_LAG_MAX, LINTEL_H, VFOV, bankEase, bankOffset, buildingsFor, cameraTarget,
   BANK_FLOAT_MAX, bankFollow, lookPitch, segmentBoxes, smoothEye,
   BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent, rollQuat, ROLL_MAX_ANGLE,
+  PAD_RISE, PAD_T, TRACK_D, moverBoxes, moverSceneX,
 } from './layout.ts'
+import { moverX } from '../mover.ts'
+import { G, JUMP_VY, MOVER_PERIOD, V_MAX } from '../constants.ts'
 import { floorAt } from '../sim.ts'
 
 const SEED = '0123456789abcdef0123456789abcdef'
@@ -64,6 +67,71 @@ describe('segmentBoxes', () => {
     const info = course.segmentAt(0)
     const boxes = segmentBoxes(course, info)
     expect(boxes.some((b) => b.cx === -3000 || b.cx === 3000)).toBe(false)
+  })
+})
+
+// v4: 점프대와 왕복 블록. 행 2 점프대(3칸), 행 4 왕복 블록 행(가운데 3칸), 행 6 왼쪽으로 옮긴 왕복 블록 행.
+const GIM = parseSegment({
+  id: 'gim', kind: 'obstacle', tier: 2,
+  rows: [JOINT, '..___..', '..JJJ..', '..___..', '..MMM..', '..___..', '.MMM...', JOINT],
+})
+const gimCourse = courseFromSegments([{ seg: GIM, mirrored: false, phase: 9 }])
+
+describe('segmentBoxes v4 gimmicks', () => {
+  it('one raised pad slab per pad row, spanning the pad cells, on top of the floor boxes', () => {
+    const boxes = segmentBoxes(gimCourse, gimCourse.segmentAt(0))
+    const pads = boxes.filter((b) => b.kind === 'pad')
+    expect(pads).toHaveLength(1)
+    const p = pads[0]
+    expect(p.cx).toBe(0)
+    expect(p.cz).toBe(2500)
+    expect(p.w).toBeGreaterThan(2800)
+    expect(p.w).toBeLessThanOrEqual(3000)
+    expect(p.d).toBeLessThanOrEqual(1000)
+    expect(p.h).toBe(PAD_T)
+    expect(p.cy - p.h / 2).toBe(0) // 바닥 위에 얹는다
+    expect(PAD_T).toBeGreaterThan(0)
+    expect(PAD_T).toBeLessThanOrEqual(60) // 공(바닥 + R)이 거의 묻히지 않게
+    // 화면의 쐐기 앞끝은 공이 뜬 다음 틱 높이보다 낮게 지나간다(최고 속도).
+    expect(PAD_RISE).toBeGreaterThan(0)
+    expect((PAD_RISE * V_MAX) / 1000).toBeLessThanOrEqual(JUMP_VY - G)
+    // 점프대 칸에도 바닥 상자는 그대로 있다.
+    expect(boxes.filter((b) => b.kind === 'floor' && b.cz === 2500)).toHaveLength(3)
+  })
+
+  it('a thin floor track across each shuttle row shows the travel', () => {
+    const tracks = segmentBoxes(gimCourse, gimCourse.segmentAt(0)).filter((b) => b.kind === 'track')
+    expect(tracks).toHaveLength(2)
+    const [a, b] = tracks
+    expect(a.cz).toBe(4500)
+    expect(a.cx).toBe(0)
+    expect(a.w).toBe(3000)
+    expect(a.d).toBe(TRACK_D)
+    expect(b.cz).toBe(6500)
+    expect(b.cx).toBe(-1000)
+    expect(a.cy - a.h / 2).toBeGreaterThanOrEqual(0)
+    expect(a.cy + a.h / 2).toBeLessThanOrEqual(PAD_T)
+    expect(TRACK_D).toBeLessThan(400)
+  })
+
+  it('moverBoxes lists the moving cubes of a segment (row, mover, cube size)', () => {
+    const list = moverBoxes(gimCourse, gimCourse.segmentAt(0))
+    expect(list.map((m) => m.row)).toEqual([4, 6])
+    expect(list[0].mover).toEqual(gimCourse.moverAt(4))
+    expect(list[0].cz).toBe(4500)
+    expect(list[0].cy).toBe(BLOCK_H / 2)
+    expect(moverBoxes(course, course.segmentAt(0))).toEqual([])
+  })
+
+  it('moverSceneX interpolates the shared moverX between the previous and current tick', () => {
+    const m = gimCourse.moverAt(4)!
+    for (let t = 0; t < 2 * MOVER_PERIOD; t += 7) {
+      expect(moverSceneX(m, t, t + 1, 0)).toBe(moverX(m, t))
+      expect(moverSceneX(m, t, t + 1, 1)).toBe(moverX(m, t + 1))
+      const mid = moverSceneX(m, t, t + 1, 0.5)
+      expect(mid).toBeCloseTo((moverX(m, t) + moverX(m, t + 1)) / 2)
+    }
+    expect(moverSceneX(m, 40, 40, 0.7)).toBe(moverX(m, 40))
   })
 })
 
