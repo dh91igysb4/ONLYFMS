@@ -11,12 +11,12 @@ import { rowOf } from './sim.ts'
 const TOP = SPEED_TABLE.length - 1
 const SPEEDS = SPEED_TABLE.map((_, k) => k)
 // v4: 왕복 블록이 있는 조각은 조각 위상을 주기에 고르게 PHASES개 돌려 본다(공이 그 행에 닿는 틱은 코스로 정해지므로 위상이 곧
-// 큐브 자리다). 위상마다 따로 케이스를 둬 실패한 위상이 보이게 한다.
-const PHASES = 6
+// 큐브 자리다). 주기에 고르게 16개(10틱 간격). 위상마다 따로 케이스를 둬 실패한 위상이 보이게 한다.
+const PHASES = 16
 const hasMover = (seg: (typeof PARSED)[number]) => seg.movers.some((m) => m !== null)
 const cases = PARSED.flatMap((seg) =>
   [false, true].flatMap((mirrored) =>
-    (hasMover(seg) ? [...Array(PHASES).keys()].map((k) => Math.floor((k * MOVER_PERIOD) / PHASES) + 3 * k) : [0]).map((phase) => ({
+    (hasMover(seg) ? [...Array(PHASES).keys()].map((k) => Math.floor((k * MOVER_PERIOD) / PHASES)) : [0]).map((phase) => ({
       id: seg.id, seg, mirrored, phase,
     })),
   ),

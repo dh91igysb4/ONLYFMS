@@ -31,7 +31,7 @@ const GOLDEN = [
   'o1-bank-intro~', 'o1-scatter', 'tunnel-30', 'd-steps~', 'o1-narrow2~', 'o2-ledge-blocks',
   'tunnel-30~', 'd-terraces~', 'o3-rails-strips', 'o2-shift-path', 'tunnel-24~', 'd-steep',
 ]
-const GOLDEN_GIMMICK: unknown[] = ['mj4-pad-shuttle', 1448, true, '96:1000..-1000@24']
+const GOLDEN_GIMMICK: unknown[] = ['mj4-pad-shuttle', 1448, true, '96:1000..-1000@56']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
