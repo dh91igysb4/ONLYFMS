@@ -1,0 +1,6 @@
+id,name_ko,name_en,birth_date,birth_precision,nation_id,position,position_detail,foot,height_cm,shirt_number,popularity,retired
+Q21621995,킬리안 음바페,Kylian Mbappé,1998-12-20,day,Q142,FW,CF,right,178,,98,false
+Q439722,손흥민,Son Heung-min,1992-07-08,day,Q884,FW,W,both,184,,95,false
+x-john-doe-1988,,John Doe,1988-05-05,day,Q21,GK,,,,,5,false
+x-kim-minsu-1990,김민수,Kim Min-su,1990-03-01,day,Q884,MF,,,,,20,false
+x-kim-minsu-1995,김민수,Kim Min-su,1995,year,Q884,DF,CB,,,,10,false

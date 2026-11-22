@@ -47,9 +47,9 @@
 | 벨기에 프로리그 | Q216022 | 벨기에 Q31 | 1 | 10 |
 | 에레디비시 | Q167541 | 네덜란드 Q55 | 1 | 10 |
 | 쉬페르리그 | Q485568 | 튀르키예 Q43 | 1 | 10 |
-| **K리그1 (추가)** | 구현 때 확인 | 대한민국 Q884 | 1 | 10 |
+| **K리그1 (추가)** | Q2386334 | 대한민국 Q884 | 1 | 10 |
 
-- K리그1의 QID는 구현 첫 단계에서 위키데이터에서 확인해 적는다. 리그 항목이 옛 이름(K리그 클래식)과 따로 있으면 **현재 리그 항목** 하나만 쓰고, 시즌 항목이 어느 쪽에 붙어 있는지(`P3450`) 확인한다.
+- K리그1의 QID는 2026-11-02 위키데이터 질의로 확인했다: `Q2386334`(대한민국 리그 가운데 시즌 항목 `P3450`이 37개로 가장 많음). 옛 통합 항목 `K리그`(Q482403, 시즌 9개)는 쓰지 않는다. 최근 시즌이 옛 항목에 붙어 있으면 커버리지 표에 빈칸으로 드러나므로 그때 `manual/team_competitions.csv`로 채우거나 다시 정한다.
 - K리그는 위키데이터의 시즌별 참가팀(`P1923`)이 비어 있을 가능성이 높다. 수집 끝의 커버리지 표에서 빈 칸을 `manual/team_competitions.csv`로 채운다(§5.3). K리그1은 12팀이라 커버리지 표의 "16팀 미만(`!`)" 경고 기준을 리그별 팀 수로 바꾼다(§4).
 
 ### 3.2 시즌 범위
@@ -63,8 +63,8 @@
 
 ### 3.3 선수 선정
 
-1. 리그별 창 안의 시즌 참가팀(위키데이터 `P1923` + `manual/team_competitions.csv`)과, 지금 그 리그 소속으로 적힌 클럽(`P118`)을 **대상 팀**으로 모은다.
-2. 팀마다 **수집 창 시작 연도**를 정한다. 그 팀이 대상 리그 시즌에 참가한 기록이 있으면 그 리그들의 창 시작 중 가장 이른 해, `P118`로만 잡힌 팀은 그 리그의 창 시작이다. 예: 2013년에 프리미어리그, 지금은 챔피언십인 팀은 2012부터.
+1. 리그별 창 안의 시즌 참가팀(위키데이터 `P1923` + openfootball(§3.5) + `manual/team_competitions.csv`)과, 지금 그 리그 소속으로 적힌 클럽(`P118`)을 **대상 팀**으로 모은다.
+2. 팀마다 **수집 창 시작 연도**를 정한다. 창 안에서 그 팀이 참가한 리그들과 지금 소속(`P118`)으로 적힌 리그들의 창 시작 중 가장 이른 해이다. 예: 2013년에 프리미어리그, 지금은 챔피언십인 팀은 2012부터. 승격해 지금 `P118`이 프리미어리그인데 참가 기록이 아직 챔피언십뿐인 팀도 2012부터. 창 밖 참가 기록만 있는 팀은 대상이 아니다.
 3. 같은 시작 연도의 팀끼리 묶어 "기간 `[시작년 7월 1일, 현재+1년 6월 30일]`에 그 팀에 있었던 선수"를 찾는다(기존 `qPlayersAtTeams`). 날짜가 하나도 없는 경력 구간은 판별할 수 없어 뺀다. 종료일이 빠진 오래된 구간을 거르려고 시작년에 40세 이하였던 선수만 받는다(기존 규칙).
 4. 팀의 창은 리그 참가 시즌만이 아니라 **창 전체**에 적용된다. 예를 들어 2015년에만 프리미어리그에 있었던 팀은 2012~2026 사이 그 팀에 있던 선수를 모두 받는다(2부 시절 선수 포함). 질의를 단순하게 두는 대가이고, 선수가 조금 늘어날 뿐 틀린 데이터는 아니다.
 5. 선정된 선수는 **창 밖 구간까지 전체 경력**을 받는다(Career Path에 필요). 경력에 나오는 팀은 대상 리그 밖이어도 `teams.csv`에 들어간다.
@@ -74,7 +74,23 @@
 - `data/football/manual/legends.csv` (`player_id,note`): §3.3 범위 밖이지만 넣고 싶은 선수의 위키데이터 QID와 메모(예: `Q1487,티에리 앙리`).
 - 수집기는 §3.3에서 찾은 선수에 이 명단을 더한 뒤 같은 방법으로 경력·정보·수상·별칭을 받는다. 명단에 있는데 직업이 축구 선수(`P106 = Q937857`)가 아니면 경고만 하고 뺀다.
 - 레전드 경력에 나오는 옛 시즌의 리그 참가 기록(`team_competitions`)은 수집 창 밖이라 생기지 않는다. "프리미어리그에서 뛴 선수" 같은 조건은 창 안에서만 정확하다는 점을 §11에 한계로 적는다.
-- 명단을 어떻게 고를지(누가 레전드인가)는 데이터 PR 리뷰에서 정한다. 첫 판은 비워 두거나 소수로 시작한다.
+- **선정 기준 (2026-11-02 결정): 발롱도르 후보.** 2000~2025년은 후보(1995~2009년 50인·2008년 이후 30인·2010~2015년 23인 명단, 무득표 포함) 전원, 1990~1999년은 연도별 상위 5위(공동 순위 포함). 2020년은 시상이 없었다. 381명.
+  - 원본: `data/football/manual/ballon_dor_nominees.csv` (`name,nation_ko,years,best_rank,player_id`). 사용자가 준 엑셀(출처 RSSSF·위키백과 등, 연도별 출처는 엑셀의 '연도별 요약' 시트)에서 위 규칙으로 뽑았다.
+  - 이름 → 위키데이터 ID: `npm run football:legends`(`scripts/football/resolve-legends.ts`, 순수 부분 `legends.ts`). 이름이 영어·mul 라벨이나 별칭과 같은 축구 선수 중, 처음 후보 연도 기준 15~45세이고 위키 문서 수가 가장 많은 선수. 2위의 2배 이상이면 확정, 아니면 '확인 필요'. 확인 필요·못 찾음은 원본의 `player_id` 칸에 ID를 적어 정한다. 판정 결과는 `manual/ballon_dor_resolved.csv`.
+  - `legends.csv`에는 확정·직접 지정만 들어가며 note가 `[발롱도르]`로 시작한다. 다시 돌리면 이 줄들만 새로 만들고 손으로 넣은 줄(예: 국내 레전드)은 그대로 둔다.
+  - 수집 범위 안 선수도 명단에 그대로 둔다(수집기가 중복을 없앤다). 5대 리그 수집 창을 넓혀 가면 실제로 '추가'되는 레전드 수만 줄어들고 명단은 고칠 필요가 없다.
+  - 국내 레전드(대표팀·K리그) 등은 필요하면 `legends.csv`에 손으로 더한다.
+
+### 3.5 시즌 참가팀 보완: openfootball (2026-11-03 결정)
+
+첫 수집(2026-11-02)에서 위키데이터 `P1923`이 빈 시즌이 많았고, 분데스리가 2020~2025는 참가팀이 실제 클럽이 아닌 별도 항목(`Q979xxxxx`, 경력 0건)을 가리켜 선수 경력과 이어지지 않았다. 우승 기록(`honours`)도 같은 항목을 가리켰다. 그래서 openfootball 경기 일정(퍼블릭 도메인, 원 설계 §4.3)으로 시즌 참가팀을 보완한다.
+
+- **받는 것**: `raw.githubusercontent.com/openfootball`의 `football.json/<시즌>/<리그>.json`, 없으면 `europe/<나라>/<시즌>_<리그>1.txt`(쉬페르리그·에레디비시). 리그 코드는 `scripts/football/openfootball.ts`의 `OF_SOURCES`. K리그는 없다(`manual/`로 유지).
+- **이름 → ID**: 이미 수집한 `teams.csv`(클럽)·`aliases.csv`에서 찾는다. 소문자·악센트·구두점을 지운 이름(엄격) → 흔한 접사(FC, SC, …)와 숫자까지 지운 이름(느슨) 순. 후보가 여럿이면 (그 리그 참가 기록, 리그 소재국과 국적 일치, 경력 수) 순으로 고르고, 셋 다 같으면 '애매'. 단 경력 수가 가장 많은 후보의 1/10 미만인 후보는 먼저 뺀다(2026-11-05: 분데스리가 장크트 파울리·홀슈타인 킬·다름슈타트·퓌르트가 참가 기록만 있는 경력 0~1개짜리 별도 항목에 이어졌다). 다른 나라 팀만 걸리면 쓰지 않는다. 못 잇거나 애매한 이름은 `openfootball/unmatched.csv`에 남기고 `manual/openfootball_teams.csv`(competition_id, name, team_id)로 정한다.
+- **합치기**: openfootball 명단이 다 이어진 시즌은 openfootball이 기준이다. 위키데이터에만 있는 팀은 빼고, 그중 같은 시즌 openfootball 쪽에 이름이 같은 다른 ID가 있으면 `openfootball/remap.csv`(옛 ID → 새 ID)로 우승 기록의 팀 ID를 옮긴다. 나머지 시즌은 합집합. 직접 입력은 항상 더한다.
+- **실행 순서**: `football:openfootball`은 `teams.csv`가 있어야 이름을 잇는다. 그 결과(`openfootball/*.csv`)를 다음 `football:fetch`가 합쳐 새로 들어온 팀의 선수까지 받는다. `--merge`는 다시 수집하지 않고 지금 CSV에 바로 반영한다(teams.csv에 없는 팀은 빼고, 옮긴 뒤 안 쓰이는 옛 ID 팀은 지움).
+- **2026-11-03 실행 결과**: 1,817행 연결, 못 이은 이름 3개(Willem II, BB Erzurumspor — `teams.csv`에 없어 위키데이터 ID 확인 필요). `team_competitions` 1,192 → 2,002행. 분데스리가 옛 항목 103행을 빼고 우승 기록 5개를 실제 클럽으로 옮겼다. openfootball에도 없는 시즌: 프리메이라리가·에레디비시·쉬페르리그 2017(위키데이터로 채워짐), 쉬페르리그 2021·2022, 벨기에 2017·2021~2023·2026.
+- **남은 일**: openfootball로 새로 들어온 팀 일부는 선수가 거의 수집되지 않았다(예: 2024 분데스리가 홀슈타인 킬·장크트 파울리). `football:fetch`를 한 번 다시 돌려야 채워진다.
 
 ## 4. 수집 스크립트 변경 (`scripts/football/`)
 
@@ -125,13 +141,14 @@
 | `names_ko.csv` | entity_id, name_ko | 한글 표시 이름 덮어쓰기 (기존) |
 | `team_competitions.csv` | team_id, competition_id, season | 위키데이터에 빠진 시즌 참가팀 (기존) |
 | `legends.csv` | player_id, note | 범위 밖 레전드 (신규, §3.4) |
+| `openfootball_teams.csv` | competition_id, name, team_id | openfootball 팀 이름 → ID 직접 지정 (§3.5). competition_id가 비면 모든 리그 |
 
 ## 6. DB 스키마 (`npx supabase@2 migration new football`)
 
 ### 6.1 공통 규칙
 
 - 테이블 이름은 `football_` 접두사. 열 값 제한은 Postgres enum 대신 `check` 제약으로 둔다(값 추가가 마이그레이션 한 줄로 끝남).
-- RLS를 켜고 `anon`·`authenticated`의 기본 권한을 회수한 뒤 `authenticated`에 `select`만 준다. 정책은 `using (public.is_approved())`. 쓰기 정책은 없다. 적재는 소유자 연결(RLS 우회)로만 한다.
+- RLS를 켜고 `anon`·`authenticated`의 기본 권한을 회수한 뒤 `authenticated`에 `select`만 준다. 정책은 `using ((select public.is_approved()))`(쿼리당 한 번만 계산되게 `select`로 감싼다. 행마다 부르면 별칭 6만 행 검색이 수백 ms). 쓰기 정책은 없다. 적재는 소유자 연결(RLS 우회)로만 한다.
 - 데이터는 공개 지식이고 출제 예정 문제가 들어 있지 않아 승인 사용자에게 전부 읽기를 연다(원 설계 §5와 같음).
 - 확장: `pg_trgm`, `unaccent`를 `extensions` 스키마에 만든다(`create extension if not exists … with schema extensions`).
 
@@ -153,7 +170,7 @@
 
 **football_team_competitions**: `team_id text references football_teams`, `competition_id text references football_competitions`, `season int`, pk 세 열
 
-**football_aliases**: `entity_id text not null`, `alias text not null`, `lang text`, `alias_norm text generated always as (public.football_norm(alias)) stored`, pk `(entity_id, alias)`. `entity_id`는 선수·팀 어느 쪽이든 될 수 있어 FK를 걸지 않고, CSV 검사(§9.1)가 존재를 확인한다.
+**football_aliases**: `entity_id text not null`, `alias text not null`, `lang text`, `alias_norm text generated always as (public.football_norm(alias)) stored`, `alias_words text[] generated always as (public.football_words(alias)) stored`(이름을 공백·하이픈으로 나눠 각각 정규화, 성만으로 찾기용), pk `(entity_id, alias)`. `entity_id`는 선수·팀 어느 쪽이든 될 수 있어 FK를 걸지 않고, CSV 검사(§9.1)가 존재를 확인한다.
 
 **football_external_ids**: `entity_id text not null`, `source text not null`, `external_id text not null`, pk `(source, external_id)`
 
@@ -208,17 +225,24 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 - 대상 팀은 11개 리그 × 창 안 시즌 참가팀으로 약 400~500개, 선수는 2만~3만 명, 경력은 15만~25만 행으로 예상한다.
 - CSV 합계 약 20~30MB, DB는 인덱스 포함 100MB 안쪽으로 무료 등급 한도(500MB) 안이다. 첫 수집 후 실제 값을 이 절에 적는다.
+- **첫 수집 실측(2026-11-02, 데이터 브랜치 `data/football-v1`)**: 선수 13,180명, 팀 5,497개, 국가 201개, 경력 68,913, 국가대표 4,404, 수상·우승 752, 별칭 46,216, 외부 ID 12,739. CSV 합계 9.1MB(최대 `spells.csv` 6.0MB). 로컬 Postgres 16 적재 2.5~3.9초, `football_*` 합계 38MB(경력 17MB, 별칭 13MB). 검색 5~37ms.
 
 ## 8. 검색 RPC
 
-`public.football_search(q text, kind text, lim int default 10)`
+`public.football_search(p_q text, p_kind text, p_lim int default 10)` — 마이그레이션 `20261102062215_football_search.sql`
 
-- `security invoker`. 승인 사용자가 아니면 `forbidden` 예외(기존 `_require_approved()`, 리더보드 RPC와 같음). `authenticated`에만 실행 권한.
-- `kind`는 `player` 또는 `team`(그 밖이면 `bad_kind` 예외). `lim`은 1~20으로 자른다. `football_norm(q)`가 빈 문자열이면 빈 결과.
+- 인자는 `p_` 접두사(기존 RPC 관례). 반환 열 `kind`와 인자 이름이 같으면 함수를 만들 수 없다. 화면에서는 `supabase.rpc('football_search', { p_q, p_kind })`.
+- `security definer`. 승인 사용자가 아니면 `forbidden` 예외(리더보드 RPC와 같은 코드). `authenticated`에만 실행 권한.
+  - 정의자 권한인 이유: RLS가 걸린 테이블에서는 `LIKE`·trigram `%`(leakproof 아님)를 인덱스 조건으로 쓸 수 없어 늘 전 행을 훑는다(별칭 6만 행에서 110ms → 정의자로 8ms).
+- `p_kind`는 `player` 또는 `team`(그 밖이면 `bad_kind` 예외). `p_lim`은 1~20으로 자르고 null이면 10. `football_norm(p_q)`가 빈 문자열이면 빈 결과.
+- 후보 찾기는 정규화한 입력 `n`의 길이로 나눈다. 내부 함수 `_football_match_long`·`_football_match_short`는 누구에게도 실행 권한이 없다.
+  - 3글자 이상: 부분 일치 또는 trigram 유사도. 함수 안에서만 `enable_seqscan = off`로 trigram 인덱스를 쓰게 한다(플래너가 GIN 비용을 비관적으로 잡아 순차 스캔을 고르기 때문).
+  - 1~2글자: 완전한 trigram이 없어 인덱스가 전 행을 후보로 돌려주므로(1.9초) 순차 스캔 + 부분 일치만(7ms).
 - 일치 규칙: 별칭의 `alias_norm`과 정규화한 입력 `n`을 비교해 엔터티별로 가장 좋은 점수를 쓴다.
-  - 3: 완전 일치, 2: 앞부분 일치, 1: 부분 일치(`like '%n%'`), 0: trigram 유사도 0.3 이상
+  - 3: 완전 일치, 2: 앞부분 일치(전체 이름 또는 이름의 한 단어, `alias_words`), 1: 부분 일치(`like '%n%'`, `%`·`_`는 이스케이프), 0: trigram 유사도 0.3 이상(`pg_trgm.similarity_threshold` 기본값)
+  - 단어 앞부분 일치는 실데이터에서 `kane`에 해리 케인보다 케인 퍼디낸드가 앞서(띄어쓰기를 지운 `harrykane`은 부분 일치뿐) 추가했다(2026-11-02).
   - 한글 두세 글자 이름은 trigram 유사도가 낮게 나와서(예: `손흥민`과 `흥민`은 0.17) 부분 일치를 함께 쓴다.
-- 정렬: 점수 내림차순 → 유사도 → 선수는 `popularity` 내림차순, 팀은 `name_en` → `id`.
+- 정렬: 점수 내림차순 → (선수이고 점수 1 이상이면) `popularity` 내림차순 → 유사도 내림차순 → 선수는 `popularity`, 팀은 `name_en` → `id`. 유사도는 짧은 이름이 높게 나와, 처음처럼 유사도를 먼저 보면 실데이터에서 `xavi`에 사비 에르난데스(인지도 100)보다 사비 시몬스·사비 토레스가 앞섰다(2026-11-02). 철자가 비슷한 것만으로 걸린 결과(점수 0)는 유사도를 먼저 본다.
 - `retired` 엔터티는 뺀다. 팀은 `club`과 `national` 모두 나온다.
 - 반환 열: `id, kind, name_ko, name_en, nation_id, position, birth_year, team_kind`
   - 선수: `position`, `birth_year`(생년만, 생일 전체는 주지 않음), `team_kind`는 null
@@ -242,7 +266,7 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 
 - 픽스처: `supabase/tests/fixtures/football/*.csv` (선수 10명 안팎: 한글·영문·악센트 이름, 동명이인, 폐기 대상 포함)
 - `scripts/db-test.sh`가 마이그레이션 뒤 `football:load`로 픽스처를 적재하고 pgTAP를 돌린다.
-- `supabase/tests/08_football.test.sql` (pgTAP)
+- `supabase/tests/11_football.test.sql`(스키마·권한), `supabase/tests/12_football_search.test.sql`(검색) (pgTAP)
   - 승인 사용자는 `football_*`를 읽고, 대기·익명 사용자는 0행 또는 권한 오류
   - `authenticated`의 insert·update·delete는 모두 거부
   - `football_search`: `손흥민`·`흥민`·`son heung min`·`Son Heung-min`이 같은 선수를 찾음, `mbappe`가 `Mbappé`를 찾음, `retired` 제외, `kind`·`lim` 처리, 반환 열에 경력 정보 없음, 비승인 `forbidden`
@@ -266,10 +290,11 @@ DATABASE_URL='postgres://…' npm run football:load -- <dir>    # 다른 폴더 
 ## 11. 알려진 한계
 
 - **인지도(`popularity`)**: 전 세계 위키 문서 수 기준이라 K리그 선수가 낮게 나온다. 국내 친구들 기준 체감과 다를 수 있다. 문제 생성 단계에서 리그별 하한이나 수동 보정(후알야 `EASY_IN/OUT`과 비슷한 방식)을 검토한다.
-- **리그 참가 기록**: 수집 창 안에서만 있다. 레전드의 옛 시즌, 창 밖 시즌의 "어느 리그에서 뛰었나" 조건은 판정할 수 없다.
+- **리그 참가 기록**: 수집 창 안에서만 있다. 시즌 참가팀은 위키데이터 + openfootball(§3.5) + 직접 입력이고, 둘 다 없는 시즌(쉬페르리그 2021·2022, 벨기에 2017·2021~2023·2026)은 비어 있다. 레전드의 옛 시즌, 창 밖 시즌의 "어느 리그에서 뛰었나" 조건은 판정할 수 없다.
 - **경력 누락**: 날짜 없는 구간은 빠진다. 위키데이터에 없는 이적은 직접 입력이나 다음 단계 API-Football로 보완한다.
 - **국적**: 성인 대표팀 출전 → 종목 국적 → 시민권 순이라 이중 국적 선수가 틀릴 수 있다(`manual/` 보정 대상, 필요해지면 `manual/nations.csv`를 추가).
 - **비어 있는 열**: `shirt_number`, `confederation`, 대부분의 `foot`. 클럽 색 비율은 균등 분할이다.
+- **팀 검색 순서**: 팀에는 인지도(`popularity`)가 없어 같은 점수면 `name_en` 순이다. `united`에 맨체스터 유나이티드가 먼저 나오지 않는다. 팀 위키 문서 수를 수집해 인지도를 두는 것은 다음 단계에서 한다.
 - **수상 이름**: `honours`는 개인상의 QID만 들고 있고 상 이름 테이블이 없다. 화면에 상 이름이 필요한 게임에서 추가한다.
 - **한글 이름 표기**: 위키데이터 한국어 라벨을 그대로 쓰고, 없거나 어색하면 `manual/names_ko.csv`로 고친다. 표기 기준(외래어 표기법 vs 중계 관행)은 정하지 않고 리뷰에서 그때그때 판단한다. 검색은 별칭으로 여러 표기를 받는다.
 
