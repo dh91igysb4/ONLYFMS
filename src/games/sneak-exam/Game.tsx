@@ -339,6 +339,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
         if (cancelled) return
         try {
           scene = mod.createScene(canvas)
+          scene.setAnswers(getExam(latest.current.ps.seed).answers)
         } catch {
           engine.current = null
           setPhase('no-webgl')
@@ -519,9 +520,29 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
             {seeing && <strong className="se-edge-seeing">보는 중</strong>}
           </div>
         )}
+        {sim.tool === 1 && (
+          <div className="se-glass" data-testid="se-glass" data-done={solved} aria-hidden="true">
+            <span className="se-glass-scan" />
+            <span className="se-glass-corner" data-c="tl" />
+            <span className="se-glass-corner" data-c="tr" />
+            <span className="se-glass-corner" data-c="bl" />
+            <span className="se-glass-corner" data-c="br" />
+            <div className="se-glass-read">
+              <span className="se-glass-tag">{`AI 안경 · 문제 ${sim.q + 1}`}</span>
+              {solved
+                ? <strong className="se-glass-ans">{`정답 ${CIRCLED[exam.answers[sim.q]]}`}</strong>
+                : <span className="se-glass-run">{`분석 중 ${prog}%`}</span>}
+            </div>
+          </div>
+        )}
         {sim.tool === 2 && (
-          <div className="se-ear" aria-label="이어폰 켜짐" role="img">
-            <EarIcon />
+          <div className="se-earfx" data-testid="se-earfx" data-stowing={stowing} aria-label="이어폰 켜짐" role="img">
+            <span className="se-ear"><EarIcon /></span>
+            <span className="se-wave" data-side="left" aria-hidden="true"><i /><i /><i /><i /></span>
+            <span className="se-wave" data-side="right" aria-hidden="true"><i /><i /><i /><i /></span>
+            <p className="se-whisper" data-done={solved} aria-hidden="true">
+              {solved ? `“정답은 ${exam.answers[sim.q] + 1}번”` : `풀이 듣는 중… ${prog}%`}
+            </p>
           </div>
         )}
         {phase === 'loading' && <p className="se-hint">불러오는 중…</p>}

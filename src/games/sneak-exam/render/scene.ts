@@ -24,7 +24,7 @@ import {
   WebGLRenderer,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { COL_X, FRONT_Z, ME_X, ME_Z, N_CHOICE, N_Q, ROW_Z } from '../constants.ts'
+import { COL_X, FRONT_Z, ME_X, ME_Z, N_CHOICE, N_Q, PROG_MAX, ROW_Z } from '../constants.ts'
 import type { SimState } from '../sim.ts'
 import { CAM } from './view.ts'
 
@@ -63,6 +63,16 @@ const PHONE_COLOR = '#7fd8ff'
 const PHONE_LIGHT = 2.5
 const GLOW_D = 0.1 // 화면 빛 판까지 거리(m)
 const GLOW_H = 0.5 // 화면 빛이 덮는 아래쪽 높이 비율
+const GLOW_OPACITY = 0.4 // 손에 든 휴대폰이 보이므로 번지는 빛은 약하게
+// 손에 든 휴대폰(카메라에 붙인 판 몇 장): 책상 아래에서 슬쩍 올라온다.
+const PH_D = 0.4 // 카메라에서 거리(m)
+const PH_H = 0.26 // 휴대폰 높이(m). 화면 높이의 40%쯤
+const PH_X = -0.55 // 화면 반폭 대비 가로 위치(왼쪽 아래)
+const PH_RATE = 9 // 꺼내고 넣는 속도(1/s)
+const PH_BODY = '#15171c'
+const PH_W = 128
+const PH_PX = 256
+const CIRCLED = ['①', '②', '③', '④', '⑤']
 
 // 정점 색을 칠한 상자. (x, y, z)는 상자 중심, 장면 m.
 function box(w: number, h: number, d: number, x: number, y: number, z: number, color: string, rx = 0, ry = 0): BufferGeometry {
@@ -371,6 +381,41 @@ function drawSheet(g: CanvasRenderingContext2D, marks: readonly number[], q: num
   }
 }
 
+// 휴대폰 화면: 풀이 중이면 진행 막대, 다 풀리면 정답 번호. answer < 0이면 풀이 중.
+function drawPhone(g: CanvasRenderingContext2D, q: number, pct: number, answer: number): void {
+  g.fillStyle = '#0e1626'
+  g.fillRect(0, 0, PH_W, PH_PX)
+  g.fillStyle = '#1f6feb'
+  g.fillRect(0, 0, PH_W, 34)
+  g.fillStyle = '#ffffff'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.font = 'bold 20px sans-serif'
+  g.fillText('AI 풀이', PH_W / 2, 18)
+  g.font = 'bold 26px sans-serif'
+  g.fillStyle = '#9fb4d8'
+  g.fillText(`문제 ${q + 1}`, PH_W / 2, 66)
+  if (answer < 0) {
+    g.fillStyle = '#ffffff'
+    g.font = 'bold 21px sans-serif'
+    g.fillText('풀이 중…', PH_W / 2, 116)
+    g.fillStyle = '#26324a'
+    g.fillRect(14, 142, PH_W - 28, 14)
+    g.fillStyle = '#4fc3ff'
+    g.fillRect(14, 142, ((PH_W - 28) * pct) / 100, 14)
+    g.fillStyle = '#9fb4d8'
+    g.font = 'bold 26px sans-serif'
+    g.fillText(`${pct}%`, PH_W / 2, 186)
+  } else {
+    g.fillStyle = '#9fb4d8'
+    g.font = 'bold 24px sans-serif'
+    g.fillText('정답', PH_W / 2, 94)
+    g.fillStyle = '#c9f25c'
+    g.font = 'bold 70px sans-serif'
+    g.fillText(CIRCLED[answer] ?? '?', PH_W / 2, 158)
+  }
+}
+
 // 무릎 위 휴대폰이 아래에서 비추는 빛: 화면 아래 가운데가 가장 밝고 위·옆으로 사라진다.
 function glowTexture(): CanvasTexture {
   const c = document.createElement('canvas')
@@ -394,6 +439,8 @@ function glowTexture(): CanvasTexture {
 export type SceneHandle = {
   resize(width: number, height: number, dpr: number): void
   render(prev: SimState, cur: SimState, alpha: number, nowMs: number): void
+  /** 이 판의 정답(문제별 0~4). 휴대폰 화면이 다 풀린 문제의 정답을 보여 주는 데만 쓴다. */
+  setAnswers(answers: readonly number[]): void
   dispose(): void
 }
 
@@ -514,6 +561,52 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
   placeGlow(1)
   let phoneOn = 0 // 0..1, 켜고 끌 때 부드럽게
 
+  // 손에 든 휴대폰. 깊이 검사 없이 renderOrder 순서로 겹쳐 그린다(손바닥 < 본체 < 화면 < 손가락).
+  const phoneCanvas = document.createElement('canvas')
+  phoneCanvas.width = PH_W
+  phoneCanvas.height = PH_PX
+  const phoneCtx = phoneCanvas.getContext('2d')
+  const phoneTex = new CanvasTexture(phoneCanvas)
+  phoneTex.colorSpace = SRGBColorSpace
+  textures.push(phoneTex)
+  const phoneRig = new Group()
+  const flat = (w: number, h: number, x: number, y: number, order: number, color: string, map?: Texture, rz = 0): void => {
+    const mat = new MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false })
+    if (map) mat.map = map
+    materials.push(mat)
+    const m = new Mesh(glowPlaneGeo, mat)
+    m.scale.set(w, h, 1)
+    m.position.set(x, y, 0)
+    m.rotation.z = rz
+    m.renderOrder = order
+    phoneRig.add(m)
+  }
+  flat(0.66, 0.9, 0.05, -0.5, 11, SKIN) // 손바닥·손목
+  flat(0.5, 1, 0, 0, 12, PH_BODY) // 본체
+  flat(0.44, 0.9, 0, 0.01, 13, '#ffffff', phoneTex) // 화면
+  flat(0.15, 0.34, 0.24, -0.42, 14, SKIN, undefined, 0.4) // 엄지
+  for (let i = 0; i < 3; i++) flat(0.1, 0.11, -0.275, -0.02 - i * 0.14, 14, SKIN) // 감싼 손가락
+  phoneRig.scale.setScalar(PH_H)
+  phoneRig.visible = false
+  camera.add(phoneRig)
+  let phShownX = 0
+  let phShownY = 0
+  let phHiddenY = 0
+  function placePhone(aspect: number): void {
+    const halfH = PH_D * Math.tan((CAM.fovY * Math.PI) / 360)
+    phShownX = halfH * aspect * PH_X
+    phShownY = -halfH + PH_H * 0.42 // 아래가 살짝 잘려 책상 밑에서 올라온 느낌
+    phHiddenY = -halfH - PH_H * 1.1
+  }
+  placePhone(1)
+  let phoneUp = 0 // 0..1, 손에 든 휴대폰이 올라온 정도
+  let phoneKey = -1
+  let answers: readonly number[] | null = null
+  function setAnswers(a: readonly number[]): void {
+    answers = a
+    phoneKey = -1
+  }
+
   // 감독관
   const rig = buildProctor(lit, geometries)
   scene.add(rig.root)
@@ -552,8 +645,29 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
     if (dt === 0) phoneOn = phoneTarget
     const flicker = 0.92 + 0.08 * Math.sin(nowMs * 0.011)
     phoneLight.intensity = PHONE_LIGHT * phoneOn * flicker
-    glowMat.opacity = phoneOn * flicker
+    glowMat.opacity = phoneOn * flicker * GLOW_OPACITY
     lapGlow.visible = phoneOn > 0.01
+
+    // 손에 든 휴대폰: 켜면 올라오고, 숨기는 중에는 내려간다.
+    const upTarget = cur.tool === 3 && cur.stow === 0 ? 1 : 0
+    phoneUp += (upTarget - phoneUp) * (1 - Math.exp(-dt * PH_RATE))
+    if (dt === 0) phoneUp = upTarget
+    phoneRig.visible = phoneUp > 0.01
+    if (phoneRig.visible) {
+      const e = phoneUp * phoneUp * (3 - 2 * phoneUp)
+      phoneRig.position.set(phShownX, phHiddenY + (phShownY - phHiddenY) * e + Math.sin(nowMs * 0.004) * 0.002, -PH_D)
+      phoneRig.rotation.z = -0.1 + (1 - e) * 0.3
+      const p = cur.prog[cur.q]
+      const done = p >= PROG_MAX
+      const ans = done && answers ? answers[cur.q] : -1
+      const pct = Math.floor((p * 20) / PROG_MAX) * 5 // 5% 단위로만 다시 그린다
+      const key = cur.q * 1000 + (done ? 200 + ans : pct)
+      if (key !== phoneKey && phoneCtx) {
+        phoneKey = key
+        drawPhone(phoneCtx, cur.q, done ? 100 : pct, ans)
+        phoneTex.needsUpdate = true
+      }
+    }
 
     // 감독관 위치·방향
     const turnT = dt === 0 ? 1 : 1 - Math.exp(-dt * TURN_RATE)
@@ -608,6 +722,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
     camera.aspect = w / h
     camera.updateProjectionMatrix()
     placeGlow(camera.aspect)
+    placePhone(camera.aspect)
   }
 
   let disposed = false
@@ -620,5 +735,5 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
     renderer.dispose()
   }
 
-  return { render, resize, dispose }
+  return { render, resize, setAnswers, dispose }
 }
