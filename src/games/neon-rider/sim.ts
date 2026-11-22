@@ -76,6 +76,13 @@ function spinSpeed(a: number, dist: number): number {
   return Math.floor((dist * sinT(a)) / cosT(a))
 }
 
+// 두 바퀴 사이 거리(막대 길이).
+function rodLen(r: Body, f: Body): number {
+  const dx = f.x - r.x
+  const dy = f.y - r.y
+  return isqrt(dx * dx + dy * dy)
+}
+
 // 바퀴 속도를 선분 c의 접선 방향으로 dv만큼 바꾼다.
 function pushAlong(w: Body, c: Cand, dv: number): void {
   w.vx += divRound(dv * c.sx, c.len)
@@ -90,7 +97,7 @@ function tangentSpeed(w: Body, c: Cand): number {
 function applyInput(r: Work, f: Work, hold: boolean, airBefore: boolean, cands: readonly Cand[]): void {
   const dx = f.x - r.x
   const dy = f.y - r.y
-  const dist = Math.max(1, isqrt(dx * dx + dy * dy))
+  const dist = Math.max(1, rodLen(r, f))
   if (hold && r.was) {
     const c = nearestCand(cands, r.x, r.y)
     if (!c) return
@@ -150,7 +157,7 @@ function gravity(w: Work): void {
 function rod(r: Work, f: Work): void {
   const dx = f.x - r.x
   const dy = f.y - r.y
-  const dist = isqrt(dx * dx + dy * dy)
+  const dist = rodLen(r, f)
   if (dist === 0) return
   const err = dist - WHEELBASE
   if (err !== 0) {
@@ -192,7 +199,7 @@ function contact(w: Work, ox: number, oy: number, cands: readonly Cand[]): void 
 function headOf(r: Body, f: Body): { x: number; y: number } {
   const dx = f.x - r.x
   const dy = f.y - r.y
-  const dist = Math.max(1, isqrt(dx * dx + dy * dy))
+  const dist = Math.max(1, rodLen(r, f))
   return {
     x: Math.floor((r.x + f.x) / 2) + divRound(-dy * HEAD_OFFSET, dist),
     y: Math.floor((r.y + f.y) / 2) + divRound(dx * HEAD_OFFSET, dist),
