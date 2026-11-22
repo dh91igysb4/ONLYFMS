@@ -1,7 +1,7 @@
 // 볼 런 시뮬레이션(설계 §3). 판정과 화면이 같은 함수를 쓰는 단일 기준.
 // 모든 상태는 정수(mm, mm/틱, 틱). 연산은 + - *, Math.floor(a / b), 비교만 쓴다.
 import {
-  BANK_DRIFT, BANK_DRIFT_MAX, BLOCK_H, DROP_TOL, FALL_DEPTH, G, JUMP_VY, LAT_ACC, LAT_K, R, ROW, SPEED_TABLE, STEP_TOL, VX_MAX, X_LIMIT,
+  BANK_ACC, BANK_DRIFT_MAX, BLOCK_H, DROP_TOL, FALL_DEPTH, G, JUMP_VY, LAT_ACC, LAT_K, R, ROW, SPEED_TABLE, STEP_TOL, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import type { Course } from './course.ts'
 import { clampX } from './input.ts'
@@ -11,7 +11,8 @@ export type SimState = {
   tick: number
   x: number
   vx: number // 옆 속도(mm/틱). 목표를 향해 틱마다 LAT_ACC까지만 바뀐다.
-  drift: number // 기운 판이 밀어 옮긴 실효 목표(mm). 판 위 한 틱마다 bank × BANK_DRIFT, 줄지 않는다.
+  drift: number // 기운 판이 밀어 옮긴 실효 목표(mm). 판 위 한 틱마다 driftV / 100(0 쪽 버림)씩, 줄지 않는다.
+  driftV: number // v8: drift의 속도(1/100 mm/틱). 판 위 한 틱마다 bank × BANK_ACC, 판을 벗어나거나 뜨면 0.
   y: number
   z: number
   vy: number
@@ -46,7 +47,7 @@ export function floorAt(course: Course, x: number, z: number): number | null {
 export function initSim(opts?: { speedLevel?: number }): SimState {
   const speedLevel = opts?.speedLevel ?? 0
   return {
-    tick: 0, x: 0, vx: 0, drift: 0, y: R, z: 0, vy: 0, vz: speedOf(speedLevel),
+    tick: 0, x: 0, vx: 0, drift: 0, driftV: 0, y: R, z: 0, vy: 0, vz: speedOf(speedLevel),
     grounded: true, lastFloor: 0, speedLevel, dead: null,
   }
 }
@@ -90,10 +91,16 @@ export function step(s: SimState, targetX: number, course: Course): SimState {
   const speedLevel = Math.max(s.speedLevel, course.boostsBefore(rowOf(z)))
   const vz = speedOf(speedLevel)
 
-  // 3. 옆으로. 기운 판: 직전 틱에 바닥에 있었고 공 중심 칸(이동 전 x, 새 z)이 기울었으면 drift를 낮은 쪽으로 BANK_DRIFT
-  // 쌓는다. drift는 줄지 않는다(판이 공을 옮긴 것이지 되돌아오는 용수철이 아니다). 실효 목표 = clampX(target + drift).
+  // 3. 옆으로. 기운 판(v8 등가속): 직전 틱에 바닥에 있었고 공 중심 칸(이동 전 x, 새 z)이 기울었으면 driftV를 낮은 쪽으로
+  // BANK_ACC 더하고, 아니면 driftV = 0(판을 벗어나면 미끄러지던 속도를 바로 잃는다). 반대로 기운 판이 바로 이어지면 driftV가
+  // 그대로 이어져 줄었다가 뒤집힌다. drift += driftV / 100(0 쪽 버림이라 좌우 정확히 대칭). drift는 줄지 않는다(판이 공을
+  // 옮긴 것이지 되돌아오는 용수철이 아니다). 실효 목표 = clampX(target + drift).
+  // vx에 힘을 직접 주지 않는 까닭: 옆 제어기가 자리를 따라가므로(want = d / LAT_K) vx에 a를 더하면 공이 목표에서 LAT_K·a만큼
+  // 비켜 선 채 멈출 뿐 계속 밀리지 않는다. 그래서 미는 힘은 실효 목표(drift)에 준다.
   const bank = s.grounded ? course.cell(colOf(s.x), rowOf(z)).bank : undefined
-  const drift = bank !== undefined ? clamp(s.drift + bank * BANK_DRIFT, -BANK_DRIFT_MAX, BANK_DRIFT_MAX) : s.drift
+  const driftV = bank !== undefined ? s.driftV + bank * BANK_ACC : 0
+  const driftStep = driftV < 0 ? 0 - Math.floor(-driftV / 100) : Math.floor(driftV / 100) // 0 - : -0 방지
+  const drift = clamp(s.drift + driftStep, -BANK_DRIFT_MAX, BANK_DRIFT_MAX)
   // 실효 목표까지 거리의 1/LAT_K를 원하는 속도로 삼고, vx는 틱마다 LAT_ACC까지만 따라간다.
   // 0 쪽으로 버림(음수는 -floor(-d / LAT_K))이라 좌우가 정확히 대칭이다(반전 조각도 같은 결과). 목표에는 넘어가거나
   // 흔들리지 않고 최대 LAT_K - 1 mm 모자라게 멈춘다. (그냥 floor면 왼쪽만 정확히 닿아 반전 코스가 어긋난다.)
@@ -147,5 +154,5 @@ export function step(s: SimState, targetX: number, course: Course): SimState {
   if ((front !== null && front > y - R + STEP_TOL) || hitsBlock(course, x, y, z, s.tick + 1)) dead = 'hit'
   else if (y - R < lastFloor - FALL_DEPTH) dead = 'fall'
 
-  return { tick: s.tick + 1, x, vx, drift, y, z, vy, vz, grounded, lastFloor, speedLevel, dead }
+  return { tick: s.tick + 1, x, vx, drift, driftV, y, z, vy, vz, grounded, lastFloor, speedLevel, dead }
 }
