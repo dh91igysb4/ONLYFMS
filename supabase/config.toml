@@ -436,3 +436,8 @@ verify_jwt = false
 # 반영되지 않으면 `functions deploy suggest --no-verify-jwt`로 배포.
 [functions.suggest]
 verify_jwt = false
+
+# ONLYFMS: world 함수도 play와 같이 토큰을 함수 안에서 확인한다(auth.getUser).
+# 반영되지 않으면 `functions deploy world --no-verify-jwt`로 배포.
+[functions.world]
+verify_jwt = false

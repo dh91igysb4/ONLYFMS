@@ -39,8 +39,11 @@ select has_function('public', 'user_records', array['text'], 'user_records exist
 set local role authenticated;
 set local request.jwt.claims = :'UA';
 
-select is((select count(*)::int from public.world_saves where user_id = :'ua'), 1, 'world_saves: own row readable');
-select is((select count(*)::int from public.world_saves where user_id = :'ub'), 0, 'world_saves: other user''s row hidden');
+-- 세이브에는 챔 전의 어종·크기가 들어 있으므로 본인도 직접 읽을 수 없다 (select 권한 없음)
+select throws_ok($$select state from public.world_saves where user_id = auth.uid()$$,
+  '42501', null, 'world_saves: own row not readable by its owner');
+select throws_ok($$select state from public.world_saves where user_id = '00000000-0000-0000-0000-0000000000e2'$$,
+  '42501', null, 'world_saves: other user''s row not readable');
 select throws_ok($$insert into public.world_saves (user_id, game_id, state, logic_version) values (auth.uid(), 'g-x', '{}', 1)$$,
   '42501', null, 'world_saves: insert denied');
 select throws_ok($$update public.world_saves set state = '{}' where user_id = auth.uid()$$,
@@ -69,7 +72,7 @@ select is(public.user_records('worldp'), null::jsonb, 'user_records: pending use
 set local request.jwt.claims = :'PU';
 
 select is((select count(*)::int from public.game_records), 0, 'pending: game_records empty');
-select is((select count(*)::int from public.world_saves), 0, 'pending: world_saves empty');
+select throws_ok($$select count(*) from public.world_saves$$, '42501', null, 'pending: world_saves not readable');
 select throws_ok($$select public.user_records('worlda')$$, 'P0001', 'forbidden', 'pending: user_records forbidden');
 
 -- ---------------------------------------------------------------- admin

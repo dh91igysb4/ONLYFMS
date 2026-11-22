@@ -189,7 +189,7 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] 새로고침·다른 브라우저에서 세이브가 이어진다
 - [ ] 프로필 기록 탭에 누적 수익·최대어·도감이 뜨고, 낚싯대를 사도 누적 수익이 줄지 않는다
 - [ ] 터치(개발자 도구 모바일 모드)로 전 과정이 된다, 길게 눌러도 화면이 스크롤·확대되지 않는다
-- [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부된다
+- [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부되고, `supabase.from('world_saves').select('state')`는 행 없이 오류(권한 거부)를 돌려준다
 
 ## 문제가 생기면
 아래를 그대로 보내 준다.

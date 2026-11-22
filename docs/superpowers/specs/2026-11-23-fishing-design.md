@@ -141,7 +141,7 @@ onlyfms에 세이브가 있는 성장형 낚시 게임을 넣는다. 친구들�
 
 테이블 이름을 `fishing_*`가 아니라 `world_*`로 둔 건 플랫폼 규칙(게임별 분기 금지) 때문이다. 다음 지속형 게임이 같은 테이블을 쓴다.
 
-RLS: `world_saves`는 본인 읽기만. `game_records`는 승인된 사용자 전체 읽기. 쓰기는 전부 Edge Function(서비스 역할)만.
+RLS: `world_saves`는 클라이언트가 읽을 수 없다(정책·권한 없음). 세이브는 Edge Function만 읽고 쓴다. state에 서버만 알아야 하는 값(챔 전의 어종·크기)이 들어 있기 때문이다. `game_records`는 승인된 사용자 전체 읽기. 쓰기는 전부 Edge Function(서비스 역할)만.
 
 **막는 것**: 골드·기록 직접 조작, 어종 지정, 가격 조작, 초당 수십 번 잡기. 다시 던져서 어종을 고르는 것은 한 번 볼 때마다 입질 대기 전체(1.5~6초)가 들고, 챈 뒤에야 어종이 보이므로 이득이 없다.
 **못 막는 것**: 미니게임을 안 하고 `success: true`를 보내는 것. 경과 시간 제한 때문에 정상 플레이보다 빠르게 벌 수는 없다. 받아들인다.
@@ -163,7 +163,7 @@ RLS: `world_saves`는 본인 읽기만. `game_records`는 승인된 사용자 �
 ### 6.5 테스트
 - `logic.test.ts`: 가격 공식, 추첨 분포(시드 고정), 낚싯대 해금, 구매 조건, 미니게임 물리.
 - `registry.test.ts`: worlds 포함.
-- `supabase/tests/`: RLS(남의 세이브 못 읽음, 직접 쓰기 불가).
+- `supabase/tests/`: RLS(본인 세이브도 못 읽음, 직접 쓰기 불가).
 - `npm run fn:test`에 `supabase/functions/world/` 추가: 시간 제한, 중복 resolve, 잔액 부족, 동시 요청.
 - `ProfilePage.test.tsx`: 기록 탭.
 
