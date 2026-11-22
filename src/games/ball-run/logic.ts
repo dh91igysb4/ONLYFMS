@@ -24,7 +24,8 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   // v5: 기믹 등장 빈도 — tier 1 기믹 조각, 추첨 가중치(GIMMICK_WEIGHT), 첫 장애물은 늘 왕복 블록(코스 추첨 결과가 달라진다).
   // v6: 템포 — 조각마다 속도 묶음(단계 1~3·4~8·9~16)을 두고 묶음 최고 속도 기준 간격으로 모든 조각을 다시 짰다(코스가 달라진다).
   // v7: 템포를 v5와 v6의 가운데로(결정 사이 간격 +REST_TOP, 단계마다 장애물 1개, 묶음 a는 1칸 길 없음), 내리막 뒤 카메라.
-  version: 7,
+  // v8: 기운 판 등가속(driftV, BANK_ACC 171), 기운 판 묶음을 묶음 최저 속도 50틱 길이로 늘리고 반대로 미는 판 사이에 평지 한 행.
+  version: 8,
 
   pickPuzzle(rng, _options) {
     let seed = ''
