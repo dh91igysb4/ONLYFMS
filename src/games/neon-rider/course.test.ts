@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REST_LEN, START_LEN } from './constants.ts'
+import { REST_LEN, START_BACK, START_LEN } from './constants.ts'
 import { courseCacheSize, courseFromTemplates, courseOf, getCourse, makeSeededCourse } from './course.ts'
 import type { Prim, Template } from './pieces.ts'
 
@@ -22,7 +22,7 @@ describe('neon-rider 코스', () => {
 
   it('선분이 이어지고 구간 경계에서 높이가 이어진다 (실제 템플릿)', () => {
     const c = getCourse('1234abcd')
-    expect(c.seg(0)).toMatchObject({ x0: 0, y0: 0, x1: START_LEN, y1: 0 })
+    expect(c.seg(0)).toMatchObject({ x0: -START_BACK, y0: 0, x1: START_LEN, y1: 0 })
     const last = c.section(30).lastSeg
     const restStarts = new Set([1, ...Array.from({ length: 31 }, (_, k) => c.section(k).firstSeg)])
     for (let i = 1; i <= last; i++) {

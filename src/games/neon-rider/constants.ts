@@ -23,6 +23,7 @@ export const AIR_SPIN_DAMP = 3 // 공중에서 뗐을 때 AIR_SPIN_KEEP을 넘�
 export const AIR_SPIN_KEEP = 8 // TURN/틱. 이 이하의 느린 잔여 회전은 그대로 남는다(녹화: 1초 넘게 줄지 않음) [M9]
 export const ROLL_DRAG = 1 // u/틱². 손맛 자리표시: V_MAX에서 120틱에 4.1% 감속(5% 미만). 관성 주행 상한 ≈ 3 [M12]
 export const RESTITUTION_PCT = 0 // 착지 8회 모두 다시 뜨지 않음(2~5 px 가라앉았다 복귀) [M10]
+export const GROUND_TOL = 16 * MM // 바퀴가 지면에서 이만큼 안에 있으면 접지로 본다(선분화한 곡선에서 생기는 1~2틱 떨어짐을 접지로). 측정 대상 아님 (설계 §5.2)
 export const FRICTION_PCT = 2 // 미측정. 바퀴가 공중에서 땅에 닿는 틱에 접선 속도에서 깎는 비율(굴러가는 동안은 0) [M12]
 export const CONSTRAINT_ITERS = 4 // 측정 대상 아님
 export const COLLIDE_WINDOW = 40 // 선분 수. 측정 대상 아님
@@ -36,6 +37,9 @@ export const SCORE_MAX = 9999
 export const SEG_LEN = 250 * MM // 호를 선분화하는 목표 길이
 export const REST_LEN = 9000 * MM
 export const START_LEN = 12000 * MM
+// 시작 평지가 코스 시작점(x = 0) 뒤로 이어지는 길이. 첫 구간(tier 1)에서 되굴러 나오는 속력은 많아야 약 3500 u/틱이고
+// ROLL_DRAG(1 u/틱²)로 멈추기까지 v²/2 ≈ 380 m를 간다(hill 오르막에서 떼면 실측 약 195 m). 그보다 넉넉히 둔다. 측정 대상 아님
+export const START_BACK = 500000 * MM
 export const TIER_WEIGHTS: readonly { from: number; w: readonly [number, number, number, number] }[] =
   [{ from: 0, w: [1, 0, 0, 0] }, { from: 4, w: [3, 2, 0, 0] }, { from: 12, w: [2, 3, 2, 0] }, { from: 30, w: [1, 2, 3, 2] }]
 export const SEND_TICKS = 30

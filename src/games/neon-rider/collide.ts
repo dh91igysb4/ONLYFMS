@@ -79,11 +79,12 @@ function respond(b: Body, nx: number, ny: number, nl: number, push: number, e: n
 
 /**
  * 반지름 r 원 b를 후보 선분들과 충돌시킨다. (ox, oy)는 이번 이동 전 중심(밀어낼 쪽을 정한다).
- * 닿은(겹치거나 딱 맞닿은) 선분 목록을 돌려준다. e는 반발 계수(%).
+ * 닿은 선분 목록을 돌려준다: 겹친(딱 맞닿은 것 포함) 선분과, 원이 온 쪽에서 중심이 r + tol 안에 든 선분.
+ * 밀어내기와 법선 속도 보정은 실제로 겹친 선분에만 한다(tol 안이지만 겹치지 않은 선분은 접지 판정에만 쓴다). e는 반발 계수(%).
  * 선분 안쪽 접촉을 먼저 모두 풀고 끝점 접촉을 나중에 본다. 거꾸로 하면 이어진 평지의 이음매에서
  * 이동 중 살짝 파고든 원이 다음 선분의 끝점을 모서리로 보고 튀어 오른다.
  */
-export function collideWheel(b: Body, ox: number, oy: number, r: number, cands: readonly Cand[], e: number): Cand[] {
+export function collideWheel(b: Body, ox: number, oy: number, r: number, tol: number, cands: readonly Cand[], e: number): Cand[] {
   const hits: Cand[] = []
   const hit = (c: Cand): void => {
     if (!hits.includes(c)) hits.push(c)
@@ -96,19 +97,23 @@ export function collideWheel(b: Body, ox: number, oy: number, r: number, cands: 
     const before = crossOf(c, ox, oy)
     const side = before > 0 ? 1 : before < 0 ? -1 : cross < 0 ? -1 : 1
     const rl = r * c.len
-    if (side * cross > rl) continue
+    if (side * cross > rl) {
+      if (side * cross <= (r + tol) * c.len) hit(c)
+      continue
+    }
     hit(c)
     respond(b, -side * c.sy, side * c.sx, c.len, ceilDiv(rl - side * cross, c.len), e)
   }
   for (const c of cands) {
-    if (far(c, b.x, b.y, r)) continue
+    if (far(c, b.x, b.y, r + tol)) continue
     const dot = dotOf(c, b.x, b.y)
     if (dot >= 0 && dot <= c.l2) continue
     const ex = b.x - (dot < 0 ? c.seg.x0 : c.seg.x1)
     const ey = b.y - (dot < 0 ? c.seg.y0 : c.seg.y1)
     const d2 = ex * ex + ey * ey
-    if (d2 > r * r || d2 === 0) continue
+    if (d2 === 0 || d2 > (r + tol) * (r + tol)) continue
     hit(c)
+    if (d2 > r * r) continue
     const d = isqrt(d2)
     respond(b, ex, ey, Math.max(1, d), r - d, e)
   }

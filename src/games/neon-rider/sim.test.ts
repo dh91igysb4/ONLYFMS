@@ -5,6 +5,7 @@ import {
   COLLIDE_WINDOW,
   FALL_DEPTH,
   G,
+  GROUND_TOL,
   LAND_GRACE,
   MM,
   PERFECT_MULT,
@@ -17,6 +18,7 @@ import {
   WHEELIE_ACC,
   WHEEL_R,
 } from './constants.ts'
+import { collideWheel, windowCands } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { Course } from './course.ts'
 import type { Template } from './pieces.ts'
@@ -367,7 +369,8 @@ describe('neon-rider 시뮬', () => {
   it('튕겨 이어진 공중 구간: 첫 접촉 → 지급 전에 다시 뜸 → 최종 착지에 한 번만 지급, 닿아 있던 틱의 회전도 센다', () => {
     // 낮은 턱(4 m 낙차) 바로 앞에서 뒷바퀴가 턱 끝을 스치고 다시 떠서 아래 평지에 내린다.
     const c = courseFromTemplates([lipT])
-    const start = TURN + 200
+    // 턱을 스치는 동안 앞으로 약 370 돌므로(GROUND_TOL 접지로 스침이 몇 틱 길다) 최종 첫 접촉에도 1바퀴가 남게 TURN + 600에서 시작한다.
+    const start = TURN + 600
     let s = airborne(c, TPL_X + mm(10000) - mm(1000), mm(100), 0, start, 2500, -200)
     let sum = start // 공중 구간 시작 뒤 모든 틱(접촉 틱 포함)의 몸체 각도 변화 합
     let phases = ''
@@ -407,6 +410,67 @@ describe('neon-rider 시뮬', () => {
     const s = run(airborne(c, TPL_X, mm(1000), 0, -TURN - 100), 120, () => false, c)
     expect(s.dead).toBeNull()
     expect(s.lastAward?.flips).toBe(1)
+  })
+
+  it('접지 깜박임 없음: V_MAX로 hill·waves를 계속 누르며 지나면 두 바퀴가 함께 뜨는 틱도, 다시 닿는 틱도 없다(GROUND_TOL)', () => {
+    for (const id of ['hill', 'waves']) {
+      const c = courseOf([id])
+      const sec = c.section(0)
+      let s = initSimAt(c, sec.startX + WHEEL_R, V_MAX)
+      let bothAir = 0
+      let retouch = 0
+      for (let i = 0; i < 900 && centreX(s) <= sec.endX; i++) {
+        const n = step(s, true, c)
+        expect(n.dead, id).toBeNull()
+        if (!n.rear.ground && !n.front.ground) bothAir++
+        if ((n.rear.ground && !s.rear.ground) || (n.front.ground && !s.front.ground)) retouch++
+        s = n
+      }
+      expect(centreX(s), id).toBeGreaterThan(sec.endX)
+      expect(bothAir, `${id} 두 바퀴 공중 틱`).toBe(0)
+      expect(retouch, `${id} 다시 닿은 틱`).toBe(0)
+    }
+  })
+
+  it('collideWheel: 지면에서 GROUND_TOL 안이면 닿은 것으로 돌려주되 밀거나 속도를 바꾸지 않는다, 그 밖이면 안 닿음', () => {
+    const c = courseFromTemplates([flatT])
+    const X = TPL_X + mm(2000) // 선분 이음매가 아닌 곳
+    const cands = windowCands(c, 1, COLLIDE_WINDOW, { x0: X - mm(5000), y0: -mm(5000), x1: X + mm(5000), y1: mm(5000) }, false)
+    const y = WHEEL_R + GROUND_TOL - 1
+    const near = { x: X, y, vx: 100, vy: 0 }
+    expect(collideWheel(near, X, y, WHEEL_R, GROUND_TOL, cands, 0).length).toBe(1)
+    expect(near).toEqual({ x: X, y, vx: 100, vy: 0 })
+    const off = { x: X, y: WHEEL_R + GROUND_TOL + 1, vx: 100, vy: 0 }
+    expect(collideWheel(off, off.x, off.y, WHEEL_R, GROUND_TOL, cands, 0)).toEqual([])
+    const sunk = { x: X, y: WHEEL_R - mm(5), vx: 100, vy: -50 }
+    expect(collideWheel(sunk, X, WHEEL_R + mm(5), WHEEL_R, GROUND_TOL, cands, 0).length).toBe(1)
+    expect(sunk.y).toBe(WHEEL_R)
+    expect(sunk.vy).toBe(0)
+  })
+
+  it('공중 회전은 두 바퀴가 두 틱 연속 공중일 때부터 건다(한 틱만 뜬 꼭대기에서 회전 충격 없음)', () => {
+    const c = courseFromTemplates([flatT])
+    const a0 = airborne(c, TPL_X, mm(5000), 0, 0)
+    expect(a0.airBefore).toBe(false)
+    const a1 = step(a0, true, c)
+    expect(omega(a0, a1)).toBe(0)
+    expect(a1.airBefore).toBe(true)
+    const a2 = step(a1, true, c)
+    expect(omega(a1, a2)).toBeGreaterThan(0)
+  })
+
+  it('코스 시작점 뒤로 되굴러가도 길이 있다: hill 오르막 중간에 떼면 x = 0 뒤로 가지만 3000틱 뒤에도 살아 있다', () => {
+    for (const release of [100, 150, 190]) {
+      const c = courseOf(['hill'])
+      let s = initSim(c)
+      let minX = centreX(s)
+      for (let i = 0; i < 3000; i++) {
+        s = step(s, i < release, c)
+        minX = Math.min(minX, centreX(s))
+      }
+      expect(s.dead, `release ${release}`).toBeNull()
+      expect(minX, `release ${release}`).toBeLessThan(0)
+    }
   })
 
   it('구간 통과: hill 하나를 지나면 sectionScore 1, nextSection 1', () => {

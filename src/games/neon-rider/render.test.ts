@@ -213,7 +213,7 @@ describe('createRenderer', () => {
     expect(Math.abs(x1 - x0)).toBeLessThan(2)
   })
 
-  it('시작 평지는 화면 왼쪽 끝까지 이어 그린다(코스 시작점 뒤가 비지 않게)', () => {
+  it('시작 평지는 화면 왼쪽 끝까지 그려진다(선분 0이 코스 시작점 뒤로 이어져 판정과 같은 길)', () => {
     const { canvas, calls } = fakeCanvas()
     const r = createRenderer(canvas)
     r.resize(360, 640, 1)

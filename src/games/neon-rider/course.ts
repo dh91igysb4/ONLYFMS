@@ -1,5 +1,5 @@
 // 시드 → 템플릿 이어붙이기. 구간·선분 조회는 게으르게 무한히 생성한다 (설계 §6). 순수 정수 TS.
-import { REST_LEN, START_LEN, TIER_WEIGHTS } from './constants.ts'
+import { REST_LEN, START_BACK, START_LEN, TIER_WEIGHTS } from './constants.ts'
 import { TEMPLATES, buildTemplate } from './pieces.ts'
 import type { Built, Seg, Template } from './pieces.ts'
 
@@ -58,7 +58,8 @@ function checkIndex(i: number, what: string): void {
 
 // k번째 구간에 쓸 템플릿을 정하는 함수를 받아 코스를 만든다. pick은 k 오름차순으로 한 번씩만 불린다.
 function buildCourse(pick: (k: number) => Template): Course {
-  const segs: Seg[] = [{ x0: 0, y0: 0, x1: START_LEN, y1: 0, boost: false }]
+  // 선분 0은 시작 평지. 코스 시작점(x = 0) 뒤로 START_BACK만큼 이어져 있어 첫 구간에서 되굴러가도 길 위에 남는다.
+  const segs: Seg[] = [{ x0: -START_BACK, y0: 0, x1: START_LEN, y1: 0, boost: false }]
   const sections: Section[] = []
   const sectionGems: Gem[][] = []
   const builtCache = new Map<Template, Built>()

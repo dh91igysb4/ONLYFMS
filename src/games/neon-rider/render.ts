@@ -237,13 +237,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const g = course.seg(i)
       const a = toScreen(view, w, h, g.x0, g.y0)
       const b = toScreen(view, w, h, g.x1, g.y1)
-      if (i === 0 && a.x > 0) {
-        // 코스 시작점 뒤도 평지로 이어 그려 시작 화면 왼쪽이 비지 않게 한다(화면 전용, 판정에는 없다).
-        c.moveTo(-carPx, a.y)
-        c.lineTo(a.x, a.y)
-        penX = a.x
-        penY = a.y
-      } else if (i === lo || Math.abs(a.x - penX) > 0.5 || Math.abs(a.y - penY) > 0.5) c.moveTo(a.x, a.y)
+      if (i === lo || Math.abs(a.x - penX) > 0.5 || Math.abs(a.y - penY) > 0.5) c.moveTo(a.x, a.y)
       c.lineTo(b.x, b.y)
       penX = b.x
       penY = b.y

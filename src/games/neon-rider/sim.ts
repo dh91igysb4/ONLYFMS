@@ -11,6 +11,7 @@ import {
   FRICTION_PCT,
   G,
   GEM_MEMORY,
+  GROUND_TOL,
   GEM_R,
   HEAD_OFFSET,
   HEAD_R,
@@ -49,6 +50,7 @@ export type SimState = {
   gems: number
   takenGems: number[] // 현재 충돌 창 안에서 주운 보석 id만 유지(창을 벗어난 것은 버린다)
   dead: null | 'crash' | 'fall' | 'give_up'
+  airBefore: boolean // 이 상태 직전 틱이 끝났을 때 두 바퀴가 모두 공중이었는지. 공중 회전은 두 틱 연속 공중일 때만 건다(설계 §5.3)
 }
 
 // 한 틱 동안의 작업용 바퀴: 속도를 따로 들고, 이번 틱에 닿은 선분을 기록한다.
@@ -85,7 +87,7 @@ function tangentSpeed(w: Body, c: Cand): number {
 }
 
 // ① 입력 힘 (설계 §5.3).
-function applyInput(r: Work, f: Work, hold: boolean, cands: readonly Cand[]): void {
+function applyInput(r: Work, f: Work, hold: boolean, airBefore: boolean, cands: readonly Cand[]): void {
   const dx = f.x - r.x
   const dy = f.y - r.y
   const dist = Math.max(1, isqrt(dx * dx + dy * dy))
@@ -105,6 +107,8 @@ function applyInput(r: Work, f: Work, hold: boolean, cands: readonly Cand[]): vo
     const rp = divRound((f.vx - r.vx) * -dy + (f.vy - r.vy) * dx, dist)
     let half = 0
     if (hold) {
+      // 곡선의 꼭대기에서 한 틱만 뜬 바퀴에 회전이 걸리지 않게, 두 틱 연속 공중일 때부터 돈다.
+      if (!airBefore) return
       const max = spinSpeed(SPIN_MAX, dist)
       if (rp < max) half = Math.min(SPIN_ACC, Math.floor((max - rp) / 2))
     } else {
@@ -170,7 +174,7 @@ function rod(r: Work, f: Work): void {
 
 // ③ 바퀴-선분 충돌과 접촉 효과(착지 마찰, 부스터).
 function contact(w: Work, ox: number, oy: number, cands: readonly Cand[]): void {
-  for (const c of collideWheel(w, ox, oy, WHEEL_R, cands, RESTITUTION_PCT)) {
+  for (const c of collideWheel(w, ox, oy, WHEEL_R, GROUND_TOL, cands, RESTITUTION_PCT)) {
     if (!w.was && !w.scrubbed) {
       w.scrubbed = true
       const vt = tangentSpeed(w, c)
@@ -250,6 +254,7 @@ export function initSimAt(course: Course, x: number, vx: number): SimState {
     gems: 0,
     takenGems: [],
     dead: null,
+    airBefore: false,
   }
 }
 
@@ -271,7 +276,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   }
   const cands = windowCands(course, s.progress, COLLIDE_WINDOW, box, !r.was && !f.was)
 
-  applyInput(r, f, hold, cands) // ①
+  applyInput(r, f, hold, s.airBefore, cands) // ①
   gravity(r) // ②
   gravity(f)
 
@@ -298,7 +303,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   // ④ 진행 번호: 이번 틱에 닿은 선분 중 가장 큰 번호. 공중이면 그대로.
   const touched = Math.max(r.top, f.top)
   const progress = touched >= 0 ? touched : s.progress
-  const base = { ...s, tick: s.tick + 1, rear: toWheel(r), front: toWheel(f), progress }
+  const base = { ...s, tick: s.tick + 1, rear: toWheel(r), front: toWheel(f), progress, airBefore: !s.rear.ground && !s.front.ground }
   if (crashed) return { ...base, dead: 'crash' }
   const cx = Math.floor((r.x + f.x) / 2)
   const cy = Math.floor((r.y + f.y) / 2)
