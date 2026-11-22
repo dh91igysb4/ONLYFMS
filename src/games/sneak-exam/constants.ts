@@ -5,8 +5,8 @@ export const N_Q = 8 // 시험 문제 수
 export const N_CHOICE = 5 // 선택지 수
 export const PROG_MAX = 3600 // 한 문제 풀이 진행도 상한(도달하면 정답 공개)
 export const SUSP_MAX = 10000 // 의심도 상한(도달하면 적발)
-export const SUSP_DECAY = 5 // 그 틱의 증가가 0이면 줄어드는 양
-export const SUSP_WATCH = 6000 // 이 이상이면 감독관이 내 옆 통로를 주시
+export const SUSP_DECAY = 2 // 그 틱의 증가가 0이면 줄어드는 양
+export const SUSP_WATCH = 5000 // 이 이상이면 감독관이 내 옆 통로를 주시
 
 // 교실 좌표(mm). 내 자리는 오른쪽에서 둘째 열, 맨 뒷줄.
 export const ME_X = 900
@@ -31,9 +31,9 @@ export type ToolSpec = {
 }
 export const TOOLS: readonly (ToolSpec | null)[] = [
   null,
-  { name: '스마트 안경', rate: 6, stow: 0, seen: [60, 10, 0], blind: [0, 0, 0] },
-  { name: '무선 이어폰', rate: 12, stow: 20, seen: [120, 20, 0], blind: [120, 20, 0] },
-  { name: '휴대폰', rate: 30, stow: 40, seen: [250, 80, 40], blind: [40, 0, 0] },
+  { name: '스마트 안경', rate: 6, stow: 0, seen: [120, 35, 0], blind: [0, 0, 0] },
+  { name: '무선 이어폰', rate: 12, stow: 20, seen: [150, 30, 0], blind: [150, 30, 0] },
+  { name: '휴대폰', rate: 30, stow: 40, seen: [280, 100, 40], blind: [50, 0, 0] },
 ]
 
 export type ProctorSpec = {
@@ -51,9 +51,9 @@ export type ProctorSpec = {
   relookOf: number // look이 끝났을 때 1/relookOf 확률로 같은 통로의 다른 줄을 한 번 더 본다. 0이면 안 함
 }
 export const PROCTORS: readonly ProctorSpec[] = [
-  { name: '순찰형', hint: '쉬지 않고 통로를 돈다', speed: 25, farMul: 1, glassesFar: 0, wWatch: 1, wDoze: 0, wPatrol: 6, watchT: [60, 120], dozeT: [0, 0], lookT: [40, 90], relookOf: 3 },
-  { name: '매의 눈', hint: '멀리서도 잘 본다', speed: 20, farMul: 2, glassesFar: 5, wWatch: 6, wDoze: 0, wPatrol: 2, watchT: [180, 360], dozeT: [0, 0], lookT: [90, 180], relookOf: 0 },
-  { name: '졸음형', hint: '자주 졸지만 언제 깰지 모른다', speed: 15, farMul: 1, glassesFar: 0, wWatch: 2, wDoze: 5, wPatrol: 1, watchT: [60, 180], dozeT: [60, 240], lookT: [60, 120], relookOf: 0 },
+  { name: '순찰형', hint: '쉬지 않고 통로를 돈다', speed: 25, farMul: 1, glassesFar: 0, wWatch: 1, wDoze: 0, wPatrol: 6, watchT: [60, 120], dozeT: [0, 0], lookT: [60, 120], relookOf: 3 },
+  { name: '매의 눈', hint: '멀리서도 잘 본다', speed: 20, farMul: 2, glassesFar: 6, wWatch: 6, wDoze: 0, wPatrol: 2, watchT: [180, 360], dozeT: [0, 0], lookT: [90, 180], relookOf: 0 },
+  { name: '졸음형', hint: '자주 졸지만 언제 깰지 모른다', speed: 15, farMul: 1, glassesFar: 0, wWatch: 3, wDoze: 4, wPatrol: 2, watchT: [60, 180], dozeT: [60, 180], lookT: [60, 120], relookOf: 0 },
 ]
 
 export const START_GRACE = 120 // 시작 직후 감독관이 앞에 서 있는 틱

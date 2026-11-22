@@ -2,7 +2,7 @@
 import { N_Q, PROG_MAX } from './constants.ts'
 import { getExam, type Exam } from './exam.ts'
 import { correctCount, scoreOf } from './logic.ts'
-import { applyCmd, canApply, gainOf, initSim, step, zoneOf, type Cmd, type SimState } from './sim.ts'
+import { applyCmd, canApply, gainOf, initSim, step, type Cmd, type SimState } from './sim.ts'
 
 /** 틱마다 불린다. known[i]는 문제 i의 공개된 정답, 아직이면 −1. null이면 명령 없음 */
 export type Bot = (s: SimState, exam: Exam, known: number[]) => Cmd | null
@@ -43,21 +43,26 @@ export const carefulBot: Bot = (s, exam, known) => {
   return advance(s, known) ?? switchTo(s, want)
 }
 
-export const glassesBot: Bot = (s, _exam, known) => {
-  const near = zoneOf(s.proctor.x, s.proctor.z) === 0
-  if (near && s.tool === 1) return ['t', 0]
-  return advance(s, known) ?? (near ? null : switchTo(s, 1))
+// 안경만 쓴다. 켜 두면 의심을 사는 상황이면 끈다. 의심도가 낮을 때는 아주 약한 노출(틱당 10 이하)은 감수한다.
+export const glassesBot: Bot = (s, exam, known) => {
+  const g = gainOf({ ...s, tool: 1 }, exam.proctorType)
+  const risky = g > 10 || (g > 0 && s.susp >= 3000)
+  if (risky && s.tool === 1) return ['t', 0]
+  return advance(s, known) ?? (risky ? null : switchTo(s, 1))
 }
 
-export function runBot(seed: string, bot: Bot): { sim: SimState; score: number; correct: number } {
+/** lag > 0이면 봇은 감독관을 lag틱 전 모습으로 본다(사람의 반응 지연 흉내). 자기 도구·진행 상태는 지금 그대로다. */
+export function runBot(seed: string, bot: Bot, lag = 0): { sim: SimState; score: number; correct: number } {
   const exam = getExam(seed)
   let sim = initSim(exam)
+  const seen = [sim.proctor]
   while (sim.end === null) {
     const known = sim.prog.map((p, i) => (p === PROG_MAX ? exam.answers[i] : -1))
-    const cmd = bot(sim, exam, known)
+    const view = lag > 0 ? { ...sim, proctor: seen[Math.max(0, seen.length - 1 - lag)] } : sim
+    const cmd = bot(view, exam, known)
     if (cmd !== null && canApply(sim, cmd)) sim = applyCmd(sim, cmd)
     if (sim.end === null) sim = step(sim, exam)
+    if (lag > 0) seen.push(sim.proctor)
   }
   return { sim, score: scoreOf(sim, exam), correct: correctCount(sim, exam) }
 }
-

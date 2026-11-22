@@ -52,11 +52,11 @@ describe('sim', () => {
       blindMid: at(900, 3400, 1),
     }
     const want: Record<keyof typeof spots, number[]> = {
-      seenNear: [60, 120, 250],
-      seenMid: [10, 20, 80],
+      seenNear: [120, 150, 280],
+      seenMid: [35, 30, 100],
       seenFar: [0, 0, 40],
-      blindNear: [0, 120, 40],
-      blindMid: [0, 20, 0],
+      blindNear: [0, 150, 50],
+      blindMid: [0, 30, 0],
     }
     for (const k of Object.keys(spots) as (keyof typeof spots)[]) {
       for (const tool of [1, 2, 3] as const) {
@@ -66,7 +66,7 @@ describe('sim', () => {
     // 표와 TOOLS 일치
     expect([1, 2, 3].map((t) => TOOLS[t]!.seen[0])).toEqual(want.seenNear)
     // 매의 눈: 보는 far
-    expect(gainOf({ ...spots.seenFar, tool: 1 }, 1)).toBe(5)
+    expect(gainOf({ ...spots.seenFar, tool: 1 }, 1)).toBe(6)
     expect(gainOf({ ...spots.seenFar, tool: 3 }, 1)).toBe(80)
     // 도구 없음, 조는 중
     expect(gainOf({ ...spots.seenNear, tool: 0 }, 0)).toBe(0)
@@ -75,10 +75,10 @@ describe('sim', () => {
 
   it('suspicion rises and decays', () => {
     const s = applyCmd(at(900, 2000, 0), ['t', 3])
-    expect(step(s, exam0).susp).toBe(250)
-    expect(step({ ...at(900, 2000, 0), susp: 250 }, exam0).susp).toBe(245)
+    expect(step(s, exam0).susp).toBe(280)
+    expect(step({ ...at(900, 2000, 0), susp: 280 }, exam0).susp).toBe(278)
     expect(step(at(900, 2000, 0), exam0).susp).toBe(0)
-    expect(step({ ...at(900, 2000, 0), susp: 3 }, exam0).susp).toBe(0)
+    expect(step({ ...at(900, 2000, 0), susp: 1 }, exam0).susp).toBe(0)
   })
 
   it('caught at max', () => {

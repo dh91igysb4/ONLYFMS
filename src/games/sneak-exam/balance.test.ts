@@ -71,6 +71,15 @@ describe('sneak-exam balance', () => {
     expect(a.score).toBeLessThan(agg(carefulBot).score)
   })
 
+  // 사람처럼 반응이 늦으면(감독관을 0.5초 전 모습으로 보면) 꽤 자주 걸려야 한다. 너무 쉽지도, 불가능하지도 않게.
+  it('a careful bot that reacts half a second late is caught often, but not always', () => {
+    let caught = 0
+    for (const seed of SEEDS) if (runBot(seed, carefulBot, 30).sim.end === 'caught') caught++
+    const rate = caught / SEEDS.length
+    expect(rate).toBeGreaterThanOrEqual(0.3)
+    expect(rate).toBeLessThanOrEqual(0.6)
+  })
+
   it('guess-all is not competitive', () => {
     let total = 0
     for (const seed of SEEDS) {
