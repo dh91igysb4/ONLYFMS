@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from 'vi
 import { Game } from './Game.tsx'
 import { logic, scoreOf, type Action, type State } from './logic.ts'
 import { getExam } from './exam.ts'
-import { MAX_ACTION_TICKS, MAX_CATCHUP, PROCTORS, SEND_TICKS, TICK_HZ, TOOLS } from './constants.ts'
+import { MAX_ACTION_TICKS, MAX_CATCHUP, PROCTORS, PROG_MAX, SEND_TICKS, TICK_HZ, TOOLS } from './constants.ts'
 import { QUESTIONS } from './questions.ts'
 import type { SimState } from './sim.ts'
 import { createScene } from './render/scene.ts'
 import type { GameProps } from '../ui.ts'
 
 vi.mock('./render/scene.ts', () => ({
-  createScene: vi.fn(() => ({ render: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+  createScene: vi.fn(() => ({ render: vi.fn(), resize: vi.fn(), setAnswers: vi.fn(), dispose: vi.fn() })),
 }))
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
@@ -94,7 +94,7 @@ async function mount(p: GameProps) {
   return r
 }
 
-const scene = (k = -1) => vi.mocked(createScene).mock.results.at(k)!.value as { render: Mock; resize: Mock; dispose: Mock }
+const scene = (k = -1) => vi.mocked(createScene).mock.results.at(k)!.value as { render: Mock; resize: Mock; setAnswers: Mock; dispose: Mock }
 const lastCur = (): SimState => scene().render.mock.calls.at(-1)![1]
 const sent = (onAction: Mock): Action[] => onAction.mock.calls.map(([a]) => a as Action)
 const lastSent = (onAction: Mock): Action => sent(onAction).at(-1)!
@@ -314,6 +314,41 @@ describe('sneak-exam Game', () => {
     await mount(props({ publicState: at(3) }))
     expect(screen.getByTestId('se-edge')).toHaveAttribute('data-seeing', 'false')
     expect(screen.queryByText('보는 중')).not.toBeInTheDocument()
+  })
+
+  test('glasses overlay reads out progress, then the answer', async () => {
+    const half = INITIAL.sim.prog.map((v, i) => (i === 0 ? PROG_MAX / 2 : v))
+    const r = await mount(props({ publicState: withSim({ tick: 10, tool: 1, prog: half }) }))
+    const g = screen.getByTestId('se-glass')
+    expect(g).toHaveTextContent('AI 안경 · 문제 1')
+    expect(g).toHaveTextContent('분석 중 50%')
+    expect(g).toHaveAttribute('data-done', 'false')
+    r.unmount()
+    const full = INITIAL.sim.prog.map((v, i) => (i === 0 ? PROG_MAX : v))
+    await mount(props({ publicState: withSim({ tick: 10, tool: 1, prog: full }) }))
+    const ans = getExam(INITIAL.seed).answers[0]
+    expect(screen.getByTestId('se-glass')).toHaveTextContent(`정답 ${'①②③④⑤'[ans]}`)
+    expect(screen.getByTestId('se-glass')).toHaveAttribute('data-done', 'true')
+  })
+
+  test('earphone overlay whispers progress, then the answer, and fades while stowing', async () => {
+    const half = INITIAL.sim.prog.map((v, i) => (i === 0 ? PROG_MAX / 2 : v))
+    const r = await mount(props({ publicState: withSim({ tick: 10, tool: 2, prog: half }) }))
+    expect(screen.getByTestId('se-earfx')).toHaveTextContent('풀이 듣는 중… 50%')
+    expect(screen.getByTestId('se-earfx')).toHaveAttribute('data-stowing', 'false')
+    r.unmount()
+    const full = INITIAL.sim.prog.map((v, i) => (i === 0 ? PROG_MAX : v))
+    await mount(props({ publicState: withSim({ tick: 10, tool: 2, stow: 10, prog: full }) }))
+    const ans = getExam(INITIAL.seed).answers[0]
+    expect(screen.getByTestId('se-earfx')).toHaveTextContent(`정답은 ${ans + 1}번`)
+    expect(screen.getByTestId('se-earfx')).toHaveAttribute('data-stowing', 'true')
+  })
+
+  test('no tool overlay without a tool, and the scene gets the answers for the phone screen', async () => {
+    await mount(props())
+    expect(screen.queryByTestId('se-glass')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('se-earfx')).not.toBeInTheDocument()
+    expect(scene().setAnswers).toHaveBeenCalledWith(getExam(INITIAL.seed).answers)
   })
 
   test('shows glasses and earphone effects', async () => {
