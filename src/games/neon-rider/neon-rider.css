@@ -1,0 +1,81 @@
+/* 네온 라이더 화면. 오버레이 색은 theme.css 토큰만 쓴다.
+   캔버스 안의 색은 render.ts의 고정색이다 (CLAUDE.md 색 예외). */
+.nr { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* 모바일 세로 기준 전체 폭. 넓은 화면에서는 화면 높이에 맞춘 세로 비율 상자를 가운데에 둔다. */
+.nr-stage {
+  position: relative;
+  width: min(100%, calc(78vh * 9 / 14));
+  width: min(100%, calc(78svh * 9 / 14));
+  aspect-ratio: 9 / 14;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.nr-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.nr-pause {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nr-hint,
+.nr-overlay {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  border: 0;
+}
+.nr-hint { pointer-events: none; }
+.nr-overlay { cursor: pointer; background: color-mix(in srgb, var(--bg) 65%, transparent); }
+
+.nr-result {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  pointer-events: none;
+}
+.nr-result h2 { margin: 0; font-size: 28px; font-weight: 800; }
+.nr-result-score { margin: 0; font-size: 48px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
+.nr-result-reason { margin: 0; font-size: 16px; color: var(--muted); }
+
+
+.nr-fallback { align-items: flex-start; }
+.nr-fallback p { margin: 0; }
+.nr-error { margin: 0; color: var(--lose-text); font-size: 14px; }
