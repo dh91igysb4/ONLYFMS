@@ -10,7 +10,7 @@ import { inBand } from './course.ts'
 // v6: 조각마다 속도 묶음. 묶음이 없는(모든 단계) 조각은 최고 속도 기준(v3 값)으로 본다.
 const TOP_BAND: Band = {
   id: 'c', minLevel: 0, maxLevel: SPEED_TABLE.length - 1, s1: 12, s2: 21, s3: 28, e1: 5, clear: 26, bank: 13, ledge: 15, flight: 11,
-  land: 42, rampLand: 50,
+  land: 42, rampLand: 50, rest: 0,
 }
 const bandFor = (t: SegmentTemplate): Band => bandOf(t) ?? TOP_BAND
 

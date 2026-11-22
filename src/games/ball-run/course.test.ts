@@ -26,12 +26,12 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-terraces-a~', 'm1-shuttle-a~', 'tunnel-14~', 'd-ledge-offset-a~', 'o2-bank-alt-a~',
-  'tunnel-14', 'd-steep-blocks-a~', 'o1-ramp-jump-a', 'o1-down-blocks-a~', 'tunnel-12~', 'd-steep-blocks-b~',
-  'o1-down-blocks-b~', 'o1-narrow2-b', 'tunnel-15', 'd-ridge-b~', 'o1-scatter-b~', 'o2-zigzag-b',
-  'tunnel-15~', 'd-ledge-offset-b~', 'm3-two-shuttles-b', 'j2-pad-wall-b', 'tunnel-17~', 'd-steep-blocks-b',
+  'start', 'd-terraces-a~', 'm1-shuttle-a~', 'tunnel-14~', 'd-ledge-offset-a~', 'o2-gate-corridor-a~',
+  'tunnel-14', 'd-steep-blocks-a~', 'o1-ramp-jump-a', 'tunnel-14~', 'd-steep-blocks-b~', 'o1-scatter-b~',
+  'tunnel-15~', 'd-terraces-b', 'o3-ledge-blocks-b', 'tunnel-17~', 'd-steep-blocks-b~', 'o2-zigzag-b',
+  'tunnel-15~', 'd-ledge-offset-b~', 'm3-narrow-shuttle-b', 'tunnel-17', 'd-terraces-b~', 'j2-pad-wall-b',
 ]
-const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle-a', 89, true, '15:1000..-1000@146']
+const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle-a', 105, true, '15:1000..-1000@146']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
@@ -71,8 +71,8 @@ describe('course', () => {
     }
   })
   it('stage cycle: tunnel, descent, obstacle x obstaclesInStage(stage), tunnel, ...', () => {
-    // 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. 단계 1·2는 장애물 1개, 3부터 2개.
-    expect([0, 1, 2, 3, 4, 10, 50].map(obstaclesInStage)).toEqual([1, 1, 1, 2, 2, 2, 2])
+    // 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. v7: 조각이 길어져 모든 단계 장애물 1개('속도 증가' 4~9초).
+    expect([0, 1, 2, 3, 4, 10, 50].map(obstaclesInStage)).toEqual([1, 1, 1, 1, 1, 1, 1])
     for (const seed of [SEED, seedN(7), 'a1b2c3d4e5f60718293a4b5c6d7e8f90']) {
       const kinds = segs(seed, 60).map((s) => s.kind)
       const want: string[] = ['tunnel']

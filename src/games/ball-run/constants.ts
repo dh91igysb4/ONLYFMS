@@ -55,10 +55,9 @@ export const MAX_CATCHUP = 5
 export const MAX_ACTION_TICKS = 120
 
 // 단계 = 지나온 터널 수(시작 터널 포함) = 그 구간의 속도 단계. 시작 터널 뒤가 단계 1이다.
-// 터널 사이 장애물 조각 수: 단계 0~2는 1개, 3부터 2개(원작 녹화: '속도 증가'가 5~8초마다).
+// 터널 사이 장애물 조각 수(원작 녹화: '속도 증가'가 5~8초마다). v7: 조각이 길어져 모든 단계 1개.
 export const OBSTACLES_BY_STAGE: readonly { fromStage: number; n: number }[] = [
   { fromStage: 0, n: 1 },
-  { fromStage: 3, n: 2 },
 ]
 export function obstaclesInStage(stage: number): number {
   let n = OBSTACLES_BY_STAGE[0].n
