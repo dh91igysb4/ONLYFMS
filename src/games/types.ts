@@ -61,6 +61,8 @@ export type Manifest = {
    * 'score'는 점수 게임: 리더보드는 플레이·평균·최고만, 최고 점수 순으로 고정한다.
    */
   freeStats?: 'solve' | 'score'
+  /** 점수 게임 리더보드에서 플레이·평균을 빼고 최고 점수만 보여 준다 (`freeStats: 'score'`일 때만 뜻이 있다) */
+  freeBestOnly?: boolean
   /**
    * 자유 플레이 점수의 상한(기본 10). 10이 아니면 자유 플레이 전용 점수 게임(`freeStats: 'score'`,
    * 데일리·대회 끔)이어야 한다. DB `game_modes.score_max`와 같아야 하며 트리거가 상한을 지킨다.

@@ -10,6 +10,7 @@ export const manifest: Manifest = {
   dailyTimeLimitSec: null,
   options: [],
   freeStats: 'score',
+  freeBestOnly: true,
   scoreMax: 99999,
   scoreDecimals: 0,
 }
