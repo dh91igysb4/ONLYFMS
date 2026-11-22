@@ -51,9 +51,9 @@ describe('sneak-exam logic', () => {
 
   it('rejected command leaves state untouched', () => {
     const s = run(fresh(), { type: 's', n: 0, c: ['t', 3] })
-    const before = s.sim.tick
+    const before = structuredClone(s)
     expect(logic.apply(puzzle, s, { type: 's', n: 10, c: ['t', 1] }, ctx)).toEqual({ error: 'invalid_input' })
-    expect(s.sim.tick).toBe(before)
+    expect(s).toEqual(before)
   })
 
   it('drops the command when the batch crosses the end', () => {
@@ -114,6 +114,10 @@ describe('sneak-exam logic', () => {
     const b = run(run(run(fresh(), { type: 's', n: 60, c: cmds[0] }), { type: 's', n: 60, c: cmds[1] }), { type: 's', n: 5, c: cmds[2] })
     expect(a).toEqual(b)
     expect(play([30, 30])).toEqual(play([60]))
+    // 같은 틱에 같은 명령이 닿으면 n을 어떻게 나눠도 결과가 같다
+    const whole = run(fresh(), { type: 's', n: 40, c: ['t', 3] })
+    const split = run(run(fresh(), { type: 's', n: 10 }), { type: 's', n: 30, c: ['t', 3] })
+    expect(split).toEqual(whole)
   })
 
   it('registry', () => {

@@ -305,6 +305,17 @@ describe('sneak-exam Game', () => {
     expect(screen.queryByTestId('se-edge')).not.toBeInTheDocument()
   })
 
+  test('edge indicator shows a gaze cue only when the proctor faces me', async () => {
+    const at = (face: 0 | 1 | 2 | 3) => withSim({ proctor: { ...INITIAL.sim.proctor, x: 1800, z: 1000, face } })
+    const r = await mount(props({ publicState: at(2) }))
+    expect(screen.getByTestId('se-edge')).toHaveAttribute('data-seeing', 'true')
+    expect(screen.getByText('보는 중')).toBeInTheDocument()
+    r.unmount()
+    await mount(props({ publicState: at(3) }))
+    expect(screen.getByTestId('se-edge')).toHaveAttribute('data-seeing', 'false')
+    expect(screen.queryByText('보는 중')).not.toBeInTheDocument()
+  })
+
   test('shows glasses and earphone effects', async () => {
     const r = await mount(props({ publicState: withSim({ tick: 10, tool: 1 }) }))
     expect(screen.getByTestId('se-stage')).toHaveAttribute('data-glasses', 'true')
@@ -342,6 +353,41 @@ describe('sneak-exam Game', () => {
     expect(onAction).toHaveBeenCalledTimes(calls)
     fireEvent.keyDown(window, { key: 'Enter', code: 'Enter' })
     expect(lastSent(onAction).c).toEqual(['x'])
+  })
+
+  test('keyboard: ignores keys typed in text fields', async () => {
+    const onAction = vi.fn()
+    await mount(props({ onAction }))
+    start()
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    fireEvent.keyDown(field, { key: '3', code: 'Digit3' })
+    fireEvent.keyDown(field, { key: ' ', code: 'Space' })
+    field.remove()
+    expect(onAction).not.toHaveBeenCalled()
+    expect(screen.queryByText('계속하려면 누르기')).not.toBeInTheDocument()
+  })
+
+  test('keyboard: Enter and Space on a focused button are left to the native click', async () => {
+    const onAction = vi.fn()
+    await mount(props({ onAction }))
+    start()
+    const b = btn('다음 문제')
+    fireEvent.keyDown(b, { key: 'Enter', code: 'Enter' })
+    fireEvent.keyDown(b, { key: ' ', code: 'Space' })
+    expect(onAction).not.toHaveBeenCalled()
+    expect(screen.queryByText('계속하려면 누르기')).not.toBeInTheDocument()
+    expect(btn('제출')).not.toHaveAttribute('data-confirm')
+  })
+
+  test('renders one more frame when resized after the render loop stopped', async () => {
+    await mount(props({ publicState: withSim({ tick: 900, tool: 3, susp: 10000, end: 'caught' }), finished: true, score: 0 }))
+    advance(2000)
+    expect(rafQ.size).toBe(0)
+    const renders = scene().render.mock.calls.length
+    rect = { ...rect, width: 300 }
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    expect(scene().render).toHaveBeenCalledTimes(renders + 1)
   })
 
   test('the platform reaches the same state from what was sent', async () => {

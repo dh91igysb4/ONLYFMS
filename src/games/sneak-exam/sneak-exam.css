@@ -129,6 +129,15 @@
   pointer-events: none;
   animation: se-pulse 0.9s ease-in-out infinite alternate;
 }
+.se-edge-seeing {
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--ink);
+}
+.se-edge[data-seeing='true'] { background: var(--lose-text); box-shadow: 0 0 0 2px var(--ink); }
 .se-edge[data-side='left'] { left: 0; border-radius: 0 10px 10px 0; }
 .se-edge[data-side='right'] { right: 0; border-radius: 10px 0 0 10px; }
 @keyframes se-pulse { from { opacity: 1; } to { opacity: 0.55; } }

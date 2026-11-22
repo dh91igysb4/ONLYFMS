@@ -7,7 +7,7 @@ import { BONUS_MAX, MAX_CATCHUP, N_CHOICE, N_Q, PROCTORS, PROG_MAX, SEND_TICKS, 
 import { getExam, type Exam } from './exam.ts'
 import { scoreOf, correctCount, type Action, type PublicState } from './logic.ts'
 import { QUESTIONS } from './questions.ts'
-import { applyCmd, canApply, step, type Cmd, type SimState } from './sim.ts'
+import { applyCmd, canApply, sees, step, type Cmd, type SimState } from './sim.ts'
 import { offscreenSide } from './render/view.ts'
 import type { SceneHandle } from './render/scene.ts'
 import './sneak-exam.css'
@@ -158,6 +158,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
     let isHidden = document.visibilityState === 'hidden'
     let isConfirm = false
     let endAt: number | null = cur.end !== null ? performance.now() : null
+    let loopStopped = false // 끝난 뒤 연출 시간이 지나 rAF를 멈춘 상태
 
     const ended = () => cur.end !== null || latest.current.finished
     const running = () => isStarted && !isPaused && !isHidden && !ended()
@@ -211,6 +212,8 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       const r = canvas.getBoundingClientRect()
       scene?.resize(r.width, r.height, window.devicePixelRatio || 1)
       if (r.width > 0 && r.height > 0) setAspect(r.width / r.height)
+      // 루프가 멈춘 뒤에는 크기가 바뀌어도 그릴 사람이 없어 캔버스가 비므로 한 프레임만 그린다.
+      if (scene && loopStopped) scene.render(prev, cur, 1, performance.now())
     }
 
     function tickOnce() {
@@ -243,7 +246,10 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       last = t
       if (ended() && endAt === null) endAt = t
       scene.render(prev, cur, cur.end === null ? Math.min(1, acc) : 1, t)
-      if (endAt !== null && t - endAt > END_RENDER_MS) return
+      if (endAt !== null && t - endAt > END_RENDER_MS) {
+        loopStopped = true
+        return
+      }
       raf = requestAnimationFrame(loop)
     }
 
@@ -297,6 +303,13 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !scene) return
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (target) {
+        // 입력 칸에서 치는 글자는 게임 키가 아니다.
+        if (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+        // 포커스된 버튼·링크의 Enter·Space는 기본 클릭으로 맡긴다.
+        if ((e.key === 'Enter' || e.key === ' ' || e.code === 'Space') && ['BUTTON', 'A'].includes(target.tagName)) return
+      }
       const code = e.code || e.key
       if (code === 'Space' || e.key === ' ') {
         if (!isStarted || ended()) return
@@ -419,6 +432,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
   const prog = Math.floor((sim.prog[sim.q] * 100) / PROG_MAX)
   const side = ready && !ended ? offscreenSide(sim.proctor.x, sim.proctor.z, aspect) : 0
   const stowing = sim.tool !== 0 && sim.stow > 0
+  const seeing = side !== 0 && sees(sim.proctor)
   const proctor = PROCTORS[exam.proctorType]
 
   return (
@@ -500,8 +514,9 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       <div className="se-stage" data-testid="se-stage" data-glasses={sim.tool === 1 || undefined}>
         <canvas ref={canvasRef} className="se-canvas" aria-label="몰래 수능 교실 화면" role="img" />
         {side !== 0 && (
-          <div className="se-edge" data-testid="se-edge" data-side={side < 0 ? 'left' : 'right'} role="status">
+          <div className="se-edge" data-testid="se-edge" data-side={side < 0 ? 'left' : 'right'} data-seeing={seeing} role="status">
             {side < 0 ? '◀ 감독관' : '감독관 ▶'}
+            {seeing && <strong className="se-edge-seeing">보는 중</strong>}
           </div>
         )}
         {sim.tool === 2 && (
