@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MIN, GATE_H, PILLAR_H, SPEED_TABLE, V0, V_MAX } from './constants.ts'
+import { COL_MIN, GATE_H, PILLAR_H, ROW, SPEED_TABLE, TICK_HZ, TIER_WEIGHTS, V0, V_MAX } from './constants.ts'
 import {
-  DESCENTS, JOINT, OBSTACLES, PARSED, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START, START_PARSED, TEMPLATES,
-  TUNNELS, parseSegment,
+  BANDS, DESCENTS, JOINT, OBSTACLES, PARSED, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START, START_PARSED, TEMPLATES,
+  TUNNELS, bandOf, bandRows, parseSegment,
 } from './segments.ts'
-import type { SegmentTemplate } from './segments.ts'
+import type { Band, SegmentTemplate } from './segments.ts'
+import { inBand } from './course.ts'
+
+// v6: 조각마다 속도 묶음. 묶음이 없는(모든 단계) 조각은 최고 속도 기준(v3 값)으로 본다.
+const TOP_BAND: Band = {
+  id: 'c', minLevel: 0, maxLevel: SPEED_TABLE.length - 1, s1: 12, s2: 21, s3: 28, e1: 5, clear: 26, bank: 13, ledge: 15, flight: 11,
+  land: 42, rampLand: 50,
+}
+const bandFor = (t: SegmentTemplate): Band => bandOf(t) ?? TOP_BAND
 
 const at = (col: number) => col - COL_MIN
 
@@ -244,9 +252,9 @@ describe('templates', () => {
     expect(jumps).toBeGreaterThan(0)
   })
 
-  it('banked boards push one way for at most 13 rows in a row', () => {
+  it('banked boards push one way for at most 13 rows (band: same ticks) in a row', () => {
     // 같은 쪽으로 미는 기운 판이 길게 이어지면 손을 거의 못 뗀다(설계 기준). 방향이 바뀌거나 평지가 끼면 끊는다.
-    // v3: 속도가 1.7배라 v2의 8행이 13행(같은 시간).
+    // v3: 속도가 1.7배라 v2의 8행이 13행(같은 시간). v6: 묶음 최고 속도에서 같은 틱(Band.bank).
     let banked = 0
     for (const t of TEMPLATES) {
       let dir = ''
@@ -257,7 +265,7 @@ describe('templates', () => {
         run = d !== '' && d === dir ? run + 1 : d !== '' ? 1 : 0
         dir = d
         if (d !== '') banked++
-        expect(run, `${t.id} row ${r}`).toBeLessThanOrEqual(13)
+        expect(run, `${t.id} row ${r}`).toBeLessThanOrEqual(bandFor(t).bank)
       })
     }
     expect(banked).toBeGreaterThan(0)
@@ -268,6 +276,7 @@ describe('templates', () => {
   // 그런 행 r1 다음 그런 행 r2: r1의 어느 통과 칸 a에서든 r2의 통과 칸 b까지 옮길 빈 행이 있어야 한다.
   // 필요한 행(v3, 최고 속도 794 mm/틱): 1칸 12, 2칸 21, 3칸 28, 4칸 34, 1칸 틈으로 들어가면 +5(v2 7·12·16·20, +3의 1.7배).
   // a와 b 사이 칸이 구멍·블록으로 끊긴 행(레일 등)은 세지 않는다: 빈 행은 그 마지막 끊긴 행 다음부터 센다.
+  // v6: 묶음 b에서는 같은 틱 = bandRows(행, b.maxLevel).
   const NEED = [0, 12, 21, 28, 34, 40, 46]
   const ENTRY1 = 5
   const pass = (row: string): number[] => [...row].flatMap((ch, i) => ('.BPG'.includes(ch) ? [] : [i]))
@@ -279,6 +288,7 @@ describe('templates', () => {
     return w
   }
   function spacingProblems(t: SegmentTemplate): { bad: string[]; checked: number } {
+    const top = t.maxLevel ?? SPEED_TABLE.length - 1
     const bad: string[] = []
     let checked = 0
     // v4: 지나갈 칸이 하나도 없는 행(점프대 뒤 'BBB' 벽)은 구멍 행처럼 날아 넘는다(점프 규칙은 따로 본다).
@@ -300,7 +310,7 @@ describe('templates', () => {
             if (p.length === 0) continue // 점프 구멍 위로는 날아서 옮긴다
             for (let c = lo; c <= hi; c++) if (!p.includes(c)) start = r
           }
-          const need = NEED[hi - lo] + (a !== b && widthAt(to, b) === 1 ? ENTRY1 : 0)
+          const need = bandRows(NEED[hi - lo], top) + (a !== b && widthAt(to, b) === 1 ? bandRows(ENTRY1, top) : 0)
           return r2 - start - 1 >= need
         })
         checked++
@@ -311,7 +321,8 @@ describe('templates', () => {
     return { bad, checked }
   }
 
-  it('lane changes leave enough rows for a human (design spacing at top speed)', () => {
+  it('lane changes leave enough rows for a human (design spacing in ticks at the band top speed)', () => {
+    expect(BANDS.map((b) => [b.s1, b.s2, b.s3, b.e1])).toEqual([[7, 11, 15, 3], [9, 15, 20, 4], [12, 21, 28, 5]])
     const all = TEMPLATES.map(spacingProblems)
     expect(all.flatMap((x) => x.bad)).toEqual([])
     expect(all.reduce((n, x) => n + x.checked, 0)).toBeGreaterThan(100)
@@ -334,12 +345,17 @@ describe('templates', () => {
     const back = [...road('___....', 13), ...road('.___...', 13)]
     expect(spacingProblems(mk([...n(12), ...road('.___...', 12), ...back])).bad).not.toEqual([])
     expect(spacingProblems(mk([...n(12), ...road('.___...', 13), ...back])).bad).toEqual([])
+    // 묶음 a(단계 1~3, 최고 404 mm/틱)는 같은 틱이 7행.
+    const a = (rows: string[]): SegmentTemplate => ({ ...mk(rows), minLevel: 1, maxLevel: 3 })
+    expect(spacingProblems(a([...n(7), '..B__..'])).bad).toEqual([])
+    expect(spacingProblems(a([...n(6), '..B__..'])).bad).not.toEqual([])
   })
 
   // ---- v4 기믹(점프대 'J', 왕복 블록 'M')
   const padRows = (t: SegmentTemplate): number[] => t.rows.flatMap((row, r) => (row.includes('J') ? [r] : []))
   const moverRows = (t: SegmentTemplate): number[] => t.rows.flatMap((row, r) => (row.includes('M') ? [r] : []))
   const plain = (row: string): boolean => /^\.*___\.*$/.test(row) // 평평한 3칸 길 한 줄
+  const slope = (row: string): boolean => row === '..\\\\\\..' // 가운데 3칸 완만한 내리막(v6: 왕복 블록 앞뒤·tier 1 기믹 조각에 쓴다)
 
   it('gimmicks: 3+ jump-pad, 3+ shuttle and 1+ combined templates; tier 1 has an easy shuttle and an easy pad', () => {
     for (const t of [START, ...TEMPLATES]) {
@@ -364,15 +380,16 @@ describe('templates', () => {
   })
 
   it('tier-1 gimmick templates hold exactly one gimmick and nothing else to dodge', () => {
-    // 기믹 하나(점프대 행 하나 또는 왕복 블록 행 하나)와 점프대 비행 구간의 길 전체 구멍·'BBB' 벽 말고는 가운데 평평한 3칸 길뿐.
+    // 기믹 하나(점프대 행 하나 또는 왕복 블록 행 하나)와 점프대 비행 구간의 길 전체 구멍·'BBB' 벽 말고는 가운데 평평한(v6: 또는
+    // 완만히 내려가는) 3칸 길뿐.
     for (const t of OBSTACLES.filter((x) => x.tier === 1 && padRows(x).length + moverRows(x).length > 0)) {
       const pads = padRows(t)
       const movers = moverRows(t)
       expect(pads.length + movers.length, t.id).toBe(1)
       t.rows.forEach((row, r) => {
         if (r === 0 || r === t.rows.length - 1 || pads.includes(r) || movers.includes(r)) return
-        const flight = pads.some((p) => r - p >= 1 && r - p <= 11)
-        const ok = row === '..___..' || (flight && (row === '.......' || row === '..BBB..'))
+        const flight = pads.some((p) => r - p >= 1 && r - p <= bandFor(t).flight)
+        const ok = row === '..___..' || slope(row) || (flight && (row === '.......' || row === '..BBB..'))
         expect(ok, `${t.id} row ${r} '${row}'`).toBe(true)
       })
       for (const r of [...pads, ...movers]) expect(t.rows[r], t.id).toMatch(/^\.\.(JJJ|MMM)\.\.$/)
@@ -388,13 +405,13 @@ describe('templates', () => {
   // 점프(JUMP_VY, G): 가장 느린 1단계(360 mm/틱)에서 약 16 m, 최고 속도(794)에서 약 36 m 난다(sim 테스트가 재 본다).
   // 점프대 뒤 JUMP_FLIGHT행 안은 날아 넘는 자리(구멍, 'BBB' 벽 또는 평지), 그 뒤 착지 평지가 점프대에서 JUMP_LAND행까지 이어진다.
   // 'BBB' 벽은 모든 속도에서 공 밑면이 1 m 위에 있는 동안 지나가는 자리(점프대 + WALL_AT행)에만 둔다.
-  const JUMP_FLIGHT = 11
-  const JUMP_LAND = 42
+  // v6: 비행 구간·착지 평지 끝은 묶음마다(Band.flight, Band.land). 'BBB' 벽 자리는 모든 단계에서 같다.
   const WALL_AT = [8, 9, 10]
   it('every pad is followed by a flight zone and a long flat landing; walls only where every speed clears them', () => {
     let walls = 0
     for (const t of OBSTACLES) {
       const pads = padRows(t)
+      const { flight: JUMP_FLIGHT, land: JUMP_LAND } = bandFor(t)
       for (const r of pads) {
         const cols = floorOf(t.rows[r])
         for (let k = 1; k <= JUMP_LAND; k++) {
@@ -425,17 +442,18 @@ describe('templates', () => {
         const blocked = floorOf(row).length > 0 && pass(row).length === 0
         const gap = floorOf(row).length === 0 && !t.rows[r - 1].includes('/') && !t.rows[r - 1].startsWith('.......')
         if (!blocked && !(gap && pads.length > 0)) return
-        expect(pads.some((p) => r - p >= 1 && r - p <= JUMP_FLIGHT), `${t.id} row ${r}`).toBe(true)
+        expect(pads.some((p) => r - p >= 1 && r - p <= bandFor(t).flight), `${t.id} row ${r}`).toBe(true)
       })
     }
   })
 
-  // 왕복 블록: 앞뒤로 다른 피할 것 없이 평평한 3칸 길(2칸 옮김 + 1칸 틈 = 26행 이상), 점프 착지 구간 안에는 두지 않는다.
-  const MOVER_CLEAR = 26
-  it('shuttle rows: whole 3-wide road, 26+ plain rows before and after, never inside a jump landing', () => {
+  // 왕복 블록: 앞뒤로 다른 피할 것 없이 평평한(v6: 또는 완만히 내려가는) 3칸 길(2칸 옮김 + 1칸 틈 = 최고 속도 26행, 묶음마다
+  // 같은 틱 Band.clear), 점프 착지 구간 안에는 두지 않는다.
+  it('shuttle rows: whole 3-wide road, clear rows (26 at top speed) of plain or downhill road before and after, never inside a jump landing', () => {
     let n = 0
     for (const t of OBSTACLES) {
       const pads = padRows(t)
+      const { clear: MOVER_CLEAR, land: JUMP_LAND } = bandFor(t)
       for (const r of moverRows(t)) {
         n++
         const cols = floorOf(t.rows[r])
@@ -444,7 +462,7 @@ describe('templates', () => {
           for (const rr of [r - k, r + k]) {
             const row = t.rows[rr]
             expect(rr > 0 && rr < t.rows.length - 1, `${t.id} mover row ${r}: ${rr} outside the segment`).toBe(true)
-            expect(plain(row) && floorOf(row).join() === cols.join(), `${t.id} mover row ${r}: row ${rr} '${row}'`).toBe(true)
+            expect((plain(row) || slope(row)) && floorOf(row).join() === cols.join(), `${t.id} mover row ${r}: row ${rr} '${row}'`).toBe(true)
           }
         }
         for (const p of pads) expect(r - p > JUMP_LAND + MOVER_CLEAR || p > r, `${t.id} mover row ${r} pad ${p}`).toBe(true)
@@ -512,17 +530,38 @@ describe('pools', () => {
     expect(gates).toBeGreaterThanOrEqual(3)
   })
 
-  it('tunnels: at least 2, 24..30 rows (v2 14..18 rows x1.7 speed)', () => {
-    expect(TUNNELS.length).toBeGreaterThanOrEqual(2)
+  it('tunnels (v6): 8+ rows, 0.8 s or less at the slowest speed they are driven at, 2+ for every speed level after the start', () => {
     for (const p of PARSED_TUNNELS) {
-      expect(p.length, p.id).toBeGreaterThanOrEqual(24)
-      expect(p.length, p.id).toBeLessThanOrEqual(30)
+      expect(p.length, p.id).toBeGreaterThanOrEqual(8)
+      expect((p.length * ROW) / (SPEED_TABLE[Math.max(1, p.minLevel)] * TICK_HZ), p.id).toBeLessThanOrEqual(0.8)
+    }
+    // 단계 s에서 뽑은 터널은 단계 s + 1로 지난다(s >= 1).
+    for (let level = 2; level < SPEED_TABLE.length; level++) {
+      expect(PARSED_TUNNELS.filter((p) => inBand(p, level)).length, `level ${level}`).toBeGreaterThanOrEqual(2)
     }
   })
 
-  it('descents: at least 4, each drops 4 m or more', () => {
-    expect(DESCENTS.length).toBeGreaterThanOrEqual(4)
+  it('descents: at least 4 for every speed level, each drops 4 m or more', () => {
+    for (let level = 1; level < SPEED_TABLE.length; level++) {
+      expect(PARSED_DESCENTS.filter((p) => inBand(p, level)).length, `level ${level}`).toBeGreaterThanOrEqual(4)
+    }
     for (const p of PARSED_DESCENTS) expect(p.dh, p.id).toBeLessThanOrEqual(-4000)
+  })
+
+  // v6: 속도 묶음. 생성기는 단계가 묶음 안인 조각만 뽑는다.
+  it('bands: every stage has 9+ obstacle candidates (6+ after the 3 most recent), every band 2+ shuttle and 2+ pad templates', () => {
+    expect(BANDS.map((b) => [b.minLevel, b.maxLevel])).toEqual([[1, 3], [4, 8], [9, 16]])
+    for (const t of [...DESCENTS, ...OBSTACLES]) expect(bandOf(t), t.id).toBeDefined()
+    const w = (stage: number) => [...TIER_WEIGHTS].reverse().find((x) => x.fromStage <= stage)!.w
+    for (let stage = 1; stage <= 30; stage++) {
+      const pool = PARSED_OBSTACLES.filter((p) => inBand(p, stage) && w(stage)[p.tier - 1] > 0)
+      expect(pool.length, `stage ${stage}`).toBeGreaterThanOrEqual(9)
+    }
+    for (const b of BANDS) {
+      const own = OBSTACLES.filter((t) => bandOf(t) === b)
+      expect(own.filter((t) => t.rows.some((r) => r.includes('M'))).length, b.id).toBeGreaterThanOrEqual(2)
+      expect(own.filter((t) => t.rows.some((r) => r.includes('J'))).length, b.id).toBeGreaterThanOrEqual(2)
+    }
   })
 
   // 녹화(11~12.5 s, 15.75~16.75 s, 22.75~23.75 s, 31.5~32.25 s)의 터널 뒤 내리막은 3칸 폭 능선이 대부분이고 군데군데

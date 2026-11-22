@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, onTestFinished, test, vi, type Mock } from 'vitest'
 import { Game } from './Game.tsx'
 import { logic, type State } from './logic.ts'
-import { getCourse } from './course.ts'
+import { FIRST_OBSTACLE, getCourse } from './course.ts'
 import { decodeInputs } from './input.ts'
 import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, R, SCORE_TICKS, SEND_TICKS, SPEED_TABLE, TICK_HZ } from './constants.ts'
 import { floorAt, rowOf, step } from './sim.ts'
@@ -34,11 +34,11 @@ afterAll(() => {
 })
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
-// 시드 1: 첫 장애물은 왕복 블록(m1-shuttle, v5). 120 m 근처에서도 30틱은 산다.
+// 시드 1: 첫 장애물은 왕복 블록(m1-shuttle-a, v5·v6). 120 m 근처에서도 30틱은 산다.
 const PUZZLE = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(1)), {})
 const INITIAL: State = logic.initState(PUZZLE, ctx)
 const START_LEN = START_PARSED.length
-const HIT_COL = -1 // 곧게 가면 큐브와 부딪히는 열(첫 왕복 블록)
+const HIT_COL = 0 // 곧게 가면 큐브와 부딪히는 열(첫 왕복 블록)
 
 function props(over: Partial<GameProps> = {}): GameProps {
   return {
@@ -167,7 +167,7 @@ describe('ball-run Game', () => {
       while (s.dead === null && rowOf(s.z) <= shuttleRow) s = step(s, col * 1000, course)
       return s.dead === 'hit' && rowOf(s.z) >= shuttleRow - 1
     })
-    expect(course.segmentAt(shuttleRow).id).toBe('m1-shuttle')
+    expect(course.segmentAt(shuttleRow).id).toBe(FIRST_OBSTACLE)
     expect(hitCol).toBe(HIT_COL)
     const block: [number, number] = [hitCol!, shuttleRow]
     const onAction = vi.fn()

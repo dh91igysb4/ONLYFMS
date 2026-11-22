@@ -8,8 +8,10 @@ import { runBot } from './bots.ts'
 import { rowOf } from './sim.ts'
 
 // 시작(0)·중간(8)·최고 속도만 보면 그 사이 속도에서만 막히는 줄(v2 o4-dense의 13단계)을 놓친다. 모든 단계를 본다.
+// v6: 조각마다 속도 묶음(minLevel..maxLevel)이 있어 그 묶음의 모든 단계를 본다(생성기도 그 단계에서만 뽑는다).
 const TOP = SPEED_TABLE.length - 1
 const SPEEDS = SPEED_TABLE.map((_, k) => k)
+const levelsOf = (seg: (typeof PARSED)[number]) => SPEEDS.filter((k) => k >= seg.minLevel && k <= seg.maxLevel)
 // v4: 왕복 블록이 있는 조각은 조각 위상을 주기에 고르게 PHASES개 돌려 본다(공이 그 행에 닿는 틱은 코스로 정해지므로 위상이 곧
 // 큐브 자리다). 주기에 고르게 16개(10틱 간격). 위상마다 따로 케이스를 둬 실패한 위상이 보이게 한다.
 const PHASES = 16
@@ -31,6 +33,10 @@ describe('ball-run balance', () => {
   it('gate covers start, middle and top speed', () => {
     expect(TOP).toBe(16)
     for (const k of [0, 8, TOP]) expect(SPEEDS).toContain(k)
+    // 단계 1..끝 모두, 장애물·내리막이 하나 이상씩 그 단계에서 시험된다.
+    for (let k = 1; k <= TOP; k++) {
+      for (const kind of ['descent', 'obstacle']) expect(PARSED.some((p) => p.kind === kind && levelsOf(p).includes(k)), `${kind} ${k}`).toBe(true)
+    }
     const movers = PARSED.filter(hasMover).length
     expect(movers).toBeGreaterThanOrEqual(4)
     expect(cases).toHaveLength((PARSED.length - movers) * 2 + movers * 2 * PHASES)
@@ -39,11 +45,11 @@ describe('ball-run balance', () => {
     for (const p of phases) expect(p).toBeLessThan(MOVER_PERIOD)
   })
 
-  it.each(cases)('every template is passable at every speed: $id mirrored=$mirrored phase=$phase', ({ seg, mirrored, phase }) => {
+  it.each(cases)('every template is passable at every speed of its band: $id mirrored=$mirrored phase=$phase', ({ seg, mirrored, phase }) => {
     const course = courseFromSegments([{ seg: START_PARSED, mirrored: false }, { seg, mirrored, phase }])
     const untilZ = (START_PARSED.length + seg.length + 5) * ROW
     const failures: string[] = []
-    for (const speedLevel of SPEEDS) {
+    for (const speedLevel of levelsOf(seg)) {
       const end = runBot(course, { untilZ, maxTicks: 6000, speedLevel })
       if (end.dead !== null || end.z < untilZ) {
         failures.push(`speed ${speedLevel}: ${end.dead ?? 'time'} at z=${end.z} x=${end.x} tick=${end.tick}`)

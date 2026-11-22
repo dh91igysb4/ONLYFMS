@@ -26,12 +26,12 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-steep-blocks~', 'm1-shuttle~', 'tunnel-27~', 'd-terraces~', 'm2-gate-shuttle~',
-  'tunnel-24', 'd-ridge~', 'o1-scatter', 'j1-pad-gap~', 'tunnel-24~', 'd-ridge~',
-  'm1-shuttle~', 'o1-down-blocks', 'tunnel-30', 'd-steps~', 'o1-gate-wide~', 'm2-gate-shuttle',
-  'tunnel-30~', 'd-terraces~', 'o3-rails-strips', 'j2-pad-gap', 'tunnel-24~', 'd-steep',
+  'start', 'd-terraces-a~', 'm1-shuttle-a~', 'tunnel-14~', 'd-ledge-offset-a~', 'm2-chain-a~',
+  'tunnel-14', 'd-steep-blocks-a~', 'o1-ramp-jump-a', 'o1-down-blocks-a~', 'tunnel-12~', 'd-steep-blocks-b~',
+  'o1-down-blocks-b~', 'o1-narrow2-b', 'tunnel-15', 'd-ridge-b~', 'o1-scatter-b~', 'o2-gate-corridor-b',
+  'tunnel-15~', 'd-ledge-offset-b~', 'm3-two-shuttles-b', 'j2-pad-wall-b', 'tunnel-17~', 'd-steep-blocks-b',
 ]
-const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle', 89, true, '35:1000..-1000@86']
+const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle-a', 82, true, '15:1000..-1000@146']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
@@ -137,7 +137,7 @@ describe('course', () => {
     for (let i = 1; i < list.length; i++) expect(list[i].startRow).toBe(list[i - 1].startRow + list[i - 1].length)
   })
   it('mirror is exact', () => {
-    const X = PARSED_OBSTACLES.find((p) => p.id === 'o2-gate-corridor')!
+    const X = PARSED_OBSTACLES.find((p) => p.id === 'o2-gate-corridor-a')!
     const a = courseFromSegments([{ seg: X, mirrored: true }])
     const b = courseFromSegments([{ seg: X, mirrored: false }])
     for (let r = 0; r < X.length; r++) {
