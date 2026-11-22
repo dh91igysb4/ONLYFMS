@@ -130,6 +130,7 @@ describe('sim', () => {
     const phone = at(0, 8200, 0, { tool: 3 })
     expect(canApply(phone, ['t', 1])).toBe(false)
     expect(canApply(phone, ['t', 3])).toBe(true)
+    expect(canApply(applyCmd(phone, ['t', 0]), ['t', 3])).toBe(false)
     expect(canApply(applyCmd(phone, ['t', 0]), ['t', 2])).toBe(false)
     expect(canApply(applyCmd(phone, ['t', 0]), ['t', 0])).toBe(true)
     expect(canApply(at(0, 8200, 0), ['t', 2])).toBe(true)
