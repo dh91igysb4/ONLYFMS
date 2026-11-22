@@ -75,4 +75,10 @@ describe('neon-rider logic', () => {
     expect(logic.apply({ seed: SEED }, s, { type: 'i', d: [0, 5] }, ctx)).toEqual({ error: 'finished' })
     expect(logic.reveal({ seed: SEED })).toBeNull()
   })
+
+  it('끝난 상태에는 잘못된 행동도 { error: finished }', () => {
+    const s = ok(logic.apply({ seed: SEED }, fresh(), { type: 'give_up' }, ctx))
+    expect(logic.apply({ seed: SEED }, s, { type: 'nope' } as never, ctx)).toEqual({ error: 'finished' })
+    expect(logic.apply({ seed: SEED }, s, { type: 'i', d: [-1] }, ctx)).toEqual({ error: 'finished' })
+  })
 })

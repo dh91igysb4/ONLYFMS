@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { CAR_LEN, VIEW_CARS, WHEEL_R } from './constants.ts'
+import { CAR_LEN, HEAD_OFFSET, HEAD_R, MM, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
 import { courseOf } from './course.ts'
 import { initSim, initSimAt } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { cameraFor, createRenderer, praiseFor, toScreen, visibleSegRange } from './render.ts'
+import { BODY, cameraFor, createRenderer, praiseFor, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -16,6 +16,21 @@ function moved(s: SimState, dx: number, dy = 0): SimState {
   const w = (x: SimState['rear']) => ({ ...x, x: x.x + dx, y: x.y + dy, px: x.px + dx, py: x.py + dy })
   return { ...s, rear: w(s.rear), front: w(s.front) }
 }
+
+describe('차 그림', () => {
+  it('차체 다각형의 모든 꼭짓점이 판정원(두 바퀴·지붕)에서 40 mm 안에 있다(그림과 판정이 어긋나지 않게)', () => {
+    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, HEAD_OFFSET).
+    const circles = [
+      { x: 0, y: 0, r: WHEEL_R / MM },
+      { x: WHEELBASE / MM, y: 0, r: WHEEL_R / MM },
+      { x: WHEELBASE / MM / 2, y: HEAD_OFFSET / MM, r: HEAD_R / MM },
+    ]
+    for (const [a, b] of BODY) {
+      const out = Math.min(...circles.map((c) => Math.hypot(a - c.x, b - c.y) - c.r))
+      expect(out, `(${a}, ${b})`).toBeLessThanOrEqual(40)
+    }
+  })
+})
 
 describe('cameraFor', () => {
   const s = initSimAt(course, 3000 * 16, 0)
@@ -48,6 +63,20 @@ describe('cameraFor', () => {
     expect(at(1)).toBeCloseTo(carX(cur), 6)
     expect(at(0.25)).toBeCloseTo(carX(s) + 1000, 6)
     expect(at(0.5)).toBeCloseTo(carX(s) + 2000, 6)
+  })
+
+  it('세로 따라가기는 시간 기준: 60 fps와 30 fps로 0.5초를 그리면 같은 곳에 온다', () => {
+    const target = cameraFor(s, s, 1, 360, 640, null).y
+    const after = (fps: number): number => {
+      let last: Camera = { x: carX(s), y: target + 80000, scale: 1 }
+      for (let k = 0; k < fps / 2; k++) last = cameraFor(s, s, 1, 360, 640, last, 1000 / fps)
+      return last.y - target
+    }
+    const a = after(60)
+    const b = after(30)
+    expect(a).toBeGreaterThan(0)
+    expect(a).toBeLessThan(80000 / 10)
+    expect(Math.abs(a - b)).toBeLessThan(80000 / 400)
   })
 
   it('세로는 last에서 목표 쪽으로 움직이고 넘어가지 않는다', () => {

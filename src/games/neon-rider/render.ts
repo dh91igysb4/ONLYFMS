@@ -13,7 +13,9 @@ export type Camera = { x: number; y: number; scale: number } // (x, y): 화면 �
 // 카메라 기준점: 차 중심 아래의 길이 화면 가로 28%, 세로 53%에 온다 [M14].
 const ANCHOR_X = 0.28
 const ANCHOR_Y = 0.53
-const CAM_EASE = 0.12 // 프레임마다 세로 목표까지 남은 거리 중 줄이는 비율
+const CAM_EASE = 0.12 // 60 fps 한 프레임(CAM_FRAME_MS)마다 세로 목표까지 남은 거리 중 줄이는 비율. 프레임 간격에 맞춰 1 − (1 − CAM_EASE)^(dt/CAM_FRAME_MS)로 바꿔 쓴다
+const CAM_FRAME_MS = 1000 / 60
+const CAM_MAX_DT_MS = 100 // 탭이 오래 멈췄다 돌아온 프레임에서 한 번에 너무 많이 따라가지 않게
 const CAR_TOP_LIMIT = 0.16 // 차가 화면 위아래 이 비율 안쪽에 머물도록 세로를 당긴다
 const CAR_BOTTOM_LIMIT = 0.86
 const PARALLAX = [0.15, 0.3] // 먼 층, 가까운 층
@@ -39,11 +41,13 @@ const PRAISE_MS = 800
 const DEATH_PARTICLES = 24
 const GEM_PARTICLES = 8
 
-// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 지붕 꼭대기 380 mm [M13], 꼬리~앞바퀴 앞끝 2000 mm.
-const BODY: readonly (readonly [number, number])[] = [
-  [-420, 70], [-410, 250], [140, 360], [430, 380], [880, 250], [1580, 150], [1580, 60],
+// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 지붕 꼭대기 380 mm [M13].
+// 판정원은 두 바퀴(반지름 180)와 지붕(축 가운데 위 200, 반지름 180)뿐이라, 그림이 판정과 어긋나지 않게 모든 꼭짓점을
+// 판정원에서 40 mm 안에 둔다(render.test). 그래서 꼬리~앞끝은 녹화의 2000 mm(CAR_LEN, 화면 축척 단위)보다 짧은 약 1815 mm다.
+export const BODY: readonly (readonly [number, number])[] = [
+  [-215, 40], [-120, 170], [550, 330], [650, 380], [860, 300], [1320, 190], [1600, 70], [1560, 20],
 ]
-const WINDOW: readonly (readonly [number, number])[] = [[230, 320], [440, 338], [740, 255], [260, 255]]
+const WINDOW: readonly (readonly [number, number])[] = [[420, 290], [620, 345], [800, 280], [450, 255]]
 
 const PRAISE: readonly (readonly string[])[] = [
   ['nice!', 'clean!'],
@@ -70,13 +74,15 @@ export function toScreen(cam: Camera, widthPx: number, heightPx: number, x: numb
   return { x: widthPx * ANCHOR_X + (x - cam.x) * cam.scale, y: heightPx * ANCHOR_Y - (y - cam.y) * cam.scale }
 }
 
-export function cameraFor(prev: SimState, cur: SimState, alpha: number, widthPx: number, heightPx: number, last: Camera | null): Camera {
+/** dtMs: 직전 카메라(last)를 그린 뒤 지난 시간. 세로 따라가기가 프레임 수가 아니라 시간에 맞춰 움직인다. */
+export function cameraFor(prev: SimState, cur: SimState, alpha: number, widthPx: number, heightPx: number, last: Camera | null, dtMs = CAM_FRAME_MS): Camera {
   const scale = scaleFor(widthPx)
   const x = lerp((prev.rear.x + prev.front.x) / 2, (cur.rear.x + cur.front.x) / 2, alpha)
   const carY = lerp((prev.rear.y + prev.front.y) / 2, (cur.rear.y + cur.front.y) / 2, alpha)
   const target = carY - WHEEL_R // 평지라면 차 아래 길
   if (!last) return { x, y: target, scale }
-  let y = last.y + (target - last.y) * CAM_EASE
+  const ease = 1 - Math.pow(1 - CAM_EASE, Math.max(0, Math.min(CAM_MAX_DT_MS, dtMs)) / CAM_FRAME_MS)
+  let y = last.y + (target - last.y) * ease
   // 차가 화면 위·아래 끝으로 밀려나지 않게 당긴다. 목표 쪽으로만 당기므로 목표를 넘지 않는다.
   const carScreenY = heightPx * ANCHOR_Y - (carY - y) * scale
   const minY = heightPx * CAR_TOP_LIMIT
@@ -143,6 +149,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let seenAward = -1
   let seenGems = 0
   let seenDead = false
+  // 그린 뒤 사라지게 할 보석 id. 시뮬이 GEM_MEMORY를 넘겨 id를 버려도(되굴러가면 다시 주울 수 있음) 여기서는 잊지 않아,
+  // 그렇게 다시 주운 보석은 화면에 다시 나타나지 않는다(받아들인 차이). 새 판(reset)에서만 비운다.
   const taken = new Set<number>()
   let particles: Particle[] = []
   let popups: Popup[] = []
@@ -434,10 +442,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (course !== lastCourse || cur.tick < lastTick) reset(cur, nowMs)
       lastCourse = course
       lastTick = cur.tick
-      const dt = Math.max(0, Math.min(0.05, (nowMs - lastNow) / 1000))
+      const frameMs = nowMs - lastNow
+      const dt = Math.max(0, Math.min(0.05, frameMs / 1000))
       lastNow = nowMs
       detect(cur, nowMs)
-      const view = cameraFor(prev, cur, alpha, w, h, cam)
+      const view = cameraFor(prev, cur, alpha, w, h, cam, frameMs)
       cam = view
 
       const c = ctx

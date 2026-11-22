@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useRef, useState } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi, type Mock } from 'vitest'
 import { Game } from './Game.tsx'
@@ -7,6 +7,7 @@ import { decodeHold } from './input.ts'
 import { MAX_CATCHUP, SEND_TICKS, TICK_HZ } from './constants.ts'
 import { createRenderer } from './render.ts'
 import type { SimState } from './sim.ts'
+import type { State } from './logic.ts'
 import type { GameProps } from '../ui.ts'
 
 vi.mock('./render.ts', () => ({
@@ -392,5 +393,105 @@ describe('neon-rider Game', () => {
     const before = rd.render.mock.calls.length
     act(() => { window.dispatchEvent(new Event('resize')) })
     expect(rd.render.mock.calls.length).toBe(before)
+  })
+
+  test('포기 버튼(일시정지 화면): 남은 입력을 보낸 뒤 give_up을 보낸다', () => {
+    const onAction = vi.fn()
+    mount(props({ onAction }))
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(6)
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }))
+    fireEvent.click(screen.getByRole('button', { name: '포기' }))
+    const types = onAction.mock.calls.map(([a]) => a.type)
+    expect(types).toEqual(['i', 'give_up'])
+    expect(holds(onAction)[0]).toHaveLength(6)
+  })
+
+  test('포기 버튼은 일시정지 중에만 보인다', () => {
+    mount(props())
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(2)
+    expect(screen.queryByRole('button', { name: '포기' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }))
+    expect(screen.getByRole('button', { name: '포기' })).toBeInTheDocument()
+  })
+
+  test('마우스로 누른 버튼은 초점을 가져가지 않는다(스페이스가 버튼을 누르지 않고 차를 누르게)', () => {
+    mount(props())
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(2)
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: '일시정지' }))).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }))
+    expect(fireEvent.mouseDown(screen.getByText('계속하려면 누르기'))).toBe(false)
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: '포기' }))).toBe(false)
+  })
+
+  test('오류 코드는 한국어 문구로 보여 준다', () => {
+    const r = mount(props({ error: 'invalid_input' }))
+    expect(screen.getByRole('alert').textContent).not.toContain('invalid_input')
+    expect(screen.getByRole('alert').textContent).toMatch(/[가-힣]/)
+    r.rerender(<Game {...props({ error: 'finished' })} />)
+    expect(screen.getByRole('alert').textContent).not.toContain('finished')
+    r.rerender(<Game {...props({ error: 'something_else' })} />)
+    expect(screen.getByRole('alert').textContent).toMatch(/[가-힣]/)
+  })
+
+  test('플랫폼과 화면이 판 전체에서 같다: 일시정지·탭 숨김을 지나 죽을 때까지', () => {
+    // 플랫폼 LocalRunner처럼 onAction마다 logic.apply를 적용하고 그 결과로 Game을 다시 그린다.
+    const batches: boolean[][] = []
+    const errors: string[] = []
+    let platform: State = INITIAL
+    function Harness() {
+      const [state, setState] = useState<State>(INITIAL)
+      const ref = useRef<State>(INITIAL)
+      const onAction = (a: unknown) => {
+        if (logic.isFinished(ref.current, ctx)) return
+        const r = logic.apply(PUZZLE, ref.current, a as never, ctx)
+        if ('error' in r) {
+          errors.push(r.error)
+          return
+        }
+        if ((a as { type: string }).type === 'i') batches.push(decodeHold((a as { d: number[] }).d)!)
+        ref.current = r.state
+        platform = r.state
+        setState(r.state)
+      }
+      const finished = logic.isFinished(state, ctx)
+      return (
+        <Game
+          publicState={logic.publicState(state)}
+          finished={finished}
+          score={finished ? logic.score(state, ctx) : null}
+          busy={false}
+          error={null}
+          remainingMs={null}
+          onAction={onAction}
+        />
+      )
+    }
+    render(<Harness />)
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(100)
+    fireEvent.click(screen.getByRole('button', { name: '일시정지' }))
+    frames(20)
+    fireEvent.click(screen.getByText('계속하려면 누르기'))
+    fireEvent.pointerDown(canvas(), { pointerId: 2 })
+    frames(100)
+    visibility = 'hidden'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    frames(20)
+    visibility = 'visible'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    fireEvent.pointerDown(canvas(), { pointerId: 3 })
+    for (let i = 0; i < 3000 && platform.sim.dead === null; i++) frame()
+    frames(5)
+    expect(errors).toEqual([])
+    expect(platform.sim.dead).not.toBeNull()
+    const cur = lastCur()
+    expect(cur.dead).toBe(platform.sim.dead)
+    expect(platform.sim).toEqual(cur)
+    expect(platform.sim.tick).toBe(cur.tick)
+    expect(batches.flat()).toHaveLength(platform.sim.tick) // 마지막 묶음이 죽은 틱에서 끝난다
+    expect(screen.getByText('게임 끝')).toBeInTheDocument()
   })
 })

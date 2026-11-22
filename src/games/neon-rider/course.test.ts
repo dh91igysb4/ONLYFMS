@@ -139,7 +139,8 @@ describe('neon-rider 코스', () => {
     const t0 = performance.now()
     let acc = 0
     for (let j = 0; j < 100000; j++) acc += c.seg(j % n).x0
-    expect(performance.now() - t0).toBeLessThan(50)
+    // 다시 생성하지 않는 O(1) 조회면 수 ms다. 느린 CI·병렬 실행에서 흔들리지 않게 여유를 크게 둔다(다시 생성하면 수 초 걸린다).
+    expect(performance.now() - t0).toBeLessThan(500)
     expect(acc).toBeGreaterThan(0)
   })
 

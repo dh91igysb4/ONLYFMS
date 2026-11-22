@@ -20,6 +20,7 @@ type Engine = {
   pointerCancel(id: number): void
   releaseAll(): void
   setPaused(paused: boolean): void
+  giveUp(): void
 }
 
 function sameSim(a: SimState, b: SimState): boolean {
@@ -30,6 +31,20 @@ const DEATH_TEXT: Record<'crash' | 'fall' | 'give_up', string> = {
   crash: '넘어졌어요',
   fall: '떨어졌어요',
   give_up: '포기했어요',
+}
+
+// 플랫폼이 넘겨주는 오류 코드(logic.apply의 error)를 화면 문구로. 모르는 코드도 원문 대신 한국어로 보여 준다.
+const ERROR_TEXT: Record<string, string> = {
+  invalid_input: '입력을 처리하지 못했어요',
+  finished: '이미 끝난 판이에요',
+}
+function errorText(code: string): string {
+  return ERROR_TEXT[code] ?? '문제가 생겼어요. 다시 시도해 주세요'
+}
+
+// 마우스로 누른 버튼이 초점을 가져가면 그 뒤의 스페이스가 차를 누르지 않고 버튼을 누른다. 마우스 누름의 초점 이동을 막는다.
+function keepFocus(e: { preventDefault(): void }) {
+  e.preventDefault()
 }
 
 function Result({ score, reason }: { score: number; reason: SimState['dead'] }) {
@@ -220,6 +235,11 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       },
       releaseAll,
       setPaused,
+      giveUp() {
+        if (latest.current.finished || cur.dead !== null) return
+        flush()
+        latest.current.onAction({ type: 'give_up' })
+      },
     }
 
     measure() // 첫 render 전에 크기를 맞춘다
@@ -288,6 +308,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
             className="nr-pause"
             aria-label="일시정지"
             aria-pressed={paused}
+            onMouseDown={keepFocus}
             onClick={() => engine.current?.setPaused(!paused)}
           >
             <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>
@@ -295,13 +316,18 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
         )}
         {!started && !dead && !finished && <p className="nr-hint">눌러서 시작</p>}
         {active && paused && (
-          <button type="button" className="nr-overlay" onClick={() => engine.current?.setPaused(false)}>
-            계속하려면 누르기
-          </button>
+          <>
+            <button type="button" className="nr-overlay" onMouseDown={keepFocus} onClick={() => engine.current?.setPaused(false)}>
+              계속하려면 누르기
+            </button>
+            <button type="button" className="nr-giveup" onMouseDown={keepFocus} onClick={() => engine.current?.giveUp()}>
+              포기
+            </button>
+          </>
         )}
         {finished && <Result score={finalScore ?? scoreOf(ps.sim)} reason={ps.sim.dead} />}
       </div>
-      {error && <p className="nr-error" role="alert">{error}</p>}
+      {error && <p className="nr-error" role="alert">{errorText(error)}</p>}
     </section>
   )
 }

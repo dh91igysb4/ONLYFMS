@@ -61,6 +61,24 @@
 .nr-overlay { place-items: end center; padding-bottom: 40%; } /* 폭 기준 % — 9:14 상자에서 높이의 약 26% */
 .nr-hint { pointer-events: none; }
 .nr-overlay { cursor: pointer; background: color-mix(in srgb, var(--bg) 65%, transparent); }
+/* 일시정지 화면의 포기: 위 가운데(점수 아래). 길·차와 "계속하려면 누르기" 문구를 가리지 않는다. */
+.nr-giveup {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 22px;
+  border: 1px solid var(--muted);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 .nr-result {
   position: absolute;
