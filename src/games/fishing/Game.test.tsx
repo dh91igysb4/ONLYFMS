@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { canvasScale, Game } from './Game.tsx'
+import { availableHeight, canvasScale, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawScene } from './scene.ts'
 import { barResult } from './minigame.ts'
@@ -382,6 +382,25 @@ describe('fishing Game', () => {
     expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
   })
 
+  test('canvas scale uses the height left below the stage, not a fixed allowance', async () => {
+    const innerH = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 650 })
+    const rect = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('fish-stage') ? new DOMRect(0, 191, 688, 0) : rect.call(this)
+    })
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('fish-stage') ? 688 : 0
+    })
+    try {
+      await mount()
+      expect(canvas().style.width).toBe('160px')
+      expect(canvas().style.height).toBe('240px')
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+    }
+  })
+
   test('stops drawing after unmount', async () => {
     const { unmount } = await mount()
     await advance(100)
@@ -400,5 +419,22 @@ describe('canvasScale', () => {
     expect(canvasScale(288, 700)).toBe(1)
     expect(canvasScale(1000, 2000)).toBe(4)
     expect(canvasScale(0, 0)).toBe(1)
+  })
+})
+
+describe('availableHeight', () => {
+  test('window height minus stage top, controls below and an 8px margin', () => {
+    expect(availableHeight(650, 191, 80)).toBe(371)
+    expect(canvasScale(688, 371)).toBe(1)
+    expect(availableHeight(844, 191, 80)).toBe(565)
+    expect(canvasScale(358, 565)).toBe(2)
+    expect(availableHeight(1300, 191, 80)).toBe(1021)
+    expect(canvasScale(688, 1021)).toBe(4)
+  })
+
+  test('a negative result still gives scale 1', () => {
+    const h = availableHeight(200, 191, 80)
+    expect(h).toBeLessThan(0)
+    expect(canvasScale(688, h)).toBe(1)
   })
 })
