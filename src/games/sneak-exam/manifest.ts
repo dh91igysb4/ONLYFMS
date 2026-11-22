@@ -4,7 +4,7 @@ export const manifest: Manifest = {
   id: 'sneak-exam',
   name: '몰래 수능',
   description: '감독관 몰래 답을 알아내 답안지를 채운다',
-  hidden: true,
+  hidden: false,
   modes: { daily: false, contest: false, free: true },
   puzzleSource: 'generate',
   dailyTimeLimitSec: null,

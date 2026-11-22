@@ -123,7 +123,7 @@ describe('sneak-exam logic', () => {
   it('registry', () => {
     const g = getGame('sneak-exam')
     expect(g?.logic).toBe(mod.logic)
-    expect(g?.manifest.hidden).toBe(true)
+    expect(g?.manifest.hidden).toBe(false)
     expect(initSim(exam).tick).toBe(0)
   })
 })
