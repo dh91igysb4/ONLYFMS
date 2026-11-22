@@ -134,10 +134,10 @@ test('menu 로그아웃 signs out', () => {
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-test('main nav lists 홈, 게임, 대회, 대전, 리더보드 in order', () => {
+test('main nav lists 홈, 게임, 대회, 대전, 리더보드, 제안 in order', () => {
   mount()
   const links = within(screen.getByRole('navigation', { name: '주 메뉴' })).getAllByRole('link')
   expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-    ['홈', '/'], ['게임', '/games'], ['대회', '/contests'], ['대전', '/duel'], ['리더보드', '/leaderboard'],
+    ['홈', '/'], ['게임', '/games'], ['대회', '/contests'], ['대전', '/duel'], ['리더보드', '/leaderboard'], ['제안', '/suggest'],
   ])
 })

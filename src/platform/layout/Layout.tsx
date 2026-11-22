@@ -21,6 +21,7 @@ export function Layout() {
             <NavLink to="/contests">대회</NavLink>
             <NavLink to="/duel">대전</NavLink>
             <NavLink to="/leaderboard">리더보드</NavLink>
+            <NavLink to="/suggest">제안</NavLink>
             {profile?.is_admin && <NavLink to="/admin">관리자</NavLink>}
           </nav>
         </div>
