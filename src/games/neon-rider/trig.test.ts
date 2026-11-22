@@ -57,6 +57,11 @@ describe('isqrt', () => {
       expect((r + 1) * (r + 1)).toBeGreaterThan(n)
     }
   })
+  it('음수·정수 아님·NaN·무한대는 RangeError (무한 루프 대신)', () => {
+    for (const n of [-1, 2.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => isqrt(n)).toThrow(RangeError)
+    }
+  })
   it('완전제곱 경계', () => {
     for (const r of [2, 3, 1000, 2 ** 25, 2 ** 26 - 1]) {
       expect(isqrt(r * r)).toBe(r)

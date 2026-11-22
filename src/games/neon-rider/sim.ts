@@ -43,7 +43,7 @@ export type SimState = {
   nextSection: number // 아직 안 지난 첫 구간 번호
   sectionScore: number
   flipScore: number
-  airAngle: number | null // 공중 구간의 부호 있는 누적 회전(TURN 단위). 접지 중이면 null(착지 지급 대기 중에는 유지)
+  airAngle: number | null // 공중 구간의 부호 있는 누적 회전(TURN 단위). 접지 중이면 null(착지 지급 대기 중에는 계속 쌓으며 유지)
   pending: null | { flips: number; perfect: boolean; grace: number }
   lastAward: null | { tick: number; flips: number; perfect: boolean; points: number }
   gems: number
@@ -309,10 +309,14 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   const rg = r.hit !== null
   const fg = f.hit !== null
   let { airAngle, pending, flipScore, lastAward } = s
+  const turned = angDiff(angle, bodyAngle(s))
   if (!rg && !fg) {
-    airAngle = (airAngle ?? 0) + angDiff(angle, bodyAngle(s))
+    airAngle = (airAngle ?? 0) + turned
     pending = null // 지급 전에 다시 뜨면 같은 공중 구간으로 이어 센다
   } else if (airAngle !== null) {
+    // 처음 닿은 틱과 지급 대기 중(한 바퀴만 닿은 틱)의 회전도 같은 구간에 쌓는다: 다시 뜨면 이어서 세므로 잃지 않는다.
+    // 그대로 지급되면 처음 닿은 틱에 정한 pending.flips를 쓴다.
+    airAngle += turned
     if (pending === null) {
       const c = (f.hit ?? r.hit) as Cand
       const err = Math.abs(angDiff(angle, atan2T(c.sy, c.sx)))
@@ -351,6 +355,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     }
   }
   // 창 안의 보석이 아주 많은 지형에서도 상태가 커지지 않게, 가장 뒤의 것부터 버린다(gemsBetween은 id 오름차순).
+  // 받아들인 한계: 버린 id의 보석은 차가 그만큼 되굴러가면 다시 주울 수 있다.
   takenGems.sort((a, b) => a - b)
   if (takenGems.length > GEM_MEMORY) takenGems.splice(0, takenGems.length - GEM_MEMORY)
 

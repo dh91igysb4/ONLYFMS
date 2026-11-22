@@ -12,6 +12,7 @@ import {
   REST_LEN,
   START_LEN,
   V_MAX,
+  V_TERMINAL,
   WHEELBASE,
   WHEELIE_ACC,
   WHEEL_R,
@@ -45,6 +46,16 @@ const quarterT: Template = {
     { t: 'line', dx: mm(10000), dy: 0 },
     { t: 'arc', r: mm(6000), a0: (TURN * 3) / 4, a1: (TURN * 3) / 4 + TURN / 6 },
     { t: 'line', dx: mm(1000), dy: mm(1732) },
+  ],
+}
+// 4 m 낙차의 낮은 턱.
+const lipT: Template = {
+  id: 'lip',
+  tier: 1,
+  prims: [
+    { t: 'line', dx: mm(10000), dy: 0 },
+    { t: 'gap', dx: mm(3000), dy: -mm(4000) },
+    { t: 'line', dx: mm(100000), dy: 0 },
   ],
 }
 const boostT: Template = {
@@ -120,6 +131,17 @@ function airborne(c: Course, x: number, h: number, angle: number, airAngle: numb
   const dy = Math.floor((half * sinT(angle)) / TRIG_ONE)
   const wheel = (x0: number, y0: number): Wheel => ({ x: x0, y: y0, px: x0 - vx, py: y0 - vy, ground: false })
   return { ...s, rear: wheel(mx - dx, my - dy), front: wheel(mx + dx, my + dy), airAngle, pending: null }
+}
+
+// 바퀴 중심의 한 틱 이동(p → q)이 선분 g를 가로지르는지(끝점에 닿거나 지나는 경우 포함, 정수 방향 판정).
+function crosses(p: Wheel, q: Wheel, g: { x0: number; y0: number; x1: number; y1: number }): boolean {
+  const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number =>
+    Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax))
+  const o1 = orient(g.x0, g.y0, g.x1, g.y1, p.x, p.y)
+  const o2 = orient(g.x0, g.y0, g.x1, g.y1, q.x, q.y)
+  const o3 = orient(p.x, p.y, q.x, q.y, g.x0, g.y0)
+  const o4 = orient(p.x, p.y, q.x, q.y, g.x1, g.y1)
+  return o1 !== o2 && o1 !== 0 && o3 !== o4
 }
 
 const omega = (a: SimState, b: SimState): number => angDiff(bodyAngle(b), bodyAngle(a))
@@ -228,7 +250,43 @@ describe('neon-rider 시뮬', () => {
     }
   })
 
-  it('ramp에서 계속 누름 → 공중에서 airAngle이 반시계로 증가, 떼면 각속도가 AIR_SPIN_KEEP 근처로 줄어 유지된다', () => {
+  it('관통 없음(집중): 돌아간 차를 V_TERMINAL로 ramp 턱(볼록 끝점)에 떨어뜨려도 바퀴 중심이 선분 너머로 가지 않는다', () => {
+    const c = courseOf(['ramp'])
+    const lipX = TPL_X + mm(19000) // 오르막 끝(높이 3 m), 그 뒤는 틈
+    let cases = 0
+    for (const off of [-1500, -700, 0, 700, 1500]) {
+      for (const angle of [0, 512, 1024, 1536, 2048, 2560, 3072, 3584]) {
+        let s = airborne(c, lipX + mm(off), mm(1500), angle, 0, 0, -V_TERMINAL)
+        cases++
+        for (let t = 0; t < 120; t++) {
+          const n = step(s, false, c)
+          if (n.dead) break
+          for (const [a, b] of [
+            [s.rear, n.rear],
+            [s.front, n.front],
+          ]) {
+            for (let k = Math.max(0, n.progress - COLLIDE_WINDOW); k <= n.progress + COLLIDE_WINDOW; k++) {
+              const g = c.seg(k)
+              if (Math.min(g.x0, g.x1) - WHEELBASE > b.x || Math.max(g.x0, g.x1) + WHEELBASE < b.x) continue
+              // 이번 틱의 중심 이동이 선분을 가로지르면(끝점 포함) 관통이다.
+              expect(crosses(a, b, g), `off ${off} angle ${angle} tick ${t} seg ${k}`).toBe(false)
+              // 끝점(턱 모서리)에 깊이 박히지도 않는다.
+              for (const [ex, ey] of [
+                [g.x0, g.y0],
+                [g.x1, g.y1],
+              ]) {
+                expect(isqrt((b.x - ex) ** 2 + (b.y - ey) ** 2)).toBeGreaterThan(Math.floor(WHEEL_R / 2))
+              }
+            }
+          }
+          s = n
+        }
+      }
+    }
+    expect(cases).toBe(40)
+  })
+
+  it('ramp에서 계속 누름 → 공중에서 airAngle이 반시계로 증가, 떼면 약 8틱 안에 각속도가 AIR_SPIN_KEEP 근처로 줄어 유지된다', () => {
     const c = courseOf(['ramp'])
     let s = initSimAt(c, TPL_X, V_MAX)
     let maxAir = 0
@@ -252,8 +310,10 @@ describe('neon-rider 시뮬', () => {
       expect(a.rear.ground || a.front.ground).toBe(false)
       ws.push(omega(prev, a))
     }
-    expect(ws[29]).toBeLessThanOrEqual(AIR_SPIN_KEEP + 2)
+    // 녹화: 빠른 회전은 뗀 뒤 4~6프레임에 1~2 °/프레임(11~23 TURN/틱)로 떨어진다 [M9 ①].
+    expect(ws[5]).toBeLessThanOrEqual(23)
     for (const w of ws) expect(w).toBeGreaterThanOrEqual(AIR_SPIN_KEEP - 2)
+    for (const w of ws.slice(8)) expect(w).toBeLessThanOrEqual(AIR_SPIN_KEEP + 2) // 약 8틱 안에 AIR_SPIN_KEEP 근처
   })
 
   it('뒤집힌 착지 → crash, 바퀴로 착지 → 생존', () => {
@@ -268,11 +328,11 @@ describe('neon-rider 시뮬', () => {
   it('공중제비: 낭떠러지에서 1바퀴 돌고 착지 → flipScore 1~2, flips 1, LAND_GRACE 안에 지급', () => {
     const c = courseFromTemplates([cliffT])
     let s = initSimAt(c, TPL_X, V_MAX)
-    // 뗀 뒤에도 (SPIN_MAX - AIR_SPIN_KEEP) × AIR_SPIN_DAMP ≈ 480만큼 더 돌고, 그 뒤 AIR_SPIN_KEEP으로 계속 돈다.
+    // 뗀 뒤에도 (SPIN_MAX - AIR_SPIN_KEEP) × AIR_SPIN_DAMP ≈ 180만큼 더 돌고, 그 뒤 AIR_SPIN_KEEP으로 계속 돈다.
     let firstTouch = -1
     let releasedAt: number | null = null
     for (let i = 0; i < 600 && !s.dead && !s.lastAward; i++) {
-      const hold = s.airAngle !== null && s.pending === null && s.airAngle < TURN - 400
+      const hold = s.airAngle !== null && s.pending === null && s.airAngle < TURN - 200
       if (!hold && s.airAngle !== null && releasedAt === null) releasedAt = s.airAngle
       const n = step(s, hold, c)
       if (firstTouch < 0 && s.airAngle !== null && s.airAngle > TURN / 2 && (n.rear.ground || n.front.ground)) firstTouch = n.tick
@@ -302,6 +362,32 @@ describe('neon-rider 시뮬', () => {
     expect(s.dead).toBe('crash')
     expect(s.flipScore).toBe(0)
     expect(s.lastAward).toBeNull()
+  })
+
+  it('튕겨 이어진 공중 구간: 첫 접촉 → 지급 전에 다시 뜸 → 최종 착지에 한 번만 지급, 닿아 있던 틱의 회전도 센다', () => {
+    // 낮은 턱(4 m 낙차) 바로 앞에서 뒷바퀴가 턱 끝을 스치고 다시 떠서 아래 평지에 내린다.
+    const c = courseFromTemplates([lipT])
+    const start = TURN + 200
+    let s = airborne(c, TPL_X + mm(10000) - mm(1000), mm(100), 0, start, 2500, -200)
+    let sum = start // 공중 구간 시작 뒤 모든 틱(접촉 틱 포함)의 몸체 각도 변화 합
+    let phases = ''
+    let awards = 0
+    for (let i = 0; i < 300 && !s.dead; i++) {
+      const n = step(s, false, c)
+      if (s.airAngle !== null && n.airAngle !== null) {
+        sum += omega(s, n)
+        expect(n.airAngle).toBe(sum)
+      }
+      const ph = n.pending ? 'P' : n.airAngle !== null ? 'A' : 'G'
+      if (!phases.endsWith(ph)) phases += ph
+      if (n.lastAward !== s.lastAward) awards++
+      s = n
+    }
+    expect(phases).toMatch(/^AP(AP)+G$/) // 닿았다가 지급 전에 다시 떴다(한 번 이상), 마지막에 착지
+    expect(s.dead).toBeNull()
+    expect(awards).toBe(1)
+    expect(s.lastAward?.flips).toBe(1)
+    expect(s.flipScore).toBe(s.lastAward?.points)
   })
 
   it('퍼펙트: 오차 0 → flips × PERFECT_MULT, 오차 PERFECT_TOL+50 → flips', () => {

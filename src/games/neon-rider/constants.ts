@@ -19,7 +19,7 @@ export const SUBSTEPS = 3 // floor(V_TERMINAL / SUBSTEPS) = 2133 < WHEEL_R. 2로
 // 공중 회전: 두 바퀴에 ±SPIN_ACC를 주면 각가속도 = 2·SPIN_ACC / WHEELBASE (rad/틱²).
 export const SPIN_ACC = 108 // 누르기 시작 후 각가속도 0.55±0.2 °/프레임² → 0.0096 rad × WHEELBASE/2 [M8]
 export const SPIN_MAX = 68 // TURN/틱. 누르고 있을 때 5.8~6.2 °/프레임 (≈ 1바퀴/초) [M7]
-export const AIR_SPIN_DAMP = 8 // 공중에서 뗐을 때 AIR_SPIN_KEEP을 넘는 각속도만 틱마다 1/AIR_SPIN_DAMP씩 줄인다 [M9]
+export const AIR_SPIN_DAMP = 3 // 공중에서 뗐을 때 AIR_SPIN_KEEP을 넘는 각속도만 틱마다 1/AIR_SPIN_DAMP씩 줄인다. 빠른 회전이 뗀 뒤 4~6프레임에 1~2 °/프레임로 떨어짐 [M9 ①]
 export const AIR_SPIN_KEEP = 8 // TURN/틱. 이 이하의 느린 잔여 회전은 그대로 남는다(녹화: 1초 넘게 줄지 않음) [M9]
 export const ROLL_DRAG = 1 // u/틱². 손맛 자리표시: V_MAX에서 120틱에 4.1% 감속(5% 미만). 관성 주행 상한 ≈ 3 [M12]
 export const RESTITUTION_PCT = 0 // 착지 8회 모두 다시 뜨지 않음(2~5 px 가라앉았다 복귀) [M10]

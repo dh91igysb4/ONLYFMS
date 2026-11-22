@@ -93,9 +93,10 @@ export function cosT(a: number): number {
   return sinT(a + QUARTER)
 }
 
-/** 0 ≤ n < 2^52 정수의 floor 제곱근 (정수 뉴턴법). */
+/** 0 ≤ n < 2^52 정수의 floor 제곱근 (정수 뉴턴법). 음수·정수 아님·NaN·무한대는 RangeError(무한 루프 방지). */
 export function isqrt(n: number): number {
-  if (n < 2) return n < 0 ? 0 : n
+  if (!Number.isInteger(n) || n < 0) throw new RangeError(`isqrt는 0 이상의 정수만 받는다: ${n}`)
+  if (n < 2) return n
   let x = 1
   while (x * x < n) x *= 2 // x ≥ √n
   for (;;) {
