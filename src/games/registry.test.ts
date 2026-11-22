@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { duels, games, getDuel, getGame } from './index.ts'
+import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -56,7 +56,7 @@ test('hidden games match hidden_games seed in migrations', () => {
   expect(Object.keys(sqlFiles).length).toBeGreaterThan(0)
 
   const seeded = hiddenGamesFromMigrations(sqlFiles)
-  const hidden = [...games, ...duels].filter((g) => g.manifest.hidden).map((g) => g.manifest.id)
+  const hidden = [...games, ...duels, ...worlds].filter((g) => g.manifest.hidden).map((g) => g.manifest.id)
   expect([...seeded].sort()).toEqual([...hidden].sort())
 })
 
@@ -74,6 +74,26 @@ test('duel modules: category duel, all solo modes off, turnSeconds default in ch
   const ids = [...games, ...duels].map((g) => g.manifest.id)
   expect(new Set(ids).size).toBe(ids.length)
   expect(getDuel('nope')).toBeUndefined()
+})
+
+test('world modules: category world, all modes off, ids unique across all registries', () => {
+  for (const w of worlds) {
+    expect(w.manifest.category).toBe('world')
+    expect(w.manifest.modes).toEqual({ daily: false, contest: false, free: false })
+    expect(getWorld(w.manifest.id)).toBe(w)
+    expect(getGame(w.manifest.id)).toBeUndefined()
+    expect(getDuel(w.manifest.id)).toBeUndefined()
+  }
+  const ids = [...games, ...duels, ...worlds].map((g) => g.manifest.id)
+  expect(new Set(ids).size).toBe(ids.length)
+  expect(getWorld('nope')).toBeUndefined()
+})
+
+test('manifest records keys are unique per game', () => {
+  for (const { manifest: m } of [...games, ...duels, ...worlds]) {
+    const keys = (m.records ?? []).map((r) => r.key)
+    expect(new Set(keys).size, m.id).toBe(keys.length)
+  }
 })
 
 test('solo modules have no duel category', () => {
@@ -142,13 +162,13 @@ test('game_modes match registry manifests', () => {
   const seeded = new Map(
     [...seededGameModes()].map(([id, { daily, contest, free }]) => [id, { daily, contest, free }]),
   )
-  const fromRegistry = new Map([...games, ...duels].map((g) => [g.manifest.id, { ...g.manifest.modes }]))
+  const fromRegistry = new Map([...games, ...duels, ...worlds].map((g) => [g.manifest.id, { ...g.manifest.modes }]))
   expect(Object.fromEntries(seeded)).toEqual(Object.fromEntries(fromRegistry))
 })
 
 test('game_modes.score_max matches manifest scoreMax (default 10)', () => {
   const seeded = seededGameModes()
-  for (const { manifest: m } of [...games, ...duels]) {
+  for (const { manifest: m } of [...games, ...duels, ...worlds]) {
     expect(seeded.get(m.id)?.scoreMax, m.id).toBe(m.scoreMax ?? 10)
   }
 })

@@ -58,3 +58,13 @@ const duelComponents: Record<string, ComponentType<DuelGameProps>> = {
 export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
   return duelComponents[id]
 }
+
+/** 지속형(world) 게임 화면이 받는 props. 저장·행동 요청은 화면이 플랫폼 데이터 계층으로 직접 한다. */
+export type WorldGameProps = { gameId: string }
+
+/** 지속형 게임 화면 등록부. 새 지속형 게임 화면을 여기에 한 줄씩 등록한다. */
+const worldComponents: Record<string, ComponentType<WorldGameProps>> = {}
+
+export function getWorldComponent(id: string): ComponentType<WorldGameProps> | undefined {
+  return worldComponents[id]
+}

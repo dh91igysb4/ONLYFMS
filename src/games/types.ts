@@ -52,8 +52,10 @@ export type Manifest = {
    */
   dailyTimeLimitSec: number | null
   options: ManifestOption[]
-  /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3) */
-  category?: 'solo' | 'duel'
+  /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3), 저장이 이어지는 지속형 게임은 'world' */
+  category?: 'solo' | 'duel' | 'world'
+  /** 지속형(world) 게임이 남기는 기록 종류. key는 `WorldRecord.key`와 맞고 게임 안에서 유일하다 */
+  records?: { key: string; label: string; unit?: string }[]
   /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
   duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
   /**
@@ -104,3 +106,27 @@ export interface DuelLogic<State, Action, View> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }
+
+// ---- 지속형(world) 게임 계약: 저장이 이어지는 게임 ----
+
+/** 서버가 넘기는 시각(밀리초)과 난수 함수 */
+export type WorldCtx = { now: number; rng: () => number }
+
+/** 게임이 남기는 기록 하나. key는 manifest.records의 key와 맞는다 */
+export type WorldRecord = { key: string; value: number; detail?: string }
+
+export interface WorldLogic<State, Action, View> {
+  /** 규칙·저장 형식을 바꿀 때마다 1씩 올린다 */
+  version: number
+  init(): State
+  /** 옛 버전 state를 현재 형식으로. 모르는 값은 기본값으로 채우고 던지지 않는다 */
+  migrate(state: unknown, fromVersion: number): State
+  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
+  apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown } | { error: string }
+  /** 브라우저에 보낼 상태 */
+  view(state: State, ctx: { now: number }): View
+  records(state: State): WorldRecord[]
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WorldModule = { manifest: Manifest; logic: WorldLogic<any, any, any> }

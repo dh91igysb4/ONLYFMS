@@ -1,4 +1,4 @@
-import type { DuelModule, GameModule } from './types.ts'
+import type { DuelModule, GameModule, WorldModule } from './types.ts'
 import { manifest as whoAreYaManifest } from './who-are-ya/manifest.ts'
 import { logic as whoAreYaLogic } from './who-are-ya/logic.ts'
 import { manifest as toothbrushManifest } from './toothbrush/manifest.ts'
@@ -27,4 +27,11 @@ export const duels: DuelModule[] = [{ manifest: yachtManifest, logic: yachtLogic
 
 export function getDuel(id: string): DuelModule | undefined {
   return duels.find((d) => d.manifest.id === id)
+}
+
+/** 지속형(world) 게임 등록부. 저장이 이어지는 게임은 solo `games`와 분리한다 (play Edge Function은 games만 본다). */
+export const worlds: WorldModule[] = []
+
+export function getWorld(id: string): WorldModule | undefined {
+  return worlds.find((w) => w.manifest.id === id)
 }
