@@ -33,9 +33,9 @@ import type { Mover } from '../mover.ts'
 import type { SimState } from '../sim.ts'
 import { colOf, floorAt, rowOf } from '../sim.ts'
 import {
-  BANK_ANGLE, FLOOR_T, VFOV, bankOffset, boostPull, buildingsFor, cameraRig, cameraTarget, descentTarget, lookPitch, plankAt,
-  plankEase, segmentBoxes, smoothDescent, PAD_RISE,
-  bankFollow, rollQuat, smoothEye, moverBoxes, moverSceneX,
+  BANK_ANGLE, FLOOR_T, VFOV, bankOffset, boostPull, buildingsFor, cameraRig, cameraStep, cameraTarget, descentTarget, plankAt,
+  plankEase, segmentBoxes, PAD_RISE,
+  bankFollow, rollQuat, moverBoxes, moverSceneX,
 } from './layout.ts'
 import type { Box, Plank } from './layout.ts'
 import {
@@ -781,15 +781,13 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): SceneHan
       camPitch = death.pitch
       camBack = death.back
     } else {
-      if (death === null) {
-        const want = Math.max(descentTarget(course, { x, z }), boostPull((now - boostAt) / 1000, cur.speedLevel))
-        camDesc = Number.isNaN(camEyeY) ? want : smoothDescent(camDesc, want, dt)
-      }
-      const rig = cameraRig(camDesc)
-      camBack = rig.back
-      const t = cameraTarget(course, { x, y, z }, rig)
-      camEyeY = Number.isNaN(camEyeY) ? t.eyeY : smoothEye(camEyeY, t.eyeY, t.minEyeY, dt)
-      camPitch = lookPitch({ y: camEyeY, z: z - camBack }, { y: y + bankDy, z }, rig.minDown)
+      // v7: 시선은 앞 LOOK_AHEAD_S초 길이 화면 위로 잘리지 않게 덜 숙이고, 그래도 안 되면 눈을 내린다(cameraStep).
+      const want = death === null ? Math.max(descentTarget(course, { x, z }), boostPull((now - boostAt) / 1000, cur.speedLevel)) : null
+      const st = cameraStep(course, { desc: camDesc, eyeY: camEyeY }, { x, y: y + bankDy, z, vz: cur.vz }, want, dt)
+      camDesc = st.desc
+      camEyeY = st.eyeY
+      camBack = st.back
+      camPitch = st.pitch
     }
     const ey = camEyeY * M
     const ez = bz + camBack * M
