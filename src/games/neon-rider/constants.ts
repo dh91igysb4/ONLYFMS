@@ -40,5 +40,6 @@ export const TIER_WEIGHTS: readonly { from: number; w: readonly [number, number,
   [{ from: 0, w: [1, 0, 0, 0] }, { from: 4, w: [3, 2, 0, 0] }, { from: 12, w: [2, 3, 2, 0] }, { from: 30, w: [1, 2, 3, 2] }]
 export const SEND_TICKS = 30
 export const MAX_ACTION_TICKS = 120
-export const MAX_RUNS = 64
+// 120틱이 전부 번갈아 바뀌면 [0, 1×120]으로 121구간이 필요하다 (첫 값 0 포함)
+export const MAX_RUNS = 121
 export const VIEW_CARS = 9 // 화면 폭 800 px ÷ 차 길이 89 px = 9.0 [M14]

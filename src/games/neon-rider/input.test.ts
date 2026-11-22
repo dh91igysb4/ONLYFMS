@@ -3,30 +3,22 @@ import { MAX_ACTION_TICKS, MAX_RUNS } from './constants.ts'
 import { decodeHold, encodeHold } from './input.ts'
 
 describe('neon-rider input codec', () => {
-  it('round-trips random bit strings of length 1..120', () => {
+  it('round-trips unbiased random and fully alternating strings for every length 1..120', () => {
     let x = 12345
     const rnd = (): number => {
       x = (x * 1103515245 + 12345) & 0x7fffffff
       return x / 0x80000000
     }
     for (let len = 1; len <= MAX_ACTION_TICKS; len++) {
-      // 런이 MAX_RUNS를 넘는 무작위 열은 규약상 거부되므로, 런이 적은 편향 열을 쓴다.
-      for (const bias of [0.97, 0.03]) {
-        const bits: boolean[] = []
-        let cur = rnd() < 0.5
-        for (let i = 0; i < len; i++) {
-          if (rnd() > bias) cur = !cur
-          bits.push(cur)
-        }
-        if (encodeHold(bits).length > MAX_RUNS) continue
-        expect(decodeHold(encodeHold(bits))).toEqual(bits)
+      const random = Array.from({ length: len }, () => rnd() < 0.5)
+      const altFalse = Array.from({ length: len }, (_, i) => i % 2 === 1)
+      const altTrue = Array.from({ length: len }, (_, i) => i % 2 === 0)
+      for (const bits of [random, altFalse, altTrue]) {
+        const enc = encodeHold(bits)
+        expect(enc.length).toBeLessThanOrEqual(MAX_RUNS)
+        expect(decodeHold(enc)).toEqual(bits)
       }
     }
-  })
-
-  it('over-long run lists are rejected by decode', () => {
-    const bits = Array.from({ length: 100 }, (_, i) => i % 2 === 0)
-    expect(decodeHold(encodeHold(bits))).toBeNull()
   })
 
   it('first value is 0 when starting with a press', () => {
@@ -39,8 +31,10 @@ describe('neon-rider input codec', () => {
     for (const d of bad) expect(decodeHold(d)).toBeNull()
   })
 
-  it('accepts boundaries', () => {
+  it('accepts boundaries and rejects MAX_RUNS + 1 runs', () => {
     expect(decodeHold([MAX_ACTION_TICKS])?.length).toBe(MAX_ACTION_TICKS)
-    expect(decodeHold(Array.from({ length: MAX_RUNS }, () => 1))?.length).toBe(MAX_RUNS)
+    const maxRuns = [0, ...Array.from({ length: MAX_RUNS - 1 }, () => 1)]
+    expect(decodeHold(maxRuns)?.length).toBe(MAX_RUNS - 1)
+    expect(decodeHold([...maxRuns, 1])).toBeNull()
   })
 })

@@ -60,6 +60,15 @@ describe('neon-rider logic', () => {
     expect(logic.actionCount(s)).toBe(ref.tick)
   })
 
+  it('apply never mutates the input state', () => {
+    const s = fresh()
+    const before = JSON.stringify(s)
+    ok(logic.apply({ seed: SEED }, s, { type: 'i', d: [0, 30] }, ctx))
+    expect(JSON.stringify(s)).toBe(before)
+    ok(logic.apply({ seed: SEED }, s, { type: 'give_up' }, ctx))
+    expect(JSON.stringify(s)).toBe(before)
+  })
+
   it('give_up finishes, then apply returns finished', () => {
     const s = ok(logic.apply({ seed: SEED }, fresh(), { type: 'give_up' }, ctx))
     expect(logic.isFinished(s, ctx)).toBe(true)
