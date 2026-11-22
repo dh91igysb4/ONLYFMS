@@ -26,12 +26,12 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-terraces-a~', 'm1-shuttle-a~', 'tunnel-14~', 'd-ledge-offset-a~', 'm2-chain-a~',
+  'start', 'd-terraces-a~', 'm1-shuttle-a~', 'tunnel-14~', 'd-ledge-offset-a~', 'o2-bank-alt-a~',
   'tunnel-14', 'd-steep-blocks-a~', 'o1-ramp-jump-a', 'o1-down-blocks-a~', 'tunnel-12~', 'd-steep-blocks-b~',
-  'o1-down-blocks-b~', 'o1-narrow2-b', 'tunnel-15', 'd-ridge-b~', 'o1-scatter-b~', 'o2-gate-corridor-b',
+  'o1-down-blocks-b~', 'o1-narrow2-b', 'tunnel-15', 'd-ridge-b~', 'o1-scatter-b~', 'o2-zigzag-b',
   'tunnel-15~', 'd-ledge-offset-b~', 'm3-two-shuttles-b', 'j2-pad-wall-b', 'tunnel-17~', 'd-steep-blocks-b',
 ]
-const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle-a', 82, true, '15:1000..-1000@146']
+const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle-a', 89, true, '15:1000..-1000@146']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 

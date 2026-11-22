@@ -379,20 +379,20 @@ describe('templates', () => {
     expect(shuttles.some((t) => moverRows(t).length >= 2)).toBe(true)
   })
 
-  it('tier-1 gimmick templates hold exactly one gimmick and nothing else to dodge', () => {
-    // 기믹 하나(점프대 행 하나 또는 왕복 블록 행 하나)와 점프대 비행 구간의 길 전체 구멍·'BBB' 벽 말고는 가운데 평평한(v6: 또는
-    // 완만히 내려가는) 3칸 길뿐.
+  it('tier-1 gimmick templates hold exactly one gimmick; the first obstacle (m1-shuttle-*) nothing else to dodge', () => {
+    // v6: 첫 장애물 'm1-shuttle-*'은 왕복 블록 하나와 가운데 평평한 3칸 길뿐. 다른 tier 1 기믹 조각은 기믹 하나 + tier 1 장애물
+    // (블록·기둥·문 — 점프 비행·착지 구간과 왕복 블록 여유 밖, 다른 규칙이 본다).
     for (const t of OBSTACLES.filter((x) => x.tier === 1 && padRows(x).length + moverRows(x).length > 0)) {
       const pads = padRows(t)
       const movers = moverRows(t)
       expect(pads.length + movers.length, t.id).toBe(1)
-      t.rows.forEach((row, r) => {
-        if (r === 0 || r === t.rows.length - 1 || pads.includes(r) || movers.includes(r)) return
-        const flight = pads.some((p) => r - p >= 1 && r - p <= bandFor(t).flight)
-        const ok = row === '..___..' || slope(row) || (flight && (row === '.......' || row === '..BBB..'))
-        expect(ok, `${t.id} row ${r} '${row}'`).toBe(true)
-      })
       for (const r of [...pads, ...movers]) expect(t.rows[r], t.id).toMatch(/^\.\.(JJJ|MMM)\.\.$/)
+      t.rows.forEach((row, r) => expect(/[<>\/\\!v]/.test(row), `${t.id} row ${r} '${row}'`).toBe(false))
+      if (!t.id.startsWith('m1-shuttle')) continue
+      t.rows.forEach((row, r) => {
+        if (r === 0 || r === t.rows.length - 1 || movers.includes(r)) return
+        expect(row, `${t.id} row ${r}`).toBe('..___..')
+      })
     }
   })
 

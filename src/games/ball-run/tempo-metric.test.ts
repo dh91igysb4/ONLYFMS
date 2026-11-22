@@ -5,54 +5,64 @@ import { JOINT, parseSegment } from './segments.ts'
 import { scanCourse, tempoStats } from './tempo-metric.ts'
 
 const rep = (row: string, n: number): string[] => new Array<string>(n).fill(row)
-const seg = (kind: 'tunnel' | 'obstacle', rows: string[]) => parseSegment({ id: kind === 'tunnel' ? 't' : 'o', kind, tier: 1, rows })
+const N3 = '..___..'
 
 describe('tempo metric (test helper)', () => {
-  const T = seg('tunnel', [JOINT, ...rep(JOINT, 8), JOINT]) // rows 0..9
-  const O = seg('obstacle', [
-    JOINT, // 10 plain
-    '..___..', // 11 plain
-    '..B__..', // 12 event, forcing (column -1 blocked)
-    '..___..', // 13 plain
-    '..\\\\\\..', // 14 event (slope), not forcing
-    '..__...', // 15 event, forcing (column 1 lost)
-    '..__...', // 16 plain
-    '..>>...', // 17 event, forcing (bank starts)
-    '..>>...', // 18 event, not forcing
-    '..JJ...', // 19 event (pad), not forcing
-    '.......', // 20 event (flight), not forcing
-    '..__...', // 21 event (floor set changed), not forcing (landing)
-    '..MMM..', // 22 event, forcing (shuttle)
-    JOINT, // 23 plain
-  ])
+  const T = parseSegment({ id: 'tm-t', kind: 'tunnel', tier: 1, rows: [JOINT, ...rep(JOINT, 8), JOINT] }) // rows 0..9
+  const O = parseSegment({
+    id: 'tm-o', kind: 'obstacle', tier: 1,
+    rows: [
+      JOINT, // 10
+      ...rep(N3, 30), // 11..40
+      '.._B_..', // 41: 가운데 블록 — 강제 행, 그 앞 1초(단계 1에서 약 21행) 안은 손 놓으면 부딪히는 조향 행
+      ...rep(N3, 5), // 42..46
+      '..\\\\\\..', '..\\\\\\..', // 47..48: 열이 그대로인 경사 — 평범한 행
+      '..vvv..', // 49: 단차 — 평범한 행
+      '..__...', // 50: 착지 길이 좁아짐 — 사건, 강제 행
+      '..>>...', // 51: 기운 판 시작 — 강제 행
+      JOINT, // 52
+    ],
+  })
+  const segs = new Map([T, O].map((p) => [p.id, p]))
   const c = courseFromSegments([{ seg: T, mirrored: false }, { seg: O, mirrored: false }])
+  const rows = scanCourse(c, 2.6, segs)
+  const at = (r: number) => rows[r]
 
-  it('classifies plain, event and forcing rows', () => {
-    const rows = scanCourse(c, 1.2).slice(10, 24)
-    expect(rows.map((r) => (r.plain ? 'p' : 'e')).join('')).toBe('ppepeepeeeeeep')
-    expect(rows.map((r) => (r.forcing ? 'f' : '.')).join('')).toBe('..f..f.f....f.')
-    expect(rows.every((r) => !r.tunnel)).toBe(true)
-    expect(scanCourse(c, 1).slice(0, 10).every((r) => r.tunnel && r.plain && !r.forcing)).toBe(true)
+  it('plain ignores height: slopes and ledges with unchanged columns are plain', () => {
+    expect(rows.length).toBeGreaterThan(53)
+    for (const r of [11, 30, 42, 47, 48, 49]) expect(at(r).plain, `row ${r}`).toBe(true)
+    for (const r of [41, 50, 51]) expect(at(r).plain, `row ${r}`).toBe(false)
+    expect(at(47).slope && at(48).slope).toBe(true)
   })
 
-  it('time per row follows the stage speed', () => {
-    const rows = scanCourse(c, 1)
-    expect(rows[0].stage).toBe(1)
-    expect(rows[0].dt).toBeCloseTo(ROW / (SPEED_TABLE[1] * TICK_HZ))
-    expect(rows.reduce((a, r) => a + r.dt, 0)).toBeGreaterThanOrEqual(1)
+  it('forcing rows are structural; steering rows come from the hands-off sim', () => {
+    expect(rows.filter((x) => x.forcing).map((x) => x.row)).toEqual([41, 50, 51])
+    // 블록 1초 앞은 조향, 훨씬 앞은 쉬는 행.
+    for (const r of [30, 35, 40]) expect(at(r).steering && !at(r).idle, `row ${r}`).toBe(true)
+    for (const r of [11, 12, 15]) expect(at(r).idle, `row ${r}`).toBe(true)
+    expect(at(41).idle).toBe(false)
+    for (const r of [1, 5]) expect(at(r).tunnel && at(r).idle).toBe(true)
   })
 
-  it('aggregates fractions, forcing spacing and longest plain stretch outside tunnels', () => {
-    // 1.2초 = 26행(0..25). 24행은 7칸 평지로 넓어져 사건 행, 25행은 평범한 행.
-    const { all, bands } = tempoStats([{ seed: 'x', course: c }], 1.2)
+  it('aggregates idle fraction, forcing spacing and longest idle stretch outside tunnels', () => {
     const dt = ROW / (SPEED_TABLE[1] * TICK_HZ)
-    expect(all.time).toBeCloseTo(26 * dt)
-    expect(all.forcing).toBe(4)
-    expect(bands['1-3'].forcing).toBe(4)
+    expect(at(0).dt).toBeCloseTo(dt)
+    const { all, bands } = tempoStats([{ seed: 'x', course: c }], 2.6, segs)
+    const idle = rows.filter((x) => x.idle).length
+    expect(all.time).toBeCloseTo(rows.length * dt)
+    expect(all.idleFrac).toBeCloseTo(idle / rows.length)
+    expect(all.forcing).toBe(3)
+    expect(bands['1-3'].forcing).toBe(3)
     expect(bands['4-8'].time).toBe(0)
-    expect(all.meanBetweenForcing).toBeCloseTo((26 * dt) / 4)
+    expect(all.meanBetweenForcing).toBeCloseTo((rows.length * dt) / 3)
     expect(all.longestTunnel).toBeCloseTo(10 * dt)
-    expect(all.longestPlain).toBeCloseTo(2 * dt) // 10..11행
-    expect(all.plainTime).toBeCloseTo((10 + 2 + 1 + 1 + 1 + 1) * dt)
+    let run = 0
+    let best = 0
+    for (const x of rows) {
+      run = x.idle && !x.tunnel ? run + 1 : 0
+      best = Math.max(best, run)
+    }
+    expect(all.longestIdle).toBeCloseTo(best * dt)
+    expect(best).toBeGreaterThanOrEqual(5)
   })
 })

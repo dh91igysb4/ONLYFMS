@@ -162,8 +162,12 @@ describe('ball-run Game', () => {
     // v5: 첫 장애물은 늘 왕복 블록. 그 행에 닿는 틱은 입력과 무관하므로, 큐브와 부딪히는 열을 시뮬로 찾는다.
     let shuttleRow = 0
     while (course.moverAt(shuttleRow) === null) shuttleRow++
+    // v6: 내리막에도 결정이 있어 곧게 가면 그 전에 죽는다 — 첫 장애물 조각 시작(틱 0)에 공을 둔다.
+    const z0 = course.segmentAt(shuttleRow).startRow * 1000
+    const h0 = floorAt(course, 0, z0)!
+    const START_STATE: State = { ...INITIAL, sim: { ...INITIAL.sim, z: z0, y: h0 + R, lastFloor: h0, speedLevel: 1, vz: SPEED_TABLE[1] } }
     const hitCol = [-1, 0, 1].find((col) => {
-      let s = INITIAL.sim
+      let s = START_STATE.sim
       while (s.dead === null && rowOf(s.z) <= shuttleRow) s = step(s, col * 1000, course)
       return s.dead === 'hit' && rowOf(s.z) >= shuttleRow - 1
     })
@@ -171,7 +175,7 @@ describe('ball-run Game', () => {
     expect(hitCol).toBe(HIT_COL)
     const block: [number, number] = [hitCol!, shuttleRow]
     const onAction = vi.fn()
-    await mount(props({ onAction }))
+    await mount(props({ onAction, publicState: logic.publicState(START_STATE) }))
     // 블록 열 중심으로: dx = col * 1000 / DRAG_SPAN(6000) * 폭(390)
     fireEvent.pointerDown(canvas(), { clientX: 100, pointerId: 1 })
     fireEvent.pointerMove(canvas(), { clientX: 100 + (block[0] * 1000 * 390) / 6000, pointerId: 1 })
@@ -187,7 +191,7 @@ describe('ball-run Game', () => {
     expect(total).toBe(dead!.tick)
     expect(reps(b.at(-1)!)).toBe(dead!.tick % SEND_TICKS || SEND_TICKS)
     // 같은 행동을 플랫폼처럼 적용하면 같은 틱에 죽는다
-    let st = INITIAL
+    let st = START_STATE
     for (const [a] of onAction.mock.calls) {
       const r = logic.apply(PUZZLE, st, a, ctx)
       if ('error' in r) throw new Error(r.error)
@@ -462,8 +466,9 @@ describe('ball-run Game', () => {
 
   test('score HUD follows time: +1 every 0.5 s (SCORE_TICKS) regardless of distance', async () => {
     expect(SCORE_TICKS).toBe(TICK_HZ / 2)
-    // 빠른 속도(단계 8)로 시작해 거리와 시간이 갈리게 한다(단계 0의 200 mm/틱이면 30틱 = 6 m라 거리 점수와 우연히 같다).
-    const fast = { ...INITIAL, sim: { ...INITIAL.sim, speedLevel: 8, vz: SPEED_TABLE[8] } }
+    // 더 빠른 속도(단계 2)로 시작해 거리와 시간이 갈리게 한다(단계 0의 200 mm/틱이면 30틱 = 6 m라 거리 점수와 우연히 같다).
+    // v6: 내리막 첫 결정이 시작 뒤 약 50 m라 2초(약 46 m) 동안 가운데로 곧게 가도 살아 있는 속도.
+    const fast = { ...INITIAL, sim: { ...INITIAL.sim, speedLevel: 2, vz: SPEED_TABLE[2] } }
     await mount(props({ publicState: logic.publicState(fast) }))
     expect(screen.getByLabelText('점수')).toHaveTextContent('0')
     fireEvent.pointerDown(canvas(), { clientX: 195, pointerId: 1 })
@@ -478,7 +483,7 @@ describe('ball-run Game', () => {
     expect(seen).toEqual([1, 2, 3, 4])
     // 2초 = 4점. 같은 시간에 더 멀리 가도(속도가 올라도) 점수는 틱으로만 센다.
     expect(lastCur().tick).toBe(4 * SCORE_TICKS)
-    expect(lastCur().z).toBe(4 * SCORE_TICKS * SPEED_TABLE[8])
+    expect(lastCur().z).toBe(4 * SCORE_TICKS * SPEED_TABLE[2])
   })
 
   test.each([
