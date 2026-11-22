@@ -44,3 +44,7 @@ export const MAX_ACTION_TICKS = 120
 // 120틱이 전부 번갈아 바뀌면 [0, 1×120]으로 121구간이 필요하다 (첫 값 0 포함)
 export const MAX_RUNS = 121
 export const VIEW_CARS = 9 // 화면 폭 800 px ÷ 차 길이 89 px = 9.0 [M14]
+export const CAR_LEN = 2000 * MM // 차 전체 길이(뒤 꼬리~앞바퀴 앞끝) 89 px = 2000 mm. 화면 축척의 단위 [M1]
+// 화면 루프(Game.tsx). 시뮬 규칙이 아니다.
+export const MAX_CATCHUP = 5 // 한 프레임에 따라잡는 최대 틱 수(설계 §7)
+export const DEATH_RENDER_MS = 3000 // 끝난 뒤 사망 입자를 그리는 시간. 지나면 프레임 루프를 멈춘다

@@ -2,16 +2,13 @@
 // 좌표: 시뮬 u(1/16 mm, y 위) → 화면 CSS px(y 아래). 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외다.
 // 입자·팝업은 화면 전용 상태로, 연속한 render 호출 사이의 SimState 변화(lastAward.tick, gems, dead)로 만든다.
 // 화면 전용이라 부동소수와 Math.random을 쓴다(결정성은 sim.ts의 몫).
-import { MM, PERFECT_MULT, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { CAR_LEN, MM, PERFECT_MULT, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
 import type { Course } from './course.ts'
 import type { Seg } from './pieces.ts'
 import { scoreOf } from './sim.ts'
 import type { SimState } from './sim.ts'
 
 export type Camera = { x: number; y: number; scale: number } // (x, y): 화면 기준점에 오는 세계 좌표. scale: px / u
-
-// 차 전체 길이(뒤 꼬리~앞바퀴) 2000 mm [M1]. TODO: constants.ts로 옮긴다(다른 작업이 그 파일을 고치는 중이라 임시로 여기 둔다).
-export const CAR_LEN = 2000 * MM
 
 // 카메라 기준점: 차 중심 아래의 길이 화면 가로 28%, 세로 53%에 온다 [M14].
 const ANCHOR_X = 0.28
@@ -121,7 +118,7 @@ function hash(n: number, salt: number): number {
 }
 
 type Particle = { x: number; y: number; vx: number; vy: number; born: number; life: number; size: number }
-type Popup = { x: number; y: number; text: string; born: number }
+type Popup = { text: string; born: number } // 차의 현재 화면 위치 옆에 그린다
 type Praise = { text: string; born: number }
 
 export type Renderer = {
@@ -184,7 +181,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (cur.lastAward && cur.lastAward.tick !== seenAward) {
       seenAward = cur.lastAward.tick
       const { flips, perfect, points, tick } = cur.lastAward
-      if (points > 0) popups.push({ x: cx, y: cy, text: `+${points}`, born: nowMs })
+      if (points > 0) popups.push({ text: `+${points}`, born: nowMs })
       if (flips > 0) praise = { text: praiseFor(flips, perfect, tick), born: nowMs }
     }
     if (cur.gems > seenGems) burst(cx, cy + WHEEL_R, GEM_PARTICLES * (cur.gems - seenGems), 1.4 * CAR_LEN, 450, 0.05, nowMs)
@@ -240,7 +237,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const g = course.seg(i)
       const a = toScreen(view, w, h, g.x0, g.y0)
       const b = toScreen(view, w, h, g.x1, g.y1)
-      if (i === lo || Math.abs(a.x - penX) > 0.5 || Math.abs(a.y - penY) > 0.5) c.moveTo(a.x, a.y)
+      if (i === 0 && a.x > 0) {
+        // 코스 시작점 뒤도 평지로 이어 그려 시작 화면 왼쪽이 비지 않게 한다(화면 전용, 판정에는 없다).
+        c.moveTo(-carPx, a.y)
+        c.lineTo(a.x, a.y)
+        penX = a.x
+        penY = a.y
+      } else if (i === lo || Math.abs(a.x - penX) > 0.5 || Math.abs(a.y - penY) > 0.5) c.moveTo(a.x, a.y)
       c.lineTo(b.x, b.y)
       penX = b.x
       penY = b.y
@@ -341,7 +344,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
   }
 
-  const drawEffects = (c: CanvasRenderingContext2D, view: Camera, nowMs: number, dt: number) => {
+  const drawEffects = (c: CanvasRenderingContext2D, view: Camera, car: { x: number; y: number }, nowMs: number, dt: number) => {
     const carPx = CAR_LEN * view.scale
     const g = 5 * CAR_LEN // u/s²
     particles = particles.filter((p) => nowMs - p.born < p.life)
@@ -360,13 +363,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     popups = popups.filter((p) => nowMs - p.born < POPUP_MS)
     c.textAlign = 'left'
     c.textBaseline = 'middle'
-    c.font = font(500, Math.max(13, carPx * 0.28))
+    c.font = font(600, Math.max(16, carPx * 0.4))
     for (const p of popups) {
       const t = (nowMs - p.born) / POPUP_MS
-      const s = toScreen(view, w, h, p.x, p.y)
       c.globalAlpha = Math.min(1, (1 - t) * 2.5)
       c.fillStyle = WHITE
-      c.fillText(p.text, s.x + carPx * 0.45, s.y - carPx * 0.45 - t * carPx * 0.6)
+      c.fillText(p.text, car.x + carPx * 0.45, car.y - carPx * 0.45 - t * carPx * 0.6)
     }
     c.globalAlpha = 1
     if (praise) {
@@ -455,7 +457,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawTrack(c, view, course, lo, hi)
       drawGems(c, view, course, lo, hi, nowMs)
       if (cur.dead !== 'crash') drawCar(c, view, prev, cur, alpha)
-      drawEffects(c, view, nowMs, dt)
+      const car = toScreen(
+        view, w, h,
+        lerp((prev.rear.x + prev.front.x) / 2, (cur.rear.x + cur.front.x) / 2, alpha),
+        lerp((prev.rear.y + prev.front.y) / 2, (cur.rear.y + cur.front.y) / 2, alpha),
+      )
+      drawEffects(c, view, car, nowMs, dt)
       drawHud(c, cur)
     },
     dispose() {

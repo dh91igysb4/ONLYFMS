@@ -23,10 +23,11 @@
   -webkit-touch-callout: none;
 }
 
+/* 왼쪽 위: 오른쪽 위에는 캔버스가 보석 수를 그린다. */
 .nr-pause {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 8px;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -55,6 +56,9 @@
   background: color-mix(in srgb, var(--bg) 45%, transparent);
   border: 0;
 }
+/* 문구는 길(위에서 53%)과 차를 가리지 않게 아래쪽 실루엣 위에 둔다. */
+.nr-hint,
+.nr-overlay { place-items: end center; padding-bottom: 40%; } /* 폭 기준 % — 9:14 상자에서 높이의 약 26% */
 .nr-hint { pointer-events: none; }
 .nr-overlay { cursor: pointer; background: color-mix(in srgb, var(--bg) 65%, transparent); }
 
@@ -75,7 +79,4 @@
 .nr-result-score { margin: 0; font-size: 48px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
 .nr-result-reason { margin: 0; font-size: 16px; color: var(--muted); }
 
-
-.nr-fallback { align-items: flex-start; }
-.nr-fallback p { margin: 0; }
 .nr-error { margin: 0; color: var(--lose-text); font-size: 14px; }

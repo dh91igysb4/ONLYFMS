@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi,
 import { Game } from './Game.tsx'
 import { logic } from './logic.ts'
 import { decodeHold } from './input.ts'
-import { SEND_TICKS, TICK_HZ } from './constants.ts'
+import { MAX_CATCHUP, SEND_TICKS, TICK_HZ } from './constants.ts'
 import { createRenderer } from './render.ts'
 import type { SimState } from './sim.ts'
 import type { GameProps } from '../ui.ts'
@@ -194,13 +194,13 @@ describe('neon-rider Game', () => {
     expect(h.every((b) => !b)).toBe(true)
   })
 
-  test('a long rAF gap advances at most 5 ticks', () => {
+  test('a long rAF gap advances at most MAX_CATCHUP ticks', () => {
     mount(props())
     fireEvent.pointerDown(canvas(), { pointerId: 1 })
     frames(2)
     const tick = lastCur().tick
     frame(500)
-    expect(lastCur().tick - tick).toBeLessThanOrEqual(5)
+    expect(lastCur().tick - tick).toBeLessThanOrEqual(MAX_CATCHUP)
     expect(lastCur().tick).toBeGreaterThan(tick)
   })
 
@@ -320,5 +320,77 @@ describe('neon-rider Game', () => {
     fireEvent.pointerDown(canvas(), { pointerId: 1 })
     frames(SEND_TICKS)
     expect(onAction).toHaveBeenCalledTimes(1)
+  })
+  test('a tap that begins and ends within one frame still holds for one tick', () => {
+    const onAction = vi.fn()
+    mount(props({ onAction }))
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(3)
+    fireEvent.pointerUp(canvas(), { pointerId: 1 })
+    frames(3)
+    fireEvent.pointerDown(canvas(), { pointerId: 2 })
+    fireEvent.pointerUp(canvas(), { pointerId: 2 })
+    frames(3)
+    space('keyDown')
+    space('keyUp')
+    frames(SEND_TICKS - 9)
+    const h = holds(onAction)[0]
+    expect(h.slice(0, 9)).toEqual([true, true, true, false, false, false, true, false, false])
+    expect(h[9]).toBe(true)
+    expect(h.slice(10).every((b) => !b)).toBe(true)
+  })
+
+  test('the very first tap starts the run and counts as one held tick', () => {
+    const onAction = vi.fn()
+    mount(props({ onAction }))
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    fireEvent.pointerUp(canvas(), { pointerId: 1 })
+    frames(SEND_TICKS)
+    const h = holds(onAction)[0]
+    expect(h[0]).toBe(true)
+    expect(h.slice(1).every((b) => !b)).toBe(true)
+  })
+
+  test('space keyup releases even when focus moved into a text field', () => {
+    const onAction = vi.fn()
+    mount(props({ onAction }))
+    space('keyDown')
+    frames(5)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    fireEvent.keyUp(input, { key: ' ', code: 'Space' })
+    frames(SEND_TICKS - 5)
+    const h = holds(onAction)[0]
+    expect(h.slice(0, 5).every(Boolean)).toBe(true)
+    expect(h.slice(5).every((b) => !b)).toBe(true)
+    input.remove()
+  })
+
+  test('re-renders one frame on resize after the loop has stopped', () => {
+    const p = props()
+    const r = mount(p)
+    fireEvent.pointerDown(canvas(), { pointerId: 1 })
+    frames(2)
+    r.rerender(<Game {...p} finished score={0} publicState={{ ...INITIAL, sim: { ...INITIAL.sim, dead: 'give_up' } }} />)
+    frame()
+    frame(4000)
+    expect(rafQ.size).toBe(0)
+    const rd = renderer()
+    const before = rd.render.mock.calls.length
+    rect = { width: 640, height: 360 }
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    expect(rd.resize).toHaveBeenLastCalledWith(640, 360, expect.any(Number))
+    expect(rd.render.mock.calls.length).toBe(before + 1)
+    expect(rd.resize.mock.invocationCallOrder.at(-1)!).toBeLessThan(rd.render.mock.invocationCallOrder.at(-1)!)
+    expect(rafQ.size).toBe(0)
+  })
+
+  test('resize while the loop runs does not draw an extra frame', () => {
+    mount(props())
+    frame()
+    const rd = renderer()
+    const before = rd.render.mock.calls.length
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    expect(rd.render.mock.calls.length).toBe(before)
   })
 })

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { VIEW_CARS, WHEEL_R } from './constants.ts'
+import { CAR_LEN, VIEW_CARS, WHEEL_R } from './constants.ts'
 import { courseOf } from './course.ts'
-import { initSimAt } from './sim.ts'
+import { initSim, initSimAt } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { CAR_LEN, cameraFor, createRenderer, praiseFor, toScreen, visibleSegRange } from './render.ts'
+import { cameraFor, createRenderer, praiseFor, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -195,6 +195,31 @@ describe('createRenderer', () => {
     expect(() => r.render(landed, dead, 1, course, 32)).not.toThrow()
     expect(() => r.render(dead, dead, 1, course, 600)).not.toThrow()
     expect(sets).not.toContain('shadowBlur')
+  })
+
+  it('착지 "+N"은 지급된 곳이 아니라 차의 현재 화면 위치를 따라간다', () => {
+    const { canvas, calls } = fakeCanvas()
+    const r = createRenderer(canvas)
+    r.resize(360, 640, 1)
+    r.render(s0, s0, 1, course, 0)
+    const landed: SimState = { ...s0, tick: 30, lastAward: { tick: 30, flips: 1, perfect: false, points: 1 }, flipScore: 1 }
+    const popupX = () => calls.filter((c) => c.name === 'fillText' && c.args[0] === '+1').map((c) => c.args[1] as number)
+    r.render(s0, landed, 1, course, 16)
+    const [x0] = popupX()
+    // 차가 차 길이 3대만큼 앞으로 간 뒤에도 팝업은 차 옆에 있다(세계에 고정이면 화면에서 그만큼 뒤로 처진다).
+    const later: SimState = { ...moved(landed, 3 * CAR_LEN), tick: 40 }
+    r.render(landed, later, 1, course, 200)
+    const x1 = popupX().at(-1)!
+    expect(Math.abs(x1 - x0)).toBeLessThan(2)
+  })
+
+  it('시작 평지는 화면 왼쪽 끝까지 이어 그린다(코스 시작점 뒤가 비지 않게)', () => {
+    const { canvas, calls } = fakeCanvas()
+    const r = createRenderer(canvas)
+    r.resize(360, 640, 1)
+    const s = initSim(course)
+    r.render(s, s, 1, course, 0)
+    expect(calls.some((c) => c.name === 'moveTo' && (c.args[0] as number) <= 0)).toBe(true)
   })
 
   it('dispose 뒤 render는 아무것도 그리지 않는다', () => {

@@ -2,7 +2,7 @@
 // 입력(누름 1비트)은 30틱씩 묶어 onAction으로 보낸다 (설계 §4.2, §7). 점수·"+N"·보석·팝업은 캔버스 안에서 그려진다.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { GameProps } from '../ui.ts'
-import { SEND_TICKS, TICK_HZ } from './constants.ts'
+import { DEATH_RENDER_MS, MAX_CATCHUP, SEND_TICKS, TICK_HZ } from './constants.ts'
 import { getCourse } from './course.ts'
 import { encodeHold } from './input.ts'
 import type { State } from './logic.ts'
@@ -10,15 +10,14 @@ import { createRenderer, type Renderer } from './render.ts'
 import { scoreOf, step, type SimState } from './sim.ts'
 import './neon-rider.css'
 
-// 화면 쪽 값(시뮬 규칙이 아니다). 프레임당 최대 틱 수와, 사망 뒤 입자가 끝날 때까지 그리는 시간.
-const MAX_CATCHUP = 5
-const DEATH_RENDER_MS = 3000
+// 누산기 비교의 부동소수 여유(정수 상수만 두는 constants.ts에 넣을 수 없는 화면 쪽 값).
 const EPS = 1e-6
 
 /** 루프가 화면 이벤트에서 부르는 조작. */
 type Engine = {
   pointerDown(id: number): boolean
   pointerUp(id: number): void
+  pointerCancel(id: number): void
   releaseAll(): void
   setPaused(paused: boolean): void
 }
@@ -64,6 +63,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
   useEffect(() => {
     let cancelled = false
     let raf = 0
+    let stopped = false // 사망 뒤 입자를 다 그리고 프레임 루프가 멈췄다
     const canvas = canvasRef.current!
     const { seed } = latest.current.ps
     const course = getCourse(seed)
@@ -80,8 +80,10 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
     let deathAt: number | null = cur.dead !== null ? performance.now() : null
     const pointers = new Set<number>()
     let space = false
+    // 누른 뒤 아직 어느 틱에도 반영되지 않았다. 한 프레임 안에 눌렀다 뗀 짧은 탭도 한 틱은 누름으로 센다.
+    let tapLatched = false
 
-    const held = () => pointers.size > 0 || space
+    const held = () => pointers.size > 0 || space || tapLatched
     const running = () => isStarted && !isPaused && !isHidden && cur.dead === null && !latest.current.finished
 
     function flush() {
@@ -98,15 +100,19 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
     function releaseAll() {
       pointers.clear()
       space = false
+      tapLatched = false
     }
 
     function measure() {
       const r = canvas.getBoundingClientRect()
       renderer.resize(r.width, r.height, window.devicePixelRatio || 1)
+      // 크기를 바꾸면 캔버스가 지워진다. 루프가 멈춘 뒤(사망 화면)에는 한 번 다시 그린다.
+      if (stopped && !cancelled) renderer.render(prev, cur, 1, course, performance.now())
     }
 
     function tickOnce() {
       const h = held()
+      tapLatched = false
       prev = cur
       cur = step(cur, h, course)
       pending.push(h)
@@ -135,7 +141,10 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       last = t
       if ((cur.dead !== null || latest.current.finished) && deathAt === null) deathAt = t
       renderer.render(prev, cur, cur.dead === null ? Math.min(1, acc) : 1, course, t)
-      if (deathAt !== null && t - deathAt > DEATH_RENDER_MS) return
+      if (deathAt !== null && t - deathAt > DEATH_RENDER_MS) {
+        stopped = true
+        return
+      }
       raf = requestAnimationFrame(loop)
     }
 
@@ -184,11 +193,12 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       if (live()) e.preventDefault()
       if (e.repeat || !live()) return
       space = true
+      tapLatched = true
       start()
     }
+    // 뗌은 어디서 받든 뗌이다(누른 채 입력칸으로 초점이 옮겨 가도 계속 누른 것으로 남지 않게).
     function onKeyUp(e: KeyboardEvent) {
       if (e.code !== 'Space' && e.key !== ' ') return
-      if (isTypingTarget(e.target)) return
       space = false
     }
 
@@ -196,11 +206,17 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       pointerDown(id) {
         if (!live()) return false
         pointers.add(id)
+        tapLatched = true
         start()
         return true
       },
       pointerUp(id) {
         pointers.delete(id)
+      },
+      // 브라우저가 취소한 누름(스크롤 제스처 등)은 탭으로 세지 않는다.
+      pointerCancel(id) {
+        pointers.delete(id)
+        if (pointers.size === 0) tapLatched = false
       },
       releaseAll,
       setPaused,
@@ -244,6 +260,9 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
   function onUp(e: ReactPointerEvent<HTMLCanvasElement>) {
     engine.current?.pointerUp(e.pointerId)
   }
+  function onCancel(e: ReactPointerEvent<HTMLCanvasElement>) {
+    engine.current?.pointerCancel(e.pointerId)
+  }
   function onLeave() {
     engine.current?.releaseAll()
   }
@@ -259,7 +278,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
           role="img"
           onPointerDown={onDown}
           onPointerUp={onUp}
-          onPointerCancel={onUp}
+          onPointerCancel={onCancel}
           onLostPointerCapture={onUp}
           onPointerLeave={onLeave}
         />
