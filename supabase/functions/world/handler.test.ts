@@ -256,7 +256,10 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   const cast = await real({ game, action: 'act', payload: { type: 'cast', area: 'pier', power: 0.5 } })
   assert.equal(cast.status, 200)
   const pending = cast.body.result as { biteDelayMs: number }
-  now += pending.biteDelayMs + 2000
+  now += pending.biteDelayMs
+  const hook = await real({ game, action: 'act', payload: { type: 'hook' } })
+  assert.equal(hook.status, 200)
+  now += 2000
   const res = await real({ game, action: 'act', payload: { type: 'resolve', success: true, perfect: false } })
   assert.equal(res.status, 200)
   const sold = await real({ game, action: 'act', payload: { type: 'sell' } })

@@ -45,3 +45,5 @@ export const AREAS = [{ id: 'pier', name: '부두' }] as const
 export const BAG_SIZE = 20
 export const MIN_FIGHT_MS = 2000
 export const HOOK_WINDOW_MS = 800
+/** 챔 창이 끝난 뒤 서버가 더 받아 주는 네트워크 지연 여유 */
+export const HOOK_GRACE_MS = 1500

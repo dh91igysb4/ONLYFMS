@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { BAG_SIZE, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
+import { BAG_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
 import { logic, price, rollCatch, sizePercentile, type Action, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -103,7 +103,10 @@ const err = (r: ReturnType<typeof logic.apply>) => {
   return r.error
 }
 const withPending = (over: Partial<State> = {}): State =>
-  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0 }, ...over })
+  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: null }, ...over })
+const BITE = T0 + 3000
+const withHooked = (over: Partial<State> = {}): State =>
+  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE }, ...over })
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
@@ -115,8 +118,8 @@ describe('fishing WorldLogic', () => {
 
   it('cast sets pending and replaces an old one', () => {
     const r1 = ok(logic.apply(fresh(), { type: 'cast', area: 'pier', power: 0.5 }, ctx(T0)))
-    expect(r1.state.pending).toMatchObject({ startedAt: T0 })
-    expect(r1.result).toEqual(r1.state.pending)
+    expect(r1.state.pending).toMatchObject({ startedAt: T0, hookedAt: null })
+    expect(r1.result).toEqual(logic.view(r1.state, { now: T0 }).pending)
     const old = withPending()
     const r2 = ok(logic.apply(old, { type: 'cast', area: 'pier', power: 0.5 }, ctx(T0 + 5000)))
     expect(r2.state.pending?.startedAt).toBe(T0 + 5000)
@@ -142,13 +145,61 @@ describe('fishing WorldLogic', () => {
     for (const power of [0, 1]) ok(logic.apply(s, { type: 'cast', area: 'pier', power }, ctx()))
   })
 
-  it('resolve success before biteDelay + 2000ms -> too_early, pending kept; boundary succeeds', () => {
-    const s = deepFreeze(withPending())
-    const edge = T0 + 3000 + MIN_FIGHT_MS
+  it('resolve success before hookedAt + 2000ms -> too_early, pending kept; boundary succeeds', () => {
+    const s = deepFreeze(withHooked())
+    const edge = BITE + MIN_FIGHT_MS
     expect(err(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(edge - 1)))).toBe('too_early')
+    expect(s.pending).not.toBeNull()
     const r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(edge)))
     expect(r.state.pending).toBeNull()
     expect(r.state.bag).toHaveLength(1)
+  })
+
+  it('resolve success without hook -> not_hooked, pending kept', () => {
+    const s = deepFreeze(withPending())
+    expect(err(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))).toBe('not_hooked')
+  })
+
+  it('hook before the bite -> too_early; at exactly startedAt + biteDelayMs succeeds', () => {
+    const s = deepFreeze(withPending())
+    expect(err(logic.apply(s, { type: 'hook' }, ctx(BITE - 1)))).toBe('too_early')
+    const r = ok(logic.apply(s, { type: 'hook' }, ctx(BITE)))
+    expect(r.state.pending?.hookedAt).toBe(BITE)
+    expect(r.result).toEqual({ species: 'anchovy', sizeCm: 12 })
+  })
+
+  it('hook after bite + 800 + 1500 -> too_late; exactly at that bound succeeds', () => {
+    const s = deepFreeze(withPending())
+    const last = BITE + HOOK_WINDOW_MS + HOOK_GRACE_MS
+    expect(err(logic.apply(s, { type: 'hook' }, ctx(last + 1)))).toBe('too_late')
+    ok(logic.apply(s, { type: 'hook' }, ctx(last)))
+  })
+
+  it('hook twice -> bad_action; hook without pending -> no_pending', () => {
+    expect(err(logic.apply(deepFreeze(withHooked()), { type: 'hook' }, ctx(BITE + 1)))).toBe('bad_action')
+    expect(err(logic.apply(fresh(), { type: 'hook' }, ctx()))).toBe('no_pending')
+  })
+
+  it('view hides species and size until hooked', () => {
+    const cast = ok(logic.apply(fresh(), { type: 'cast', area: 'pier', power: 0.5 }, ctx(T0)))
+    const v = logic.view(cast.state, { now: T0 })
+    expect(v.pending).toMatchObject({ species: null, sizeCm: null, hooked: false, startedAt: T0 })
+    expect(cast.result).toMatchObject({ species: null, sizeCm: null, hooked: false })
+    expect(JSON.stringify(v)).not.toContain(cast.state.pending!.species)
+    const at = T0 + cast.state.pending!.biteDelayMs
+    const hooked = ok(logic.apply(cast.state, { type: 'hook' }, ctx(at)))
+    const hv = logic.view(hooked.state, { now: at })
+    expect(hv.pending).toMatchObject({ species: cast.state.pending!.species, sizeCm: cast.state.pending!.sizeCm, hooked: true })
+  })
+
+  it('recasting never reveals species', () => {
+    let s = fresh()
+    for (let i = 0; i < 200; i++) {
+      const r = ok(logic.apply(s, { type: 'cast', area: 'pier', power: 0.5 }, { now: T0 + i, rng: rngFromSeed(seedBytes(i)) }))
+      s = r.state
+      expect(logic.view(s, { now: T0 }).pending).toMatchObject({ species: null, sizeCm: null })
+      expect(r.result).toMatchObject({ species: null, sizeCm: null })
+    }
   })
 
   it('resolve failure clears pending without adding fish (no time limit)', () => {
@@ -158,17 +209,20 @@ describe('fishing WorldLogic', () => {
     expect(r.state.bag).toEqual([])
     expect(r.state.dex).toEqual({})
     expect(r.result).toEqual({ caught: null })
+    const h = ok(logic.apply(deepFreeze(withHooked()), { type: 'resolve', success: false, perfect: false }, ctx(BITE)))
+    expect(h.state.pending).toBeNull()
+    expect(h.state.bag).toEqual([])
   })
 
   it('resolve success adds to bag and dex; maxCm keeps the larger', () => {
     const late = ctx(T0 + 100_000)
-    let s = withPending({ dex: { anchovy: { count: 1, maxCm: 14 } } })
+    let s = withHooked({ dex: { anchovy: { count: 1, maxCm: 14 } } })
     let r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: true }, late))
     expect(r.result).toEqual({ caught: { species: 'anchovy', sizeCm: 12, perfect: true } })
     expect(r.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: true }])
     expect(r.state.dex.anchovy).toEqual({ count: 2, maxCm: 14 })
-    s = withPending({
-      pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0 },
+    s = withHooked({
+      pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0, hookedAt: T0 + 1500 },
       dex: { anchovy: { count: 2, maxCm: 14 } },
     })
     r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: false }, late))
@@ -177,7 +231,7 @@ describe('fishing WorldLogic', () => {
 
   it('resolve without pending -> no_pending; non-boolean flags -> bad_action', () => {
     expect(err(logic.apply(fresh(), { type: 'resolve', success: true, perfect: false }, ctx()))).toBe('no_pending')
-    const s = withPending()
+    const s = withHooked()
     for (const a of [{ success: 'true', perfect: false }, { success: true, perfect: 1 }, { success: true }]) {
       expect(err(logic.apply(s, { type: 'resolve', ...a } as unknown as Action, ctx(T0 + 1e6)))).toBe('bad_action')
     }
@@ -227,8 +281,13 @@ describe('fishing WorldLogic', () => {
       [fresh(), { type: 'cast', area: 'pier', power: 9 }],
       [fresh({ bag: full }), { type: 'cast', area: 'pier', power: 0.5 }],
       [fresh(), { type: 'resolve', success: true, perfect: false }],
-      [withPending(), { type: 'resolve', success: true, perfect: false }, T0],
-      [withPending(), { type: 'resolve', success: 1, perfect: false }, T0 + 1e6],
+      [withHooked(), { type: 'resolve', success: true, perfect: false }, BITE],
+      [withPending(), { type: 'resolve', success: true, perfect: false }, T0 + 1e6],
+      [withHooked(), { type: 'resolve', success: 1, perfect: false }, T0 + 1e6],
+      [fresh(), { type: 'hook' }],
+      [withPending(), { type: 'hook' }, BITE - 1],
+      [withPending(), { type: 'hook' }, BITE + HOOK_WINDOW_MS + HOOK_GRACE_MS + 1],
+      [withHooked(), { type: 'hook' }, BITE + 1],
       [fresh(), { type: 'sell' }],
       [fresh(), { type: 'buyRod', tier: 3 }],
       [fresh({ gold: 5 }), { type: 'buyRod', tier: 2 }],
@@ -290,8 +349,11 @@ describe('fishing WorldLogic', () => {
     ])
   })
 
-  it('view returns the state as is', () => {
-    const s = withPending()
-    expect(logic.view(s, { now: T0 })).toBe(s)
+  it('view passes everything but pending through', () => {
+    const s = withHooked({ gold: 7 })
+    const v = logic.view(s, { now: T0 })
+    expect(v.gold).toBe(7)
+    expect(v.pending).toEqual({ biteDelayMs: 3000, startedAt: T0, hooked: true, species: 'anchovy', sizeCm: 12 })
+    expect(logic.view(fresh(), { now: T0 }).pending).toBeNull()
   })
 })

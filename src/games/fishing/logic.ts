@@ -1,6 +1,6 @@
 // 낚시 추첨·가격. 순수 함수만, 외부 의존 없음.
 import type { WorldLogic, WorldRecord } from '../types.ts'
-import { AREAS, BAG_SIZE, MIN_FIGHT_MS, RODS, SPECIES, type Rarity, type Species } from './data.ts'
+import { AREAS, BAG_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES, type Rarity, type Species } from './data.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 
@@ -53,7 +53,21 @@ export function price(speciesId: string, sizeCm: number, perfect: boolean): numb
 
 // ---------------------------------------------------------------- WorldLogic
 export type Fish = { species: string; sizeCm: number; perfect: boolean }
-export type Pending = { species: string; sizeCm: number; biteDelayMs: number; startedAt: number }
+export type Pending = {
+  species: string
+  sizeCm: number
+  biteDelayMs: number
+  startedAt: number
+  /** 챈 시각. null이면 아직 입질에 반응하지 않아 어종·크기를 브라우저에 보내지 않는다 */
+  hookedAt: number | null
+}
+export type PendingView = {
+  biteDelayMs: number
+  startedAt: number
+  hooked: boolean
+  species: string | null
+  sizeCm: number | null
+}
 export type State = {
   gold: number
   totalEarned: number
@@ -65,13 +79,25 @@ export type State = {
 }
 export type Action =
   | { type: 'cast'; area: string; power: number }
+  | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
   | { type: 'buyRod'; tier: number }
-// 숨길 값 없음. pending의 어종은 미니게임 난이도에 필요해 그대로 보낸다.
-export type View = State
+// pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
+export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
 type Out = { state: State; result?: unknown } | { error: string }
+
+function pendingView(p: Pending): PendingView {
+  const hooked = p.hookedAt !== null
+  return {
+    biteDelayMs: p.biteDelayMs,
+    startedAt: p.startedAt,
+    hooked,
+    species: hooked ? p.species : null,
+    sizeCm: hooked ? p.sizeCm : null,
+  }
+}
 
 const init = (): State => ({
   gold: 0,
@@ -92,8 +118,18 @@ function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng:
   if (!isNum(a.power) || a.power < 0 || a.power > 1) return { error: 'bad_power' }
   if (state.bag.length >= BAG_SIZE) return { error: 'bag_full' }
   const c = rollCatch(ctx.rng, state.rodTier, a.power)
-  const pending: Pending = { ...c, startedAt: ctx.now }
-  return { state: { ...state, pending }, result: pending }
+  const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null }
+  return { state: { ...state, pending }, result: pendingView(pending) }
+}
+
+function hook(state: State, now: number): Out {
+  const p = state.pending
+  if (!p) return { error: 'no_pending' }
+  if (p.hookedAt !== null) return { error: 'bad_action' }
+  const bite = p.startedAt + p.biteDelayMs
+  if (now < bite) return { error: 'too_early' }
+  if (now > bite + HOOK_WINDOW_MS + HOOK_GRACE_MS) return { error: 'too_late' }
+  return { state: { ...state, pending: { ...p, hookedAt: now } }, result: { species: p.species, sizeCm: p.sizeCm } }
 }
 
 function resolve(state: State, a: Record<string, unknown>, now: number): Out {
@@ -101,7 +137,8 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (!p) return { error: 'no_pending' }
   if (typeof a.success !== 'boolean' || typeof a.perfect !== 'boolean') return { error: 'bad_action' }
   if (!a.success) return { state: { ...state, pending: null }, result: { caught: null } }
-  if (now < p.startedAt + p.biteDelayMs + MIN_FIGHT_MS) return { error: 'too_early' }
+  if (p.hookedAt === null) return { error: 'not_hooked' }
+  if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
   const fish: Fish = { species: p.species, sizeCm: p.sizeCm, perfect: a.perfect }
   const prev = state.dex[p.species]
   const dex = {
@@ -186,6 +223,8 @@ export const logic: WorldLogic<State, Action, View> = {
     switch (action.type) {
       case 'cast':
         return cast(state, action, ctx)
+      case 'hook':
+        return hook(state, ctx.now)
       case 'resolve':
         return resolve(state, action, ctx.now)
       case 'sell':
@@ -196,6 +235,6 @@ export const logic: WorldLogic<State, Action, View> = {
         return { error: 'bad_action' }
     }
   },
-  view: (state) => state,
+  view: (state): View => ({ ...state, pending: state.pending && pendingView(state.pending) }),
   records,
 }
