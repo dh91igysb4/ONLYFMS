@@ -5,6 +5,7 @@ import { duels, games } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { normalizeHandle } from '../../shared/handle.ts'
 import { DuelSection } from './DuelSection.tsx'
+import { RecordsSection } from './RecordsSection.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { Avatar } from './Avatar.tsx'
@@ -26,11 +27,12 @@ type DuelRecent = {
 type DuelStat = { game_id: string; rating: number; all: Wdl; recent: DuelRecent[] }
 type H2hGames = { games: { game_id: string; a_wins: number; draws: number; b_wins: number }[] }
 
-type Tab = 'summary' | 'puzzle' | 'duel' | 'settings'
+type Tab = 'summary' | 'puzzle' | 'duel' | 'records' | 'settings'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'summary', label: '요약' },
   { id: 'puzzle', label: '퍼즐' },
   { id: 'duel', label: '대전' },
+  { id: 'records', label: '기록' },
   { id: 'settings', label: '설정' },
 ]
 
@@ -252,6 +254,8 @@ export function ProfilePage() {
         )}
 
         {tab === 'duel' && <DuelSection key={handle} handle={handle} />}
+
+        {tab === 'records' && <RecordsSection key={handle} handle={handle} />}
 
         {tab === 'settings' && mine && <div className="card"><AppearanceSettings /></div>}
       </div>

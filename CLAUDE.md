@@ -12,9 +12,12 @@
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `src/test-fixtures/` 테스트 전용 게임(`test-guess`, 숫자 맞히기)과 등록부 래퍼. 운영 등록부에 넣지 않는다. 플랫폼 테스트는 `vi.mock`으로 `withTestGame`/`withTestGameUi`를 끼워 쓴다
 - `src/platform/games/freeLogQueue.ts` + 테이블 `free_play_logs`: 자유 플레이의 시드와 행동 기록. `free_plays` 행 저장 뒤에 올린다
+- `src/platform/world/` 지속형(world) 게임 화면 `WorldPage`(라우트 `/world/:game`). 게임 화면은 `getWorldComponent`로 찾고, 상태는 서버(Edge Function `world`)가 쥔다
 - `src/platform/chat/` 데일리 채팅(데이터 계층·화면). 권한은 화면이 아니라 DB `can_chat`(RLS·RPC·Storage 정책)이 정한다. 사진은 비공개 Storage 버킷 `daily-chat`에 올리고 서명 주소로만 연다
 - `src/platform/suggest/` 제안 게시판(데이터 계층·화면). 읽기는 RLS, 쓰기는 RPC. 분류·진행 기록은 워커가 `supabase/functions/suggest/`로만 쓴다
 - `supabase/functions/suggest/` 제안 워커용 Edge Function. 브라우저는 부르지 않고 헤더 `x-worker-token`으로만 인증한다. 워커 절차는 `docs/suggest-worker.md`
+- `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`
+- 등록부 `src/games/index.ts`의 `worlds`/`getWorld`(지속형 게임), 화면은 `src/games/ui.ts`의 `getWorldComponent`
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차
@@ -33,6 +36,11 @@
 - 등록은 `src/games/index.ts`의 `duels`, 화면은 `src/games/ui.ts`의 `getDuelComponent`(`DuelGameProps`).
 - 마이그레이션에 `game_modes` (false, false, false) 행과 숨김이면 `hidden_games` 행.
 - `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
+
+지속형(world) 게임은 대전과 비슷하게 추가한다:
+- manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
+- 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
+- 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
 
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
@@ -78,6 +86,6 @@
 ## 개발 환경
 - `npm run dev`, `npm test`, `npm run typecheck`, `npm run build`
 - DB 테스트: `npm run db:test` (`scripts/db-test.sh`, 로컬 Postgres + Supabase shim). Docker가 있는 머신에서는 로컬 스택에 `npx supabase test db`가 동일한 역할이다.
-- Edge Function 테스트: `npm run fn:test` (`scripts/fn-test.sh`: `scripts/db-up.sh`로 임시 Postgres를 띄우고 `deno test`로 `supabase/functions/play/`, `supabase/functions/duel/`, `supabase/functions/suggest/`를 돌린 뒤 `scripts/db-down.sh`). Deno 경로는 `DENO` 환경 변수로 바꿀 수 있다.
+- Edge Function 테스트: `npm run fn:test` (`scripts/fn-test.sh`: `scripts/db-up.sh`로 임시 Postgres를 띄우고 `deno test`로 `supabase/functions/play/`, `supabase/functions/duel/`, `supabase/functions/suggest/`, `supabase/functions/world/`를 돌린 뒤 `scripts/db-down.sh`). Deno 경로는 `DENO` 환경 변수로 바꿀 수 있다.
 - 게임 로직 공유(설계 §4.7): Edge Function은 `../../../src/games/index.ts`를 상대 경로로 직접 import한다(로컬 `deno check`·실행 확인 완료). 원격 `supabase functions deploy` 번들은 배포 체크리스트 §3에서 확인한다(실패하면 sync-logic 방식으로 전환).
 - Deno는 이 클라우드 환경에서 npm으로만 쓸 수 있다 (`npx deno` 또는 로컬 설치). Deno 코드(Edge Function)의 import는 상대 경로, `npm:` 지정자, `node:` 내장 모듈만 쓴다 (jsr, deno.land 금지. 예: `handler.ts`의 `node:crypto`).
