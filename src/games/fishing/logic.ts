@@ -89,7 +89,7 @@ export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 type Out = { state: State; result?: unknown } | { error: string }
 
 function pendingView(p: Pending): PendingView {
-  const hooked = p.hookedAt !== null
+  const hooked = p.hookedAt != null
   return {
     biteDelayMs: p.biteDelayMs,
     startedAt: p.startedAt,
@@ -125,7 +125,7 @@ function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng:
 function hook(state: State, now: number): Out {
   const p = state.pending
   if (!p) return { error: 'no_pending' }
-  if (p.hookedAt !== null) return { error: 'bad_action' }
+  if (p.hookedAt != null) return { error: 'bad_action' }
   const bite = p.startedAt + p.biteDelayMs
   if (now < bite) return { error: 'too_early' }
   if (now > bite + HOOK_WINDOW_MS + HOOK_GRACE_MS) return { error: 'too_late' }
@@ -137,7 +137,7 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (!p) return { error: 'no_pending' }
   if (typeof a.success !== 'boolean' || typeof a.perfect !== 'boolean') return { error: 'bad_action' }
   if (!a.success) return { state: { ...state, pending: null }, result: { caught: null } }
-  if (p.hookedAt === null) return { error: 'not_hooked' }
+  if (p.hookedAt == null) return { error: 'not_hooked' }
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
   const fish: Fish = { species: p.species, sizeCm: p.sizeCm, perfect: a.perfect }
   const prev = state.dex[p.species]

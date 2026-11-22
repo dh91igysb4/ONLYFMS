@@ -160,6 +160,16 @@ describe('fishing WorldLogic', () => {
     expect(err(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))).toBe('not_hooked')
   })
 
+  it('a pending without hookedAt is treated as not hooked', () => {
+    const s = deepFreeze(fresh({
+      pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0 } as unknown as State['pending'],
+    }))
+    expect(logic.view(s, { now: BITE }).pending).toMatchObject({ hooked: false, species: null, sizeCm: null })
+    expect(err(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))).toBe('not_hooked')
+    const r = ok(logic.apply(s, { type: 'hook' }, ctx(BITE)))
+    expect(r.state.pending?.hookedAt).toBe(BITE)
+  })
+
   it('hook before the bite -> too_early; at exactly startedAt + biteDelayMs succeeds', () => {
     const s = deepFreeze(withPending())
     expect(err(logic.apply(s, { type: 'hook' }, ctx(BITE - 1)))).toBe('too_early')

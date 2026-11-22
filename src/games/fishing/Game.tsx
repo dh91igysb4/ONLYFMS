@@ -12,7 +12,15 @@ import './fishing.css'
 
 const AREA = AREAS[0].id
 const OUTCOME_MS = 1200
-const MIN_SCALE = 2
+const MAX_SCALE = 4
+/** 캔버스 밖 화면 요소(골드 줄, 안내·오류 줄, 가방·메뉴 줄, 사이 간격)에 남겨 두는 높이. 넉넉하게 잡는다. */
+const CHROME_H = 140
+
+/** 주어진 너비·높이에 들어가는 가장 큰 정수 배율 (1~4). 픽셀이 뭉개지지 않게 정수 배만 쓴다. */
+export function canvasScale(availW: number, availH: number): number {
+  const fit = Math.min(Math.floor(availW / SCENE_W), Math.floor(availH / SCENE_H))
+  return Math.max(1, Math.min(MAX_SCALE, fit))
+}
 
 type Menu = 'bag' | 'shop' | 'dex'
 type Outcome =
@@ -44,6 +52,21 @@ const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 // 결과를 모르는 실패: 오류 화면 없이 view를 다시 불러와 맞춘다.
 const SILENT_CODES = new Set(['network', 'no_pending'])
 
+const RETRY = '다시 시도해 주세요'
+// 낚시 로직의 오류 코드 문구. 플랫폼 공통 문구(MESSAGES)에 넣지 않고 여기서만 쓴다.
+const FISHING_MESSAGES: Record<string, string> = {
+  bag_empty: '팔 물고기가 없어요',
+  not_enough_gold: '골드가 부족해요',
+  bad_tier: '이전 단계를 먼저 사야 해요',
+  too_early: RETRY,
+  too_late: RETRY,
+  not_hooked: RETRY,
+  bad_action: RETRY,
+  bad_area: RETRY,
+  bad_power: RETRY,
+}
+const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
+
 const HINTS: Partial<Record<Phase, string>> = {
   idle: '화면을 눌러 힘을 모으고, 떼면 던져요',
   charging: '떼면 던져요',
@@ -60,7 +83,7 @@ export function Game({ gameId }: WorldGameProps) {
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
-  const [scale, setScale] = useState(MIN_SCALE)
+  const [scale, setScale] = useState(1)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -133,11 +156,11 @@ export function Game({ gameId }: WorldGameProps) {
     resetFight()
     setOutcome(null)
     setPhase('idle')
-    if (!SILENT_CODES.has(code)) setNotice({ kind: 'error', text: errorMessage(code) })
+    if (!SILENT_CODES.has(code)) setNotice({ kind: 'error', text: fishingMessage(code) })
     try {
       await send({ game: gameId, action: 'load' })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: errorMessage(codeOf(e)) })
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }
 
@@ -163,7 +186,7 @@ export function Game({ gameId }: WorldGameProps) {
       if (!alive.current) return
       const code = codeOf(e)
       setPhase('idle')
-      setNotice(code === 'bag_full' ? { kind: 'bag_full' } : { kind: 'error', text: errorMessage(code) })
+      setNotice(code === 'bag_full' ? { kind: 'bag_full' } : { kind: 'error', text: fishingMessage(code) })
       return
     }
     if (!alive.current) return
@@ -337,19 +360,21 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }, [loaded, rt])
 
-  // 캔버스 배율: 너비에 맞는 가장 큰 정수 배(최소 2)
+  // 캔버스 배율: 무대 너비와 (창 높이 - 캔버스 밖 요소 높이)에 함께 들어가는 가장 큰 정수 배
   useEffect(() => {
     const el = stageRef.current
     if (!loaded || !el) return
-    const measure = () => setScale(Math.max(MIN_SCALE, Math.floor(el.clientWidth / SCENE_W)))
+    const measure = () => setScale(canvasScale(el.clientWidth, window.innerHeight - CHROME_H))
     measure()
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(measure)
-      ro.observe(el)
-      return () => ro.disconnect()
-    }
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    ro?.observe(el)
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    window.addEventListener('orientationchange', measure)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('orientationchange', measure)
+    }
   }, [loaded])
 
   // 스페이스 키 = 누르기. 버튼·입력칸에 초점이 있으면 그쪽 동작에 맡긴다.
@@ -382,7 +407,7 @@ export function Game({ gameId }: WorldGameProps) {
       const res = await act<{ earned: number }>({ type: 'sell' })
       if (alive.current && res.result) setNotice({ kind: 'info', text: `${gold(res.result.earned)}를 벌었어요` })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: errorMessage(codeOf(e)) })
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }
 
@@ -391,7 +416,7 @@ export function Game({ gameId }: WorldGameProps) {
     try {
       await act({ type: 'buyRod', tier })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: errorMessage(codeOf(e)) })
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }
 

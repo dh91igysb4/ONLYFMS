@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { Game } from './Game.tsx'
+import { canvasScale, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawScene } from './scene.ts'
 import { barResult } from './minigame.ts'
@@ -236,6 +236,16 @@ describe('fishing Game', () => {
     expect(screen.getByText('500 G')).toBeInTheDocument()
   })
 
+  test('shop: a not_enough_gold failure on buy shows the Korean message', async () => {
+    const rich = makeView({ gold: 2000 })
+    await mount(rich)
+    route({ buyRod: () => Promise.reject(new ApiError('not_enough_gold', 400)), load: () => ok(rich) })
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+  })
+
   test('shop shows the top-tier message when the best rod is owned', async () => {
     await mount(makeView({ rodTier: 4 }))
     fireEvent.click(screen.getByRole('button', { name: '상점' }))
@@ -380,5 +390,15 @@ describe('fishing Game', () => {
     const n = vi.mocked(drawScene).mock.calls.length
     await advance(200)
     expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+  })
+})
+
+describe('canvasScale', () => {
+  test('largest integer scale that fits both width and height, between 1 and 4', () => {
+    expect(canvasScale(688, 600)).toBe(2)
+    expect(canvasScale(358, 700)).toBe(2)
+    expect(canvasScale(288, 700)).toBe(1)
+    expect(canvasScale(1000, 2000)).toBe(4)
+    expect(canvasScale(0, 0)).toBe(1)
   })
 })
