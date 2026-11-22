@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANK_DRIFT, BLOCK_H, DROP_TOL, G, GATE_H, KEY_STEP, LAT_ACC, LEDGE, PILLAR_H, R, ROW, SPEED_TABLE, STEEP_STEP, V0, V_MAX, VX_MAX,
-  X_LIMIT,
+  BANK_DRIFT, BLOCK_H, DROP_TOL, G, GATE_H, JUMP_VY, KEY_STEP, LAT_ACC, LEDGE, MOVER_PERIOD, MOVER_ROW_OFFSET, PILLAR_H, R, ROW, SPEED_TABLE, STEEP_STEP,
+  V0, V_MAX, VX_MAX, X_LIMIT,
 } from './constants.ts'
+import { moverX } from './mover.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
 import { JOINT, START_PARSED, parseSegment } from './segments.ts'
@@ -422,6 +423,153 @@ describe('ball-run sim', () => {
     expect(over('___G___').dead).toBeNull()
     expect(GATE_H).toBe(BLOCK_H)
     expect(PILLAR_H).toBeGreaterThan(BLOCK_H + 200)
+  })
+
+  // ---- v4 기믹: 점프대('J'), 좌우 왕복 블록('M')
+  const N3 = '..___..'
+  const PAD = 5 // 점프대 행
+  const padCourse = (...after: string[]): Course => course(J, ...rep(N3, PAD - 1), '..JJJ..', ...after, ...rep(N3, 60), J)
+  const SPEEDS = SPEED_TABLE.map((_, k) => k)
+
+  it('jump pad: a grounded ball launches with vy = JUMP_VY and lands alive on flat', () => {
+    const c = padCourse(...rep(N3, 10))
+    const states = run(c, 200, 0)
+    const i = states.findIndex((s) => rowOf(s.z) === PAD)
+    expect(i).toBeGreaterThan(0)
+    expect(states[i - 1].grounded).toBe(true)
+    expect(states[i].grounded).toBe(false)
+    expect(states[i].vy).toBe(JUMP_VY)
+    expect(states[i].y).toBe(R) // 이 틱은 바닥 높이, 다음 틱부터 올라간다
+    expect(states[i + 1].vy).toBe(JUMP_VY - G)
+    expect(states[i + 1].y).toBe(R + JUMP_VY - G)
+    const land = states.findIndex((s, k) => k > i && s.grounded)
+    expect(land).toBeGreaterThan(i + 30)
+    expect(states[land].y).toBe(R)
+    for (const s of states) expect(s.dead).toBeNull()
+    expect(last(states).grounded).toBe(true)
+  })
+
+  it('jump pad: apex 1.6-1.8 m above the floor, about 45 ticks of airtime', () => {
+    const states = run(padCourse(...rep(N3, 10)), 200, 0)
+    const apex = Math.max(...states.map((s) => s.y)) - R
+    expect(apex).toBeGreaterThanOrEqual(1600)
+    expect(apex).toBeLessThanOrEqual(1800)
+    const i = states.findIndex((s) => !s.grounded)
+    const land = states.findIndex((s, k) => k > i && s.grounded)
+    expect(land - i).toBeGreaterThanOrEqual(40)
+    expect(land - i).toBeLessThanOrEqual(48)
+    expect(Number.isInteger(JUMP_VY)).toBe(true)
+  })
+
+  it('jump pad clears a 1 m block wall 8-10 rows after the pad at every speed level, never a 3 m pillar', () => {
+    for (const k of [8, 9, 10]) {
+      const after = (row: string) => [...rep(N3, k - 1), row, ...rep(N3, 50)]
+      for (const speedLevel of SPEEDS) {
+        const ok = run(padCourse(...after('..BBB..')), 400, 0, initSim({ speedLevel }))
+        expect(last(ok).dead, `wall +${k} speed ${speedLevel}`).toBeNull()
+        expect(last(ok).grounded).toBe(true)
+        const no = run(padCourse(...after('..PPP..')), 400, 0, initSim({ speedLevel }))
+        expect(last(no).dead, `pillar +${k} speed ${speedLevel}`).toBe('hit')
+      }
+    }
+    // 점프대 없이는 벽에 부딪힌다.
+    expect(last(run(course(J, ...rep(N3, 12), '..BBB..', ...rep(N3, 10), J), 200, 0)).dead).toBe('hit')
+  })
+
+  it('jump pad clears an 11-row hole at every speed level and lands within 42 rows', () => {
+    for (const speedLevel of SPEEDS) {
+      const states = run(padCourse(...rep('.......', 11), ...rep(N3, 40)), 400, 0, initSim({ speedLevel }))
+      expect(last(states).dead, `speed ${speedLevel}`).toBeNull()
+      const i = states.findIndex((s) => !s.grounded)
+      const land = states.findIndex((s, k) => k > i && s.grounded)
+      expect(rowOf(states[land].z), `speed ${speedLevel}`).toBeGreaterThanOrEqual(PAD + 12)
+      expect(rowOf(states[land].z), `speed ${speedLevel}`).toBeLessThanOrEqual(PAD + 42)
+    }
+  })
+
+  it('jump pad does nothing to an airborne ball passing over it', () => {
+    const c = padCourse(...rep(N3, 10))
+    let s: SimState = { ...initSim(), z: PAD * ROW - 600, y: R + 600, vy: 0, grounded: false }
+    const over: SimState[] = []
+    for (let k = 0; k < 6; k++) {
+      const n = step(s, 0, c)
+      if (rowOf(n.z) === PAD) over.push(n)
+      expect(n.vy).toBe(s.vy - G)
+      s = n
+    }
+    expect(over.length).toBeGreaterThan(0)
+    for (const o of over) expect(o.grounded).toBe(false)
+  })
+
+  // 왕복 블록 행 하나(행 SH). 공은 x에 가만히 있다. 위상은 공이 그 행을 지나는 틱에 큐브가 한쪽 끝에 오도록 고른다.
+  const SH = 10
+  const shuttle = (phase: number, mirrored = false): Course =>
+    courseFromSegments([
+      { seg: parseSegment({ id: 'sh', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, SH - 1), '..MMM..', ...rep(N3, 20), J] }), mirrored, phase },
+    ])
+  const at = (x: number): SimState => ({ ...initSim(), x })
+  // 1단계 속도 340에서 공이 행 SH와 겹치는 틱(z + R > 10000, z - R < 11000)은 29..33, 가운데 31.
+  const ARRIVE = 31
+  // 조각 위상(행 위상 = 조각 위상 + SH × MOVER_ROW_OFFSET).
+  const leftEnd = (((-ARRIVE - SH * MOVER_ROW_OFFSET) % MOVER_PERIOD) + MOVER_PERIOD) % MOVER_PERIOD // 큐브가 왼쪽 끝(x0)
+  const rightEnd = (leftEnd + MOVER_PERIOD / 2) % MOVER_PERIOD
+
+  it('shuttle: hit when overlapping the cube at its current x, pass on the free side', () => {
+    const l = shuttle(leftEnd)
+    expect(moverX(l.moverAt(SH)!, ARRIVE)).toBe(-1000)
+    expect(last(run(l, 80, -1000, at(-1000))).dead).toBe('hit')
+    expect(last(run(l, 80, 1000, at(1000))).dead).toBeNull()
+    // 같은 행, 다른 위상: 이번에는 오른쪽이 막히고 왼쪽이 빈다.
+    const r = shuttle(rightEnd)
+    expect(moverX(r.moverAt(SH)!, ARRIVE)).toBe(1000)
+    expect(last(run(r, 80, -1000, at(-1000))).dead).toBeNull()
+    expect(last(run(r, 80, 1000, at(1000))).dead).toBe('hit')
+    // 맞은 틱에 공과 큐브(그 틱 위치)가 겹친다.
+    const hit = last(run(l, 80, -1000, at(-1000)))
+    const mx = moverX(l.moverAt(SH)!, hit.tick)
+    const dx = Math.max(mx - 500 - hit.x, 0, hit.x - mx - 500)
+    const dz = Math.max(SH * ROW - hit.z, 0, hit.z - (SH + 1) * ROW)
+    expect(dx * dx + dz * dz).toBeLessThan(R * R)
+  })
+
+  it('shuttle collision is exactly the circle-vs-cube test at the new tick', () => {
+    for (const phase of [0, 13, 40, 77, 100]) {
+      const c = shuttle(phase)
+      const m = c.moverAt(SH)!
+      for (let x = -1400; x <= 1400; x += 50) {
+        for (let z = SH * ROW - 1100; z <= (SH + 1) * ROW + 400; z += 125) {
+          for (const tick of [0, 30, 61, 95]) {
+            const s0: SimState = { ...initSim(), x, z, tick }
+            const s = step(s0, x, c)
+            const mx = moverX(m, s.tick)
+            const dx = Math.max(mx - 500 - s.x, 0, s.x - mx - 500)
+            const dz = Math.max(SH * ROW - s.z, 0, s.z - (SH + 1) * ROW)
+            expect(s.dead === 'hit', `phase ${phase} x ${x} z ${z} tick ${tick}`).toBe(dx * dx + dz * dz < R * R)
+          }
+        }
+      }
+    }
+  })
+
+  it('shuttle: an airborne ball above the cube clears it', () => {
+    const c = shuttle(leftEnd)
+    const high: SimState = { ...at(-1000), z: SH * ROW - R - 100, y: R + BLOCK_H + 300, vy: 0, grounded: false, tick: ARRIVE - 1 }
+    const s = step(high, -1000, c)
+    expect(s.dead).toBeNull()
+    expect(step({ ...high, y: R + BLOCK_H - 100 }, -1000, c).dead).toBe('hit')
+  })
+
+  it('gimmick course: deterministic and the mirrored course mirrors the run', () => {
+    const rows = [J, ...rep(N3, 4), '..JJJ..', ...rep('.......', 8), ...rep(N3, 40), '..MMM..', ...rep(N3, 30), J]
+    const seg = parseSegment({ id: 'g', kind: 'obstacle', tier: 2, rows })
+    const tgt = (s: SimState) => ((s.tick * 613) % 2400) - 1200
+    const a = run(courseFromSegments([{ seg, mirrored: false, phase: 21 }]), 400, tgt)
+    const a2 = run(courseFromSegments([{ seg, mirrored: false, phase: 21 }]), 400, tgt)
+    expect(a2).toEqual(a)
+    const b = run(courseFromSegments([{ seg, mirrored: true, phase: 21 }]), 400, (s) => 0 - tgt({ ...s, x: 0 - s.x }))
+    expect(b.map((s) => [0 - s.x, s.y, s.z, s.dead])).toEqual(a.map((s) => [s.x, s.y, s.z, s.dead]))
+    expect(a.some((s) => !s.grounded)).toBe(true)
+    for (const s of a) for (const v of Object.values(s)) if (typeof v === 'number') expect(Number.isInteger(v)).toBe(true)
   })
 
   it('dead state is frozen', () => {

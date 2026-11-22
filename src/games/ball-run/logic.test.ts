@@ -36,9 +36,9 @@ describe('ball-run logic', () => {
     expect(logic.puzzleKey(p)).toBe(p.seed)
   })
 
-  it('has version 3 and the spec manifest', () => {
+  it('has version 4 and the spec manifest', () => {
     // v2: 코스·물리·점수 규칙이 모두 바뀌어 v1 기록은 재생되지 않는다.
-    expect(logic.version).toBe(3)
+    expect(logic.version).toBe(4)
     expect(manifest).toMatchObject({
       id: 'ball-run', name: '볼 런', description: '굴러가는 공을 좌우로 움직여 장애물을 피한다', options: [], hidden: false, freeStats: 'score', scoreMax: 99999, scoreDecimals: 0,
       modes: { daily: false, contest: false, free: true }, puzzleSource: 'generate', dailyTimeLimitSec: null,

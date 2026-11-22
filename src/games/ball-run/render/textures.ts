@@ -156,3 +156,45 @@ export function ballTexture(): CanvasTexture {
   ctx.filter = 'none'
   return finish(c)
 }
+
+// v4 점프대: 노란 판에 앞(캔버스 위쪽)을 가리키는 주황 갈매기 하나. 한 장 = 1 m × 1 m(판 폭만큼 반복). 터널의 하늘색 화살표·
+// 마젠타 블록과 확실히 다른 색이라 멀리서도 읽힌다.
+export const PAD_COLOR = '#ffd21f'
+export const PAD_CHEVRON = '#ff5a00'
+export const PAD_EDGE = '#fff7c2'
+export function padTexture(): CanvasTexture {
+  const S = 128
+  const [c, ctx] = canvas(S, S)
+  ctx.fillStyle = PAD_COLOR
+  ctx.fillRect(0, 0, S, S)
+  ctx.strokeStyle = PAD_CHEVRON
+  ctx.lineWidth = 22
+  ctx.lineJoin = 'miter'
+  ctx.beginPath()
+  ctx.moveTo(S * 0.16, S * 0.78)
+  ctx.lineTo(S * 0.5, S * 0.3)
+  ctx.lineTo(S * 0.84, S * 0.78)
+  ctx.stroke()
+  ctx.strokeStyle = PAD_EDGE
+  ctx.lineWidth = 6
+  ctx.strokeRect(0, 0, S, S)
+  return finish(c, true)
+}
+
+// v4 왕복 블록: 주황 큐브에 가운데 노란 가로띠와 밝은 테두리(마젠타 블록과 다른 '움직이는 기계' 색). 1 m 큐브 한 면 = 한 장.
+export const MOVER_COLOR = '#ff7a12'
+export const MOVER_STRIPE = '#fff04a'
+export const MOVER_EDGE = '#ffd7a8'
+export const TRACK_COLOR = '#ff9a3c'
+export function moverTexture(): CanvasTexture {
+  const S = 128
+  const [c, ctx] = canvas(S, S)
+  ctx.fillStyle = MOVER_COLOR
+  ctx.fillRect(0, 0, S, S)
+  ctx.fillStyle = MOVER_STRIPE
+  ctx.fillRect(0, S * 0.4, S, S * 0.2)
+  ctx.strokeStyle = MOVER_EDGE
+  ctx.lineWidth = 10
+  ctx.strokeRect(0, 0, S, S)
+  return finish(c, true)
+}

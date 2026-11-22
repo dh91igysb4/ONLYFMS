@@ -1,5 +1,6 @@
 // 시드 기반 코스 생성기. 순수 정수 연산, 외부 의존 없음.
-import { COL_MAX, COL_MIN, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
+import { COL_MAX, COL_MIN, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
+import type { Mover } from './mover.ts'
 import { JOINT, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell, ParsedSegment, SegmentKind } from './segments.ts'
 
@@ -20,6 +21,8 @@ export interface Course {
   segmentsBetween(fromRow: number, toRow: number): SegmentInfo[]
   /** 시작 행이 row 이하인 터널 조각 수(시작 터널 포함). row < 0은 0행으로 본다. */
   boostsBefore(row: number): number
+  /** row 행의 좌우 왕복 블록(위치는 mover.ts moverX). 없으면 null. */
+  moverAt(row: number): Mover | null
 }
 
 const COLS = COL_MAX - COL_MIN + 1
@@ -66,10 +69,13 @@ export function decorRandom(seed: string): () => number {
   return u32Stream(seed, 'decor')
 }
 
-// tunnels: 이 조각까지(포함) 놓인 터널 조각 수.
-type Placed = SegmentInfo & { grid: Cell[][]; tunnels: number }
+// tunnels: 이 조각까지(포함) 놓인 터널 조각 수. movers: 조각 안 행마다 왕복 블록.
+type Placed = SegmentInfo & { grid: Cell[][]; tunnels: number; movers: (Mover | null)[] }
+type Pick = { seg: ParsedSegment; mirrored: boolean; phase?: number }
 
-function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: number, tunnelsBefore: number): Placed {
+function place(p: Pick, startRow: number, base: number, tunnelsBefore: number): Placed {
+  const { seg, mirrored } = p
+  const phase = p.phase ?? 0
   const grid: Cell[][] = []
   for (const row of seg.cells) {
     const out: Cell[] = new Array(COLS)
@@ -83,25 +89,37 @@ function place(seg: ParsedSegment, mirrored: boolean, startRow: number, base: nu
               block: src.block,
               ...(src.blockH !== undefined ? { blockH: src.blockH } : {}),
               ...(src.bank !== undefined ? { bank: (mirrored ? -src.bank : src.bank) as -1 | 1 } : {}),
+              ...(src.pad ? { pad: true as const } : {}),
             }
     }
     grid.push(out)
   }
+  // 반전하면 x 범위 부호를 뒤집는다(moverX가 정확한 거울상을 낸다). 위상은 그대로.
+  const movers = seg.movers.map((m, r): Mover | null =>
+    m === null
+      ? null
+      : {
+          x0: mirrored ? 0 - m.x0 : m.x0,
+          x1: mirrored ? 0 - m.x1 : m.x1,
+          h: seg.cells[r][m.x0 / 1000 - COL_MIN].floor!.h0 + base,
+          phase: (phase + r * MOVER_ROW_OFFSET) % MOVER_PERIOD,
+        },
+  )
   const tunnels = tunnelsBefore + (seg.kind === 'tunnel' ? 1 : 0)
-  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, kind: seg.kind, grid, tunnels }
+  return { id: seg.id, tier: seg.tier, startRow, length: seg.length, mirrored, base, kind: seg.kind, grid, tunnels, movers }
 }
 
-function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) => { seg: ParsedSegment; mirrored: boolean }): Course {
+function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) => Pick): Course {
   const placed: Placed[] = []
   const first = pick(placed, 0)
-  placed.push(place(first.seg, first.mirrored, 0, 0, 0))
+  placed.push(place(first, 0, 0, 0))
   let endRow = first.seg.length
   let endBase = first.seg.dh
 
   const ensure = (row: number): void => {
     while (endRow <= row) {
       const p = pick(placed, endRow)
-      placed.push(place(p.seg, p.mirrored, endRow, endBase, placed[placed.length - 1].tunnels))
+      placed.push(place(p, endRow, endBase, placed[placed.length - 1].tunnels))
       endRow += p.seg.length
       endBase += p.seg.dh
     }
@@ -145,6 +163,12 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
       ensure(r)
       return find(r).tunnels
     },
+    moverAt(row) {
+      if (row < 0) return null
+      ensure(row)
+      const p = find(row)
+      return p.movers[row - p.startRow]
+    },
   }
 }
 
@@ -168,12 +192,14 @@ export function makeCourse(seed: string): Course {
     const rPick = next()
     const rMirror = next()
     const mirrored = (rMirror & 1) === 1
+    // 왕복 블록 위상: 반전 동전과 같은 셋째 난수의 위 비트(난수 개수는 그대로 3개).
+    const phase = (rMirror >>> 1) % MOVER_PERIOD
     const prev = placed[placed.length - 1]
     const stage = prev.tunnels
-    if (prev.kind === 'tunnel') return { seg: PARSED_DESCENTS[rPick % PARSED_DESCENTS.length], mirrored }
+    if (prev.kind === 'tunnel') return { seg: PARSED_DESCENTS[rPick % PARSED_DESCENTS.length], mirrored, phase }
     let obstacles = 0
     for (let i = placed.length - 1; placed[i].kind === 'obstacle'; i--) obstacles++
-    if (obstacles >= obstaclesInStage(stage)) return { seg: PARSED_TUNNELS[rPick % PARSED_TUNNELS.length], mirrored }
+    if (obstacles >= obstaclesInStage(stage)) return { seg: PARSED_TUNNELS[rPick % PARSED_TUNNELS.length], mirrored, phase }
 
     // 장애물: 단계 가중치로 tier를 고르고, 최근 장애물 3개는 피한다.
     const w = stageWeights(stage)
@@ -186,7 +212,7 @@ export function makeCourse(seed: string): Course {
     for (let i = placed.length - 1; i >= 0 && recent.size < 3; i--) if (placed[i].kind === 'obstacle') recent.add(placed[i].id)
     let cands = PARSED_OBSTACLES.filter((p) => p.tier === tier && !recent.has(p.id))
     if (cands.length === 0) cands = PARSED_OBSTACLES.filter((p) => w[p.tier - 1] > 0 && !recent.has(p.id))
-    return { seg: cands[rPick % cands.length], mirrored }
+    return { seg: cands[rPick % cands.length], mirrored, phase }
   })
 }
 
@@ -197,7 +223,8 @@ const FLAT: ParsedSegment = parseSegment({
   rows: [JOINT, ...new Array<string>(62).fill('_______'), JOINT],
 })
 
-export function courseFromSegments(list: { seg: ParsedSegment; mirrored: boolean }[]): Course {
+// phase: 왕복 블록 조각 위상(기본 0). 밸런스 테스트가 위상을 돌려 본다.
+export function courseFromSegments(list: Pick[]): Course {
   let i = 0
   return buildCourse('', () => (i < list.length ? list[i++] : { seg: FLAT, mirrored: false }))
 }
