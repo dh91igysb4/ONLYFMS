@@ -2,7 +2,7 @@
 import { ME_X, ME_Z } from '../constants.ts'
 
 // 카메라: 내 자리 눈높이에서 칠판(+z) 쪽을 본다. fovY는 세로 시야각(도).
-export const CAM = { x: ME_X, y: 1150, z: ME_Z, fovY: 60 } as const
+export const CAM = { x: ME_X, y: 1150, z: ME_Z, fovY: 75 } as const
 
 const TAN_HALF = Math.tan((CAM.fovY * Math.PI) / 360)
 

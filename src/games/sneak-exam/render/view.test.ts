@@ -4,7 +4,7 @@ import { ME_X, ME_Z } from '../constants.ts'
 
 describe('CAM', () => {
   it('내 자리 눈높이에 있다', () => {
-    expect(CAM).toEqual({ x: ME_X, y: 1150, z: ME_Z, fovY: 60 })
+    expect(CAM).toEqual({ x: ME_X, y: 1150, z: ME_Z, fovY: 75 })
   })
 })
 

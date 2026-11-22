@@ -31,8 +31,9 @@ import { CAM } from './view.ts'
 const M = 1 / 1000
 const MAX_DPR = 2
 const BG = '#1b1712'
-// 카메라 아래로 숙인 각. 책상 위 답안지가 화면 아래에, 앞에 선 감독관이 화면 위쪽 절반에 걸린다.
-const PITCH = (-15 * Math.PI) / 180
+// 카메라 아래로 숙인 각. 책상 위 답안지가 화면 아래에 걸리고, 옆 통로 (0|1800, 3800)에 선 감독관이 머리까지 화면 안에 든다.
+// 숙일수록 위쪽 점이 가까워져 화면 가장자리로 밀리므로 그 감독관의 어깨가 잘리지 않는 만큼만 숙인다.
+const PITCH = (-12 * Math.PI) / 180
 
 // 교실 크기(m)
 const WALL_X = 4.2
@@ -145,7 +146,7 @@ function classroomParts(): BufferGeometry[] {
     p.push(box(0.06, 1.46, 0.06, -WALL_X + 0.03, 1.7, z + 0.85, '#f8f6f0'))
     p.push(box(0.06, 1.46, 0.04, -WALL_X + 0.03, 1.7, z, '#f8f6f0'))
   }
-  // 책상·의자 20개, 내 자리를 뺀 19명
+  // 책상·의자 20개, 내 자리와 바로 앞 빈자리를 뺀 18명
   let k = 0
   for (let r = 0; r < ROW_Z.length; r++) {
     for (let c = 0; c < COL_X.length; c++) {
@@ -154,6 +155,8 @@ function classroomParts(): BufferGeometry[] {
       deskParts(p, x, z - DESK_AHEAD)
       if (COL_X[c] === ME_X && ROW_Z[r] === ME_Z) continue
       chairParts(p, x, z)
+      // 바로 앞자리는 결시생(빈자리): 세로 화면 가운데로 칠판·앞 통로·감독관 전신이 보인다.
+      if (COL_X[c] === ME_X && r === 1) continue
       studentParts(p, x, z, k++)
     }
   }
@@ -265,18 +268,18 @@ function buildProctor(material: Material, geos: BufferGeometry[]): ProctorRig {
   // 몸통: 뒤는 검은 정장, 앞은 흰 셔츠 V와 넥타이.
   body.add(
     mk([
-      box(0.46, 0.62, 0.24, 0, HIP + 0.31, 0, SUIT),
+      box(0.42, 0.62, 0.24, 0, HIP + 0.31, 0, SUIT),
       box(0.14, 0.4, 0.01, 0, HIP + 0.42, 0.125, SHIRT),
       box(0.05, 0.34, 0.012, 0, HIP + 0.4, 0.132, TIE),
-      box(0.4, 0.06, 0.25, 0, HIP + 0.02, 0, '#0a0a0c'), // 허리띠
+      box(0.38, 0.06, 0.25, 0, HIP + 0.02, 0, '#0a0a0c'), // 허리띠
       box(0.1, 0.06, 0.1, 0, HIP + 0.64, 0, SKIN), // 목
     ]),
   )
   const armL = new Group()
   const armR = new Group()
   for (const [arm, sx] of [[armL, -1], [armR, 1]] as const) {
-    arm.position.set(sx * 0.29, HIP + 0.58, 0)
-    arm.add(mk([box(0.12, 0.6, 0.14, 0, -0.3, 0, SUIT), box(0.1, 0.1, 0.1, 0, -0.64, 0, SKIN)]))
+    arm.position.set(sx * 0.265, HIP + 0.58, 0) // 바깥 끝 ±0.32 m: 옆 통로 3800에서도 화면 폭 안
+    arm.add(mk([box(0.11, 0.6, 0.14, 0, -0.3, 0, SUIT), box(0.09, 0.1, 0.1, 0, -0.64, 0, SKIN)]))
     body.add(arm)
   }
   // 머리: 앞은 얼굴(눈·코·안경), 뒤는 머리카락으로 덮어 뒷모습과 앞모습이 다르게 보인다.
