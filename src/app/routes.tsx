@@ -5,6 +5,7 @@ import { RequireAdmin, RequireApproved } from '../platform/auth/Guard.tsx'
 import { Layout } from '../platform/layout/Layout.tsx'
 import { AdminPage } from '../platform/admin/AdminPage.tsx'
 import { LeaderboardPage } from '../platform/leaderboard/LeaderboardPage.tsx'
+import { SuggestPage } from '../platform/suggest/SuggestPage.tsx'
 import { ProfilePage } from '../platform/profile/ProfilePage.tsx'
 import { HomePage } from '../platform/home/HomePage.tsx'
 import { GamesPage } from '../platform/games/GamesPage.tsx'
@@ -40,6 +41,7 @@ export function AppRoutes() {
         <Route path="/duel/local/:game" element={<DuelLocalPage />} />
         <Route path="/duel/:id" element={<DuelMatchPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/suggest" element={<SuggestPage />} />
         <Route path="/u/:handle" element={<ProfilePage />} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
       </Route>
