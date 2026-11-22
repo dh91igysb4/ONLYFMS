@@ -35,8 +35,12 @@ export const SPEED_TABLE: readonly number[] = [
 
 export const LAT_K = 5
 export const LAT_ACC = 25
-// 기운 판 위 한 틱마다 drift(실효 목표 이동량)에 더하는 값. drift는 줄지 않고 ±BANK_DRIFT_MAX에서 멈춘다.
-export const BANK_DRIFT = 80
+// v8: 기운 판은 등가속으로 민다. 판 위 한 틱마다 driftV(1/100 mm/틱)에 bank × BANK_ACC를 더하고 drift(실효 목표 이동량, mm)에
+// 0 쪽으로 버린 driftV / 100을 더한다. 판을 벗어나거나 뜨면 driftV = 0. drift는 줄지 않고 ±BANK_DRIFT_MAX에서 멈춘다.
+// 시작 값: 20° 기운 판을 미끄러지지 않고 구르는 꽉 찬 공의 가속 a = (5/7)·G·sin 20°
+//   = (5/7) × 7 mm/틱² × 0.3420 ≈ 1.71 mm/틱² → 171(1/100 mm/틱²).
+// 매 틱 버림으로 잃는 몫은 1 mm 미만(50틱 판에서 25 mm 안팎)이다 — 정수·좌우 대칭을 지키는 값.
+export const BANK_ACC = 171
 export const BANK_DRIFT_MAX = 2 * X_LIMIT
 
 export const VX_MAX = 117
