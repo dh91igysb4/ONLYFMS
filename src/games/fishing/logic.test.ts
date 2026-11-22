@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES } from './data.ts'
-import { price, rollCatch, sizePercentile } from './logic.ts'
+import { BAG_SIZE, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
+import { logic, price, rollCatch, sizePercentile, type Action, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
@@ -79,5 +79,219 @@ describe('rollCatch', () => {
     const a = rngFromSeed(seedBytes(7))
     const b = rngFromSeed(seedBytes(7))
     for (let i = 0; i < 100; i++) expect(rollCatch(a, 3, 0.4)).toEqual(rollCatch(b, 3, 0.4))
+  })
+})
+
+// ---------------------------------------------------------------- WorldLogic
+function deepFreeze<T>(o: T): T {
+  if (o && typeof o === 'object') {
+    Object.freeze(o)
+    for (const v of Object.values(o)) deepFreeze(v)
+  }
+  return o
+}
+const T0 = 1_000_000
+const fixedRng = () => 0.5
+const ctx = (now = T0) => ({ now, rng: fixedRng })
+const fresh = (over: Partial<State> = {}): State => ({ ...logic.init(), ...over })
+const ok = (r: ReturnType<typeof logic.apply>) => {
+  if ('error' in r) throw new Error(`unexpected error ${r.error}`)
+  return r
+}
+const err = (r: ReturnType<typeof logic.apply>) => {
+  if (!('error' in r)) throw new Error('expected error')
+  return r.error
+}
+const withPending = (over: Partial<State> = {}): State =>
+  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0 }, ...over })
+
+describe('fishing WorldLogic', () => {
+  it('init and version', () => {
+    expect(logic.version).toBe(1)
+    expect(logic.init()).toEqual({
+      gold: 0, totalEarned: 0, rodTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null,
+    })
+  })
+
+  it('cast sets pending and replaces an old one', () => {
+    const r1 = ok(logic.apply(fresh(), { type: 'cast', area: 'pier', power: 0.5 }, ctx(T0)))
+    expect(r1.state.pending).toMatchObject({ startedAt: T0 })
+    expect(r1.result).toEqual(r1.state.pending)
+    const old = withPending()
+    const r2 = ok(logic.apply(old, { type: 'cast', area: 'pier', power: 0.5 }, ctx(T0 + 5000)))
+    expect(r2.state.pending?.startedAt).toBe(T0 + 5000)
+    expect(r2.state.pending).not.toBe(old.pending)
+  })
+
+  it('cast with full bag -> bag_full, no pending', () => {
+    const bag: Fish[] = Array.from({ length: BAG_SIZE }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const s = deepFreeze(fresh({ bag }))
+    expect(err(logic.apply(s, { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
+    expect(s.pending).toBeNull()
+  })
+
+  it('cast rejects bad payloads', () => {
+    const s = deepFreeze(fresh())
+    for (const power of [NaN, -0.1, 2, '1', Infinity, null, undefined]) {
+      expect(err(logic.apply(s, { type: 'cast', area: 'pier', power } as unknown as Action, ctx()))).toBe('bad_power')
+    }
+    for (const area of ['ocean', 1, null, undefined]) {
+      expect(err(logic.apply(s, { type: 'cast', area, power: 0.5 } as unknown as Action, ctx()))).toBe('bad_area')
+    }
+    // 경계값 0과 1은 허용
+    for (const power of [0, 1]) ok(logic.apply(s, { type: 'cast', area: 'pier', power }, ctx()))
+  })
+
+  it('resolve success before biteDelay + 2000ms -> too_early, pending kept; boundary succeeds', () => {
+    const s = deepFreeze(withPending())
+    const edge = T0 + 3000 + MIN_FIGHT_MS
+    expect(err(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(edge - 1)))).toBe('too_early')
+    const r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: false }, ctx(edge)))
+    expect(r.state.pending).toBeNull()
+    expect(r.state.bag).toHaveLength(1)
+  })
+
+  it('resolve failure clears pending without adding fish (no time limit)', () => {
+    const s = deepFreeze(withPending())
+    const r = ok(logic.apply(s, { type: 'resolve', success: false, perfect: false }, ctx(T0)))
+    expect(r.state.pending).toBeNull()
+    expect(r.state.bag).toEqual([])
+    expect(r.state.dex).toEqual({})
+    expect(r.result).toEqual({ caught: null })
+  })
+
+  it('resolve success adds to bag and dex; maxCm keeps the larger', () => {
+    const late = ctx(T0 + 100_000)
+    let s = withPending({ dex: { anchovy: { count: 1, maxCm: 14 } } })
+    let r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: true }, late))
+    expect(r.result).toEqual({ caught: { species: 'anchovy', sizeCm: 12, perfect: true } })
+    expect(r.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: true }])
+    expect(r.state.dex.anchovy).toEqual({ count: 2, maxCm: 14 })
+    s = withPending({
+      pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0 },
+      dex: { anchovy: { count: 2, maxCm: 14 } },
+    })
+    r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: false }, late))
+    expect(r.state.dex.anchovy).toEqual({ count: 3, maxCm: 15 })
+  })
+
+  it('resolve without pending -> no_pending; non-boolean flags -> bad_action', () => {
+    expect(err(logic.apply(fresh(), { type: 'resolve', success: true, perfect: false }, ctx()))).toBe('no_pending')
+    const s = withPending()
+    for (const a of [{ success: 'true', perfect: false }, { success: true, perfect: 1 }, { success: true }]) {
+      expect(err(logic.apply(s, { type: 'resolve', ...a } as unknown as Action, ctx(T0 + 1e6)))).toBe('bad_action')
+    }
+  })
+
+  it('sell adds exact price sum to gold and totalEarned, empties bag; empty -> bag_empty', () => {
+    const bag: Fish[] = [
+      { species: 'anchovy', sizeCm: 8, perfect: false },
+      { species: 'grouper', sizeCm: 140, perfect: true },
+    ]
+    const s = deepFreeze(fresh({ gold: 10, totalEarned: 5, bag }))
+    const sum = price('anchovy', 8, false) + price('grouper', 140, true)
+    const r = ok(logic.apply(s, { type: 'sell' }, ctx()))
+    expect(r.result).toEqual({ earned: sum })
+    expect(r.state.gold).toBe(10 + sum)
+    expect(r.state.totalEarned).toBe(5 + sum)
+    expect(r.state.bag).toEqual([])
+    expect(err(logic.apply(fresh(), { type: 'sell' }, ctx()))).toBe('bag_empty')
+  })
+
+  it('buyRod: 1->2 at 1500 gold leaves 0 and keeps totalEarned; 1499 -> not_enough_gold; bad tiers', () => {
+    const r = ok(logic.apply(fresh({ gold: 1500, totalEarned: 2000 }), { type: 'buyRod', tier: 2 }, ctx()))
+    expect(r.state.rodTier).toBe(2)
+    expect(r.state.gold).toBe(0)
+    expect(r.state.totalEarned).toBe(2000)
+    expect(err(logic.apply(fresh({ gold: 1499 }), { type: 'buyRod', tier: 2 }, ctx()))).toBe('not_enough_gold')
+    const rich = deepFreeze(fresh({ gold: 1e6 }))
+    for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 5]) {
+      expect(err(logic.apply(rich, { type: 'buyRod', tier } as unknown as Action, ctx()))).toBe('bad_tier')
+    }
+  })
+
+  it('rare species only after rod 2 (5k casts at rod 1)', () => {
+    const rare = new Set(SPECIES.filter((s) => s.rarity === 'rare' || s.rarity === 'legend').map((s) => s.id))
+    const rng = rngFromSeed(seedBytes(11))
+    const s = fresh()
+    for (let i = 0; i < 5000; i++) {
+      const r = ok(logic.apply(s, { type: 'cast', area: 'pier', power: 0.5 }, { now: T0, rng }))
+      expect(rare.has(r.state.pending!.species)).toBe(false)
+    }
+  })
+
+  it('errors never mutate the input state', () => {
+    const full: Fish[] = Array.from({ length: BAG_SIZE }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const cases: [State, unknown, number?][] = [
+      [fresh(), { type: 'cast', area: 'x', power: 0.5 }],
+      [fresh(), { type: 'cast', area: 'pier', power: 9 }],
+      [fresh({ bag: full }), { type: 'cast', area: 'pier', power: 0.5 }],
+      [fresh(), { type: 'resolve', success: true, perfect: false }],
+      [withPending(), { type: 'resolve', success: true, perfect: false }, T0],
+      [withPending(), { type: 'resolve', success: 1, perfect: false }, T0 + 1e6],
+      [fresh(), { type: 'sell' }],
+      [fresh(), { type: 'buyRod', tier: 3 }],
+      [fresh({ gold: 5 }), { type: 'buyRod', tier: 2 }],
+      [fresh(), { type: 'dance' }],
+      [fresh(), null],
+      [fresh(), 'cast'],
+      [fresh(), 7],
+      [fresh(), []],
+    ]
+    for (const [state, action, now] of cases) {
+      const before = JSON.stringify(state)
+      deepFreeze(state)
+      expect(() => logic.apply(state, action as Action, ctx(now))).not.toThrow()
+      expect('error' in logic.apply(state, action as Action, ctx(now))).toBe(true)
+      expect(JSON.stringify(state)).toBe(before)
+    }
+    expect(err(logic.apply(fresh(), { type: 'dance' } as unknown as Action, ctx()))).toBe('bad_action')
+    expect(err(logic.apply(fresh(), null as unknown as Action, ctx()))).toBe('bad_action')
+  })
+
+  it('migrate fills missing fields and keeps gold/dex', () => {
+    const m = logic.migrate({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
+    expect(m).toEqual({ ...logic.init(), gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
+    expect(logic.migrate(null, 1)).toEqual(logic.init())
+    expect(logic.migrate('x', 1)).toEqual(logic.init())
+    expect(logic.migrate([], 1)).toEqual(logic.init())
+  })
+
+  it('migrate drops unknown species, bad fields, and pending', () => {
+    const m = logic.migrate(
+      {
+        gold: 'lots', totalEarned: 40, rodTier: 9, areas: ['pier', 3],
+        bag: [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'kraken', sizeCm: 9, perfect: false }, 'junk'],
+        dex: { goby: { count: 1, maxCm: 10 }, kraken: { count: 1, maxCm: 99 }, mackerel: { count: 'x', maxCm: 1 } },
+        pending: { species: 'anchovy', sizeCm: 10, biteDelayMs: 1, startedAt: 1 },
+      },
+      1,
+    )
+    expect(m.gold).toBe(0)
+    expect(m.totalEarned).toBe(40)
+    expect(m.rodTier).toBe(1)
+    expect(m.areas).toEqual(['pier'])
+    expect(m.bag).toEqual([{ species: 'anchovy', sizeCm: 10, perfect: true }])
+    expect(m.dex).toEqual({ goby: { count: 1, maxCm: 10 } })
+    expect(m.pending).toBeNull()
+  })
+
+  it("records: empty state -> 0, 0, '0/12'; after a catch biggest detail is the species name", () => {
+    expect(logic.records(logic.init())).toEqual([
+      { key: 'total_earned', value: 0 },
+      { key: 'biggest', value: 0 },
+      { key: 'dex', value: 0, detail: '0/12' },
+    ])
+    const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
+    expect(logic.records(s)).toEqual([
+      { key: 'total_earned', value: 70 },
+      { key: 'biggest', value: 100, detail: '다금바리' },
+      { key: 'dex', value: 2, detail: '2/12' },
+    ])
+  })
+
+  it('view returns the state as is', () => {
+    const s = withPending()
+    expect(logic.view(s, { now: T0 })).toBe(s)
   })
 })

@@ -9,6 +9,8 @@ import { manifest as ballRunManifest } from './ball-run/manifest.ts'
 import { logic as ballRunLogic } from './ball-run/logic.ts'
 import { manifest as sneakExamManifest } from './sneak-exam/manifest.ts'
 import { logic as sneakExamLogic } from './sneak-exam/logic.ts'
+import { manifest as fishingManifest } from './fishing/manifest.ts'
+import { logic as fishingLogic } from './fishing/logic.ts'
 
 /** 게임 등록부. 새 게임은 여기에 한 줄 추가한다. */
 export const games: GameModule[] = [
@@ -30,7 +32,7 @@ export function getDuel(id: string): DuelModule | undefined {
 }
 
 /** 지속형(world) 게임 등록부. 저장이 이어지는 게임은 solo `games`와 분리한다 (play Edge Function은 games만 본다). */
-export const worlds: WorldModule[] = []
+export const worlds: WorldModule[] = [{ manifest: fishingManifest, logic: fishingLogic }]
 
 export function getWorld(id: string): WorldModule | undefined {
   return worlds.find((w) => w.manifest.id === id)
