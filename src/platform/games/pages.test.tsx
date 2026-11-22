@@ -5,8 +5,13 @@ import { beforeEach, expect, test, vi } from 'vitest'
 const rpcMock = vi.fn()
 const playMock = vi.fn()
 let admin = true
-vi.mock('../../games/index.ts', async (orig) =>
-  (await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
+vi.mock('../../games/index.ts', async (orig) => {
+  const fx = await import('../../test-fixtures/world.ts')
+  const real = fx.withTestWorld((await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
+  // 숨김 world (일반 사용자에게는 카드가 없어야 한다)
+  const hidden = { ...fx.testWorld, manifest: { ...fx.testWorld.manifest, id: 'hidden-world', name: '숨김 월드', hidden: true } }
+  return { ...real, worlds: [...real.worlds, hidden] }
+})
 vi.mock('../../games/ui.ts', async (orig) =>
   (await import('../../test-fixtures/ui.ts')).withTestGameUi(await orig()))
 vi.mock('../../lib/supabase.ts', () => ({ supabase: { from: () => ({ upsert: async () => ({ error: null }) }) }, supabaseUrl: 'x', supabaseKey: 'k' }))
@@ -55,6 +60,19 @@ test('home says not played yet, and hides hidden games from non-admins', async (
   render(<MemoryRouter><GamesPage /></MemoryRouter>)
   expect(await screen.findByText('후알야')).toBeInTheDocument()
   expect(screen.queryByText('테스트 숫자 맞히기')).toBeNull()
+})
+
+test('home lists world games with an enter link, hidden ones only for admins', async () => {
+  rpcMock.mockResolvedValue([])
+  const r = render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  const card = within((await screen.findByRole('heading', { name: '테스트 월드' })).closest('article') as HTMLElement)
+  expect(card.getByRole('link', { name: '들어가기' })).toHaveAttribute('href', '/world/test-world')
+  expect(screen.getByRole('heading', { name: '숨김 월드' })).toBeInTheDocument()
+  r.unmount()
+  admin = false
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  expect(await screen.findByRole('heading', { name: '테스트 월드' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: '숨김 월드' })).toBeNull()
 })
 
 test('daily page with unknown game', () => {
