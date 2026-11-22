@@ -341,9 +341,9 @@ describe('templates', () => {
   const moverRows = (t: SegmentTemplate): number[] => t.rows.flatMap((row, r) => (row.includes('M') ? [r] : []))
   const plain = (row: string): boolean => /^\.*___\.*$/.test(row) // 평평한 3칸 길 한 줄
 
-  it('gimmicks: tier 1 has none; 3+ jump-pad, 3+ shuttle and 1+ combined templates over tiers 2-4', () => {
+  it('gimmicks: 3+ jump-pad, 3+ shuttle and 1+ combined templates; tier 1 has an easy shuttle and an easy pad', () => {
     for (const t of [START, ...TEMPLATES]) {
-      if (t.kind !== 'obstacle' || t.tier === 1) {
+      if (t.kind !== 'obstacle') {
         expect(padRows(t), t.id).toEqual([])
         expect(moverRows(t), t.id).toEqual([])
       }
@@ -353,11 +353,30 @@ describe('templates', () => {
     expect(jumps.filter((t) => moverRows(t).length === 0).length).toBeGreaterThanOrEqual(3)
     expect(shuttles.filter((t) => padRows(t).length === 0).length).toBeGreaterThanOrEqual(3)
     expect(jumps.filter((t) => moverRows(t).length > 0).length).toBeGreaterThanOrEqual(1)
-    expect(new Set([...jumps, ...shuttles].map((t) => t.tier))).toEqual(new Set([2, 3, 4]))
+    expect(new Set([...jumps, ...shuttles].map((t) => t.tier))).toEqual(new Set([1, 2, 3, 4]))
+    // v5: 첫 단계에서도 기믹을 본다 — tier 1 왕복 블록('m1-…')과 점프대('j1-…')가 하나 이상씩.
+    expect(shuttles.some((t) => t.tier === 1 && t.id.startsWith('m1-'))).toBe(true)
+    expect(jumps.some((t) => t.tier === 1 && t.id.startsWith('j1-'))).toBe(true)
     // 'BBB'처럼 길 전체를 막는 벽, 길 전체 구멍, 섬 건너기가 모두 있다.
     expect(jumps.some((t) => t.rows.some((row) => /^\.*BBB\.*$/.test(row)))).toBe(true)
     expect(jumps.some((t) => padRows(t).length >= 2)).toBe(true)
     expect(shuttles.some((t) => moverRows(t).length >= 2)).toBe(true)
+  })
+
+  it('tier-1 gimmick templates hold exactly one gimmick and nothing else to dodge', () => {
+    // 기믹 하나(점프대 행 하나 또는 왕복 블록 행 하나)와 점프대 비행 구간의 길 전체 구멍·'BBB' 벽 말고는 가운데 평평한 3칸 길뿐.
+    for (const t of OBSTACLES.filter((x) => x.tier === 1 && padRows(x).length + moverRows(x).length > 0)) {
+      const pads = padRows(t)
+      const movers = moverRows(t)
+      expect(pads.length + movers.length, t.id).toBe(1)
+      t.rows.forEach((row, r) => {
+        if (r === 0 || r === t.rows.length - 1 || pads.includes(r) || movers.includes(r)) return
+        const flight = pads.some((p) => r - p >= 1 && r - p <= 11)
+        const ok = row === '..___..' || (flight && (row === '.......' || row === '..BBB..'))
+        expect(ok, `${t.id} row ${r} '${row}'`).toBe(true)
+      })
+      for (const r of [...pads, ...movers]) expect(t.rows[r], t.id).toMatch(/^\.\.(JJJ|MMM)\.\.$/)
+    }
   })
 
   it('pads span the whole road of their row (a required jump cannot be half-missed)', () => {

@@ -133,7 +133,7 @@ const SHUT = '..MMM..' // 3칸 길 위 좌우 왕복 블록
 // - 점프대 'J'는 길 전체 3칸. 1단계(360)에서 점프대 뒤 약 15행, 최고 속도에서 약 35행에 내린다. 점프대 뒤 11행 안은 날아 넘는 자리
 //   (구멍은 14행까지 모든 속도에서 넘지만 8행만 쓴다), 'BBB' 벽은 모든 속도에서 넘는 +7..+10행 가운데 +9행, 착지 평지는 +42행까지.
 // - 왕복 블록 'M' 행은 3칸 길 전체. 앞뒤 26행(2칸 옮김 21 + 1칸 틈 5)은 평평한 3칸 길만, 점프 착지 구간(+42행) 안에는 두지 않는다.
-//   tier 1에는 기믹이 없다(첫 단계는 기본기).
+// - v5: tier 1에도 쉬운 기믹이 하나씩 있다(기믹 하나, 그 밖엔 피할 것 없는 평평한 3칸 길). 코스의 첫 장애물은 늘 'm1-shuttle'이다.
 
 // 시작 터널(속도 단계 1로 센다 — 시작 직후 '속도 증가' 한 번). 첫 화면이 터널 안이다.
 export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(N3, 38), J] }
@@ -211,6 +211,10 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
     id: 'o1-down-blocks', kind: 'obstacle', tier: 1,
     rows: [J, N3, N3, ...rep(D3, 4), ...rep(N3, 10), '..B__..', ...rep(N3, 17), '..B_B..', ...rep(N3, 6), J],
   },
+  // 왕복 블록 하나만, 앞뒤로 넉넉한 평지(v5: 첫 장애물로 늘 나온다).
+  { id: 'm1-shuttle', kind: 'obstacle', tier: 1, rows: [J, ...rep(N3, 34), SHUT, ...rep(N3, 34), J] },
+  // 점프대 → 짧은 길 전체 구멍 5행 → 긴 착지 평지(v5).
+  { id: 'j1-pad-gap', kind: 'obstacle', tier: 1, rows: [J, ...rep(N3, 20), PAD, ...rep(GAP, 5), ...rep(N3, 44), J] },
   // ---- tier 2
   // 가운데 1칸 문 뒤 블록 벽 사이 1칸 통로(녹화 27.0~27.5 s).
   {
@@ -248,8 +252,8 @@ export const OBSTACLES: readonly SegmentTemplate[] = [
   },
   // 점프대 → 길 전체 구멍 8행 → 긴 착지 평지(v4).
   { id: 'j2-pad-gap', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, 20), PAD, ...rep(GAP, 8), ...rep(N3, 44), J] },
-  // 왕복 블록 하나(v4). 큐브 반대쪽으로 비켜 지난다.
-  { id: 'm2-shuttle', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, 30), SHUT, ...rep(N3, 30), J] },
+  // 가운데 1칸 문을 지나 왕복 블록(v5: 왕복 블록 하나짜리는 tier 1 'm1-shuttle'로 옮겼다).
+  { id: 'm2-gate-shuttle', kind: 'obstacle', tier: 2, rows: [J, ...rep(N3, 17), '..G_G..', ...rep(N3, 26), SHUT, ...rep(N3, 30), J] },
   // ---- tier 3
   // 점프대 → 길 전체 1 m 블록 벽(점프로만 넘는다, v4).
   { id: 'j3-pad-wall', kind: 'obstacle', tier: 3, rows: [J, ...rep(N3, 20), PAD, ...rep(N3, 8), WALL, ...rep(N3, 44), J] },

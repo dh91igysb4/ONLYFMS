@@ -74,3 +74,6 @@ export const TIER_WEIGHTS: readonly { fromStage: number; w: readonly [number, nu
   { fromStage: 8, w: [1, 2, 2, 1] },
   { fromStage: 12, w: [1, 1, 2, 2] },
 ]
+
+// v5: 장애물 추첨에서 기믹 조각(점프대·왕복 블록)은 후보 목록 안에서 GIMMICK_WEIGHT번 센다(초반에도 기믹을 보게).
+export const GIMMICK_WEIGHT = 3

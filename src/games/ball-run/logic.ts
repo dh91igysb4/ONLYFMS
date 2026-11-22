@@ -21,7 +21,8 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   // v2: 코스(단계 주기)·물리(관성·기운 판·단차·터널 가속)·점수(시간) 규칙이 모두 바뀌었다.
   // v3: 공 속도 ×1.7(DROP_TOL 함께), 길 폭 최대 3칸으로 모든 조각을 다시 짰다.
   // v4: 기믹 — 점프대('J')·좌우 왕복 블록('M')과 새 장애물 조각 7개(코스 추첨 결과가 달라진다).
-  version: 4,
+  // v5: 기믹 등장 빈도 — tier 1 기믹 조각, 추첨 가중치(GIMMICK_WEIGHT), 첫 장애물은 늘 왕복 블록(코스 추첨 결과가 달라진다).
+  version: 5,
 
   pickPuzzle(rng, _options) {
     let seed = ''

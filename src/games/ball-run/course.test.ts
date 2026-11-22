@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { COL_MAX, COL_MIN, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
-import { courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
+import { COL_MAX, COL_MIN, GIMMICK_WEIGHT, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
+import { FIRST_OBSTACLE, courseFromSegments, decorRandom, getCourse, makeCourse, u32Stream } from './course.ts'
 import { JOINT, PARSED, PARSED_OBSTACLES, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell } from './segments.ts'
 
@@ -26,12 +26,12 @@ function segs(seed: string, count: number) {
 }
 // id 뒤의 ~는 좌우 반전
 const GOLDEN = [
-  'start', 'd-steep-blocks~', 'o1-down-blocks~', 'tunnel-27~', 'd-terraces~', 'o2-rails~',
-  'tunnel-24', 'd-ridge~', 'o1-edge-pillars', 'o1-gate-wide~', 'tunnel-24~', 'd-ridge~',
-  'o1-bank-intro~', 'o1-scatter', 'tunnel-30', 'd-steps~', 'o1-narrow2~', 'o2-ledge-blocks',
-  'tunnel-30~', 'd-terraces~', 'o3-rails-strips', 'o2-shift-path', 'tunnel-24~', 'd-steep',
+  'start', 'd-steep-blocks~', 'm1-shuttle~', 'tunnel-27~', 'd-terraces~', 'm2-gate-shuttle~',
+  'tunnel-24', 'd-ridge~', 'o1-scatter', 'j1-pad-gap~', 'tunnel-24~', 'd-ridge~',
+  'm1-shuttle~', 'o1-down-blocks', 'tunnel-30', 'd-steps~', 'o1-gate-wide~', 'm2-gate-shuttle',
+  'tunnel-30~', 'd-terraces~', 'o3-rails-strips', 'j2-pad-gap', 'tunnel-24~', 'd-steep',
 ]
-const GOLDEN_GIMMICK: unknown[] = ['mj4-pad-shuttle', 1448, true, '96:1000..-1000@56']
+const GOLDEN_GIMMICK: unknown[] = ['m1-shuttle', 89, true, '35:1000..-1000@86']
 const stageW = (stage: number) => [...TIER_WEIGHTS].reverse().find((b) => b.fromStage <= stage)!.w
 const flipBank = (c: Cell): Cell => (c.bank === undefined ? c : { ...c, bank: (-c.bank) as -1 | 1 })
 
@@ -92,6 +92,27 @@ describe('course', () => {
         expect(list[i].mirrored, `${seed} #${i} ${list[i].kind}`).toBe((next() & 1) === 1)
       }
     }
+  })
+  it('v5: the first obstacle of every run is the tier-1 shuttle (still 3 draws, mirror and phase from the 3rd)', () => {
+    for (let n = 0; n < 50; n++) {
+      const first = segs(seedN(n + 60), 4).find((s) => s.kind === 'obstacle')!
+      expect(first.id).toBe(FIRST_OBSTACLE)
+      expect(first.tier).toBe(1)
+    }
+  })
+  it('v5: gimmick templates count GIMMICK_WEIGHT times in the draw', () => {
+    expect(GIMMICK_WEIGHT).toBe(3)
+    // 1단계 첫 조각 뒤 단계 1~2(tier 1만 또는 tier 1 위주)에서 기믹 조각이 균등 추첨보다 자주 나온다.
+    let gim = 0
+    let all = 0
+    for (let n = 0; n < 200; n++) {
+      for (const s of segs(seedN(n), 40).slice(4)) {
+        if (s.kind !== 'obstacle' || s.tier !== 1) continue
+        all++
+        if (/^[jm]/.test(s.id)) gim++
+      }
+    }
+    expect(gim / all).toBeGreaterThan(0.3)
   })
   it('tier weights by stage (rescaled for shorter stages)', () => {
     expect(TIER_WEIGHTS.map((b) => b.fromStage)).toEqual([0, 2, 5, 8, 12])
