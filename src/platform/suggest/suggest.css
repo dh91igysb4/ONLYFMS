@@ -20,3 +20,10 @@
 .suggest-vote { min-width: 64px; }
 .suggest-vote[aria-pressed='true'] { background: var(--lime); color: var(--on-accent); border-color: var(--accent-edge); font-weight: 700; }
 .suggest-empty { padding: 24px 8px; text-align: center; }
+
+.suggest-admin-target { margin: 0; font-size: 16px; }
+.suggest-admin-group { margin: 0; font-size: 14px; color: var(--muted); }
+.suggest-admin-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 0; border-top: 1px solid var(--edge); }
+.suggest-note { margin: 0; font-size: 14px; color: var(--accent-strong); overflow-wrap: anywhere; }
+.suggest-reject { display: flex; flex-direction: column; gap: 8px; }
+.suggest-reject .input { width: 100%; box-sizing: border-box; }

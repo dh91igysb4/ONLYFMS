@@ -20,6 +20,7 @@ vi.mock('../../games/index.ts', () => ({
     { manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false, puzzleSource: 'generate' } },
     { manifest: { id: 'players', name: '선수 맞추기', hidden: false, puzzleSource: 'bank' } },
   ],
+  duels: [],
 }))
 
 import { ApiError } from '../../lib/api.ts'
@@ -45,6 +46,7 @@ beforeEach(() => {
     if (handlers[name]) return handlers[name](args)
     if (name === 'admin_list_users') return users.filter((u) => u.status === args.p_status)
     if (name === 'admin_bank_status') return bank
+    if (name === 'admin_suggestion_list') return []
     if (name === 'admin_set_status') {
       users = users.map((u) => (u.id === args.p_user ? { ...u, status: args.p_status as string } : u))
       return null
@@ -55,6 +57,13 @@ beforeEach(() => {
 
 const renderPage = () => render(<AdminPage />)
 const rowOf = (text: string) => screen.getByText(text).closest('li') as HTMLElement
+
+test('제안 검토 구역이 함께 뜬다', async () => {
+  renderPage()
+  expect(await screen.findByText('검토할 제안이 없어요')).toBeTruthy()
+  expect(screen.getByRole('region', { name: '제안 검토' })).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('admin_suggestion_list')
+})
 
 test('lists_pending_with_email', async () => {
   renderPage()

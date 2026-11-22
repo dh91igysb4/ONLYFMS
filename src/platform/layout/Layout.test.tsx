@@ -7,9 +7,12 @@ const signOut = vi.hoisted(() => vi.fn(async () => ({ error: null })))
 vi.mock('../../lib/supabase.ts', () => ({
   supabase: { from: () => ({ upsert: (...a: unknown[]) => (upsert as (...x: unknown[]) => unknown)(...a) }), auth: { signOut } },
 }))
+const auth = vi.hoisted(() => ({ isAdmin: false }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
-  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: false } }),
+  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: auth.isAdmin } }),
 }))
+const pendingCount = vi.hoisted(() => vi.fn())
+vi.mock('../suggest/adminApi.ts', () => ({ suggestionPendingCount: pendingCount }))
 
 import { Layout } from './Layout.tsx'
 import { resetFreeQueue } from '../games/freeQueue.ts'
@@ -22,6 +25,9 @@ const row = {
 beforeEach(() => {
   upsert.mockClear()
   signOut.mockClear()
+  pendingCount.mockReset()
+  pendingCount.mockResolvedValue(0)
+  auth.isAdmin = false
   localStorage.clear()
   resetFreeQueue()
   localStorage.setItem('onlyfms:freeQueue', JSON.stringify([row]))
@@ -140,4 +146,38 @@ test('main nav lists 홈, 게임, 대회, 대전, 리더보드, 제안 in order'
   expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
     ['홈', '/'], ['게임', '/games'], ['대회', '/contests'], ['대전', '/duel'], ['리더보드', '/leaderboard'], ['제안', '/suggest'],
   ])
+})
+
+test('관리자이고 대기 제안이 있으면 관리자 링크에 배지가 붙는다', async () => {
+  auth.isAdmin = true
+  pendingCount.mockResolvedValue(3)
+  mount()
+  const badge = await screen.findByLabelText('결정 대기 제안 3건')
+  expect(badge.textContent).toBe('3')
+  expect(badge.closest('a')?.getAttribute('href')).toBe('/admin')
+  expect(pendingCount).toHaveBeenCalledTimes(1)
+})
+
+test('대기 제안이 0건이면 배지가 없다', async () => {
+  auth.isAdmin = true
+  mount()
+  await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(1))
+  expect(screen.queryByLabelText(/결정 대기 제안/)).toBeNull()
+})
+
+test('일반 사용자는 대기 제안 수를 부르지 않는다', async () => {
+  pendingCount.mockResolvedValue(3)
+  mount()
+  await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
+  expect(pendingCount).not.toHaveBeenCalled()
+  expect(screen.queryByLabelText(/결정 대기 제안/)).toBeNull()
+})
+
+test('대기 제안 수 조회가 실패해도 조용히 배지만 없다', async () => {
+  auth.isAdmin = true
+  pendingCount.mockRejectedValue(new Error('boom'))
+  mount()
+  await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(1))
+  expect(screen.getByRole('link', { name: '관리자' })).toBeTruthy()
+  expect(screen.queryByLabelText(/결정 대기 제안/)).toBeNull()
 })
