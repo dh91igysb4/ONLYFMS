@@ -431,3 +431,8 @@ verify_jwt = false
 # 반영되지 않으면 `functions deploy duel --no-verify-jwt`로 배포.
 [functions.duel]
 verify_jwt = false
+
+# 제안 워커 전용 함수: 호출자는 x-worker-token(SUGGEST_WORKER_TOKEN)으로만 확인한다.
+# 반영되지 않으면 `functions deploy suggest --no-verify-jwt`로 배포.
+[functions.suggest]
+verify_jwt = false
