@@ -42,6 +42,12 @@
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
 
+## 낚시 데이터 갱신 (`fishing`)
+`src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
+1. `logic.ts`의 `logic.version`을 올린다.
+2. `migrate`가 옛 버전 세이브를 읽는지 `logic.test.ts`에 테스트를 추가한다 (세이브는 서버에 계속 남아 있다).
+3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
+
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
 - 판정·채점·문제 선택 결과가 달라지는 변경은 `logic.version`을 올린다. 불확실하면 올린다.
@@ -77,7 +83,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
-- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색 예외).
+- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색, 낚시 캔버스 내부 색 예외).
 
 ## 비밀값 위치
 - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)
