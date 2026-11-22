@@ -54,7 +54,7 @@ describe('sim', () => {
     const want: Record<keyof typeof spots, number[]> = {
       seenNear: [60, 120, 250],
       seenMid: [10, 20, 80],
-      seenFar: [0, 0, 15],
+      seenFar: [0, 0, 40],
       blindNear: [0, 120, 40],
       blindMid: [0, 20, 0],
     }
@@ -67,7 +67,7 @@ describe('sim', () => {
     expect([1, 2, 3].map((t) => TOOLS[t]!.seen[0])).toEqual(want.seenNear)
     // 매의 눈: 보는 far
     expect(gainOf({ ...spots.seenFar, tool: 1 }, 1)).toBe(5)
-    expect(gainOf({ ...spots.seenFar, tool: 3 }, 1)).toBe(30)
+    expect(gainOf({ ...spots.seenFar, tool: 3 }, 1)).toBe(80)
     // 도구 없음, 조는 중
     expect(gainOf({ ...spots.seenNear, tool: 0 }, 0)).toBe(0)
     for (const tool of [1, 2, 3] as const) expect(gainOf(at(900, 2000, 0, { tool }, true), 0)).toBe(0)

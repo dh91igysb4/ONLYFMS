@@ -33,7 +33,7 @@ export const TOOLS: readonly (ToolSpec | null)[] = [
   null,
   { name: '스마트 안경', rate: 6, stow: 0, seen: [60, 10, 0], blind: [0, 0, 0] },
   { name: '무선 이어폰', rate: 12, stow: 20, seen: [120, 20, 0], blind: [120, 20, 0] },
-  { name: '휴대폰', rate: 30, stow: 40, seen: [250, 80, 15], blind: [40, 0, 0] },
+  { name: '휴대폰', rate: 30, stow: 40, seen: [250, 80, 40], blind: [40, 0, 0] },
 ]
 
 export type ProctorSpec = {
