@@ -22,7 +22,8 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   // v3: 공 속도 ×1.7(DROP_TOL 함께), 길 폭 최대 3칸으로 모든 조각을 다시 짰다.
   // v4: 기믹 — 점프대('J')·좌우 왕복 블록('M')과 새 장애물 조각 7개(코스 추첨 결과가 달라진다).
   // v5: 기믹 등장 빈도 — tier 1 기믹 조각, 추첨 가중치(GIMMICK_WEIGHT), 첫 장애물은 늘 왕복 블록(코스 추첨 결과가 달라진다).
-  version: 5,
+  // v6: 템포 — 조각마다 속도 묶음(단계 1~3·4~8·9~16)을 두고 묶음 최고 속도 기준 간격으로 모든 조각을 다시 짰다(코스가 달라진다).
+  version: 6,
 
   pickPuzzle(rng, _options) {
     let seed = ''
