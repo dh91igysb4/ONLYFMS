@@ -45,6 +45,8 @@ function mount() {
         <Route element={<Layout />}>
           <Route path="/leaderboard" element={<p>lb</p>} />
           <Route path="/u/:handle" element={<p>profile</p>} />
+          <Route path="/suggest" element={<p>sg</p>} />
+          <Route path="/admin" element={<p>adm</p>} />
         </Route>
       </Routes>
       <Where />
@@ -180,4 +182,31 @@ test('대기 제안 수 조회가 실패해도 조용히 배지만 없다', asyn
   await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(1))
   expect(screen.getByRole('link', { name: '관리자' })).toBeTruthy()
   expect(screen.queryByLabelText(/결정 대기 제안/)).toBeNull()
+})
+
+test('관리자는 경로가 바뀔 때마다 대기 제안 수를 다시 읽어 배지를 갱신한다', async () => {
+  auth.isAdmin = true
+  pendingCount.mockResolvedValueOnce(3).mockResolvedValueOnce(2)
+  mount()
+  expect((await screen.findByLabelText('결정 대기 제안 3건')).textContent).toBe('3')
+  fireEvent.click(screen.getByRole('link', { name: '제안' }))
+  expect((await screen.findByLabelText('결정 대기 제안 2건')).textContent).toBe('2')
+  expect(pendingCount).toHaveBeenCalledTimes(2)
+})
+
+test('일반 사용자는 경로가 바뀌어도 대기 제안 수를 부르지 않는다', async () => {
+  mount()
+  fireEvent.click(screen.getByRole('link', { name: '제안' }))
+  await vi.waitFor(() => expect(where()).toBe('/suggest'))
+  expect(pendingCount).not.toHaveBeenCalled()
+})
+
+test('경로가 바뀐 뒤 조회가 실패하면 조용히 이전 배지를 유지한다', async () => {
+  auth.isAdmin = true
+  pendingCount.mockResolvedValueOnce(3).mockRejectedValueOnce(new Error('boom'))
+  mount()
+  await screen.findByLabelText('결정 대기 제안 3건')
+  fireEvent.click(screen.getByRole('link', { name: '제안' }))
+  await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(2))
+  expect(screen.getByLabelText('결정 대기 제안 3건')).toBeTruthy()
 })

@@ -64,7 +64,8 @@ export function SuggestPage() {
     try {
       await postSuggestion(target, body.trim())
       setBody('')
-      await load()
+      if (filter !== null && filter !== target) setFilter(target)
+      else await load()
     } catch (e) {
       setPostError(msg(e))
     } finally {

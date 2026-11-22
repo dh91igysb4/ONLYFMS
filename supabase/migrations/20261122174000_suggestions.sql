@@ -252,7 +252,8 @@ begin
   if v_verdict is null then
     raise exception using errcode = 'P0001', message = 'not_triaged';
   end if;
-  if v_row.status = 'shipped' or v_row.pr_url is not null then
+  -- 반영된 글은 결정할 수 없다. PR이 달린 글은 승인만 막는다(닫힌 PR 정리를 위해 거절은 허용).
+  if v_row.status = 'shipped' or (v_row.pr_url is not null and coalesce(p_approve, false)) then
     raise exception using errcode = 'P0001', message = 'not_editable';
   end if;
   if v_reason is not null and char_length(v_reason) > 200 then

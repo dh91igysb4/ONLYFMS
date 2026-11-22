@@ -118,7 +118,19 @@ t('pending_build_and_check', async () => {
   assert.equal(r.body.to_build[0].id, build)
   assert.equal(r.body.to_build[0].summary, '빌드 요약')
   assert.equal(r.body.to_build[0].note, '메모')
+  assert.deepEqual(Object.keys(r.body.to_build[0]).sort(), ['id', 'note', 'summary', 'target'])
   assert.deepEqual(r.body.to_check, [{ id: check, target: 'site', pr_url: PR }])
+})
+
+t('pending_check_skips_deleted', async () => {
+  await sql`delete from public.suggestions`
+  const u = await user('sgcheckdel')
+  const live = await sug(u, { status: 'planned', pr_url: PR })
+  const gone = await sug(u, { status: 'planned', pr_url: PR, deleted: true })
+  const r = await call({ action: 'pending' })
+  const ids = r.body.to_check.map((x: { id: string }) => x.id)
+  assert.deepEqual(ids, [live])
+  assert.ok(!ids.includes(gone))
 })
 
 // ---------------------------------------------------------------- triage
@@ -193,6 +205,17 @@ t('triage_duplicate_sets_link', async () => {
   assert.equal(d.duplicate_of, orig)
   assert.equal(d.status, 'rejected')
   assert.ok(d.decided_at)
+})
+
+t('triage_duplicate_of_deleted_is_invalid', async () => {
+  const u = await user('sgdupdel')
+  const orig = await sug(u, { deleted: true })
+  const dup = await sug(u)
+  const r = await call({ action: 'triage', items: [ok(dup, { verdict: 'duplicate', duplicate_of: orig })] })
+  assert.deepEqual(r.body.applied, [])
+  assert.deepEqual(r.body.skipped, [{ id: dup, reason: 'invalid' }])
+  assert.equal((await row(dup)).status, 'open')
+  assert.equal(await triageRow(dup), undefined)
 })
 
 t('triage_over_100_400', async () => {

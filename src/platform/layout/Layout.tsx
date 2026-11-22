@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useFreeQueueFlush } from '../games/freeQueue.ts'
 import { suggestionPendingCount } from '../suggest/adminApi.ts'
@@ -10,13 +10,14 @@ export function Layout() {
   const { profile } = useAuth()
   useFreeQueueFlush()
   const isAdmin = !!profile?.is_admin
+  const { pathname } = useLocation()
   const [pending, setPending] = useState(0)
   useEffect(() => {
     if (!isAdmin) return
     let alive = true
     suggestionPendingCount().then((n) => { if (alive) setPending(n) }).catch(() => {})
     return () => { alive = false }
-  }, [isAdmin])
+  }, [isAdmin, pathname])
   return (
     <div className="layout">
       <header className="app-header">

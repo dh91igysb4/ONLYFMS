@@ -57,7 +57,7 @@ async function pending(tx: Tx) {
      order by created_at desc, id desc
      limit 300`
   const to_build = await tx`
-    select s.id, s.target, s.body, t.summary, t.note
+    select s.id, s.target, t.summary, t.note
       from public.suggestions s
       left join public.suggestion_triage t on t.suggestion_id = s.id
      where s.status = 'planned' and s.pr_url is null and s.deleted_at is null
@@ -65,7 +65,7 @@ async function pending(tx: Tx) {
   const to_check = await tx`
     select id, target, pr_url
       from public.suggestions
-     where status = 'planned' and pr_url is not null
+     where status = 'planned' and pr_url is not null and deleted_at is null
      order by created_at asc, id asc`
   return { to_triage, context, to_build, to_check }
 }
@@ -116,7 +116,8 @@ async function triage(tx: Tx, items: unknown[]) {
       continue
     }
     if (item.duplicate_of) {
-      const [orig] = await tx`select 1 as ok from public.suggestions where id = ${item.duplicate_of}`
+      const [orig] = await tx`select 1 as ok from public.suggestions
+         where id = ${item.duplicate_of} and deleted_at is null`
       if (!orig) {
         skipped.push({ id: item.id, reason: 'invalid' })
         continue

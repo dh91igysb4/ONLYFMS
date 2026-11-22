@@ -107,6 +107,32 @@ test('4자면 올리기 비활성, 5자면 올리고 비우고 다시 읽는다'
   await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(before))
 })
 
+test('특정 대상 필터에서 다른 대상으로 올리면 필터가 그 대상으로 바뀐다', async () => {
+  postMock.mockResolvedValue('new')
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  fireEvent.click(screen.getByRole('button', { name: '사이트' }))
+  await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
+  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'players' } })
+  fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
+  fireEvent.click(screen.getByRole('button', { name: '올리기' }))
+  await waitFor(() => expect(postMock).toHaveBeenCalledWith('players', 'abcde'))
+  await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('players'))
+  expect(screen.getByRole('button', { name: '선수 맞추기' }).getAttribute('aria-pressed')).toBe('true')
+})
+
+test('전체 필터에서 올리면 필터는 그대로 전체다', async () => {
+  postMock.mockResolvedValue('new')
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
+  fireEvent.click(screen.getByRole('button', { name: '올리기' }))
+  await waitFor(() => expect(postMock).toHaveBeenCalled())
+  await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(1))
+  expect(listMock).toHaveBeenLastCalledWith(null)
+  expect(screen.getByRole('button', { name: '전체' }).getAttribute('aria-pressed')).toBe('true')
+})
+
 test('올리기 실패는 alert로 보인다', async () => {
   postMock.mockRejectedValue(new ApiError('too_many', 400))
   renderPage()

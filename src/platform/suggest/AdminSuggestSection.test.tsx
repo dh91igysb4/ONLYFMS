@@ -149,6 +149,37 @@ test('진행 중 묶음은 상태와 PR 링크를 보이고 design은 반영됨�
   await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2))
 })
 
+test('진행 중의 planned(PR 있음·없음)와 design 항목은 거절 이유와 함께 거절할 수 있다', async () => {
+  listMock.mockResolvedValue([
+    sg({ id: 'p1', body: '닫힌 PR 제안', status: 'planned', prUrl: 'https://github.com/x/y/pull/9' }),
+    sg({ id: 'p2', body: 'PR 없는 제안', status: 'planned' }),
+    sg({ id: 'd1', body: '설계할 제안', status: 'design' }),
+  ])
+  renderSection()
+  const prog = await screen.findByRole('group', { name: '진행 중' })
+  for (const text of ['닫힌 PR 제안', 'PR 없는 제안', '설계할 제안']) {
+    const li = within(prog).getByText(text).closest('li') as HTMLElement
+    expect(within(li).getByRole('button', { name: '거절' })).toBeTruthy()
+  }
+  const li = within(prog).getByText('닫힌 PR 제안').closest('li') as HTMLElement
+  fireEvent.click(within(li).getByRole('button', { name: '거절' }))
+  fireEvent.change(within(li).getByLabelText('거절 이유'), { target: { value: 'PR이 닫혔어요' } })
+  fireEvent.click(within(li).getByRole('button', { name: '거절 확정' }))
+  await waitFor(() => expect(decideMock).toHaveBeenCalledWith('p1', false, 'PR이 닫혔어요'))
+  await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2))
+})
+
+test('진행 중 항목의 거절 취소는 호출 없이 닫는다', async () => {
+  listMock.mockResolvedValue([sg({ id: 'd1', body: '설계할 제안', status: 'design' })])
+  renderSection()
+  const prog = await screen.findByRole('group', { name: '진행 중' })
+  fireEvent.click(within(prog).getByRole('button', { name: '거절' }))
+  expect(within(prog).getByLabelText('거절 이유')).toBeTruthy()
+  fireEvent.click(within(prog).getByRole('button', { name: '취소' }))
+  expect(within(prog).queryByLabelText('거절 이유')).toBeNull()
+  expect(decideMock).not.toHaveBeenCalled()
+})
+
 test('결정이 not_editable로 실패하면 alert를 보인다', async () => {
   decideMock.mockRejectedValue(new ApiError('not_editable', 400))
   renderSection()

@@ -78,6 +78,19 @@ export function AdminSuggestSection() {
 
   const empty = items !== null && pending === 0 && byTarget.length === 0 && progress.length === 0
 
+  const rejectForm = (s: AdminSuggestion) => (
+    <div className="suggest-reject">
+      <label className="suggest-field">
+        거절 이유
+        <input className="input" value={reason} maxLength={MAX_REASON} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <div className="card-actions">
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void decide(s, false, reason)}>거절 확정</button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRejectingId(null); setReason('') }}>취소</button>
+      </div>
+    </div>
+  )
+
   const row = (s: AdminSuggestion, buttons: React.ReactNode) => (
     <li key={s.id} className="suggest-admin-item">
       {s.summary && <strong>{s.summary}</strong>}
@@ -85,20 +98,7 @@ export function AdminSuggestSection() {
       <div className="suggest-meta">{s.handle ?? '알 수 없음'} · 공감 {s.votes}</div>
       {s.publicReason && <p className="suggest-reason">└ {s.publicReason}</p>}
       {s.note && <p className="suggest-note">주의: {s.note}</p>}
-      {rejectingId === s.id ? (
-        <div className="suggest-reject">
-          <label className="suggest-field">
-            거절 이유
-            <input className="input" value={reason} maxLength={MAX_REASON} onChange={(e) => setReason(e.target.value)} />
-          </label>
-          <div className="card-actions">
-            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void decide(s, false, reason)}>거절 확정</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRejectingId(null); setReason('') }}>취소</button>
-          </div>
-        </div>
-      ) : (
-        <div className="card-actions">{buttons}</div>
-      )}
+      {rejectingId === s.id ? rejectForm(s) : <div className="card-actions">{buttons}</div>}
     </li>
   )
 
@@ -163,14 +163,17 @@ export function AdminSuggestSection() {
               <li key={s.id} className="suggest-admin-item">
                 <div className="suggest-meta">{targetName(s.target)} · {STATUS_LABEL[s.status]}</div>
                 <p className="suggest-body">{s.body}</p>
-                <div className="card-actions">
-                  {s.status === 'planned' && s.prUrl && (
-                    <a className="btn btn-ghost btn-sm btn-link" href={s.prUrl} target="_blank" rel="noreferrer">PR</a>
-                  )}
-                  {s.status === 'design' && (
-                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void ship(s)}>반영됨으로 표시</button>
-                  )}
-                </div>
+                {rejectingId === s.id ? rejectForm(s) : (
+                  <div className="card-actions">
+                    {s.status === 'planned' && s.prUrl && (
+                      <a className="btn btn-ghost btn-sm btn-link" href={s.prUrl} target="_blank" rel="noreferrer">PR</a>
+                    )}
+                    {s.status === 'design' && (
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void ship(s)}>반영됨으로 표시</button>
+                    )}
+                    {rejectBtn(s)}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

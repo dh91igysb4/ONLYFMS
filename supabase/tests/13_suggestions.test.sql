@@ -2,7 +2,7 @@
 -- 한 트랜잭션 안에서 now()는 고정이다. 하루 5개 제한·정렬은 소유자 권한으로 created_at을 과거로 밀어 확인한다.
 -- 게임 id는 등록부와 무관한 테스트용 문자열(g-sug*)을 쓴다.
 begin;
-select plan(128);
+select plan(130);
 
 insert into public.game_modes (game_id, daily, contest, free) values
   ('g-sug', false, false, true),
@@ -28,6 +28,7 @@ insert into public.hidden_games (game_id) values ('g-sug-hidden');
 \set x9  'a1000000-0000-0000-0000-000000000009'
 \set x10 'a1000000-0000-0000-0000-00000000000a'
 \set x11 'a1000000-0000-0000-0000-00000000000b'
+\set x12 'a1000000-0000-0000-0000-00000000000c'
 -- 중복 링크 시험용
 \set d1 'a2000000-0000-0000-0000-000000000001'
 \set d2 'a2000000-0000-0000-0000-000000000002'
@@ -306,7 +307,9 @@ insert into public.suggestions (id, target, user_id, body, status, public_reason
   (:'x8',  'site', :'ua', '이미 반영된 제안입니다 8', 'shipped', null, null, null),
   (:'x9',  'site', :'ua', '긴 사유 시험 제안입니다 9', 'open', null, null, null),
   (:'x10', 'site', :'ua', '설계 중인 제안입니다 10', 'design', null, null, null),
-  (:'x11', 'site', :'ua', '계획된 제안입니다 11', 'planned', null, null, null);
+  (:'x11', 'site', :'ua', '계획된 제안입니다 11', 'planned', null, null, null),
+  (:'x12', 'site', :'ua', '닫힌 PR이 있는 제안입니다 12', 'planned', null, null,
+     'https://github.com/dh91igysb4/onlyfms/pull/12');
 insert into public.suggestion_triage (suggestion_id, verdict, summary, note) values
   (:'x2',  'recommend', '추천 요약', '추천 메모'),
   (:'x3',  'hold', '보류 요약', null),
@@ -317,7 +320,8 @@ insert into public.suggestion_triage (suggestion_id, verdict, summary, note) val
   (:'x8',  'recommend', '요약', null),
   (:'x9',  'recommend', '요약', null),
   (:'x10', 'hold', '요약', null),
-  (:'x11', 'recommend', '요약', null);
+  (:'x11', 'recommend', '요약', null),
+  (:'x12', 'recommend', '요약', null);
 
 -- ---------------------------------------------------------------- admin: forbidden
 set local role authenticated;
@@ -357,6 +361,12 @@ select throws_ok(format('select public.admin_suggestion_decide(%L, true)', :'x1'
   'P0001', 'not_triaged', 'decide: untriaged not_triaged');
 select throws_ok(format('select public.admin_suggestion_decide(%L, true)', :'x7'),
   'P0001', 'not_editable', 'decide: post with pr_url not_editable');
+select is(public.admin_suggestion_decide(:'x12', false, '닫힌 PR이라 거절합니다'), 'rejected'::public.suggestion_status,
+  'decide: reject planned post with pr_url → rejected');
+select results_eq(format('select status, pr_url, public_reason from public.suggestions where id = %L', :'x12'),
+  $$values ('rejected'::public.suggestion_status, 'https://github.com/dh91igysb4/onlyfms/pull/12'::text,
+            '닫힌 PR이라 거절합니다'::text)$$,
+  'decide: rejecting with pr_url keeps pr_url and stores reason');
 select throws_ok(format('select public.admin_suggestion_decide(%L, false)', :'x8'),
   'P0001', 'not_editable', 'decide: shipped post not_editable');
 select throws_ok(format('select public.admin_suggestion_decide(%L, true, repeat(%L, 201))', :'x7', 'a'),
