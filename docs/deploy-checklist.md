@@ -141,11 +141,11 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
 ```bash
 npx supabase@2 db push
 ```
-- [ ] 워커 토큰을 만들고 시크릿으로 설정한다. 만든 값은 터미널 기록·채팅·커밋에 남기지 말고 5번 예약 작업에서 쓸 곳(맥 `.env.local` 또는 예약 작업 설정)에만 넣는다.
+- [ ] 워커 토큰을 만들고 시크릿으로 설정한다. 값을 화면에 찍지 않고 셸 변수에 담아 바로 넘긴다.
 ```bash
-openssl rand -hex 32
-npx supabase@2 secrets set SUGGEST_WORKER_TOKEN=<값>
+TOKEN="$(openssl rand -hex 32)"; npx supabase@2 secrets set SUGGEST_WORKER_TOKEN="$TOKEN"
 ```
+  같은 값을 이 절 끝의 예약 작업 단계에서 쓸 곳(맥 `.env.local` 또는 예약 작업 설정)에 넣는다. 값을 `echo`로 찍거나 채팅·커밋에 남기지 않는다. 같은 셸에서 `.env.local`에 넣을 때는 `printf 'SUGGEST_WORKER_TOKEN=%s\n' "$TOKEN" >> .env.local`처럼 화면에 출력하지 않는 방법으로 하고, 끝나면 `unset TOKEN`을 한다.
 - [ ] 함수 배포
 ```bash
 npx supabase@2 functions deploy suggest --no-verify-jwt
