@@ -7,12 +7,15 @@ import { manifest as yachtManifest } from './yacht/manifest.ts'
 import { logic as yachtLogic } from './yacht/logic.ts'
 import { manifest as ballRunManifest } from './ball-run/manifest.ts'
 import { logic as ballRunLogic } from './ball-run/logic.ts'
+import { manifest as sneakExamManifest } from './sneak-exam/manifest.ts'
+import { logic as sneakExamLogic } from './sneak-exam/logic.ts'
 
 /** 게임 등록부. 새 게임은 여기에 한 줄 추가한다. */
 export const games: GameModule[] = [
   { manifest: whoAreYaManifest, logic: whoAreYaLogic },
   { manifest: toothbrushManifest, logic: toothbrushLogic },
   { manifest: ballRunManifest, logic: ballRunLogic },
+  { manifest: sneakExamManifest, logic: sneakExamLogic },
 ]
 
 export function getGame(id: string): GameModule | undefined {
