@@ -141,7 +141,15 @@ export function LeaderboardPage() {
       {!error && ready && tab === 'free' && (
         freeRows.length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
           <div className="lb-panel">
-            {isScoreGame(game) ? (
+            {isScoreGame(game) && getGame(game)?.manifest.freeBestOnly ? (
+              <LbTable
+                cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '최고', num: true, sorted: true }]}
+                rows={freeRows.map((r, i) => ({
+                  id: r.user_id, top: i < 3, me: r.user_id === myId,
+                  cells: [i + 1, <Handle handle={r.handle} />, formatFreeScore(game, r.best_score)],
+                }))}
+              />
+            ) : isScoreGame(game) ? (
               <LbTable
                 cols={[{ label: '아이디' }, { label: '플레이', num: true }, { label: '평균', num: true }, { label: '최고', num: true, sorted: true }]}
                 rows={freeRows.map((r, i) => ({

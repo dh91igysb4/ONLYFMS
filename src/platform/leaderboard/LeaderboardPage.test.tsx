@@ -19,6 +19,7 @@ vi.mock('../../games/index.ts', () => {
     { manifest: { id: 'who-are-ya', name: '후알야', hidden: false } },
     { manifest: { id: 'toothbrush', name: '양치', hidden: true, freeStats: 'score' } },
     { manifest: { id: 'int-score', name: '정수 점수', hidden: true, freeStats: 'score', scoreDecimals: 0 } },
+    { manifest: { id: 'best-only', name: '최고만', hidden: true, freeStats: 'score', scoreDecimals: 0, freeBestOnly: true } },
   ]
   return {
     games,
@@ -148,6 +149,24 @@ test('score_game_with_zero_decimals_shows_integers', async () => {
   const tr = (await screen.findByText('alpha')).closest('tr')!
   expect(within(tr).getByText('583')).toBeTruthy()
   expect(within(tr).queryByText('583.00')).toBeNull()
+})
+
+test('best_only_score_game_shows_rank_and_best_only', async () => {
+  admin = true
+  setup({ lb_free: [
+    { ...free('a', 'alpha', 4, 0, 0, 0, 0, 120), avg_score: 80.5 },
+    { ...free('b', 'beta', 9, 0, 0, 0, 0, 583), avg_score: 410.5 },
+  ] })
+  renderPage()
+  tab('자유 플레이')
+  await screen.findByText('alpha')
+  fireEvent.change(screen.getByLabelText('게임'), { target: { value: 'best-only' } })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_free', { p_game: 'best-only' }))
+  await waitFor(() => expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['순위', '아이디', '최고']))
+  const rows = screen.getAllByRole('row').slice(1)
+  expect(rows.map((r) => within(r).getAllByRole('cell').map((c) => c.textContent))).toEqual([['1', 'beta', '583'], ['2', 'alpha', '120']])
+  expect(screen.queryByText('410.5')).toBeNull()
+  expect(screen.queryByText('411')).toBeNull()
 })
 
 test('who_are_ya_keeps_wins_sort', async () => {
