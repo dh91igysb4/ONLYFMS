@@ -2,7 +2,7 @@ import type { Manifest } from '../types.ts'
 
 export const manifest: Manifest = {
   id: 'sneak-exam',
-  name: '몰래 수능',
+  name: '이진우 따라잡기',
   description: '감독관 몰래 답을 알아내 답안지를 채운다',
   hidden: false,
   modes: { daily: false, contest: false, free: true },

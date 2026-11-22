@@ -513,7 +513,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       </div>
 
       <div className="se-stage" data-testid="se-stage" data-glasses={sim.tool === 1 || undefined}>
-        <canvas ref={canvasRef} className="se-canvas" aria-label="몰래 수능 교실 화면" role="img" />
+        <canvas ref={canvasRef} className="se-canvas" aria-label="이진우 따라잡기 교실 화면" role="img" />
         {side !== 0 && (
           <div className="se-edge" data-testid="se-edge" data-side={side < 0 ? 'left' : 'right'} data-seeing={seeing} role="status">
             {side < 0 ? '◀ 감독관' : '감독관 ▶'}
@@ -598,7 +598,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
 
       {ready && !started && !ended && (
         <div className="se-overlay se-intro">
-          <h2>몰래 수능</h2>
+          <h2>이진우 따라잡기</h2>
           <ul className="se-rules">
             <li>답을 알 수 없는 8문제, 제한 시간 2분.</li>
             <li>커닝 도구를 켜면 답이 보이지만, 감독관에게 들키면 의심도가 오른다.</li>
