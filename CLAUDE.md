@@ -69,7 +69,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
-- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색 예외).
+- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색, 네온 라이더 캔버스 내부 색 예외). 문구 예외는 네온 라이더 착지 감탄 문구(영어 소문자) 하나뿐이다.
 
 ## 비밀값 위치
 - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)
