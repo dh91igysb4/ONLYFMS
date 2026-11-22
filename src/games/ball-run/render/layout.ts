@@ -189,11 +189,74 @@ export function cameraTarget(
   return { eyeY, minEyeY: Math.min(eyeY, floorMax + EYE_CLEAR) }
 }
 
+// v7: 시선이 내다볼 점 — 공 열의 LOOK_AHEAD_S초 앞(LOOK_AHEAD_MIN..MAX) 바닥 위 블록 꼭대기. 급경사를 내려온 직후 눈이 높이
+// 남아(EYE_RATE_DOWN) 공을 BALL_FRAC에 두려고 40° 가까이 숙이면 앞 길이 화면 위로 잘려 블록이 0.4초 앞에야 보였다.
+// lookPitch가 이 점을 화면 위 끝 LOOK_TOP_MARGIN 안에 두도록 덜 숙인다(공은 그만큼 화면 아래로 내려간다).
+export const LOOK_AHEAD_S = 1.2
+export const LOOK_AHEAD_MIN = 20000
+export const LOOK_AHEAD_MAX = 60000
+export function lookAheadPoint(course: Course, ball: { x: number; y: number; z: number; vz: number }): { y: number; z: number } {
+  const d = Math.min(LOOK_AHEAD_MAX, Math.max(LOOK_AHEAD_MIN, ball.vz * TICK_HZ * LOOK_AHEAD_S))
+  const f = floorAt(course, ball.x, ball.z + d)
+  return { y: (f ?? ball.y - R) + BLOCK_H, z: ball.z + d }
+}
+const DEG = Math.PI / 180
+const HALF_FOV = (VFOV / 2) * DEG
+export const LOOK_TOP_MARGIN = 2 * DEG // 내다볼 점은 화면 위 끝에서 이만큼 아래
+export const BALL_BOTTOM_MARGIN = 6 * DEG // 공 가운데는 화면 아래 끝에서 이만큼 위(공이 우선)
+
 // 시선 각(rad, 음수면 아래). eye·ball은 (y, z) mm, z는 앞쪽이 +. minDown(rad)이 있으면 적어도 그만큼 숙인다(세계 기준).
 const BALL_OFF = Math.atan((BALL_FRAC - 0.5) * 2 * Math.tan(((VFOV / 2) * Math.PI) / 180))
-export function lookPitch(eye: { y: number; z: number }, ball: { y: number; z: number }, minDown = 0): number {
-  const p = Math.atan2(ball.y - eye.y, ball.z - eye.z) + BALL_OFF
-  return minDown > 0 ? Math.min(p, -minDown) : p
+// ahead(lookAheadPoint)가 있으면 그 점이 화면 위로 잘리지 않을 만큼만 숙인다(최소 숙임보다 우선). 공은 화면 아래 끝 여유 안에 남긴다.
+export function lookPitch(
+  eye: { y: number; z: number },
+  ball: { y: number; z: number },
+  minDown = 0,
+  ahead: { y: number; z: number } | null = null,
+): number {
+  const toBall = Math.atan2(ball.y - eye.y, ball.z - eye.z)
+  let p = toBall + BALL_OFF
+  if (minDown > 0) p = Math.min(p, -minDown)
+  if (ahead !== null) {
+    p = Math.max(p, Math.atan2(ahead.y - eye.y, ahead.z - eye.z) + LOOK_TOP_MARGIN - HALF_FOV)
+    p = Math.min(p, toBall + HALF_FOV - BALL_BOTTOM_MARGIN)
+  }
+  return p
+}
+
+// 카메라 한 프레임(장면 render가 쓰는 순서 그대로, 순수 함수). desc·eyeY가 NaN이면 첫 프레임(목표로 바로 둔다).
+// descWant: 이번 프레임 내리막 정도 목표(내리막·가속 중 큰 쪽). null이면 desc를 그대로 둔다(부딪혀 죽은 뒤).
+// ball.y는 그린 공 높이(기운 판 보정 포함), vz는 시선이 내다볼 거리를 정하는 전진 속도(mm/틱).
+export type CamState = { desc: number; eyeY: number }
+export function cameraStep(
+  course: Course,
+  cam: CamState,
+  ball: { x: number; y: number; z: number; vz: number },
+  descWant: number | null,
+  dt: number,
+): CamState & { back: number; pitch: number } {
+  const first = Number.isNaN(cam.eyeY)
+  const desc = descWant === null ? cam.desc : first ? descWant : smoothDescent(cam.desc, descWant, dt)
+  const rig = cameraRig(desc)
+  const t = cameraTarget(course, ball, rig)
+  let eyeY = first ? t.eyeY : smoothEye(cam.eyeY, t.eyeY, t.minEyeY, dt)
+  const ahead = lookAheadPoint(course, ball)
+  const ez = ball.z - rig.back
+  // 공과 내다볼 점이 한 화면(여유 빼고)에 들어가지 않을 만큼 눈이 높이 남았으면 들어갈 때까지 눈을 내린다(목표 높이까지만).
+  const fits = (e: number): boolean =>
+    Math.atan2(ahead.y - e, ahead.z - ez) - Math.atan2(ball.y - e, ball.z - ez) <= 2 * HALF_FOV - LOOK_TOP_MARGIN - BALL_BOTTOM_MARGIN
+  if (eyeY > t.eyeY && !fits(eyeY)) {
+    let lo = t.eyeY
+    let hi = eyeY
+    for (let k = 0; k < 16; k++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) lo = mid
+      else hi = mid
+    }
+    eyeY = lo
+  }
+  const pitch = lookPitch({ y: eyeY, z: ez }, ball, rig.minDown, ahead)
+  return { desc, eyeY, back: rig.back, pitch }
 }
 
 // 눈 높이 한 프레임 보간(mm). 내려갈 때는 천천히, 올라갈 때는 빨리. 목표보다 EYE_LAG_MAX 넘게 높지 않고 minEye 아래로 가지 않는다.

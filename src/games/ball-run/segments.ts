@@ -154,11 +154,14 @@ export type Band = {
   flight: number // 점프대 뒤 날아 넘는 구간(구멍·'BBB' 벽): 묶음 최저 속도에서 착지 행 − 4
   land: number // 점프대 뒤 착지 평지 끝(42행): 묶음 최고 속도 착지 행 + 여유
   rampLand: number // 오르막(4행) 끝 구멍 2행 뒤 착지 평지: 묶음 최고 속도 착지 행 + 3
+  rest: number // v7: 결정 사이에 설계 간격보다 더 두는 행(최고 속도 REST_TOP행과 같은 틱)
 }
+// v7(사용자: "지금이랑 아까의 중간 정도로"): v6은 결정 사이를 설계 최소 간격으로 붙였다. 그 위에 이만큼 더 둔다.
+export const REST_TOP = 23
 function band(id: Band['id'], minLevel: number, maxLevel: number, flight: number, rampLand: number): Band {
   const r = (n: number) => bandRows(n, maxLevel)
   const bank = Math.floor((13 * SPEED_TABLE[maxLevel]) / V_MAX)
-  return { id, minLevel, maxLevel, s1: r(12), s2: r(21), s3: r(28), e1: r(5), clear: r(26), bank, ledge: r(15), flight, land: r(42), rampLand }
+  return { id, minLevel, maxLevel, s1: r(12), s2: r(21), s3: r(28), e1: r(5), clear: r(26), bank, ledge: r(15), flight, land: r(42), rampLand, rest: r(REST_TOP) }
 }
 // 점프대 착지 행(시뮬로 잰 값, sim.test): 단계 1 → +15, 3 → +17, 4 → +19, 8 → +24, 9 → +25, 16 → +35.
 // 오르막 끝 점프 착지(오르막 끝에서): 단계 3 → +12, 8 → +21, 16 → +45(묶음 c는 착지 평지가 너무 길어 쓰지 않는다).
@@ -177,6 +180,8 @@ export const BANDS: readonly Band[] = [band('a', 1, 3, 11, 15), band('b', 4, 8, 
 //   착지 평지 바로 뒤에 다음 결정(날아가는 동안 미리 옮길 수 있다).
 // - 왕복 블록 'M' 행은 3칸 길 전체. 앞뒤 clear행은 같은 칸의 평평한 3칸 길만, 점프 착지 구간 + clear 안에는 두지 않는다.
 // - 첫 장애물 'm1-shuttle-*'은 왕복 블록 하나와 평평한 3칸 길뿐. 다른 tier 1 기믹 조각은 기믹 하나 + tier 1 장애물.
+// - v7: 결정 사이에는 설계 간격보다 rest행(최고 속도 REST_TOP행과 같은 틱)을 더 둔다. 낮은 tier는 가운데가 비는 블록을 섞어
+//   덜 몰아붙이고, 묶음 a(단계 1~3)에는 1칸 길이 이어지는 구간(1칸 레일·굽는 1칸 길·1칸 능선)을 두지 않는다.
 
 // 시작 터널(속도 단계 1로 센다 — 시작 직후 '속도 증가' 한 번). 첫 화면이 터널 안이다. 판을 시작하는 자리라 길이는 그대로 둔다.
 export const START: SegmentTemplate = { id: 'start', kind: 'tunnel', tier: 1, rows: [J, ...rep(N3, 38), J] }
@@ -253,7 +258,7 @@ function chain(b: Band, ...items: Item[]): string[] {
     }
     const rows = typeof it === 'string' ? [it] : it
     // 채움 행이 막는 행이 되면(바깥 열이 빠지는 등) 그 행부터 다시 센다.
-    while (gapNeed(b, last, rows[0]) > since) push(fill)
+    while (gapNeed(b, last, rows[0]) + b.rest > since) push(fill)
     rows.forEach(push)
   }
   while (gapNeed(b, last, J) > since) push(fill)
@@ -275,27 +280,37 @@ const DESCENT_RECIPES: readonly Recipe[] = [
   // 급경사 능선 뒤 평평한 턱에 번갈아 막는 블록(녹화 4.0~5.25 s, 16.0~16.75 s).
   {
     base: 'd-steep-blocks', kind: 'descent', tier: 1, bands: ALL,
-    rows: (b) => chain(b, { raw: S(8) }, '.._B_..', '..B_B..', '.._B_..', '..B_B..', '..BB_..'),
+    rows: (b) => chain(b, { raw: S(8) }, '..B__..', '..__B..', '..BB_..'),
   },
   // 굽는 능선: 급경사 뒤 왼쪽 2칸 → 왼쪽 1칸 → 2칸 → 가운데 1칸 → 오른쪽 2칸 → 오른쪽 1칸(녹화 12.0 s, 16.0 s).
   {
     base: 'd-ridge', kind: 'descent', tier: 1, bands: ALL,
-    rows: (b) => [
-      ...S(Math.max(8, b.s1)), ...rep(N2, g1(b) + 1), ...rep(L1, nr(b)), ...rep(N2, g1(b)), ...rep(N1, nr(b)), ...rep(R2, g1(b)),
-      ...rep(R1, nr(b)), R2, N3,
-    ],
+    rows: (b) => {
+      const k = g1(b) + b.rest
+      // 묶음 a(단계 1~3)는 1칸까지 좁히지 않는다(v7: 초반은 너그럽게).
+      if (b.id === 'a') return [...S(8), ...rep(N2, b.s1 + 1 + b.rest), ...rep(R2, b.s1 + 1 + b.rest), ...rep(N2, b.s1 + 1), N3]
+      return [...S(Math.max(8, b.s1)), ...rep(N2, k + 1), ...rep(L1, nr(b)), ...rep(N2, k), ...rep(N1, nr(b)), ...rep(R2, k), ...rep(R1, nr(b)), R2, N3]
+    },
   },
   // 단차 뒤 착지 길이 2칸 → 1칸으로 좁아져 옆으로 옮겨 가고, 다시 단차 뒤 블록.
   {
     base: 'd-ledge-offset', kind: 'descent', tier: 1, bands: ALL,
     rows: (b) =>
-      chain(b, { raw: [...S(b.s1 - 1), RL, ...rep(N2, g1(b) + 1), ...rep(L1, nr(b)), ...rep(N2, b.s1), N3, ...S(3), RL] }, '..B_B..', '.._B_..'),
+      chain(
+        b,
+        {
+          raw: b.id === 'a'
+            ? [...S(b.s1 - 1), RL, ...rep(N2, b.s1 + 1 + b.rest), ...rep(R2, b.s1 + 1), N3, ...S(3), RL]
+            : [...S(b.s1 - 1), RL, ...rep(N2, g1(b) + 1 + b.rest), ...rep(L1, nr(b)), ...rep(N2, b.s1), N3, ...S(3), RL],
+        },
+        '..B_B..', '.._B_..',
+      ),
   },
   // 급경사 + 단차 계단, 착지 턱마다 블록(녹화 22.75~23.75 s).
   {
     base: 'd-terraces', kind: 'descent', tier: 1, bands: ALL,
     rows: (b) =>
-      chain(b, { raw: [...S(3), RL, ...F(b.ledge)] }, '.._B_..', '..B_B..', { raw: [...S(2), RL, ...F(b.ledge)] }, '..B_B..', '.._BB..'),
+      chain(b, { raw: [...S(3), RL, ...F(b.ledge)] }, '..B__..', { raw: [...S(2), RL, ...F(b.ledge)] }, '..__B..', '.._BB..'),
   },
 ]
 
@@ -304,19 +319,19 @@ const DESCENT_RECIPES: readonly Recipe[] = [
 const OBSTACLE_RECIPES: readonly Recipe[] = [
   // ---- tier 1
   // 가운데 블록과 양옆 블록이 번갈아(녹화 17.0~19.5 s).
-  { base: 'o1-scatter', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, '.._B_..', '..B_B..', '.._B_..', '..B_B..', '.._B_..') },
+  { base: 'o1-scatter', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, '..__B..', '..B__..', '.._B_..', '..__B..', '..B_B..') },
   // 큰 기둥 둘이 틈을 좌우로 옮긴다(녹화 17.75 s, 19.0 s).
   {
     base: 'o1-edge-pillars', kind: 'obstacle', tier: 1, bands: ALL,
     rows: (b) => chain(b, rep('..P_P..', 2), rep('..PP_..', 2), rep('..P_P..', 2), rep('.._PP..', 2)),
   },
   // 가운데 1칸 문(녹화 27.0 s)과 블록이 번갈아.
-  { base: 'o1-gate-wide', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, '..G_G..', '.._B_..', '..G_G..', '..BB_..') },
+  { base: 'o1-gate-wide', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, '..G_G..', '..B__..', '..G_G..', '..BB_..') },
   // 2칸 길이 한 칸씩 왼쪽 끝에서 오른쪽 끝까지 옮겨 간다(휘는 길).
   {
     base: 'o1-narrow2', kind: 'obstacle', tier: 1, bands: ALL,
     rows: (b) => {
-      const k = b.s1 + 1
+      const k = b.s1 + 1 + b.rest
       return [...F(b.s2), ...rep('.__....', k), ...rep(N2, k), ...rep(R2, k), ...rep('....__.', k), R2, N3]
     },
   },
@@ -327,7 +342,7 @@ const OBSTACLE_RECIPES: readonly Recipe[] = [
       chain(b, { raw: [...rep('..>>>..', b.bank), N3, ...rep('..>>>..', b.bank), ...rep('..<<<..', b.bank), N3, ...rep('..<<<..', b.bank), ...F(b.s1)] }, '..B_B..', '.._B_..'),
   },
   // 완만한 내리막 끝 번갈아 막는 블록.
-  { base: 'o1-down-blocks', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, { raw: D(4) }, '.._B_..', '..B_B..', '..BB_..') },
+  { base: 'o1-down-blocks', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, { raw: D(4) }, '..B__..', '..B_B..', '..__B..') },
   // 오르막 끝 구멍 점프(묶음 a·b: 착지 평지가 짧다), 내려와 블록.
   {
     base: 'o1-ramp-jump', kind: 'obstacle', tier: 1, bands: ['a', 'b'],
@@ -343,11 +358,11 @@ const OBSTACLE_RECIPES: readonly Recipe[] = [
   // 가운데 1칸 문 뒤 블록 벽 사이 1칸 통로(녹화 27.0~27.5 s), 틈이 옮겨 가고 다시 문과 통로.
   {
     base: 'o2-gate-corridor', kind: 'obstacle', tier: 2, bands: ALL,
-    rows: (b) => chain(b, '.._B_..', ['..G_G..', ...rep('..B_B..', b.s1)], '.._BB..', ['..G_G..', ...rep('..B_B..', 3)], '..BB_..'),
+    rows: (b) => chain(b, '.._B_..', ['..G_G..', ...rep('..B_B..', b.id === 'a' ? 3 : b.s1)], '.._BB..', ['..G_G..', ...rep('..B_B..', 3)], '..BB_..'),
   },
   // 마젠타 띠로 갈라진 1칸 레일 두 줄(녹화 28.5~29.0 s) → 가운데 1칸 틈 → 레일 → 틈.
   {
-    base: 'o2-rails-strips', kind: 'obstacle', tier: 2, bands: ALL,
+    base: 'o2-rails-strips', kind: 'obstacle', tier: 2, bands: BC,
     rows: (b) => chain(b, rep('.._B_..', 7), '..B_B..', rep('.._B_..', 4), '..BB_..'),
   },
   // 기운 3칸 판이 좌우로 번갈아 기울며 옆으로 옮겨 간다(녹화 4.5~8.0 s), 돌아와 블록.
@@ -362,11 +377,14 @@ const OBSTACLE_RECIPES: readonly Recipe[] = [
   },
   // 1칸 레일이 한 칸씩 옮겨 가는 굽은 길(사이는 2칸 이음).
   {
-    base: 'o2-winding-rail', kind: 'obstacle', tier: 2, bands: ALL,
-    rows: (b) => [
-      ...F(b.s2 + b.e1), ...rep(L1, nr(b)), ...rep(N2, g1(b)), ...rep(N1, nr(b)), ...rep(R2, g1(b)), ...rep(R1, nr(b)), ...rep(R2, g1(b)),
-      ...rep(N1, nr(b)), ...rep(N2, g1(b)), ...rep(L1, nr(b)), N2, N3,
-    ],
+    base: 'o2-winding-rail', kind: 'obstacle', tier: 2, bands: BC,
+    rows: (b) => {
+      const k = g1(b) + b.rest
+      return [
+        ...F(b.s2 + b.e1), ...rep(L1, nr(b)), ...rep(N2, k), ...rep(N1, nr(b)), ...rep(R2, k), ...rep(R1, nr(b)), ...rep(R2, k),
+        ...rep(N1, nr(b)), ...rep(N2, k), ...rep(L1, nr(b)), N2, N3,
+      ]
+    },
   },
   // 블록 → 왕복 블록 → 점프대 → 블록(v6: 결정이 이어진다).
   {

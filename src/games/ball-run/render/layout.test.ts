@@ -6,8 +6,11 @@ import {
   BALL_FRAC, BANK_ANGLE, BANK_EASE, CAM_BACK, CAM_UP, EYE_LAG_MAX, LINTEL_H, VFOV, bankEase, bankOffset, buildingsFor, cameraTarget,
   BANK_FLOAT_MAX, bankFollow, lookPitch, segmentBoxes, smoothEye,
   BOOST_PULL_S, CAM_BACK_FAR, CAM_UP_FAR, MIN_DOWN_FAR, boostPull, cameraRig, descentTarget, smoothDescent, rollQuat, ROLL_MAX_ANGLE,
-  PAD_RISE, PAD_T, TRACK_D, moverBoxes, moverSceneX,
+  PAD_RISE, PAD_T, TRACK_D, moverBoxes, moverSceneX, cameraStep,
 } from './layout.ts'
+import type { CamState } from './layout.ts'
+import { initSim, step } from '../sim.ts'
+import { ROW, TICK_HZ } from '../constants.ts'
 import { moverX } from '../mover.ts'
 import { G, JUMP_VY, MOVER_PERIOD, V_MAX } from '../constants.ts'
 import { floorAt } from '../sim.ts'
@@ -524,5 +527,43 @@ describe('rollQuat (rolling without slipping)', () => {
       expect(p[2] / scale).toBeCloseTo(dz, 1)
       expect(p[1]).toBeCloseTo(-R, 2)
     }
+  })
+})
+
+// v7 회귀: 내리막(급경사)을 내려온 직후 카메라가 높이 떠 가파르게 숙여, 앞 블록이 화면 위로 잘려 0.4초 앞(약 11 m)에야 보였다.
+describe('camera look-ahead after a descent (v7)', () => {
+  const HALF = ((VFOV / 2) * Math.PI) / 180
+  const N3 = '..___..'
+  const desc = parseSegment({
+    id: 'cam-desc', kind: 'descent', tier: 1,
+    rows: [JOINT, ...new Array<string>(10).fill(N3), ...new Array<string>(8).fill('..!!!..'), ...new Array<string>(5).fill(N3), '.._B_..',
+      ...new Array<string>(13).fill(N3), '..B_B..', ...new Array<string>(13).fill(N3), '.._B_..', ...new Array<string>(40).fill(N3), JOINT],
+  })
+  // 공 앞 ahead mm 안의 블록 행마다, 블록 바닥·꼭대기가 세로 시야(위아래 여유 1°) 안에 들어야 한다.
+  function hidden(level: number, aheadS: number): string[] {
+    const c = courseFromSegments([{ seg: desc, mirrored: false }])
+    let s = { ...initSim({ speedLevel: level }), x: 1000 }
+    let cam: CamState = { desc: Number.NaN, eyeY: Number.NaN }
+    const bad: string[] = []
+    for (let t = 0; t < 400 && s.dead === null && s.z < 80000; t++) {
+      const ball = { x: s.x, y: s.y, z: s.z, vz: s.vz }
+      const st = cameraStep(c, cam, ball, descentTarget(c, s), 1 / 60)
+      cam = st
+      const eye = { y: st.eyeY, z: s.z - st.back }
+      const reach = s.vz * TICK_HZ * aheadS
+      for (let row = Math.floor(s.z / ROW) + 2; row * ROW <= s.z + reach; row++) {
+        if (![-1, 0, 1].some((col) => c.cell(col, row).block)) continue
+        const f = c.cell(0, row).floor!.h0
+        for (const y of [f, f + BLOCK_H]) {
+          const a = Math.atan2(y - eye.y, row * ROW + ROW / 2 - eye.z) - st.pitch
+          if (a > HALF - (1 * Math.PI) / 180 || a < -HALF) bad.push(`level ${level} tick ${t} ball row ${Math.floor(s.z / ROW)} block row ${row}`)
+        }
+      }
+      s = step(s, 1000, c)
+    }
+    return bad
+  }
+  it('blocks within 1 s ahead stay inside the vertical field of view while coming down a steep run', () => {
+    for (const level of [1, 4, 8, 12, 16]) expect(hidden(level, 1.0).slice(0, 3), `level ${level}`).toEqual([])
   })
 })
