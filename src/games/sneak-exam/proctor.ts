@@ -40,7 +40,8 @@ function stepToward(from: number, to: number, speed: number): number {
 
 function walk(p: Proctor, r: number, type: 0 | 1 | 2, susp: number): { p: Proctor; rng: number } {
   const spec = PROCTORS[type]
-  let { x, z, face } = p
+  let { x, z } = p
+  let face: Face = p.face
   if (x === p.tx) {
     const nz = stepToward(z, p.tz, spec.speed)
     if (nz !== z) face = nz < z ? 0 : 1
@@ -54,7 +55,7 @@ function walk(p: Proctor, r: number, type: 0 | 1 | 2, susp: number): { p: Procto
     face = nz < z ? 0 : 1
     z = nz
   }
-  if (x !== p.tx || z !== p.tz) return { p: { ...p, x, z, face: face as Face }, rng: r }
+  if (x !== p.tx || z !== p.tz) return { p: { ...p, x, z, face }, rng: r }
 
   // 도착
   if (p.tz === FRONT_Z) return { p: { ...p, x, z, mode: 'front', face: 0, dozing: false, timer: FRONT_WAIT }, rng: r }
