@@ -134,6 +134,39 @@ npx -y supabase@2 functions deploy play --no-verify-jwt
   - [ ] 지운 뒤 (받아 둔 서명 주소를 포함해) 사진 주소가 열리지 않는지
   - [ ] 아이폰·안드로이드에서 사진 고르기·줄이기·올리기
 
+## 제안 게시판 배포
+`feat/suggestion-board` 머지 전에, 미리보기에서 확인한다. 워커 절차는 `docs/suggest-worker.md`에 있다.
+
+- [ ] 마이그레이션 먼저: `npx supabase@2 db push` → `20261122174000_suggestions.sql`
+```bash
+npx supabase@2 db push
+```
+- [ ] 워커 토큰을 만들고 시크릿으로 설정한다. 만든 값은 터미널 기록·채팅·커밋에 남기지 말고 5번 예약 작업에서 쓸 곳(맥 `.env.local` 또는 예약 작업 설정)에만 넣는다.
+```bash
+openssl rand -hex 32
+npx supabase@2 secrets set SUGGEST_WORKER_TOKEN=<값>
+```
+- [ ] 함수 배포
+```bash
+npx supabase@2 functions deploy suggest --no-verify-jwt
+```
+- [ ] 함수 확인 (`<함수 주소>`는 `https://xhikfflklkrysmakaqoj.supabase.co/functions/v1/suggest`)
+  - 토큰 없이 POST하면 401
+```bash
+curl -sS -i -X POST "<함수 주소>" -H 'content-type: application/json' -d '{"action":"pending"}'
+```
+  - 토큰과 `{"action":"pending"}`이면 200과 네 목록(`to_triage`, `context`, `to_build`, `to_check`)
+```bash
+curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-type: application/json' -d '{"action":"pending"}'
+```
+- [ ] 수동 확인 (미리보기, 관리자와 일반 승인 계정 각각)
+  - [ ] 제안 쓰기, 공감, 본인 글 삭제
+  - [ ] 같은 계정으로 하루에 6번째 제안은 거절됨
+  - [ ] 관리자 구역(`/admin` 제안 검토)에서 승인·거절 (분류된 항목은 위 `pending` 호출이 아니라 워커 실행 뒤에 나타난다. 확인용 분류가 필요하면 `docs/suggest-worker.md`의 `triage` 호출로 글 하나를 분류한다)
+- [ ] 예약 작업 만들기 (프롬프트는 "저장소를 최신 main으로 맞추고 `docs/suggest-worker.md`를 따르라"뿐)
+  - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
+  - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지
