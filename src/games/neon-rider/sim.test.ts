@@ -536,8 +536,8 @@ describe('neon-rider 시뮬', () => {
 
   it('틈으로 떨어지면 fall', () => {
     const c = courseOf(['ramp'])
-    // ramp의 틈(템플릿 x 19~26 m) 한가운데에 멈춘 채로 둔다. 착지 평지 높이(-1 m)에서 떨어지기 시작한다.
-    const s = run(airborne(c, TPL_X + mm(21000), 0, 0, 0), 600, () => false, c)
+    // ramp의 틈(템플릿 x 11.5~19.5 m) 한가운데에 멈춘 채로 둔다. 틈 뒤 내리막 시작 높이에서 떨어지기 시작한다.
+    const s = run(airborne(c, TPL_X + mm(15500), 0, 0, 0), 600, () => false, c)
     expect(s.dead).toBe('fall')
     expect(Math.floor((s.rear.y + s.front.y) / 2)).toBeLessThan(c.section(0).minY - FALL_DEPTH)
   })

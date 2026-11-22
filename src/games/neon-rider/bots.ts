@@ -1,14 +1,13 @@
 // 통과 게이트용 봇 (설계 §2, §8). 템플릿(들)을 이은 코스에서 앞 구간들을 살아서 넘는 누름 열을 찾는다.
 // 순수 정수 TS. 무작위 없음: 탐색 순서와 동점 처리가 고정이라 결과가 늘 같다.
 // 아래 수치는 시험 도구의 탐색 설정이다(게임 조정 수치가 아니다). 통과 규칙은 constants.ts의 PASS_AFTER_TICKS.
-import { BOOST_V, MM, PASS_AFTER_TICKS, V_MAX, WHEEL_R } from './constants.ts'
+import { MM, PASS_AFTER_TICKS, WHEEL_R } from './constants.ts'
 import { courseOf } from './course.ts'
 import type { Course } from './course.ts'
 import { initSimAt, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 import { atan2T, isqrt } from './trig.ts'
 
-export type Entry = 'rest' | 'fast' // rest: 구간 시작점에 정지 / fast: V_MAX와 BOOST_V 양쪽으로 진입
 /** bestX: 못 찾았을 때 차 중심이 간 가장 먼 곳(첫 구간 시작 기준, mm). */
 export type PassResult = { ok: true; holds: boolean[] } | { ok: false; bestX: number }
 
@@ -100,20 +99,11 @@ export function findPassFrom(templateId: string, vx: number): PassResult {
   return findPassCourse([templateId], vx)
 }
 
-/** rest는 정지 진입, fast는 V_MAX와 BOOST_V 진입이 모두 통과해야 한다(누름 열은 V_MAX 쪽). 게이트 전체는 속도를 훑는다(balance.test). */
-export function findPass(templateId: string, entry: Entry): PassResult {
-  if (entry === 'rest') return findPassFrom(templateId, 0)
-  const a = findPassFrom(templateId, V_MAX)
-  if (!a.ok) return a
-  const b = findPassFrom(templateId, BOOST_V)
-  return b.ok ? a : b
-}
-
 /**
  * maxX: 차 중심이 간 가장 먼 곳(구간 시작 기준, mm).
- * exitV·exitGrounded: 차 중심이 구간 끝(= 다음 구간의 시작 평지 시작)을 넘은 틱의 중심 속력(u/틱)과 두 바퀴 접지 여부. 못 넘으면 0·false.
+ * exitV: 차 중심이 구간 끝(= 다음 구간의 시작 평지 시작)을 넘은 틱의 중심 속력(u/틱). 못 넘으면 0.
  */
-export type RunResult = { passed: boolean; dead: SimState['dead']; ticks: number; maxX: number; gems: number; exitV: number; exitGrounded: boolean }
+export type RunResult = { passed: boolean; dead: SimState['dead']; ticks: number; maxX: number; gems: number; exitV: number }
 
 /** 정해진 입력(틱 → 누름)으로 템플릿 하나의 첫 구간을 굴려 본다. holds 배열이면 끝난 뒤는 뗌. */
 export function runPolicy(templateId: string, vx: number, policy: boolean[] | ((tick: number) => boolean)): RunResult {
@@ -123,8 +113,7 @@ export function runPolicy(templateId: string, vx: number, policy: boolean[] | ((
   let cross: number | null = null
   let maxX = 0
   let exitV = 0
-  let exitGrounded = false
-  const result = (passed: boolean): RunResult => ({ passed, dead: s.dead, ticks: s.tick, maxX: Math.floor(maxX / MM), gems: s.gems, exitV, exitGrounded })
+  const result = (passed: boolean): RunResult => ({ passed, dead: s.dead, ticks: s.tick, maxX: Math.floor(maxX / MM), gems: s.gems, exitV })
   for (let t = 0; t < POLICY_TICKS; t++) {
     const hold = typeof policy === 'function' ? policy(t) : t < policy.length && policy[t]
     s = step(s, hold, course)
@@ -135,7 +124,6 @@ export function runPolicy(templateId: string, vx: number, policy: boolean[] | ((
       const vx2 = s.rear.x - s.rear.px + s.front.x - s.front.px
       const vy2 = s.rear.y - s.rear.py + s.front.y - s.front.py
       exitV = Math.floor(isqrt(vx2 * vx2 + vy2 * vy2) / 2)
-      exitGrounded = s.rear.ground && s.front.ground
     }
     if (cross !== null && s.tick >= cross + PASS_AFTER_TICKS) return result(true)
   }

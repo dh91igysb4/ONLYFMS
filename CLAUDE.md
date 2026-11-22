@@ -77,6 +77,7 @@
 
 ## 개발 환경
 - `npm run dev`, `npm test`, `npm run typecheck`, `npm run build`
+- 네온 라이더의 `sim.ts`·`collide.ts`·`pieces.ts`·`constants.ts`를 바꾸면 푸시 전에 `npm run test:gate`(느린 통과 게이트 `*.gate.test.ts`, 기본 `npm test`에서는 빠진다)도 돌린다.
 - DB 테스트: `npm run db:test` (`scripts/db-test.sh`, 로컬 Postgres + Supabase shim). Docker가 있는 머신에서는 로컬 스택에 `npx supabase test db`가 동일한 역할이다.
 - Edge Function 테스트: `npm run fn:test` (`scripts/fn-test.sh`: `scripts/db-up.sh`로 임시 Postgres를 띄우고 `deno test`로 `supabase/functions/play/`, `supabase/functions/duel/`, `supabase/functions/suggest/`를 돌린 뒤 `scripts/db-down.sh`). Deno 경로는 `DENO` 환경 변수로 바꿀 수 있다.
 - 게임 로직 공유(설계 §4.7): Edge Function은 `../../../src/games/index.ts`를 상대 경로로 직접 import한다(로컬 `deno check`·실행 확인 완료). 원격 `supabase functions deploy` 번들은 배포 체크리스트 §3에서 확인한다(실패하면 sync-logic 방식으로 전환).

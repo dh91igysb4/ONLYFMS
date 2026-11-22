@@ -117,7 +117,7 @@ describe('TEMPLATES', () => {
   // 이어진 두 선분 사이에서 진행 방향이 꺾이는 각. 호 안과 호 이음은 MAX_JOINT보다 작아야 하고,
   // 그보다 큰 꺾임은 직선끼리 일부러 만든 모서리뿐이다(템플릿마다 개수를 적어 둔다). 호 방향을 잘못 쓰면 거의 반 바퀴 꺾여 걸린다.
   const MAX_JOINT = Math.floor(TURN / 24) // 15°
-  const SHARP: Record<string, number> = { ramp: 1, spikes: 9, spikes2: 11 }
+  const SHARP: Record<string, number> = { spikes: 7, spikes2: 11 }
   for (const t of TEMPLATES) {
     it(`${t.id}: 이음 꺾임 < 15°, 일부러 만든 모서리 ${SHARP[t.id] ?? 0}개`, () => {
       const s = buildTemplate(t).segs
@@ -160,8 +160,12 @@ describe('TEMPLATES', () => {
   it('bowl은 보석 4개', () => {
     expect(buildTemplate(TEMPLATES.find((t) => t.id === 'bowl')!).gems).toHaveLength(4)
   })
-  it('ramp: 착지 평지가 이륙점보다 낮다', () => {
-    const b = buildTemplate(TEMPLATES.find((t) => t.id === 'ramp')!)
-    expect(b.endY).toBeLessThan(b.segs[1].y1)
+  it('ramp·boostjump·spikes: 점프대 턱(틈 앞 선분 끝)보다 끝 평지가 낮다', () => {
+    for (const id of ['ramp', 'boostjump', 'spikes']) {
+      const b = buildTemplate(TEMPLATES.find((t) => t.id === id)!)
+      const k = b.segs.findIndex((s, i) => i > 0 && s.x0 !== b.segs[i - 1].x1)
+      expect(k, id).toBeGreaterThan(0)
+      expect(b.endY, id).toBeLessThan(b.segs[k - 1].y1)
+    }
   })
 })
