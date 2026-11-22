@@ -32,7 +32,7 @@ export function scoreOf(sim: SimState, exam: Exam): number {
 }
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 1,
+  version: 2,
 
   pickPuzzle(rng, _options) {
     let seed = ''
