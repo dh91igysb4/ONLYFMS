@@ -1,10 +1,13 @@
 // 통과 게이트 (설계 §2 "통과할 수 없는 구간이 나오면 실패", §8).
+// 앞 구간이 넘겨줄 수 있는 진입 속도는 0 ~ BOOST_V 어디든이고 속도에 따라 통과 여부가 단조롭지 않으므로, 촘촘히 훑는다.
 import { describe, expect, it } from 'vitest'
 import { BOOST_V, V_MAX } from './constants.ts'
 import { findPass, findPassFrom, runPolicy, type PassResult } from './bots.ts'
 import { TEMPLATES } from './pieces.ts'
 
-const SPEEDS = [0, V_MAX, BOOST_V] as const
+const SWEEP_STEP = 200
+const SWEEP: readonly number[] = [...new Set([...Array.from({ length: Math.floor(BOOST_V / SWEEP_STEP) + 1 }, (_, i) => i * SWEEP_STEP), V_MAX, BOOST_V])].sort((a, b) => a - b)
+const SLOW = 60000 // 탐색이 드는 테스트의 시간 상한(ms)
 const cache = new Map<string, PassResult>()
 function found(id: string, vx: number): PassResult {
   const k = `${id}@${vx}`
@@ -15,17 +18,19 @@ function found(id: string, vx: number): PassResult {
   }
   return r
 }
-const fail = (id: string, label: string, r: PassResult): string => (r.ok ? '' : `${id} ${label}: 못 넘음, 가장 멀리 ${r.diedAt} mm`)
 
 describe('통과 게이트', () => {
-  it.each(TEMPLATES.map((t) => t.id))('%s: 정지 진입(rest)과 빠른 진입(fast = V_MAX·BOOST_V) 모두 통과', (id) => {
-    for (const vx of SPEEDS) {
+  it.each(TEMPLATES.map((t) => t.id))('%s: 진입 속도 0 ~ BOOST_V 전부 통과, 넘겨주는 속력 ≤ BOOST_V', (id) => {
+    for (const vx of SWEEP) {
       const r = found(id, vx)
-      expect(r.ok, fail(id, `vx=${vx}`, r)).toBe(true)
-      // 찾은 누름 열을 그대로 다시 굴려도 통과한다
-      if (r.ok) expect(runPolicy(id, vx, r.holds).passed, `${id} vx=${vx} 재생`).toBe(true)
+      expect(r.ok, r.ok ? '' : `${id} vx=${vx}: 못 넘음, 가장 멀리 ${r.bestX} mm`).toBe(true)
+      if (!r.ok) continue
+      // 찾은 누름 열을 다시 굴려도 통과하고, 다음 구간 시작에서의 속력이 게이트가 재는 최고 진입 속도를 넘지 않는다
+      const run = runPolicy(id, vx, r.holds)
+      expect(run.passed, `${id} vx=${vx} 재생`).toBe(true)
+      expect(run.exitV, `${id} vx=${vx} 넘겨주는 속력`).toBeLessThanOrEqual(BOOST_V)
     }
-  })
+  }, SLOW)
 
   it('findPass는 rest = 정지, fast = V_MAX와 BOOST_V 둘 다', () => {
     const id = TEMPLATES[0].id
@@ -42,7 +47,7 @@ describe('통과 게이트', () => {
     expect(failed.length * 2).toBeGreaterThanOrEqual(TEMPLATES.length)
   })
 
-  it('계속 누르기만 해서 넘는 tier 3·4 템플릿은 없다(정지·V_MAX 진입)', () => {
+  it('계속 누르기만 해서 넘는 tier 3·4 템플릿은 없다(정지·V_MAX 진입. BOOST_V 진입은 재지 않는다: steps는 계단을 다 날아 넘어 한 바퀴 돌고 내리고, spikes2도 계속 눌러 넘는다)', () => {
     for (const t of TEMPLATES.filter((x) => x.tier >= 3))
       for (const vx of [0, V_MAX]) expect(runPolicy(t.id, vx, () => true).passed, `${t.id} vx=${vx}`).toBe(false)
   })
@@ -55,24 +60,20 @@ describe('통과 게이트', () => {
         for (let m = k + 6; !ok && m <= k + 120; m += 6) ok = runPolicy(t.id, 0, (i) => i < k || i >= m).passed
       expect(ok, t.id).toBe(true)
     }
-  })
+  }, SLOW)
 
-  it('빠른 진입의 상한: 통과한 경로(찾은 열·계속 누름·안 누름)가 구간 끝을 넘는 속력은 BOOST_V 이하', () => {
-    // 게이트가 재는 가장 빠른 진입 속도가 BOOST_V이므로, 어떤 템플릿도 그보다 빠르게 다음 구간에 넘겨주면 안 된다.
+  it('계속 누름·안 누름으로 넘는 경우도 넘겨주는 속력 ≤ BOOST_V', () => {
     for (const t of TEMPLATES)
-      for (const vx of SPEEDS) {
-        const r = found(t.id, vx)
-        const runs = [runPolicy(t.id, vx, () => true), runPolicy(t.id, vx, () => false)]
-        if (r.ok) runs.push(runPolicy(t.id, vx, r.holds))
-        for (const run of runs) if (run.passed) expect(run.exitV, `${t.id} vx=${vx}`).toBeLessThanOrEqual(BOOST_V)
-      }
-  })
+      for (const vx of [0, V_MAX, BOOST_V])
+        for (const run of [runPolicy(t.id, vx, () => true), runPolicy(t.id, vx, () => false)])
+          if (run.passed) expect(run.exitV, `${t.id} vx=${vx}`).toBeLessThanOrEqual(BOOST_V)
+  }, SLOW)
 
-  it('보석: 그릇 4개, 부스터 점프 궤적 4개를 찾은 통과 경로에서 줍는다(V_MAX 진입)', () => {
-    for (const [id, n] of [['bowl', 4], ['boostjump', 4]] as const) {
-      const r = found(id, V_MAX)
+  it('보석: 그릇 4개(정지·V_MAX 진입), 부스터 점프 궤적 4개(V_MAX 진입)를 찾은 통과 경로에서 줍는다', () => {
+    for (const [id, vx, n] of [['bowl', 0, 4], ['bowl', V_MAX, 4], ['boostjump', V_MAX, 4]] as const) {
+      const r = found(id, vx)
       expect(r.ok).toBe(true)
-      if (r.ok) expect(runPolicy(id, V_MAX, r.holds).gems, id).toBe(n)
+      if (r.ok) expect(runPolicy(id, vx, r.holds).gems, `${id} vx=${vx}`).toBe(n)
     }
   })
 })

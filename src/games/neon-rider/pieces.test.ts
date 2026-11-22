@@ -117,7 +117,7 @@ describe('TEMPLATES', () => {
   // 이어진 두 선분 사이에서 진행 방향이 꺾이는 각. 호 안과 호 이음은 MAX_JOINT보다 작아야 하고,
   // 그보다 큰 꺾임은 직선끼리 일부러 만든 모서리뿐이다(템플릿마다 개수를 적어 둔다). 호 방향을 잘못 쓰면 거의 반 바퀴 꺾여 걸린다.
   const MAX_JOINT = Math.floor(TURN / 24) // 15°
-  const SHARP: Record<string, number> = { ramp: 1, spikes: 9, spikes2: 7 }
+  const SHARP: Record<string, number> = { ramp: 1, spikes: 9, spikes2: 11 }
   for (const t of TEMPLATES) {
     it(`${t.id}: 이음 꺾임 < 15°, 일부러 만든 모서리 ${SHARP[t.id] ?? 0}개`, () => {
       const s = buildTemplate(t).segs

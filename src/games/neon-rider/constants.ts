@@ -39,6 +39,7 @@ export const START_LEN = 12000 * MM
 export const TIER_WEIGHTS: readonly { from: number; w: readonly [number, number, number, number] }[] =
   [{ from: 0, w: [1, 0, 0, 0] }, { from: 4, w: [3, 2, 0, 0] }, { from: 12, w: [2, 3, 2, 0] }, { from: 30, w: [1, 2, 3, 2] }]
 export const SEND_TICKS = 30
+export const PASS_AFTER_TICKS = 30 // 통과 게이트(bots.ts): 구간 끝을 넘은 뒤 이만큼 더 살아 있어야 그 구간을 넘은 것으로 본다
 export const MAX_ACTION_TICKS = 120
 // 120틱이 전부 번갈아 바뀌면 [0, 1×120]으로 121구간이 필요하다 (첫 값 0 포함)
 export const MAX_RUNS = 121

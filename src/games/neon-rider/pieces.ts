@@ -216,32 +216,34 @@ const steps: Template = {
   prims: [line(4000, 0), drop(), line(4000, 0), drop(), line(4000, 0), drop(), line(4000, 0), drop(), line(12000, 0)],
 }
 
-// 위·아래 삼각 교차: 위 삼각 사이가 바닥 없는 3 m 틈이고, 그 위에 거꾸로 매달린 삼각이 있다.
-// 위 삼각 꼭대기에서 힘껏 뛰면 매달린 삼각에 부딪히므로, 오르막에서 떼어 낮게 건너야 한다.
-// (틈은 앞으로만 끊긴다: 매달린 삼각은 펜을 위로 옮겨 그리고 다시 내려온다.)
-const HANG_Y = 6400 // 매달린 삼각 밑변 높이(평지 기준). 꼭짓점은 HANG_Y - HANG_H
-const HANG_W = 1000 // 밑변의 절반
+// 위·아래 삼각 교차: 위 삼각 사이 2 m 평지 위에 거꾸로 매달린 삼각.
+// gap은 앞으로만 끊겨야 하므로(course.test) 평지 가운데에서 펜을 매달린 삼각 오른쪽 끝으로 올려 오른쪽→왼쪽으로 그리고,
+// 평지 가운데로 다시 내려와(앞으로 W만큼) 평지를 마저 그린다. 길은 끊기지 않는다.
+const HANG_Y = 6200 // 매달린 삼각 밑변 높이(평지 기준). 꼭짓점은 HANG_Y - HANG_H
+const HANG_W = 1200 // 밑변의 절반
 const HANG_H = 2000
-const PIT_EDGE = 500 // 틈 가장자리에서 매달린 삼각 밑변 끝까지
-const hangOverPit = (): Prim[] => [gap(PIT_EDGE, HANG_Y), line(HANG_W, -HANG_H), line(HANG_W, HANG_H), gap(PIT_EDGE, -HANG_Y)]
+const flatWithHang = (): Prim[] => [line(1000, 0), gap(HANG_W, HANG_Y), line(-HANG_W, -HANG_H), line(-HANG_W, HANG_H), gap(HANG_W, -HANG_Y), line(1000, 0)]
 const spikes2: Template = {
   id: 'spikes2',
   tier: 3,
-  prims: [line(6000, 0), ...spike(), ...hangOverPit(), ...spike(), ...hangOverPit(), ...spike(), line(10000, 0)],
+  prims: [line(6000, 0), ...spike(), ...flatWithHang(), ...spike(), ...flatWithHang(), ...spike(), line(10000, 0)],
 }
 
 // ---- tier 4 ----
 
 // 끊어진 호 징검다리: 점프대에서 떠서 오목 호(가운데가 낮은 짧은 그릇) 3개를 차례로 건넌다.
 // 각 호는 내려가며 받아 주고(-30°) 올라가며 다음 호로 던진다(+30°).
+// 호는 1.5 m 틈마다 1 m씩 낮아진다: 진입 속도가 0 ~ BOOST_V 어디든 날아간 궤적이 틈에 빠지지 않고 뒤의 호나 착지 평지에 걸린다
+// (같은 높이에 4.5 m 틈을 두었을 때는 진입 속도 3100·4300·4400에서 틈에 빠졌다).
 const ARC_R = mm(5000)
 const ARC_A = deg(30)
-const ARC_GAP = 4500
+const ARC_GAP = 1500
+const ARC_DROP = 1000
 const hop = (): Prim => bend(ARC_R, -ARC_A, ARC_A)
 const arcs: Template = {
   id: 'arcs',
   tier: 4,
-  prims: [line(6000, 0), bend(mm(5000), 0, ARC_A), gap(ARC_GAP, 0), hop(), gap(ARC_GAP, 0), hop(), gap(ARC_GAP, 0), hop(), gap(ARC_GAP + 2000, -2000), line(16000, 0)],
+  prims: [line(6000, 0), bend(mm(5000), 0, ARC_A), gap(ARC_GAP, -ARC_DROP), hop(), gap(ARC_GAP, -ARC_DROP), hop(), gap(ARC_GAP, -ARC_DROP), hop(), gap(ARC_GAP, -ARC_DROP), line(16000, 0)],
 }
 
 // 연속 루프: 루프 두 개 뒤 높은 점프대.
