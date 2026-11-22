@@ -1,5 +1,5 @@
 // 시드 기반 코스 생성기. 순수 정수 연산, 외부 의존 없음.
-import { COL_MAX, COL_MIN, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
+import { COL_MAX, COL_MIN, GIMMICK_WEIGHT, MOVER_PERIOD, MOVER_ROW_OFFSET, TIER_WEIGHTS, obstaclesInStage } from './constants.ts'
 import type { Mover } from './mover.ts'
 import { JOINT, PARSED_DESCENTS, PARSED_OBSTACLES, PARSED_TUNNELS, START_PARSED, parseSegment } from './segments.ts'
 import type { Cell, ParsedSegment, SegmentKind } from './segments.ts'
@@ -172,6 +172,12 @@ function buildCourse(seed: string, pick: (placed: Placed[], startRow: number) =>
   }
 }
 
+// v5: 코스의 첫 장애물(단계 1)은 늘 이 조각 — 모든 판이 처음 10초 안에 움직이는 블록을 만난다.
+export const FIRST_OBSTACLE = 'm1-shuttle'
+const FIRST_PARSED = PARSED_OBSTACLES.find((p) => p.id === FIRST_OBSTACLE)!
+const isGimmick = (p: ParsedSegment): boolean => p.movers.some((m) => m !== null) || p.cells.some((row) => row.some((c) => c.pad === true))
+const GIMMICK = new Set(PARSED_OBSTACLES.filter(isGimmick).map((p) => p.id))
+
 function stageWeights(stage: number): readonly [number, number, number, number] {
   let w = TIER_WEIGHTS[0].w
   for (const b of TIER_WEIGHTS) if (b.fromStage <= stage) w = b.w
@@ -201,6 +207,9 @@ export function makeCourse(seed: string): Course {
     for (let i = placed.length - 1; placed[i].kind === 'obstacle'; i--) obstacles++
     if (obstacles >= obstaclesInStage(stage)) return { seg: PARSED_TUNNELS[rPick % PARSED_TUNNELS.length], mirrored, phase }
 
+    // 첫 장애물은 늘 tier 1 왕복 블록(난수 3개는 그대로 뽑았고, 반전·위상도 그대로 쓴다).
+    if (!placed.some((p) => p.kind === 'obstacle')) return { seg: FIRST_PARSED, mirrored, phase }
+
     // 장애물: 단계 가중치로 tier를 고르고, 최근 장애물 3개는 피한다.
     const w = stageWeights(stage)
     const total = w[0] + w[1] + w[2] + w[3]
@@ -212,7 +221,18 @@ export function makeCourse(seed: string): Course {
     for (let i = placed.length - 1; i >= 0 && recent.size < 3; i--) if (placed[i].kind === 'obstacle') recent.add(placed[i].id)
     let cands = PARSED_OBSTACLES.filter((p) => p.tier === tier && !recent.has(p.id))
     if (cands.length === 0) cands = PARSED_OBSTACLES.filter((p) => w[p.tier - 1] > 0 && !recent.has(p.id))
-    return { seg: cands[rPick % cands.length], mirrored, phase }
+    // 기믹 조각은 GIMMICK_WEIGHT번 센다.
+    let wsum = 0
+    for (const p of cands) wsum += GIMMICK.has(p.id) ? GIMMICK_WEIGHT : 1
+    let rp = rPick % wsum
+    let k = 0
+    for (;;) {
+      const wk = GIMMICK.has(cands[k].id) ? GIMMICK_WEIGHT : 1
+      if (rp < wk) break
+      rp -= wk
+      k++
+    }
+    return { seg: cands[k], mirrored, phase }
   })
 }
 

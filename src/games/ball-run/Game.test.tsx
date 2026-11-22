@@ -6,7 +6,7 @@ import { logic, type State } from './logic.ts'
 import { getCourse } from './course.ts'
 import { decodeInputs } from './input.ts'
 import { KEY_STEP, MAX_ACTION_TICKS, MAX_CATCHUP, R, SCORE_TICKS, SEND_TICKS, SPEED_TABLE, TICK_HZ } from './constants.ts'
-import { floorAt, rowOf } from './sim.ts'
+import { floorAt, rowOf, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 import { START_PARSED } from './segments.ts'
 import { createScene } from './render/scene.ts'
@@ -34,10 +34,11 @@ afterAll(() => {
 })
 
 const ctx = { now: 0, startedAt: 0, deadline: null }
-// 시드 1: 곧게 가서 닿는 첫 블록은 col -1, row 115(o1-down-blocks). 120 m 근처에서도 30틱은 산다.
+// 시드 1: 첫 장애물은 왕복 블록(m1-shuttle, v5). 120 m 근처에서도 30틱은 산다.
 const PUZZLE = logic.pickPuzzle(rngFromSeed(new Uint8Array(16).fill(1)), {})
 const INITIAL: State = logic.initState(PUZZLE, ctx)
 const START_LEN = START_PARSED.length
+const HIT_COL = -1 // 곧게 가면 큐브와 부딪히는 열(첫 왕복 블록)
 
 function props(over: Partial<GameProps> = {}): GameProps {
   return {
@@ -158,28 +159,22 @@ describe('ball-run Game', () => {
 
   test('flushes on death', async () => {
     const course = getCourse(PUZZLE.seed)
-    // 그 열로 곧게 가서 닿는 첫 블록: 앞 행마다 그 열이 가운데 열과 같은 높이의 바닥이어야 한다
-    // (내리막 능선 옆 열은 떨어져 나가 구멍이 되므로 그 열 블록에는 가기 전에 떨어진다).
-    const sameFloor = (col: number, row: number) => {
-      const a = course.cell(col, row)
-      const m = course.cell(0, row)
-      return a.floor !== null && !a.block && m.floor !== null && a.floor.h0 === m.floor.h0 && a.floor.h1 === m.floor.h1
-    }
-    let block: [number, number] | null = null
-    for (let row = 0; row < 400 && !block; row++) {
-      for (let col = -3; col <= 3; col++) {
-        if (!course.cell(col, row).block) continue
-        let open = true
-        for (let r = 0; r < row && open; r++) open = sameFloor(col, r)
-        if (open) { block = [col, row]; break }
-      }
-    }
-    expect(block).toEqual([-1, 115])
+    // v5: 첫 장애물은 늘 왕복 블록. 그 행에 닿는 틱은 입력과 무관하므로, 큐브와 부딪히는 열을 시뮬로 찾는다.
+    let shuttleRow = 0
+    while (course.moverAt(shuttleRow) === null) shuttleRow++
+    const hitCol = [-1, 0, 1].find((col) => {
+      let s = INITIAL.sim
+      while (s.dead === null && rowOf(s.z) <= shuttleRow) s = step(s, col * 1000, course)
+      return s.dead === 'hit' && rowOf(s.z) >= shuttleRow - 1
+    })
+    expect(course.segmentAt(shuttleRow).id).toBe('m1-shuttle')
+    expect(hitCol).toBe(HIT_COL)
+    const block: [number, number] = [hitCol!, shuttleRow]
     const onAction = vi.fn()
     await mount(props({ onAction }))
     // 블록 열 중심으로: dx = col * 1000 / DRAG_SPAN(6000) * 폭(390)
     fireEvent.pointerDown(canvas(), { clientX: 100, pointerId: 1 })
-    fireEvent.pointerMove(canvas(), { clientX: 100 + (block![0] * 1000 * 390) / 6000, pointerId: 1 })
+    fireEvent.pointerMove(canvas(), { clientX: 100 + (block[0] * 1000 * 390) / 6000, pointerId: 1 })
     let dead: SimState | null = null
     for (let i = 0; i < 1200 && !dead; i++) {
       frame()
