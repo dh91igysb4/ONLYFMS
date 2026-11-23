@@ -12,6 +12,7 @@ export type Bar = {
   progress: number
   perfect: boolean
   t: number // 누적 경과 ms(MAX_DT_MS로 자른 값)
+  slackMs?: number // 손을 놓은 채 바가 바닥에 내려앉아 있던 시간(ms). 없으면 0
 }
 export type BarParams = {
   barSize: number
@@ -37,17 +38,12 @@ const DART_RETARGET_SCALE = 2.5 // dart: 목표 변경 빈도 배율
 const DART_SPEED_SCALE = 1.5
 const DART_MIN_JUMP = 0.4 // dart: 새 목표는 현재 위치에서 이만큼 이상 떨어진 곳
 const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
-// sinker: 새 목표는 손을 놓아 바닥에 붙은 바 바로 위(barSize + GAP ~ + GAP + SPAN). 트랙 아래쪽에 머물지만
-// 쉬는 바에는 들어오지 않아, 살살 눌러 받쳐야 잡힌다(예전에는 0~0.45라 안 눌러도 잡혔다).
-const SINKER_GAP = 0.03
-// mixed·smooth·dart: 새 목표의 바닥 = 바 크기 × FLOOR_FRAC. 바닥에 붙은 바 깊숙이 머물지 않아 안 눌러도 잡히지 않는다
-// (큰 바 0.41에서 예전에는 smooth 46%·mixed 30%·dart 12%가 안 눌러 잡혔다, minigame.test)
-const FLOOR_FRAC = 0.8
-const SINKER_SPAN = 0.27
+const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
 // 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
 // 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
 // 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
 export const BARBED_PULL = 70
+const SLACK_GRACE_MS = 500
 const PROGRESS_UP = 0.35 // 초당 진행 증가
 const PROGRESS_DOWN = 0.3 // 초당 진행 감소
 const GAUGE_PERIOD_MS = 1600
@@ -71,26 +67,24 @@ export function barParams(speciesId: string, rodTier: RodTier, equipped: readonl
 }
 
 // 유형별 새 목표. rng는 한 번만 부른다(mixed는 예전과 같은 난수열).
-function pickTarget(behavior: Behavior, fishPos: number, barSize: number, rng: () => number): number {
+function pickTarget(behavior: Behavior, fishPos: number, rng: () => number): number {
   const r = rng()
-  // 손을 놓아 바닥에 붙은 바가 덮는 칸([0, barSize])보다 깊이(FLOOR_FRAC) 내려가지 않는다. 안 눌러도 잡히는 일을 막는다
-  const floor = barSize * FLOOR_FRAC
   switch (behavior) {
     case 'floater':
       return FLOATER_MIN + (1 - FLOATER_MIN) * r
     case 'sinker':
-      return Math.min(1, barSize + SINKER_GAP + SINKER_SPAN * r)
+      return SINKER_MAX * r
     case 'dart': {
-      // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간(바닥 floor 위)을 이어 붙여 고른다
-      const below = Math.max(0, fishPos - DART_MIN_JUMP - floor)
-      const aboveLen = Math.max(0, 1 - Math.max(floor, fishPos + DART_MIN_JUMP))
+      // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간을 이어 붙여 고른다
+      const below = Math.max(0, fishPos - DART_MIN_JUMP)
+      const aboveLen = Math.max(0, 1 - (fishPos + DART_MIN_JUMP))
       const total = below + aboveLen
-      if (total <= 0) return floor + (1 - floor) * r
+      if (total <= 0) return r
       const x = r * total
-      return x < below ? floor + x : Math.max(floor, fishPos + DART_MIN_JUMP) + (x - below)
+      return x < below ? x : fishPos + DART_MIN_JUMP + (x - below)
     }
     default:
-      return floor + (1 - floor) * r
+      return r
   }
 }
 
@@ -106,7 +100,8 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   const lo = params.barSize / 2
   const hi = 1 - params.barSize / 2
   const wasInside = Math.abs(bar.fishPos - bar.barPos) <= params.barSize / 2
-  const pullAccel = params.pull > 0 && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
+  // 가시 바늘은 누르고 있을 때만 끈다(놓은 바가 물고기에 매달려 저절로 잡히지 않게)
+  const pullAccel = params.pull > 0 && held && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
   let barVel = (bar.barVel + ((held ? BAR_ACCEL_UP : -BAR_ACCEL_DOWN) + pullAccel) * dt) * Math.exp(-BAR_DRAG * dt)
   let barPos = bar.barPos + barVel * dt
   if (barPos <= lo) {
@@ -123,7 +118,7 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   let fishTarget = bar.fishTarget
   const retargetScale = behavior === 'smooth' ? SMOOTH_RETARGET_SCALE : behavior === 'dart' ? DART_RETARGET_SCALE : 1
   const retargetRate = (RETARGET_RATE_MIN + (RETARGET_RATE_MAX - RETARGET_RATE_MIN) * d) * retargetScale
-  if (rng() < 1 - Math.exp(-retargetRate * dt)) fishTarget = pickTarget(behavior, bar.fishPos, params.barSize, rng)
+  if (rng() < 1 - Math.exp(-retargetRate * dt)) fishTarget = pickTarget(behavior, bar.fishPos, rng)
   const speedScale = behavior === 'dart' ? DART_SPEED_SCALE : 1
   const maxStep = (FISH_SPEED_MIN + (FISH_SPEED_MAX - FISH_SPEED_MIN) * d) * speedScale * dt
   const gap = fishTarget - bar.fishPos
@@ -133,13 +128,17 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   let fishPos = Math.abs(gap) <= Math.max(step, snap) ? fishTarget : bar.fishPos + Math.sign(gap) * step
   fishPos = clamp01(fishPos)
   const arriveRetarget = behavior === 'smooth' ? SMOOTH_ARRIVE_RETARGET : 0.5
-  if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, params.barSize, rng) // 도착하면 곧 다시 움직인다
+  if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, rng) // 도착하면 곧 다시 움직인다
 
   // 진행도
-  const inside = Math.abs(fishPos - barPos) <= params.barSize / 2
+  // 손을 놓아 바닥에 내려앉은 지 SLACK_GRACE_MS가 지난 바는 줄이 느슨해 물고기가 겹쳐도 세지 않는다
+  // (안 눌러도 잡히는 일을 막는다. 바닥 근처에서 살살 누르는 동안 잠깐 닿는 것은 봐준다)
+  const slackMs = barPos <= lo && !held ? (bar.slackMs ?? 0) + clampedMs : 0
+  const slack = slackMs > SLACK_GRACE_MS
+  const inside = !slack && Math.abs(fishPos - barPos) <= params.barSize / 2
   const progress = clamp01(bar.progress + (inside ? PROGRESS_UP : -PROGRESS_DOWN * params.drain) * dt)
 
-  return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs }
+  return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs, slackMs }
 }
 
 export function barResult(bar: Bar): 'playing' | 'caught' | 'lost' {

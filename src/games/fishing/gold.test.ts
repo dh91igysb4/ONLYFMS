@@ -85,3 +85,15 @@ describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
     expect(at(capped, '가시 바늘').atDay).toBeLessThan(7)
   })
 })
+
+// 오래 하는 사람: 지금 상한 모양(하루 30,750 + 넘은 몫 20%)으로는 늦은 시간당 수입(76,000~89,000 G)의 20%만으로도
+// 시간당 약 15,000 G가 들어와 하루 여러 시간이면 2주 안에 끝난다(지갑 §2 실패 조건 "하루 여러 시간 → 2주 안"에 걸린다).
+// 장비 가격으로는 하루 1시간 한 달을 깨지 않고 고칠 수 없어 지갑 상한 모양(SOFT_CAP_RATE, 2단 상한 등)의 결정으로 남긴다.
+// 아래 값은 지금 상태를 기록해 지갑 PR이 바꿀 때 보이게 한다(±10%).
+describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', () => {
+  const daysFor = (hoursPerDay: number) => simulate(BUY_ORDER, { hoursPerDay, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE }).at(-1)!.atDay
+  const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.1)
+  it('하루 3시간: 약 16.4일', () => near(daysFor(3), 16.38))
+  it('하루 5시간: 약 11.4일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 11.41))
+  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 15.9일', () => near(plain[plain.length - 1].atHours, 15.86))
+})

@@ -59,6 +59,8 @@
 }
 .fish-new { color: var(--accent-strong); }
 .fish-toast-legend { font-size: 16px; }
+/* 전설 알림은 둘째 줄이 길어 좁은 폰(390px)에서는 줄을 바꾼다 */
+.fish-toast-wrap { white-space: normal; width: max-content; max-width: calc(100% - 24px); text-align: center; }
 .fish-toast-price { color: var(--win-text); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .fish-panel {

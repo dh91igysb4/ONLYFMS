@@ -10,7 +10,8 @@
 // - 크기: 던지기 힘 0.8(부두는 +PIER_POWER_BONUS) → p = u^(1.5 − min(1.25, 힘)), price() 그대로(cm 반올림 포함).
 //   성공한 물고기의 20%가 퍼펙트.
 // - 시간: 던질 때마다 평균 입질 지연 (1500 + 4500/2) × biteScale(× 회전 찌 0.7) + 미니게임 8초 + 다음 던지기 3초.
-//   성공률 80%(화면 찌 효과는 넣지 않는다). 가방이 찰 때마다 상점 왕복 TRIP_SEC[지역]초.
+//   성공률 80%(난이도·바 크기·화면 찌와 무관한 고정값. 진행 속도 고정 검사는 이 가정에 기댄다:
+//   동굴 수입의 대부분인 용암장어(난이도 0.9)는 실제로는 낚싯대가 낮을수록 덜 잡힌다). 가방이 찰 때마다 상점 왕복 TRIP_SEC[지역]초.
 import { RAIN_CHANCE, type Conditions, type Season } from './clock.ts'
 import {
   AREAS, BAGS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
@@ -96,7 +97,10 @@ export function hourlyIncome(area: AreaId, spot: string, gear: Gear): number {
   return (3600 / secPerFish) * fishValue(area, spot, gear.rodTier, gear.equipped)
 }
 
-/** 열린 지역 가운데 가장 많이 버는 자리와 그 수입. 찌는 칸 수 안에서 가장 좋은 조합으로 낀다 */
+/**
+ * 열린 지역 가운데 가장 많이 버는 자리와 그 수입. 찌는 칸 수 안에서 가장 좋은 조합으로 낀다.
+ * 찌 조합은 2개까지만 본다: 수입에 닿는 찌가 회전·호기심 둘뿐이라서다. 서버 효과 찌가 늘면 3개 조합도 보게 고친다.
+ */
 export function bestSpot(areas: readonly AreaId[], rodTier: RodTier, bagTier: BagTier, owned: readonly TackleId[]) {
   const slots = tackleSlots(rodTier)
   const combos: TackleId[][] = [[]]

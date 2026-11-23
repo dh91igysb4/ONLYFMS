@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES, TACKLE_FX, type Behavior } from './data.ts'
-import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar } from './minigame.ts'
+import { RODS, SPECIES, TACKLE_FX, tackleSlots, type Behavior, type RodTier, type TackleId } from './data.ts'
+import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 
 function seeded(n: number): () => number {
   const seed = new Uint8Array(16)
@@ -76,17 +76,17 @@ describe('찌 효과 stepBar', () => {
     expect(run(trap)).toBeCloseTo(run(base) * TACKLE_FX.trapDrain, 9)
     expect(run(base)).toBeGreaterThan(0)
   })
-  it('barbed: 바 안 위쪽 끝 근처 물고기가 있으면 안 눌러도 바가 그쪽으로 끌린다, 바 밖이면 효과 없음', () => {
+  it('barbed: 누르는 동안 바 안 위쪽 끝 근처 물고기가 있으면 바가 그쪽으로 더 끌린다, 바 밖이면 효과 없음', () => {
     const base = { ...barParams('anchovy', 1), behavior: 'mixed' as const }
     const barbed = barParams('anchovy', 1, ['barbed'])
     const top = base.barSize / 2 - 0.01
     const inside = { ...initBar(), barPos: 0.5, fishPos: 0.5 + top, fishTarget: 0.5 + top }
-    const a = stepBar(inside, false, 20, base, calm)
-    const b = stepBar(inside, false, 20, { ...base, pull: barbed.pull }, calm)
+    const a = stepBar(inside, true, 20, base, calm)
+    const b = stepBar(inside, true, 20, { ...base, pull: barbed.pull }, calm)
     expect(b.barPos).toBeGreaterThan(a.barPos)
     const outside = { ...inside, fishPos: 0.5 + base.barSize, fishTarget: 0.5 + base.barSize }
-    const c = stepBar(outside, false, 20, base, calm)
-    const d = stepBar(outside, false, 20, { ...base, pull: barbed.pull }, calm)
+    const c = stepBar(outside, true, 20, base, calm)
+    const d = stepBar(outside, true, 20, { ...base, pull: barbed.pull }, calm)
     expect(d.barPos).toBe(c.barPos)
   })
   it('barbed만으로는 혼자 다 잡지 못한다: 안 눌러도 빠른 dart 물고기(난이도 .7)는 빠져나간다', () => {
@@ -282,12 +282,11 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
     expect(mixed).toBeGreaterThan(smooth)
   })
 
-  it('mixed 궤적 골든 (seed 11, 60초)', () => {
-    // 6단계 마무리에서 목표를 바닥 floor(= 바 크기 × 0.8) 위로 옮긴 뒤 구한 값.
-    // 그 전(589b409 ~ 4dc92c8)은 1897.822500257715 / 3750, 35.29450431521198 (목표 범위 0~1)
+  it('mixed는 변경 전 구현과 같은 궤적이다 (골든: seed 11, 60초)', () => {
+    // 행동 유형 도입 전 minigame.ts(589b409)로 구한 값
     const { mean, move } = sim('mixed', 11)
-    expect(mean).toBeCloseTo(2162.059748733822 / 3750, 9)
-    expect(move).toBeCloseTo(34.864400795472264, 9)
+    expect(mean).toBeCloseTo(1897.822500257715 / 3750, 9)
+    expect(move).toBeCloseTo(35.29450431521198, 9)
   })
 
   it('모든 유형에서 위치가 [0, 1] 안에 머문다', () => {
@@ -306,50 +305,6 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
   })
 })
 
-describe('가라앉는(sinker) 물고기: 안 누르면 잡히지 않는다', () => {
-  const sinkers = SPECIES.filter((s) => s.behavior === 'sinker')
-  const play = (params: ReturnType<typeof barParams>, seedN: number, strategy: (b: Bar) => boolean) => {
-    const rng = seeded(seedN)
-    let bar = initBar()
-    for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, strategy(bar), 16, params, rng)
-    return barResult(bar)
-  }
-  const idleRate = (params: ReturnType<typeof barParams>) => {
-    let caught = 0
-    for (let n = 0; n < 100; n++) if (play(params, 500 + n, () => false) === 'caught') caught++
-    return caught / 100
-  }
-
-  it('sinker 어종이 여럿 있다', () => {
-    expect(sinkers.length).toBeGreaterThanOrEqual(8)
-  })
-
-  it('가장 낮은 낚싯대, 그리고 6단계+코르크(가장 큰 바)에서 60초 동안 안 누르면 잡히는 비율 ≤ 5%', () => {
-    for (const s of sinkers) {
-      expect(idleRate(barParams(s.id, s.minRod)), `${s.id} rod ${s.minRod}`).toBeLessThanOrEqual(0.05)
-      expect(idleRate(barParams(s.id, 6, ['cork'])), `${s.id} rod 6 cork`).toBeLessThanOrEqual(0.05)
-    }
-  })
-
-  it('따라가면(물고기가 바보다 위면 누름) 쉬운 sinker(우럭, 2단계)는 잘 잡힌다', () => {
-    let caught = 0
-    for (let n = 0; n < 50; n++) if (play(barParams('rockfish', 2), 900 + n, (b) => b.fishPos > b.barPos) === 'caught') caught++
-    expect(caught).toBeGreaterThanOrEqual(45)
-  })
-
-  it('sinker는 여전히 트랙 아래쪽에 머문다(바 0.22, 평균 < 0.45)', () => {
-    const params = { barSize: 0.22, difficulty: 0.5, behavior: 'sinker' as const, drain: 1, pull: 0 }
-    const rng = seeded(11)
-    let bar = initBar()
-    let sum = 0
-    for (let i = 0; i < 3750; i++) {
-      bar = stepBar({ ...bar, progress: 0.5 }, false, 16, params, rng)
-      sum += bar.fishPos
-    }
-    expect(sum / 3750).toBeLessThan(0.45)
-  })
-})
-
 describe('barParams: 더 새 서버가 준 모르는 값', () => {
   it('모르는 어종이면 throw하지 않고 중립값(난이도 0.5, mixed)', () => {
     const p = barParams('fish-from-the-future', 2)
@@ -364,40 +319,96 @@ describe('barParams: 더 새 서버가 준 모르는 값', () => {
   })
 })
 
-describe('어떤 유형도 안 누르면 잡히지 않는다', () => {
-  it('모든 어종 × 낚을 수 있는 모든 낚싯대(1~6) × 코르크 있음/없음, 60초 안 누르면 잡히는 비율 ≤ 5% (시드 40개)', () => {
-    const worst: Record<string, number> = {}
+/** 60초 동안 strategy로 누른다. 결과와 끝난 시각 */
+function fight(params: BarParams, seedN: number, strategy: (b: Bar, hist: Bar[]) => boolean) {
+  const rng = seeded(seedN)
+  let bar = initBar()
+  const hist: Bar[] = []
+  let t = 0
+  for (; t < 60000 && barResult(bar) === 'playing'; t += 16) {
+    hist.push(bar)
+    bar = stepBar(bar, strategy(bar, hist), 16, params, rng)
+  }
+  return { result: barResult(bar), t, perfect: bar.perfect }
+}
+/** 사람 비슷한 봇: 200ms 늦게 본 물고기·바 위치로 누른다(속도 보정 0.12) */
+const human200 = (_b: Bar, hist: Bar[]) => {
+  const s = hist[Math.max(0, hist.length - 1 - Math.round(200 / 16))]
+  return s.fishPos - s.barPos - 0.12 * s.barVel > 0
+}
+const rate = (params: BarParams, strategy: (b: Bar, hist: Bar[]) => boolean, n: number, seed0: number) => {
+  let caught = 0
+  for (let i = 0; i < n; i++) if (fight(params, seed0 + i, strategy).result === 'caught') caught++
+  return caught / n
+}
+
+describe('안 누르면 잡히지 않는다 (바닥에 내려앉은 바는 줄이 느슨하다)', () => {
+  // 낚싯대 칸 수 안의 찌 조합: 칸 0 → 없음, 1 → 하나씩, 2·3 → 코르크+가시(+함정)까지
+  const combos = (tier: number): TackleId[][] => {
+    const slots = tackleSlots(tier)
+    const out: TackleId[][] = [[]]
+    if (slots >= 1) out.push(['cork'], ['barbed'], ['trap'])
+    if (slots >= 2) out.push(['cork', 'barbed'], ['barbed', 'trap'])
+    if (slots >= 3) out.push(['cork', 'barbed', 'trap'])
+    return out
+  }
+
+  it('모든 어종 × 낚을 수 있는 모든 낚싯대(1~6) × 칸 안의 모든 찌 조합(코르크·가시·함정), 60초 안 누르면 잡히는 비율 ≤ 5% (실제 0)', () => {
+    let worst = 0
+    const seen = new Set<string>()
     for (const s of SPECIES) {
       for (const r of RODS) {
         if (r.tier < s.minRod) continue
-        for (const eq of [[], ['cork']] as const) {
-          const params = barParams(s.id, r.tier, eq)
-          let caught = 0
-          for (let n = 0; n < 40; n++) {
-            const rng = seeded(500 + n)
-            let bar = initBar()
-            for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, false, 16, params, rng)
-            if (barResult(bar) === 'caught') caught++
-          }
-          worst[s.behavior] = Math.max(worst[s.behavior] ?? 0, caught / 40)
-          expect(caught / 40, `${s.id} rod ${r.tier} ${eq.join()}`).toBeLessThanOrEqual(0.05)
+        for (const eq of combos(r.tier)) {
+          const v = rate(barParams(s.id, r.tier, eq), () => false, 20, 500)
+          seen.add(s.behavior)
+          worst = Math.max(worst, v)
+          expect(v, `${s.id} rod ${r.tier} ${eq.join('+')}`).toBeLessThanOrEqual(0.05)
         }
       }
     }
-    expect(Object.keys(worst).sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth'])
+    expect(worst).toBe(0)
+    expect([...seen].sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth'])
   })
 
-  it('따라가면 쉬운 물고기는 여전히 잘 잡힌다(유형마다, 2단계)', () => {
-    for (const id of ['goby', 'carp', 'anchovy', 'pufferfish', 'rockfish']) {
-      let caught = 0
-      for (let n = 0; n < 20; n++) {
-        const rng = seeded(700 + n)
-        const params = barParams(id, 2)
-        let bar = initBar()
-        for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, bar.fishPos > bar.barPos, 16, params, rng)
-        if (barResult(bar) === 'caught') caught++
-      }
-      expect(caught, id).toBeGreaterThanOrEqual(18)
-    }
+  it('바닥에 막 닿은 바(500ms 안)는 아직 센다: 바닥 근처에서 살살 누르는 것은 봐준다', () => {
+    const params = { barSize: 0.22, difficulty: 0, behavior: 'sinker' as const, drain: 1, pull: 0 }
+    const calm = () => 0.99
+    let bar: Bar = { ...initBar(), barPos: 0.11, fishPos: 0.05, fishTarget: 0.05, progress: 0.5 }
+    bar = stepBar(bar, false, 16, params, calm)
+    expect(bar.progress).toBeGreaterThan(0.5)
+    for (let i = 0; i < 40; i++) bar = stepBar(bar, false, 16, params, calm)
+    const p = bar.progress
+    bar = stepBar(bar, false, 16, params, calm)
+    expect(bar.progress).toBeLessThan(p) // 640ms 뒤에는 느슨해져 줄어든다
+    bar = stepBar(bar, true, 16, params, calm)
+    expect(bar.slackMs).toBe(0)
+  })
+
+  it('가시 바늘은 누를 때만 바를 끈다', () => {
+    const base = { ...barParams('anchovy', 3, ['barbed']), behavior: 'mixed' as const }
+    const calm = () => 0.99
+    const inside = { ...initBar(), barPos: 0.5, fishPos: 0.6, fishTarget: 0.6 }
+    expect(stepBar(inside, false, 20, base, calm).barPos).toBe(stepBar(inside, false, 20, { ...base, pull: 0 }, calm).barPos)
+    expect(stepBar(inside, true, 20, base, calm).barPos).toBeGreaterThan(stepBar(inside, true, 20, { ...base, pull: 0 }, calm).barPos)
+  })
+})
+
+describe('난이도는 그대로 (사람 비슷한 봇의 잡는 비율, 바꾸기 전 구현 3097fc9로 잰 값 ±15%p)', () => {
+  // [어종, 낚싯대, 찌, 옛 구현 잡는 비율(시드 900~939)]
+  const cases: [string, RodTier, TackleId[], number][] = [
+    ['grouper', 3, [], 0], // 전설 다금바리, 가장 낮은 낚싯대
+    ['grouper', 4, ['cork'], 0.6],
+    ['golden-mandarin', 3, ['cork'], 0.275], // 전설 황금 쏘가리
+    ['silver-king-trout', 4, [], 0.15], // 전설 은빛 대왕송어(dart)
+    ['fire-dragonfish', 4, ['cork'], 0.95], // 전설 화룡어(dart)
+    ['lava-eel', 3, [], 0], // 동굴 수입의 대부분
+    ['lava-eel', 6, ['cork'], 0.75],
+    ['rockfish', 1, [], 0.275], // sinker, 바닥 근처에서 살살 눌러야 한다
+    ['yellowtail', 2, [], 0.95], // smooth
+  ]
+  it.each(cases)('%s 낚싯대 %i %j: 옛 값 %f', (id, tier, eq, old) => {
+    const v = rate(barParams(id, tier, eq), human200, 40, 900)
+    expect(Math.abs(v - old)).toBeLessThanOrEqual(0.15)
   })
 })

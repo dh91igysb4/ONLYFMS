@@ -344,6 +344,12 @@ describe('fishing Game', () => {
     expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
     expect(screen.queryByText('새로운 물고기!')).not.toBeInTheDocument()
     expect(screen.getByText('세이브당 한 마리 · 가방에 잠가 뒀어요')).toBeInTheDocument()
+    // 보통 물고기(1.2초)보다 오래, 2.5초 보이고 좁은 화면에서 줄을 바꾼다
+    expect(document.querySelector('.fish-toast')).toHaveClass('fish-toast-wrap')
+    await advance(2000)
+    expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
+    await advance(600)
+    expect(screen.queryByText('전설의 물고기!')).not.toBeInTheDocument()
   })
 
   test('모르는 어종(더 새 서버)을 잡아도 알림이 죽지 않고 가격 줄만 빠진다', async () => {

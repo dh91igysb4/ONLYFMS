@@ -21,6 +21,8 @@ import { releaseMinimapCache } from './minimap.ts'
 import './fishing.css'
 
 const OUTCOME_MS = 1200
+/** 전설은 세이브당 한 번뿐이라 알림을 더 오래 보여 준다 */
+const LEGEND_OUTCOME_MS = 2500
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
 const MAX_SCENE_W = 320
@@ -414,7 +416,7 @@ export function Game({ gameId }: WorldGameProps) {
       rt.caughtSpecies = null
       setOutcome(null)
       setPhase('idle')
-    }, OUTCOME_MS)
+    }, o.kind === 'caught' && isLegend(o.fish.species) ? LEGEND_OUTCOME_MS : OUTCOME_MS)
   }
 
   // ------------------------------------------------------------ 단계
@@ -1168,7 +1170,7 @@ export function Game({ gameId }: WorldGameProps) {
             />
           )}
           {outcome && (
-            <div className="fish-toast" aria-live="polite">
+            <div className={`fish-toast${outcome.kind === 'caught' && isLegend(outcome.fish.species) ? ' fish-toast-wrap' : ''}`} aria-live="polite">
               {outcome.kind === 'caught' ? (
                 <>
                   {isLegend(outcome.fish.species) ? (
