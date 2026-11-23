@@ -44,4 +44,7 @@ export const ISLAND = defineMap('island', [
   spots: { water: 'sea', lagoon: 'lagoon' },
   // 마을 선착장 한 칸 안쪽(뭍 쪽)에 내린다
   docks: [{ front: { tx: 24, ty: 4, facing: 'right' }, target: 'village', entry: { tx: 42, ty: 28, facing: 'up' }, boat: { tx: 25, ty: 4 } }],
+  // 순간이동기: 선착장 동남쪽 모래. 섬은 세계 지도에서 아주 멀리 있어 순간이동 요금이 비싸다
+  teleporter: { tiles: { tx: 27, ty: 8, w: 2, h: 2 }, front: { tx: 27, ty: 10, facing: 'down' } },
+  world: { tx: 360, ty: 980 },
 })

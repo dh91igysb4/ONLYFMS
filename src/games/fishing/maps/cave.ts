@@ -44,4 +44,7 @@ export const CAVE = defineMap('cave', [
   // 남쪽 출구 → 숲 동굴 입구 바로 아래 빈터
   exits: [{ edge: 's', from: 24, to: 25, target: 'forest', entry: { tx: 35, ty: 6, facing: 'down' } }],
   indoor: true,
+  // 순간이동기: 첫 방 동쪽(입구에서 올라오는 길 옆). 세계 지도에서 숲 북쪽 산속
+  teleporter: { tiles: { tx: 29, ty: 25, w: 2, h: 2 }, front: { tx: 30, ty: 27, facing: 'down' } },
+  world: { tx: -40, ty: -70 },
 })

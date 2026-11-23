@@ -19,7 +19,7 @@ export const FOREST = defineMap('forest', [
   'TTTTTTTTTTTTTTf,,f,bbbbbbbbb,,,f,,f,,,,TTTTTTTTT',
   'TTTTTTTTTTTTTT,f,,,bbbbbbbbbf,,Tf,,,,fTTTTTTTTTT',
   'TTTTTTTTT,,TTT,,,,,ofbbbbb,o,,,,,,,,TTTTTTTTTTTT',
-  'TTTTTT,,,,,Tf,T,f,,,,,,f,,,,,f,,TTTTTTTTTTTTTTTT',
+  'TTTTTT,,,,,Tf,T,f,,,,,,f,,,,,,,,TTTTTTTTTTTTTTTT',
   'TTTTTTf,,,,,,,,T,,T,,,,f,,,,,,,,TTTTTTTTTTTTTTTT',
   'TTTTTT,,,,f,,,,,,,,,,,,,,,,,,=,,,,,,,,TTTTTTTTTT',
   'TTTTT,,,f,,f,,,T,TTT,T,,,f,f,=========,TTTTTTTTT',
@@ -53,4 +53,7 @@ export const FOREST = defineMap('forest', [
     { at: { tx: 35, ty: 5, w: 1, h: 1 }, target: 'cave', entry: { tx: 24, ty: 31, facing: 'up' } },
   ],
   gates: [{ area: 'cave', tiles: { tx: 35, ty: 5, w: 1, h: 1 }, look: 'rubble', front: { tx: 35, ty: 6, facing: 'up' } }],
+  // 순간이동기: 폭포 빈터로 오르는 길(tx 29) 끝 서쪽 풀밭. 세계 지도에서 강 서쪽
+  teleporter: { tiles: { tx: 28, ty: 11, w: 2, h: 2 }, front: { tx: 28, ty: 13, facing: 'down' } },
+  world: { tx: -48, ty: -34 },
 })

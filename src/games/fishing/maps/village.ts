@@ -10,6 +10,7 @@ import { defineMap } from '../map.ts'
 // 앞바다 바위(o)는 장식이자 찌가 바위 앞 물에서 멈추는 지점.
 // 선착장은 부두에서 열일곱 칸 떨어져 있어 부두 끝 낚시(pier)와 부두 끝→문 37칸에 영향이 없다.
 // 선착장 위에서 바다를 보면 shore 낚시, 끝 칸에서 배(오른쪽)를 보면 배 타기.
+// 순간이동기(tx 35~36, ty 20~21)는 동쪽 모래사장 가운데, 길·부두·선착장에서 떨어져 있다.
 export const VILLAGE = defineMap('village', [
   'TTTTTTTTTTTTTTTTTTTTTTTT==TTTTTTTTTTTTTTTTTTTTTT',
   'TTTTTT,T,,,,,,,,TT,T,TT,==,TT,T,,TT,T,TT,T,TTTTT',
@@ -53,4 +54,7 @@ export const VILLAGE = defineMap('village', [
   exits: [{ edge: 'n', from: 24, to: 25, target: 'river', entry: { tx: 24, ty: 31, facing: 'up' } }],
   // 섬 선착장 한 칸 안쪽(뭍 쪽)에 내린다
   docks: [{ front: { tx: 42, ty: 29, facing: 'right' }, target: 'island', entry: { tx: 24, ty: 5, facing: 'down' }, boat: { tx: 43, ty: 29 } }],
+  // 등대 신호기(순간이동기): 동쪽 모래사장, 바다를 내려다본다. 도착하면 바로 아래 모래에 선다
+  teleporter: { tiles: { tx: 35, ty: 20, w: 2, h: 2 }, front: { tx: 35, ty: 22, facing: 'down' } },
+  world: { tx: 0, ty: 0 },
 })

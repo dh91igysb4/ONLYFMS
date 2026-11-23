@@ -382,3 +382,57 @@ describe('새 지역 맵', () => {
     }
   })
 })
+
+describe('순간이동기', () => {
+  const tp = (map: MapDef) => map.teleporter!
+  /** 구조물을 바라보는 방향 하나(front에서) */
+  const facingInto = (map: MapDef): Facing =>
+    FACINGS.find((f) => {
+      const { tiles } = tp(map)
+      const t = { tx: tp(map).front.tx + DIRS[f].dx, ty: tp(map).front.ty + DIRS[f].dy }
+      return t.tx >= tiles.tx && t.tx < tiles.tx + tiles.w && t.ty >= tiles.ty && t.ty < tiles.ty + tiles.h
+    })!
+
+  it.each(ALL.map((m) => [m.id, m] as const))('%s: 2×2 이동기, 칸은 rows에서 땅이고 어떤 열림에서도 못 걷는다', (_id, map) => {
+    expect(map.teleporter).not.toBeNull()
+    const { tiles } = tp(map)
+    expect([tiles.w, tiles.h]).toEqual([2, 2])
+    for (let ty = tiles.ty; ty < tiles.ty + 2; ty++) for (let tx = tiles.tx; tx < tiles.tx + 2; tx++) {
+      expect(['grass', 'sand', 'path', 'cave-floor'], `(${tx},${ty})`).toContain(tileAt(map, tx, ty))
+      expect(isWalkable(map, tx, ty, ALL_AREAS_OPEN), `(${tx},${ty})`).toBe(false)
+      expect(isWalkable(map, tx, ty, BASE_OPEN), `(${tx},${ty})`).toBe(false)
+    }
+  })
+
+  it.each(ALL.map((m) => [m.id, m] as const))('%s: front는 걸을 수 있고 출구·문·선착장 자리가 아니며, 도착 방향으로는 안 열리고 구조물을 보면 열린다', (_id, map) => {
+    const { front } = tp(map)
+    const pos = center(front.tx, front.ty)
+    expect(isWalkable(map, front.tx, front.ty, ALL_AREAS_OPEN)).toBe(true)
+    expect(feetBlocked(map, pos.x, pos.y, ALL_AREAS_OPEN)).toBe(false)
+    expect(exitAt(map, pos)).toBeNull()
+    for (const g of map.gates) for (let ty = g.tiles.ty; ty < g.tiles.ty + g.tiles.h; ty++) for (let tx = g.tiles.tx; tx < g.tiles.tx + g.tiles.w; tx++) {
+      expect(key({ tx, ty })).not.toBe(key(front))
+    }
+    for (const d of map.docks) expect(key(d.front)).not.toBe(key(front))
+    expect(interactionAt(map, pos, front.facing, ALL_AREAS_OPEN)).toBeNull()
+    expect(interactionAt(map, pos, facingInto(map), ALL_AREAS_OPEN)).toEqual({ kind: 'teleporter' })
+  })
+
+  it.each(ALL.map((m) => [m.id, m] as const))('%s: front는 실제 도착점에서 걸어 닿는다(기본 맵은 기본 지역만, 해금 맵은 그 지역을 연 상태)', (id, map) => {
+    const base = DEFAULT_AREAS.includes(id)
+    const opened: Opened = base ? BASE_OPEN : new Set<AreaId>([...DEFAULT_AREAS, id])
+    const starts = base
+      ? baseStarts(map)
+      : ALL.filter((m) => opened.has(m.id)).flatMap((m) => [...m.exits, ...m.docks].filter((e) => e.target === id).map(({ entry: { tx, ty } }) => ({ tx, ty })))
+    expect(starts.length).toBeGreaterThan(0)
+    for (const s of starts) expect(bfs(map, s, opened).has(key(tp(map).front)), `${id} from (${s.tx},${s.ty})`).toBe(true)
+  })
+
+  it('세계 원점은 맵마다 다르고, 섬은 멀리 있다', () => {
+    const origins = ALL.map((m) => key(m.world))
+    expect(new Set(origins).size).toBe(ALL.length)
+    expect(MAPS.village!.world).toEqual({ tx: 0, ty: 0 })
+    const island = MAPS.island!.world
+    expect(Math.hypot(island.tx, island.ty)).toBeGreaterThan(500)
+  })
+})
