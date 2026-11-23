@@ -46,8 +46,8 @@ select has_function('public', 'my_wallet', 'has my_wallet');
 select has_function('public', 'user_wallet', array['text'], 'has user_wallet');
 select has_function('public', 'admin_gold_adjust', array['text', 'bigint', 'text'], 'has admin_gold_adjust');
 select has_function('public', 'admin_gold_ledger', array['integer'], 'has admin_gold_ledger');
-select is(public._economy(), '{"daily_soft_cap":30750,"soft_cap_rate":0.2,"daily_soft_cap_2":41000,"soft_cap_rate_2":0.04}'::jsonb,
-  '_economy: economy.ts 사본 (2단 상한은 16_soft_cap_tier2)');
+select ok(public._economy() @> '{"daily_soft_cap":30750,"soft_cap_rate":0.2,"daily_soft_cap_2":41000,"soft_cap_rate_2":0.04}'::jsonb,
+  '_economy: economy.ts 사본 상한 키 (2단 상한은 16_soft_cap_tier2, 상금·판돈·참가비는 18_settle_daily)');
 
 -- ---------------------------------------------------------------- _gold_move 기본 (Review Focus 2)
 select is(public._gold_move(:'ua', 100, 'admin', 'r1', 'g-x', '메모'), 100::bigint, 'move: 지갑 없던 사람 +100 → 100');
@@ -172,7 +172,7 @@ select throws_ok($$select public._economy()$$, '42501', null, '_economy: authent
 select throws_ok($$select public._kst_today_start()$$, '42501', null, '_kst_today_start: authenticated 실행 불가');
 select throws_ok($$select public._earned_today(auth.uid())$$, '42501', null, '_earned_today: authenticated 실행 불가');
 
-select is(public.my_wallet(), '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
+select is(public.my_wallet() - 'prizes', '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
 select is(public.user_wallet('goldb'), 0::bigint, 'user_wallet: 지갑 0');
 select is(public.user_wallet(' GoldB '), 0::bigint, 'user_wallet: handle 정규화');
 select is(public.user_wallet('goldp'), null::bigint, 'user_wallet: 대기 사용자 → null');
