@@ -88,6 +88,32 @@ export const SPECIES: Species[] = [
   { id: 'stream-minnow', name: '버들치', rarity: 'common', basePrice: 20, minCm: 6, maxCm: 12, difficulty: 0.25, minRod: 1, behavior: 'dart', area: 'forest', spots: ['waterfall'] },
   { id: 'lenok', name: '열목어', rarity: 'rare', basePrice: 380, minCm: 30, maxCm: 70, difficulty: 0.72, minRod: 2, behavior: 'dart', area: 'forest', spots: ['waterfall'], seasons: ['autumn', 'winter'] },
   { id: 'century-snakehead', name: '백년 가물치', rarity: 'legend', basePrice: 2800, minCm: 90, maxCm: 150, difficulty: 0.9, minRod: 3, behavior: 'sinker', area: 'forest', spots: ['pond'], seasons: ['spring'], hours: [20, 5], legend: { power: 0 } },
+  // 산 호수
+  { id: 'rainbow-trout', name: '무지개송어', rarity: 'common', basePrice: 60, minCm: 25, maxCm: 60, difficulty: 0.35, minRod: 1, behavior: 'mixed', area: 'lake' },
+  { id: 'largemouth-bass', name: '큰입배스', rarity: 'common', basePrice: 70, minCm: 25, maxCm: 55, difficulty: 0.4, minRod: 1, behavior: 'mixed', area: 'lake' },
+  { id: 'smelt', name: '빙어', rarity: 'common', basePrice: 30, minCm: 8, maxCm: 15, difficulty: 0.3, minRod: 1, behavior: 'dart', area: 'lake', seasons: ['winter'] },
+  { id: 'masu-salmon', name: '산천어', rarity: 'uncommon', basePrice: 180, minCm: 20, maxCm: 40, difficulty: 0.55, minRod: 1, behavior: 'dart', area: 'lake', seasons: ['autumn', 'winter'], hours: [6, 19] },
+  { id: 'skygazer', name: '강준치', rarity: 'uncommon', basePrice: 160, minCm: 40, maxCm: 90, difficulty: 0.6, minRod: 1, behavior: 'smooth', area: 'lake', seasons: ['spring', 'summer'], weather: 'rain' },
+  { id: 'israeli-carp', name: '향어', rarity: 'uncommon', basePrice: 150, minCm: 40, maxCm: 80, difficulty: 0.5, minRod: 1, behavior: 'smooth', area: 'lake', hours: [20, 5] },
+  { id: 'sturgeon', name: '철갑상어', rarity: 'rare', basePrice: 700, minCm: 80, maxCm: 160, difficulty: 0.85, minRod: 2, behavior: 'sinker', area: 'lake', seasons: ['summer', 'winter'], hours: [6, 19] },
+  { id: 'silver-king-trout', name: '은빛 대왕송어', rarity: 'legend', basePrice: 4000, minCm: 70, maxCm: 120, difficulty: 0.95, minRod: 3, behavior: 'dart', area: 'lake', seasons: ['autumn'], hours: [4, 7], legend: { power: 0.95 } },
+  // 동굴
+  { id: 'blind-fish', name: '장님고기', rarity: 'common', basePrice: 60, minCm: 8, maxCm: 20, difficulty: 0.3, minRod: 1, behavior: 'mixed', area: 'cave', spots: ['cave1'] },
+  { id: 'cave-crayfish', name: '돌가재어', rarity: 'common', basePrice: 70, minCm: 10, maxCm: 25, difficulty: 0.35, minRod: 1, behavior: 'sinker', area: 'cave', spots: ['cave1'] },
+  { id: 'crystal-fry', name: '수정치어', rarity: 'common', basePrice: 90, minCm: 6, maxCm: 14, difficulty: 0.45, minRod: 1, behavior: 'dart', area: 'cave', spots: ['cave2'] },
+  { id: 'bat-catfish', name: '박쥐메기', rarity: 'uncommon', basePrice: 220, minCm: 30, maxCm: 70, difficulty: 0.65, minRod: 1, behavior: 'smooth', area: 'cave', spots: ['cave2'] },
+  { id: 'ember-carp', name: '불꽃잉어', rarity: 'common', basePrice: 150, minCm: 30, maxCm: 60, difficulty: 0.6, minRod: 1, behavior: 'mixed', area: 'cave', spots: ['cave3'] },
+  { id: 'lava-eel', name: '용암장어', rarity: 'rare', basePrice: 900, minCm: 60, maxCm: 120, difficulty: 0.9, minRod: 3, behavior: 'mixed', area: 'cave', spots: ['cave3'] },
+  { id: 'fire-dragonfish', name: '화룡어', rarity: 'legend', basePrice: 6000, minCm: 90, maxCm: 150, difficulty: 0.98, minRod: 4, behavior: 'dart', area: 'cave', spots: ['cave3'], legend: { power: 0.95 } },
+  // 섬
+  { id: 'clownfish', name: '흰동가리', rarity: 'common', basePrice: 80, minCm: 6, maxCm: 11, difficulty: 0.35, minRod: 1, behavior: 'mixed', area: 'island', spots: ['lagoon'] },
+  { id: 'butterflyfish', name: '나비고기', rarity: 'common', basePrice: 90, minCm: 10, maxCm: 20, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'island', spots: ['lagoon'] },
+  { id: 'blue-damsel', name: '청줄돔', rarity: 'common', basePrice: 85, minCm: 8, maxCm: 18, difficulty: 0.3, minRod: 1, behavior: 'smooth', area: 'island', spots: ['sea'] },
+  { id: 'lionfish', name: '쏠배감펭', rarity: 'uncommon', basePrice: 260, minCm: 20, maxCm: 38, difficulty: 0.6, minRod: 1, behavior: 'smooth', area: 'island', spots: ['lagoon'], hours: [20, 5] },
+  { id: 'moray', name: '곰치', rarity: 'uncommon', basePrice: 280, minCm: 60, maxCm: 150, difficulty: 0.65, minRod: 1, behavior: 'sinker', area: 'island', spots: ['sea'], weather: 'rain' },
+  { id: 'stingray', name: '가오리', rarity: 'rare', basePrice: 650, minCm: 50, maxCm: 120, difficulty: 0.8, minRod: 2, behavior: 'sinker', area: 'island', spots: ['lagoon'] },
+  { id: 'mahi', name: '만새기', rarity: 'rare', basePrice: 750, minCm: 60, maxCm: 140, difficulty: 0.82, minRod: 2, behavior: 'dart', area: 'island', spots: ['sea'], hours: [6, 19] },
+  { id: 'rainbow-marlin', name: '무지개 청새치', rarity: 'legend', basePrice: 8000, minCm: 150, maxCm: 300, difficulty: 0.98, minRod: 4, behavior: 'dart', area: 'island', spots: ['sea'], hours: [11, 14], weather: 'sun', legend: { power: 0.95 } },
 ]
 
 export const RODS: Rod[] = [
