@@ -434,11 +434,56 @@ test('참가비 0 대회는 지금처럼 "참가" 한 번', async () => {
   expect(screen.queryByText(/참가비/)).toBeNull()
 })
 
-test('취소된 참가비 대회에 참가했으면 "참가비를 돌려받았어요"', async () => {
+test('취소된 참가비 대회에 참가했으면 "참가비를 돌려받았어요"이고 모인 돈은 보이지 않는다', async () => {
   dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000, cancelled_at: iso(sNow() - MIN) }))
   setup({ entries: ['u1'] })
   renderAt()
   expect(await screen.findByText('참가비를 돌려받았어요')).toBeInTheDocument()
+  expect(document.querySelector('.contest-fee')).toHaveTextContent('참가비 1,000 G')
+  expect(screen.queryByText(/모인 돈/)).toBeNull()
+})
+
+test('지갑이 보이기 전에는 참가비를 보이지 않는다', async () => {
+  wallet.enabled = false
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
+  setup({ entries: ['u9'] })
+  renderAt()
+  expect(await screen.findByRole('button', { name: '참가' })).toBeInTheDocument()
+  expect(screen.queryByText(/참가비/)).toBeNull()
+})
+
+test('정산 전(끝나고 1분 유예)에는 "참가비를 돌려받았어요"를 보이지 않는다', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000, starts_at: iso(sNow() - 120 * MIN), ends_at: iso(sNow() - 30_000) }))
+  setupPrizes([[]], null)
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'lb_contest') return []
+    if (name === 'contest_prizes') return []
+    if (name === 'my_wallet') return { balance: 1, today: {}, earned_today: 0, prizes: [] }
+    return null
+  })
+  renderAt()
+  await vi.waitFor(() => expect(calls).toContain('my_wallet'))
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+  expect(screen.queryByText(/참가비를 돌려받았어요/)).toBeNull()
+})
+
+test('문제 화면에서 참가비 대회에 바로 들어오면(fee_mismatch) 대회 페이지로 보낸다', async () => {
+  const { ApiError } = await import('../../lib/api.ts')
+  dataMock.getContest.mockResolvedValue(
+    contest({ entry_fee: 500, starts_at: iso(sNow() - 10 * MIN), ends_at: iso(sNow() + 50 * MIN) }),
+  )
+  setup({ entries: [] })
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'join_contest') throw new ApiError('fee_mismatch', 400, { details: '500' })
+    return name === 'lb_contest' ? [] : null
+  })
+  renderAt('/contests/c1/1')
+  expect(await screen.findByRole('button', { name: '참가비 500 G 내고 참가' })).toBeInTheDocument()
+  expect(playMock).not.toHaveBeenCalled()
 })
 
 test('끝난 참가비 대회: 모인 돈·상금 열·내 상금, 정산 전이면 my_wallet로 정산', async () => {

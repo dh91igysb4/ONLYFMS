@@ -316,6 +316,7 @@ npx supabase@2 functions deploy world --no-verify-jwt
 
 ### Task 4(낚시 → 지갑) 배포 때 더할 것
 Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
+- **새 마이그레이션에서 `_wallet_enabled()`를 `create or replace … select true`로 바꾼다**(5단계 대회 참가비가 이 값으로 새 참가비 대회를 막는다). `src/games/walletFlag.test.ts`가 마지막 정의와 등록부 `walletEnabled()`를 비교하므로 빠뜨리면 `npm test`가 실패한다. 순서는 DB push가 먼저라 그 사이(새 DB·옛 화면)에는 참가비 입력이 아직 없을 뿐이다.
 - 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다. 옛 로직은 세이브에 gold가 없어 0으로 시작하고, 그 사이 번 골드는 다시 배포해도 **사라진다**: 이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시되기 때문이다.
 - 수동 확인: 낚시를 열기 전 헤더 `0 G`(지연 이전), 낚시를 열면 헤더와 낚시 화면 골드가 옛 골드와 같음, 새로고침해도 같음; 물고기 팔기 → 헤더가 바로 오름; 낚싯대·가방·찌·해금·순간이동·고급 장비 구매 → 헤더가 바로 내림, 모자라면 "골드가 부족해요".
 - 확인 쿼리: 아직 이전되지 않은 세이브 `select count(*) from world_saves where game_id = 'fishing' and logic_version <= <LAST_GOLD_IN_SAVE>;`, 이전 합계 `select count(*), sum(delta) from gold_ledger where reason = 'migrate';`, 이중 이전 없음 `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행).
@@ -406,7 +407,9 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
 
 - [ ] `npx supabase@2 db push`. DB만 먼저: 옛 화면은 `p_entry_fee`를 보내지 않아 참가비 0 대회만 만든다. 옛 화면이 참가비 대회에 참가하려 하면 `fee_mismatch`(돈이 빠지지 않음).
 - [ ] PR 머지 → Vercel 배포 (Vercel이 먼저 올라가도 대회 화면은 `entry_fee` 열이 없으면 없이 다시 읽어 깨지지 않는다)
-- [ ] **낚시 Task 4(지갑 이전) 전에는 참가비 입력이 없다**(`walletEnabled()`). SQL은 등록부를 모르므로 막지 않지만, 지갑 잔액이 없으면 참가비 대회는 `not_enough_gold`로 만들어지지 않는다.
+- [ ] **낚시 Task 4(지갑 이전) 전에는 참가비 대회를 만들 수 없다**: 화면은 `walletEnabled()`로 참가비 입력·표시를 가리고, 서버는 `create_contest`가 `_wallet_enabled()`(등록부의 사본, 이 PR에서는 `false`)를 보고 참가비 > 0을 `fee_invalid`로 거절한다. 자유 플레이·데일리 상금으로 이미 골드가 있는 사람도 마찬가지다. 이때는 아래 수동 확인 가운데 "참가비 0 대회가 지금과 같다"만 본다.
+- 참고: 참가비 대회에 든 게임을 나중에 숨기면 `_lb_contest_rows(…, false)`가 그 기록을 빼므로 순위가 바뀌거나(재정렬) 순위 0명이 되어 전원 환불된다. 돈은 보존된다. 진행 중 참가비 대회가 있으면 게임 숨김을 끝날 때까지 미룬다.
+- 참고: 만든 사람이 아닌 누군가 참가비를 낸 뒤에는 `update_contest`가 시작 시각·제한 시간·문제 구성 변경을 `not_editable`로 거절한다(제목·공개 범위는 가능). 바꾸려면 취소(전원 환불) 뒤 다시 만든다.
 - [ ] 수동 확인(세 계정 A·B·C, 미리보기 → 운영, 폰 390px·PC):
   - [ ] 참가비 0 대회: 만들기·참가·자동 참가·결과가 지금과 같다(골드 문구 없음)
   - [ ] A가 참가비 1,000 친선 대회를 만든다(버튼 "참가비 1,000 G 내고 만들기") → A 헤더 −1,000, 대회 페이지 "참가비 1,000 G · 모인 돈 1,000 G"

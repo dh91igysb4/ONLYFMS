@@ -363,9 +363,11 @@ legacyGold?(raw: unknown, fromVersion: number): number                  // 옛 �
 - `contests.entry_fee int not null default 0 check (entry_fee between 0 and 41000)` (`FEE_MAX`), 데일리는 항상 0(제약). 숨김 게임이 든 대회는 0만.
 - **만들기**: `create_contest`에 `p_entry_fee int default 0`. 만든 사람은 지금처럼 자동 참가하므로 만들 때 참가비를 뺀다 (`contest_fee`, ref = 대회 id).
 - **고치기**: 참가비는 만든 뒤 바꿀 수 없다 (`update_contest`는 그대로). 바꾸려면 취소(환불) 후 다시 만든다 (초안에서 고침: 만든 사람이 자동 참가라 "참가자가 생긴 뒤 금지"는 곧 "언제나 금지"다).
+  - **5단계 리뷰에서 더함**: 만든 사람이 아닌 누군가 참가비를 낸 뒤에는 시작 시각·제한 시간·문제 구성도 바꿀 수 없다(`not_editable`, 낸 사람이 동의한 조건 고정). 제목·공개 범위는 고칠 수 있다.
+- **지갑이 보이기 전**(등록부에 `wallet: true` 게임이 없음): 새 참가비 대회는 `fee_invalid`. SQL `_wallet_enabled()`가 등록부 `walletEnabled()`의 사본이고 vitest가 비교한다(대전 판돈의 `invalid_stake`와 같은 규칙).
 - **참가**: `join_contest`·`join_by_invite_code`가 처음 참가할 때만 참가비를 뺀다(이미 참가했으면 아무 일도 없음). 대회 행을 먼저 `for update`로 잠근 뒤 지갑. 참가 화면에 금액을 보여 준다.
 - **취소**: `cancel_contest`가 전원 환불 (`contest_refund`, 장부의 `contest_fee` 줄 기준).
-- **정산** (`settle_due`): 모인 돈 = 장부의 그 대회 `contest_fee` 합계. 순위는 `_lb_contest_rows(대회, false)`(참가자만 풀 수 있으므로 곧 참가자 중 기록 있는 사람). 순위에 든 사람 수 `N`:
+- **정산** (`settle_due`): 모인 돈 = 장부의 그 대회 `contest_fee` 합계. 순위는 `_lb_contest_rows(대회, false)` 가운데 **행동을 한 번 이상 한 사람(`action_count > 0`)만 남겨 다시 센 등수**(데일리 상금 §8.1과 같은 규칙. 문제만 열어 본 사람은 점수 0·행동 0 기록이 생기지만 기록 있는 사람으로 치지 않는다 — 그렇지 않으면 10% 몫을 받거나 2명 독식을 60/30/10으로 바꾼다). 동점은 리더보드 정렬(점수 → 행동 수 적은 쪽 → 먼저 끝낸 쪽 → 아이디)이 가르고 나누지 않는다. 순위에 든 사람 수 `N`:
   - `N = 0`: 전원 환불.
   - `N = 1` 또는 `2`: 1등이 전부.
   - `N ≥ 3`: 60 / 30 / 10 %. 각각 1 단위 내림, 나머지는 1등.

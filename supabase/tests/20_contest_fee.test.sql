@@ -2,7 +2,7 @@
 -- 승인 사용자 역할로 create_contest·join_contest·join_by_invite_code·cancel_contest를 부르고, 정산을 흉내 내려면
 -- 슈퍼유저가 대회 시각을 과거로 옮기고 기록(attempts)을 직접 넣은 뒤 settle_due()를 부른다.
 begin;
-select plan(90);
+select plan(104);
 
 \set f1 '00000000-0000-0000-0000-0000000008f1'
 \set f2 '00000000-0000-0000-0000-0000000008f2'
@@ -137,6 +137,21 @@ select ok(position('soft_cap' in pg_get_functiondef('public._contest_payouts(uui
       and position('soft_cap' in pg_get_functiondef('public._contest_enter(uuid,uuid,int)'::regprocedure)) = 0,
   '참가비·분배 함수에 사이트 상한 계산이 없다');
 
+-- ---------------------------------------------------------------- 지갑이 보이기 전: 참가비 0만
+select ok(not has_function_privilege('authenticated', 'public._wallet_enabled()', 'execute'),
+  '_wallet_enabled는 authenticated에 실행 권한 없음');
+select is(public._wallet_enabled(), false, '이 브랜치의 _wallet_enabled()는 false (등록부에 wallet 게임 없음)');
+set local role authenticated;
+set local request.jwt.claims = :'F1';
+select throws_ok($$select pg_temp.mk('cf-off', 1000)$$, 'P0001', 'fee_invalid',
+  '지갑이 꺼져 있으면 잔액이 있어도 참가비 대회를 만들 수 없다(fee_invalid)');
+select lives_ok($$select pg_temp.mk('cf-off0', 0)$$, '지갑이 꺼져 있어도 참가비 0 대회는 만든다');
+reset role;
+select is(pg_temp.bal(:'f1'), 100000::bigint, '꺼진 동안 잔액 그대로');
+-- 이 아래는 지갑이 켜진 상태(트랜잭션 안에서만, 롤백됨)
+create or replace function public._wallet_enabled() returns boolean
+language sql immutable security definer set search_path = public as $$ select true $$;
+
 -- ---------------------------------------------------------------- 만들기
 set local role authenticated;
 set local request.jwt.claims = :'F1';
@@ -246,6 +261,50 @@ select is(public.join_by_invite_code(:'cinvcode'), :'cinv'::uuid, '이미 참가
 reset role;
 select is(pg_temp.bal(:'f3'), 99300::bigint, '초대 참가비 한 번만 −700');
 
+-- 정산된 대회에는 참가·취소가 닿지 않는다 (행 잠금을 오래 기다린 트랜잭션 흉내: 시각은 열려 있어도 settled_at)
+set local role authenticated;
+set local request.jwt.claims = :'F1';
+select pg_temp.mk('cf-settled', 100) as cset \gset
+reset role;
+update public.contests set settled_at = now() where id = :'cset';
+set local role authenticated;
+set local request.jwt.claims = :'F2';
+select throws_ok(format('select public.join_contest(%L, null, 100)', :'cset'), 'P0001', 'contest_closed', '정산된 대회 참가 → contest_closed');
+set local request.jwt.claims = :'F1';
+select throws_ok(format('select public.cancel_contest(%L)', :'cset'), 'P0001', 'not_editable', '정산된 대회 취소 → not_editable');
+reset role;
+
+-- 남이 낸 뒤에는 시작 시각·제한 시간·문제를 바꿀 수 없다(제목·공개 범위는 가능)
+set local role authenticated;
+set local request.jwt.claims = :'F1';
+select pg_temp.mk('cf-frz', 100) as cfrz \gset
+reset role;
+select starts_at as cfrzstart from public.contests where id = :'cfrz' \gset
+set local role authenticated;
+set local request.jwt.claims = :'F1';
+select lives_ok(format($q$select public.update_contest(%L, 'cf-frz2', %L::timestamptz + interval '1 minute', 30, 'public',
+  '[{"game_id":"g-fee","options":{},"count":1}]'::jsonb)$q$, :'cfrz', :'cfrzstart'),
+  '만든 사람만 낸 동안은 시작 시각을 고칠 수 있다');
+select lives_ok(format($q$select public.update_contest(%L, 'cf-frz', %L::timestamptz, 30, 'public',
+  '[{"game_id":"g-fee","options":{},"count":1}]'::jsonb)$q$, :'cfrz', :'cfrzstart'), '되돌리기');
+set local request.jwt.claims = :'F2';
+select public.join_contest(:'cfrz', null, 100);
+set local request.jwt.claims = :'F1';
+select throws_ok(format($q$select public.update_contest(%L, 'cf-frz', %L::timestamptz + interval '1 minute', 30, 'public',
+  '[{"game_id":"g-fee","options":{},"count":1}]'::jsonb)$q$, :'cfrz', :'cfrzstart'), 'P0001', 'not_editable',
+  '남이 낸 뒤 시작 시각 변경 → not_editable');
+select throws_ok(format($q$select public.update_contest(%L, 'cf-frz', %L::timestamptz, 45, 'public',
+  '[{"game_id":"g-fee","options":{},"count":1}]'::jsonb)$q$, :'cfrz', :'cfrzstart'), 'P0001', 'not_editable',
+  '남이 낸 뒤 제한 시간 변경 → not_editable');
+select throws_ok(format($q$select public.update_contest(%L, 'cf-frz', %L::timestamptz, 30, 'public',
+  '[{"game_id":"g-fee","options":{},"count":2}]'::jsonb)$q$, :'cfrz', :'cfrzstart'), 'P0001', 'not_editable',
+  '남이 낸 뒤 문제 구성 변경 → not_editable');
+select lives_ok(format($q$select public.update_contest(%L, '새 제목', %L::timestamptz, 30, 'invite',
+  '[{"game_id":"g-fee","options":{},"count":1}]'::jsonb)$q$, :'cfrz', :'cfrzstart'),
+  '남이 낸 뒤에도 제목·공개 범위는 고칠 수 있다');
+reset role;
+select is((select title from public.contests where id = :'cfrz'), '새 제목', '제목이 바뀌었다');
+
 -- 참가비 0 대회는 지금과 같다
 set local role authenticated;
 set local request.jwt.claims = :'F1';
@@ -268,7 +327,7 @@ select lives_ok(format('select public.cancel_contest(%L)', :'ccan'), '만든 사
 reset role;
 select is(pg_temp.paid(:'ccan', 'contest_refund'), 'feeone:2000,feethree:2000,feetwo:2000', '취소 → 전원 환불');
 select is(pg_temp.net(:'ccan'), 0::bigint, '취소: 모인 돈 = 돌려준 돈');
-select is(pg_temp.bal(:'f2'), 99000::bigint, 'f2 잔액: 취소 대회 참가비 돌려받음');
+select is(pg_temp.bal(:'f2'), 98900::bigint, 'f2 잔액: 취소 대회 참가비 돌려받음 (a 1,000·frz 100은 낸 채)');
 -- 끝난 뒤 정산이 잡아도 더 주지 않는다
 update public.contests set settled_at = now() where settled_at is null and ends_at <= now() and id <> :'ccan';
 update public.contests set starts_at = now() - interval '2 days', ends_at = now() - interval '1 day' where id = :'ccan';
@@ -402,8 +461,8 @@ select ok(exists (select 1 from jsonb_array_elements(public.my_wallet() -> 'priz
                    where p ->> 'reason' = 'contest_prize' and p ->> 'contest_id' = :'ch'), 'my_wallet prizes에 대회 상금');
 reset role;
 
--- 잔액 검사(f2): 100,000 − (a 1,000 + z·o·t·h·f 5,000 + r 1,001 + s 7 + tie 100) + (z 환불 1,000 + o 2,000 + t 3,000 + h 400 + r 900 + s 6 + tie 90)
-select is(pg_temp.bal(:'f2'), (100000 - 1000 - 5000 - 1001 - 7 - 100 + 1000 + 2000 + 3000 + 400 + 900 + 6 + 90)::bigint,
+-- 잔액 검사(f2): 100,000 − (a 1,000 + frz 100 + z·o·t·h·f 5,000 + r 1,001 + s 7 + tie 100) + (z 환불 1,000 + o 2,000 + t 3,000 + h 400 + r 900 + s 6 + tie 90)
+select is(pg_temp.bal(:'f2'), (100000 - 1000 - 100 - 5000 - 1001 - 7 - 100 + 1000 + 2000 + 3000 + 400 + 900 + 6 + 90)::bigint,
   'f2 잔액 = 낸 것과 받은 것의 합');
 
 -- 데일리는 3단계 그대로(참가비 경로를 타지 않음): 데일리 _contest_payouts는 daily_prize만

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { formatGold } from '../wallet/format.ts'
 import { refreshWallet, useWallet } from '../wallet/useWallet.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
 import { mismatchFee } from './fee.ts'
 import '../wallet/wallet.css'
 
@@ -29,7 +30,7 @@ export function JoinPage() {
     } catch (e) {
       const c = e instanceof ApiError ? e.code : 'network'
       const real = mismatchFee(e)
-      if (real !== null && real > 0) {
+      if (real !== null && real > 0 && walletEnabled()) {
         setConfirmFee(real)
         setConfirmError(null)
         return

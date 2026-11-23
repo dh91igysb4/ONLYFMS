@@ -4,6 +4,8 @@ import { beforeEach, expect, test, vi } from 'vitest'
 
 const rpcMock = vi.fn()
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'x', supabaseKey: 'k' }))
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
   rpc: (...a: unknown[]) => rpcMock(...a),
@@ -25,7 +27,7 @@ function renderAt() {
   )
 }
 
-beforeEach(() => { rpcMock.mockReset(); setBalance(100000) })
+beforeEach(() => { rpcMock.mockReset(); setBalance(100000); wallet.enabled = true })
 
 test('참가비 0 대회는 바로 들어간다', async () => {
   rpcMock.mockResolvedValue('c1')
@@ -72,4 +74,12 @@ test('다른 오류는 지금처럼 문구와 다시 시도', async () => {
   renderAt()
   expect(await screen.findByText('이미 끝났거나 취소된 대회예요')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+})
+
+test('지갑이 보이기 전에는 확인 화면 대신 오류 문구', async () => {
+  wallet.enabled = false
+  rpcMock.mockRejectedValue(new ApiError('fee_mismatch', 400, { details: '700' }))
+  renderAt()
+  expect(await screen.findByText('참가비를 확인하고 대회 페이지에서 다시 참가해 주세요')).toBeInTheDocument()
+  expect(screen.queryByText('참가비가 있는 대회예요')).toBeNull()
 })

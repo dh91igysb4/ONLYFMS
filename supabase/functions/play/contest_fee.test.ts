@@ -12,6 +12,9 @@ type Tx = postgres.TransactionSql
 
 await sql`insert into public.game_modes (game_id, daily, contest, free) values ('fee-g', false, true, false)
           on conflict (game_id) do nothing`
+// 이 브랜치는 등록부에 지갑 게임이 없어 _wallet_enabled()가 false다(새 참가비 대회 금지). 임시 DB에서만 켠다.
+await sql`create or replace function public._wallet_enabled() returns boolean
+          language sql immutable security definer set search_path = public as $$ select true $$`
 
 async function makeUsers(n: number, gold = 100000): Promise<string[]> {
   const ids = Array.from({ length: n }, () => crypto.randomUUID())

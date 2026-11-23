@@ -4,9 +4,13 @@ import { ApiError, errorMessage } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import { syncServerTime } from './clock.ts'
 import { getEntryCounts, listContests, type ContestRow } from './data.ts'
-import { feeOf } from './fee.ts'
+import { feeOf as rawFee } from './fee.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
 import { formatGold } from '../wallet/format.ts'
 import '../wallet/wallet.css'
+
+// 지갑이 보이기 전에는 참가비를 보이지 않는다
+const feeOf = (c: ContestRow) => (walletEnabled() ? rawFee(c) : 0)
 import { kindLabel, kstLabel, phaseOf } from './format.ts'
 
 function Section({ title, rows, empty, counts }: { title: string; rows: ContestRow[]; empty: string; counts: Map<string, number> }) {

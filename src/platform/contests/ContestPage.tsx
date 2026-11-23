@@ -61,6 +61,7 @@ export function ContestPage() {
   // 참가비(지갑 5단계): 참가 버튼을 한 번 누르면 확인 단계
   const { balance } = useWallet()
   const [confirmJoin, setConfirmJoin] = useState(false)
+  const [settled, setSettled] = useState(false)
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -85,7 +86,8 @@ export function ContestPage() {
   const isAdmin = !!profile?.is_admin
   const joined = !!me && entries.includes(me)
   const phase = contest ? phaseOf(contest, now()) : null
-  const fee = feeOf(contest)
+  // 지갑이 보이기 전에는 참가비를 보이지 않는다(서버도 그동안 새 참가비 대회를 만들지 않는다)
+  const fee = walletEnabled() ? feeOf(contest) : 0
 
   // 1초마다 다시 그려 카운트다운과 시작·종료 전환을 반영한다.
   useEffect(() => {
@@ -132,11 +134,20 @@ export function ContestPage() {
     void (async () => {
       try {
         let rows = await fetchContestPrizes(id)
-        if (alive && rows.length === 0 && (kind === 'daily' || fee > 0) && (await getSettledAt(id)) === null && alive) {
-          setSettling(true)
-          await refreshWallet()
+        if (alive && rows.length > 0) setSettled(true)
+        if (alive && rows.length === 0 && (kind === 'daily' || fee > 0)) {
+          let st = await getSettledAt(id)
           if (!alive) return
-          rows = await fetchContestPrizes(id)
+          if (st === null) {
+            setSettling(true)
+            await refreshWallet()
+            if (!alive) return
+            rows = await fetchContestPrizes(id)
+            st = await getSettledAt(id)
+            if (!alive) return
+          }
+          // 정산 표시가 있어야 "참가비를 돌려받았어요"를 보인다(끝나고 1분 유예 동안은 아직 환불 전)
+          setSettled(!!st || rows.length > 0)
         }
         if (alive) setPrizes(rows)
       } catch {
@@ -225,7 +236,7 @@ export function ContestPage() {
   const short = fee > 0 && balance !== null && balance < fee
   const joinLabel = fee > 0 ? `참가비 ${formatGold(fee)} 내고 참가` : '참가'
   // 끝난 참가비 대회에서 순위(행동 1번 이상)에 든 사람이 없으면 전원 환불(설계 §10)
-  const noneRanked = phase === 'ended' && lbReady && lb.every((r) => r.action_count === 0)
+  const noneRanked = phase === 'ended' && lbReady && settled && lb.every((r) => r.action_count === 0)
   const startMs = Date.parse(contest.starts_at)
   const endMs = Date.parse(contest.ends_at)
 
@@ -242,7 +253,8 @@ export function ContestPage() {
 
       {fee > 0 && (
         <p className="contest-fee">
-          참가비 <strong>{formatGold(fee)}</strong> · 모인 돈 <strong>{formatGold(pool)}</strong>
+          참가비 <strong>{formatGold(fee)}</strong>
+          {phase !== 'cancelled' && <> · 모인 돈 <strong>{formatGold(pool)}</strong></>}
           {phase !== 'ended' && phase !== 'cancelled' && <span className="muted"> · 1~3등이 6:3:1로 나눠 가져요</span>}
         </p>
       )}

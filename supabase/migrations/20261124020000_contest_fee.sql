@@ -21,6 +21,17 @@
 --   * 잠금 순서: 대회 행을 먼저(for no key update — 서로는 막지만 contest_entries·contest_items 삽입의 외래 키 확인
 --     KEY SHARE는 막지 않는다), 지갑을 나중에. 여러 지갑은 user_id 오름차순. profiles는 잠그지 않는다.
 --   * 참가를 떠나는 기능은 없다(참가비는 취소·순위 0명일 때만 돌아온다).
+--   * 지갑이 화면에 보이기 전(등록부에 wallet: true 게임이 없음)에는 새 참가비 대회를 만들 수 없다(fee_invalid).
+--     SQL은 등록부를 모르므로 _wallet_enabled()가 등록부 walletEnabled()의 사본이고,
+--     src/games/walletFlag.test.ts가 마이그레이션의 가장 마지막 정의와 등록부를 비교한다(대전 함수의 invalid_stake와 같은 규칙).
+--   * 남이 참가비를 낸 뒤에는 시작 시각·제한 시간·문제를 바꿀 수 없다(not_editable). 제목·공개 범위는 그대로 고칠 수 있다.
+--   * 정산된 대회(settled_at)에는 참가·취소가 닿지 않는다(행 잠금을 오래 기다린 트랜잭션의 now()가 옛 시각이어도).
+
+-- 등록부 walletEnabled()의 사본. 낚시 지갑 이전(wallet: true) PR이 새 마이그레이션에서 true로 바꾼다.
+create or replace function public._wallet_enabled() returns boolean
+language sql immutable security definer set search_path = public as $$
+  select false
+$$;
 
 alter table public.contests
   add column entry_fee int not null default 0,
@@ -31,7 +42,7 @@ grant select (entry_fee) on table public.contests to authenticated;
 
 -- ------------------------------------------------------------------ 참가비 검사 (바꾸기 금지, 숨김 게임 0만)
 create function public._contest_fee_guard() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql set search_path = public as $$
 begin
   if new.entry_fee is distinct from old.entry_fee then
     raise exception using errcode = 'P0001', message = 'fee_immutable';
@@ -45,7 +56,7 @@ create trigger contests_fee_guard
   for each row execute function public._contest_fee_guard();
 
 create function public._contest_item_fee_guard() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql set search_path = public as $$
 begin
   if public._is_hidden_game(new.game_id)
      and exists (select 1 from public.contests c where c.id = new.contest_id and c.entry_fee > 0) then
@@ -62,6 +73,8 @@ create trigger contest_items_fee_guard
 -- ------------------------------------------------------------------ 참가 (한 곳)
 -- 부르는 쪽이 대회 행을 이미 잡고(for no key update) 열림·권한을 확인했어야 한다.
 -- 이미 참가했으면 아무 일도 없다(참가비 확인도 하지 않는다: 멱등).
+-- 주의: 장부 unique (user_id, reason, ref = 대회 id)와 _gold_move의 중복 건너뛰기에 기댄다. 나중에 "나가기"(참가 행 삭제 +
+-- 환불)를 더하면 다시 참가할 때 참가비가 빠지지 않고 두 번째 환불도 무시되므로, 그때는 ref에 참가 회차를 넣어야 한다.
 create function public._contest_enter(p_contest uuid, p_uid uuid, p_entry_fee int) returns void
 language plpgsql volatile security definer set search_path = public as $$
 declare
@@ -121,6 +134,10 @@ begin
   if v_fee < 0 or v_fee > (public._economy() ->> 'fee_max')::int then
     raise exception using errcode = 'P0001', message = 'fee_invalid';
   end if;
+  -- 지갑이 보이기 전에는 참가비 0만 (볼 수 없는 골드를 걸지 않게)
+  if v_fee > 0 and not public._wallet_enabled() then
+    raise exception using errcode = 'P0001', message = 'fee_invalid';
+  end if;
   v_title := public._validate_contest_input(p_title, p_starts_at, p_duration_min, p_items);
   if v_fee > 0 and exists (select 1 from jsonb_array_elements(p_items) e
                             where public._is_hidden_game(e.value ->> 'game_id')) then
@@ -151,6 +168,73 @@ begin
 end
 $$;
 
+-- ------------------------------------------------------------------ update_contest (남이 낸 뒤 조건 고정)
+-- 0003과 같고, 만든 사람이 아닌 누군가 참가비를 냈으면 시작 시각·제한 시간·문제 구성을 바꾸지 못한다(not_editable).
+-- 낸 사람이 동의한 조건이 바뀌지 않게 한다. 바꾸려면 취소(전원 환불) 뒤 다시 만든다. 제목·공개 범위는 고칠 수 있다.
+create or replace function public.update_contest(
+  p_id uuid, p_title text, p_starts_at timestamptz, p_duration_min int,
+  p_visibility public.contest_visibility, p_items jsonb)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_c     public.contests%rowtype;
+  v_title text;
+  v_vis   public.contest_visibility;
+  v_code  text;
+begin
+  if v_uid is null or not public.is_approved() then
+    raise exception using errcode = 'P0001', message = 'forbidden';
+  end if;
+  select * into v_c from public.contests where id = p_id for update;
+  if not found or not (v_c.created_by is not distinct from v_uid or public.is_admin()) then
+    raise exception using errcode = 'P0001', message = 'forbidden';
+  end if;
+  if v_c.kind = 'daily' or v_c.cancelled_at is not null or now() >= v_c.starts_at then
+    raise exception using errcode = 'P0001', message = 'not_editable';
+  end if;
+  -- 공개 범위를 넘기지 않으면 지금 값을 유지한다 (초대 대회가 실수로 공개되지 않게)
+  v_vis := coalesce(p_visibility, v_c.visibility);
+  v_title := public._validate_contest_input(p_title, p_starts_at, p_duration_min, p_items);
+
+  if exists (select 1 from public.gold_ledger l
+              where l.reason = 'contest_fee' and l.ref = p_id::text
+                and l.user_id is distinct from v_c.created_by)
+     and (p_starts_at is distinct from v_c.starts_at
+          or p_starts_at + make_interval(mins => p_duration_min) is distinct from v_c.ends_at
+          or (select coalesce(jsonb_agg(jsonb_build_array(i.game_id, i.options) order by i.position), '[]'::jsonb)
+                from public.contest_items i where i.contest_id = p_id)
+             is distinct from
+             (select coalesce(jsonb_agg(jsonb_build_array(e.value ->> 'game_id', e.value -> 'options') order by e.ord, n), '[]'::jsonb)
+                from jsonb_array_elements(p_items) with ordinality as e(value, ord)
+               cross join lateral generate_series(1, (e.value ->> 'count')::int) as n)) then
+    raise exception using errcode = 'P0001', message = 'not_editable';
+  end if;
+
+  for attempt in 1 .. 10 loop
+    v_code := case
+      when v_vis = 'public' then null
+      when v_c.visibility = 'invite' then v_c.invite_code   -- 초대 → 초대: 코드 유지
+      else public._new_invite_code() end;
+    begin
+      update public.contests
+         set title = v_title, starts_at = p_starts_at,
+             ends_at = p_starts_at + make_interval(mins => p_duration_min),
+             visibility = v_vis, invite_code = v_code
+       where id = p_id;
+      exit;
+    exception when unique_violation then
+      if v_code is null or v_code = v_c.invite_code or attempt = 10 then
+        raise;
+      end if;
+    end;
+  end loop;
+
+  delete from public.contest_items where contest_id = p_id;
+  perform public._insert_contest_items(p_id, p_items);
+end
+$$;
+
 -- ------------------------------------------------------------------ cancel_contest (+ 환불)
 create or replace function public.cancel_contest(p_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
@@ -168,7 +252,9 @@ begin
   end if;
   if v_c.kind = 'daily'
      or v_c.cancelled_at is not null
+     or v_c.settled_at is not null
      or now() >= v_c.ends_at
+     or clock_timestamp() >= v_c.ends_at
      or (not public.is_admin() and now() >= v_c.starts_at) then
     raise exception using errcode = 'P0001', message = 'not_editable';
   end if;
@@ -205,7 +291,8 @@ begin
      and lower(btrim(coalesce(p_invite_code, ''))) is distinct from lower(v_c.invite_code) then
     raise exception using errcode = 'P0001', message = 'invite_required';
   end if;
-  if v_c.cancelled_at is not null or now() >= v_c.ends_at then
+  if v_c.cancelled_at is not null or v_c.settled_at is not null
+     or now() >= v_c.ends_at or clock_timestamp() >= v_c.ends_at then
     raise exception using errcode = 'P0001', message = 'contest_closed';
   end if;
   perform public._contest_enter(p_id, v_uid, p_entry_fee);
@@ -233,7 +320,8 @@ begin
   if not found or (public._contest_hidden_only(v_c.id) and not public.is_admin()) then
     raise exception using errcode = 'P0001', message = 'invite_required';
   end if;
-  if v_c.cancelled_at is not null or now() >= v_c.ends_at then
+  if v_c.cancelled_at is not null or v_c.settled_at is not null
+     or now() >= v_c.ends_at or clock_timestamp() >= v_c.ends_at then
     raise exception using errcode = 'P0001', message = 'contest_closed';
   end if;
   perform public._contest_enter(v_c.id, v_uid, p_entry_fee);
@@ -324,6 +412,7 @@ end
 $$;
 
 -- ------------------------------------------------------------------ 권한
+revoke execute on function public._wallet_enabled()                   from public, anon, authenticated;
 revoke execute on function public._contest_fee_guard()                from public, anon, authenticated;
 revoke execute on function public._contest_item_fee_guard()           from public, anon, authenticated;
 revoke execute on function public._contest_enter(uuid, uuid, int)     from public, anon, authenticated;
