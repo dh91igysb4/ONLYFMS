@@ -3,7 +3,7 @@
 // 달력 기준이다: 지갑의 사이트 하루 상한(§5.6)을 넣고 하루 1시간씩 플레이해 약 30일(±20%).
 // 기존 장비 가격은 그대로 두고 고급 장비(5·6단계 낚싯대, 50·60칸 가방)로 늘린다(사용자 결정 2026-11-24).
 // 낚시 5부(설계 2026-11-24-fishing-world-5 §8): 새 지역 해금이 쓸 곳을 늘려 목표가 약 34일(M3 뒤)로 늘어난다.
-// M2(갯벌·늪지)까지는 약 32일(±20%) — 저장소 밖 시험 계산 31.7일과 같다.
+// M3(산정 호수·난파선)까지 다 넣은 최종 목표는 하루 1시간 + 상한으로 약 34일(±20%, 27~41일).
 import { describe, expect, it } from 'vitest'
 import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS, type AreaId, type TackleId } from './data.ts'
 import { BUY_ORDER, buffsAt, hourlyIncome, openFraction, simulate, totalSinks } from './econSim.ts'
@@ -52,8 +52,8 @@ describe('장비 가격', () => {
     expect(SPECIES.find((s) => s.id === 'imugi')!.minRod).toBe(5)
   })
   it('총액(낚싯대·가방·찌·해금, 순간이동 제외)', () => {
-    // 기존 1,186,300 + 갯벌 30,000 + 늪지 60,000
-    expect(totalSinks()).toBe(1_276_300)
+    // 기존 1,186,300 + 갯벌 30,000 + 늪지 60,000 + 산정 120,000 + 난파선 150,000
+    expect(totalSinks()).toBe(1_546_300)
   })
 })
 
@@ -68,10 +68,10 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
   it('기존 장비·해금은 지금 속도 그대로(4시간 안에 다 산다)', () => {
     expect(at(plain, '가시 바늘').atHours).toBeLessThan(4)
   })
-  it('상한이 없으면 전부 다 사기까지 약 17시간(±20%, 상한 없이 몰아서 하는 경우의 참고값)', () => {
+  it('상한이 없으면 전부 다 사기까지 약 20시간(±20%, 상한 없이 몰아서 하는 경우의 참고값 — M3 중간값)', () => {
     const h = plain[plain.length - 1].atHours
-    expect(h).toBeGreaterThan(16.86 * 0.8)
-    expect(h).toBeLessThan(16.86 * 1.2)
+    expect(h).toBeGreaterThan(20.09 * 0.8)
+    expect(h).toBeLessThan(20.09 * 1.2)
   })
   it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각은 낚시 5부 전과 같다(상한 없음·하루 1시간 상한)', () => {
     expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.36, 1.46, 1.55, 2.2, 2.86, 2.88, 2.9, 2.92])
@@ -89,10 +89,10 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
 })
 
 describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
-  it('전부 다 사기까지 약 32일(±20%, M2 — 갯벌·늪지 해금 포함, 시험 계산 31.7일)', () => {
+  it('전부 다 사기까지 약 34일(±20%, 27~41일 — 새 지역 해금 넷 포함)', () => {
     const d = capped[capped.length - 1].atDay
-    expect(d).toBeGreaterThan(32 * 0.8)
-    expect(d).toBeLessThan(32 * 1.2)
+    expect(d).toBeGreaterThan(27)
+    expect(d).toBeLessThan(41)
   })
   it('3주 안에 다 사지 못한다(지갑 실패 조건), 기존 장비는 일주일 안', () => {
     expect(capped[capped.length - 1].atDay).toBeGreaterThan(21)
@@ -107,9 +107,10 @@ describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
 describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', () => {
   const daysFor = (hoursPerDay: number) => simulate(BUY_ORDER, { hoursPerDay, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE }).at(-1)!.atDay
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.1)
-  it('하루 3시간: 약 17.6일', () => near(daysFor(3), 17.59))
-  it('하루 5시간: 약 12.1일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 12.14))
-  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 16.9일', () => near(plain[plain.length - 1].atHours, 16.86))
+  // M3 Task 2 중간값(산정·난파선 해금만, 어종 전) — Task 7에서 최종값으로 고친다
+  it('하루 3시간: 약 21.1일', () => near(daysFor(3), 21.1))
+  it('하루 5시간: 약 14.8일', () => near(daysFor(5), 14.78))
+  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 20.1일', () => near(plain[plain.length - 1].atHours, 20.09))
 })
 
 // ---------------------------------------------------------------- 낚시 5부 M1: 물때 자리·지역 최소 낚싯대·신화 버프

@@ -29,9 +29,10 @@ describe('spotAnchors', () => {
       for (const an of anchors) {
         const dyn = a.tideSpots?.includes(an.spot) ? LOW : undefined
         expect(isWalkable(map(a.id), an.tx, an.ty, ALL_AREAS_OPEN, dyn), `${a.id} ${an.spot}`).toBe(true)
+        // 얼음 구멍 자리는 뚫을 수 있는 얼음을 보는 칸(drill)
         const fishes = FACINGS.some((f) => {
           const it = interactionAt(map(a.id), center(an.tx, an.ty), f, ALL_AREAS_OPEN, dyn)
-          return it?.kind === 'fish' && it.spot === an.spot
+          return (it?.kind === 'fish' && it.spot === an.spot) || (it?.kind === 'drill' && map(a.id).spots.hole === an.spot)
         })
         expect(fishes, `${a.id} ${an.spot}`).toBe(true)
       }
@@ -129,8 +130,8 @@ describe('spotAtTile / spotTiles', () => {
       expect(t.stands.length, `${a.id} ${s}`).toBeGreaterThan(0)
       const dyn = a.tideSpots?.includes(s) ? LOW : undefined
       for (const c of t.stands) expect(isWalkable(map(a.id), c.tx, c.ty, ALL_AREAS_OPEN, dyn)).toBe(true)
-      // 물 칸은 물 종류, 또는 밀물 진흙(하구)
-      for (const c of t.waters) expect(WATER_KINDS.has(tileAt(map(a.id), c.tx, c.ty)!) || tileAt(map(a.id), c.tx, c.ty) === 'mud').toBe(true)
+      // 물 칸은 물 종류, 또는 밀물 진흙(하구)·뚫을 얼음(얼음 구멍)
+      for (const c of t.waters) expect(WATER_KINDS.has(tileAt(map(a.id), c.tx, c.ty)!) || ['mud', 'ice'].includes(tileAt(map(a.id), c.tx, c.ty)!)).toBe(true)
     }
     for (const c of spotTiles(map('village'), 'pier').stands) expect(tileAt(map('village'), c.tx, c.ty)).toBe('pier')
     expect(spotTiles(map('village'), 'nope')).toEqual({ stands: [], waters: [] })

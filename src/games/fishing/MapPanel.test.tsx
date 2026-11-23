@@ -58,10 +58,12 @@ afterEach(() => {
 })
 
 describe('MapPanel', () => {
-  it('처음 탭은 지금 지역, 탭 8개(갯벌·늪지 포함), 잠긴 지역은 "· 잠김"', () => {
+  it('처음 탭은 지금 지역, 탭 10개(갯벌·늪지·산정 호수·난파선 포함), 잠긴 지역은 "· 잠김"', () => {
     mount()
     const tabs = within(panel()).getAllByRole('tab')
-    expect(tabs).toHaveLength(8)
+    expect(tabs).toHaveLength(10)
+    expect(tab(/산정 호수/)).toHaveTextContent('산정 호수 · 잠김')
+    expect(tab(/난파선/)).toHaveTextContent('난파선 앞바다 · 잠김')
     expect(tab(/갯벌/)).toHaveTextContent('갯벌 · 잠김')
     expect(tab(/늪지/)).toHaveTextContent('늪지 · 잠김')
     expect(within(panel()).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')

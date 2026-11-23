@@ -78,11 +78,15 @@ describe('fishing data', () => {
     expect(byId('anchovy').behavior).toBe('dart')
   })
   it('areas and defaults', () => {
-    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp'])
+    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
   })
-  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000', () => {
-    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp'])
+  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000, 산정·난파선 120000/150000(난파선은 백골 이상)', () => {
+    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
+    expect(UNLOCKS.summit).toEqual({ price: 120000, name: '등산 장비' })
+    expect(UNLOCKS.wreck).toEqual({ price: 150000, name: '원양 어선', minRod: 5 })
+    expect(AREAS.find((a) => a.id === 'summit')).toEqual({ id: 'summit', name: '산정 호수', spots: ['ice', 'hotspring'] })
+    expect(AREAS.find((a) => a.id === 'wreck')).toEqual({ id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 })
     expect(UNLOCKS.tideflat).toEqual({ price: 30000, name: '갯벌 장화' })
     expect(UNLOCKS.swamp).toEqual({ price: 60000, name: '늪 나무 데크' })
     expect(AREAS.find((a) => a.id === 'tideflat')).toEqual({ id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] })
@@ -231,7 +235,8 @@ describe('speciesAvailable', () => {
 
 describe('areaHasSpecies', () => {
   it('모든 지역 true', () => {
-    for (const a of AREAS) expect(areaHasSpecies(a.id), a.id).toBe(true)
+    // 산정·난파선 어종은 M3 Task 6에서 더한다
+    for (const a of AREAS) expect(areaHasSpecies(a.id), a.id).toBe(a.id !== 'summit' && a.id !== 'wreck')
     expect(areaHasSpecies('village')).toBe(true)
     expect(areaHasSpecies('river')).toBe(true)
     expect(areaHasSpecies('forest')).toBe(true)
@@ -261,7 +266,8 @@ describe('찌', () => {
 
 describe('도전과제', () => {
   it('8개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
-    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    // 산정·난파선 과제는 M3 Task 5에서 더한다
+    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id).filter((id) => id !== 'summit' && id !== 'wreck'))
     expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
     expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big', 'tideflat-creek', 'swamp-rain-night'])
     expect(CHALLENGES.at(-2)).toEqual({ id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } })
@@ -321,8 +327,8 @@ describe('물때 자리·지역 최소 낚싯대', () => {
       areas.pop()
     }
   })
-  it('areaMinRod: 지금 6지역 모두 1, 모르는 지역도 1', () => {
-    for (const a of AREAS) expect(areaMinRod(a.id)).toBe(1)
+  it('areaMinRod: 난파선만 5, 나머지 지역·모르는 지역은 1', () => {
+    for (const a of AREAS) expect(areaMinRod(a.id), a.id).toBe(a.id === 'wreck' ? 5 : 1)
     expect(areaMinRod('atlantis' as never)).toBe(1)
   })
   it('TIDE_GRACE_MIN 10, MYTHIC_CHANCE 0.02', () => {

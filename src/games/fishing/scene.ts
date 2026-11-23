@@ -94,6 +94,8 @@ const C = {
   sedgeDark: '#58794a', // 물가 풀 끝 그늘
   snowLip: '#f4f8fb', // 물가 눈 턱
   snowShade: '#9fb8c8', // 눈 턱 그늘
+  iceRim: '#8fb4c8', // 얼음판 가장자리
+  iceShine: '#f6fbfd', // 얼음판 가장자리 빛
   grass: '#78b85c',
   grassDark: '#5f9e4a',
   pierFace: '#6e4526',
@@ -453,6 +455,7 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   }
   if (kind === 'ice') {
     drawSprite(ctx, 'tile-ice', x, y, 1)
+    drawIceRim(ctx, g, tx, ty)
     return
   }
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
@@ -497,18 +500,42 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'hull') drawSprite(ctx, 'tile-hull', x, y, 1)
 }
 
-/** 물 칸 가장자리에 눈이 닿으면 눈 턱(흰 2px)과 그 아래 그늘 1px. 온천·얼음 구멍 둘레가 눈에 파묻혀 보이게 */
+/** 얼음판 가장자리(얼음이 아닌 쪽 변)에 짙은 테 1px와 그 안쪽 빛 1px: 눈밭과 얼음판의 경계가 보이게 */
+function drawIceRim(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const x = tx * TILE
+  const y = ty * TILE
+  const edge = (dx: number, dy: number) => tileAt(g.map, tx + dx, ty + dy) !== 'ice'
+  if (edge(0, -1)) {
+    rect(ctx, x, y, TILE, 1, C.iceRim)
+    rect(ctx, x, y + 1, TILE, 1, C.iceShine)
+  }
+  if (edge(0, 1)) rect(ctx, x, y + TILE - 1, TILE, 1, C.iceRim)
+  if (edge(-1, 0)) rect(ctx, x, y, 1, TILE, C.iceRim)
+  if (edge(1, 0)) rect(ctx, x + TILE - 1, y, 1, TILE, C.iceRim)
+}
+
+/** 물 칸 가장자리에 눈이 닿으면 눈 턱과 그늘. 온천 둘레가 눈에 파묻혀 보이게 */
 function drawSnowEdges(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
   const x = tx * TILE
   const y = ty * TILE
   const snow = (dx: number, dy: number) => groundAt(g, tx + dx, ty + dy) === 'snow'
+  // 위쪽은 물 위로 내민 눈 턱과 그늘, 나머지 변은 눈 1px + 돌 테 1px
   if (snow(0, -1)) {
     rect(ctx, x, y, TILE, 2, C.snowLip)
     rect(ctx, x, y + 2, TILE, 1, C.snowShade)
   }
-  if (snow(0, 1)) rect(ctx, x, y + TILE - 1, TILE, 1, C.snowLip)
-  if (snow(-1, 0)) rect(ctx, x, y, 1, TILE, C.snowLip)
-  if (snow(1, 0)) rect(ctx, x + TILE - 1, y, 1, TILE, C.snowLip)
+  if (snow(0, 1)) {
+    rect(ctx, x, y + TILE - 2, TILE, 1, C.snowShade)
+    rect(ctx, x, y + TILE - 1, TILE, 1, C.snowLip)
+  }
+  if (snow(-1, 0)) {
+    rect(ctx, x, y, 1, TILE, C.snowLip)
+    rect(ctx, x + 1, y, 1, TILE, C.snowShade)
+  }
+  if (snow(1, 0)) {
+    rect(ctx, x + TILE - 1, y, 1, TILE, C.snowLip)
+    rect(ctx, x + TILE - 2, y, 1, TILE, C.snowShade)
+  }
 }
 
 /**

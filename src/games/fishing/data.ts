@@ -4,7 +4,7 @@ import { inHours, tideAt, type Conditions, type Season, type Weather } from './c
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
-export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp'
+export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck'
 /** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
@@ -55,6 +55,9 @@ export const AREAS: readonly AreaDef[] = [
   // 낚시 5부 M2: 갯벌(갯골은 썰물에만), 늪지
   { id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] },
   { id: 'swamp', name: '늪지', spots: ['marsh', 'bog'] },
+  // 낚시 5부 M3: 산정 호수(얼음 구멍·온천), 난파선 앞바다(백골 낚싯대 이상)
+  { id: 'summit', name: '산정 호수', spots: ['ice', 'hotspring'] },
+  { id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 },
 ]
 export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest']
 // 돈으로 여는 지역. 기본 지역(DEFAULT_AREAS)은 여기 없다.
@@ -65,6 +68,8 @@ export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: str
   island: { price: 50000, name: '배' },
   tideflat: { price: 30000, name: '갯벌 장화' },
   swamp: { price: 60000, name: '늪 나무 데크' },
+  summit: { price: 120000, name: '등산 장비' },
+  wreck: { price: 150000, name: '원양 어선', minRod: 5 },
 }
 export const LEGEND_CHANCE = 0.08
 
