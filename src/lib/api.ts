@@ -1,4 +1,5 @@
 import { supabase, supabaseUrl, supabaseKey } from './supabase.ts'
+import { setBalance } from './walletStore.ts'
 
 export type PlayView = {
   item_id: string
@@ -93,6 +94,7 @@ const MESSAGES: Record<string, string> = {
   not_waiting: '이미 끝났거나 취소된 대국이에요',
   not_player: '참가한 대국이 아니에요',
   not_found: '없는 대국이에요',
+  not_enough_gold: '골드가 부족해요',
 }
 
 export function errorMessage(code: string): string {
@@ -191,9 +193,9 @@ export async function duel<T = DuelView>(body: Record<string, unknown>): Promise
   return (await callFunction('duel', body)) as T
 }
 
-/** 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null. */
 /**
- * world 응답. gold(지갑 잔액)·gold_capped(사이트 하루 상한으로 줄었을 때)는 플랫폼 필드로,
+ * 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null.
+ * gold(지갑 잔액)·gold_capped(사이트 하루 상한으로 줄었을 때)는 플랫폼 필드로,
  * 지갑을 쓰는 게임(WorldLogic.wallet)만 보낸다(설계 §6).
  */
 export type WorldView<V = unknown, R = unknown> = {
@@ -208,5 +210,8 @@ export type WorldView<V = unknown, R = unknown> = {
 export async function world<V = unknown, R = unknown>(
   body: { game: string; action: 'load' } | { game: string; action: 'act'; payload: unknown },
 ): Promise<WorldView<V, R>> {
-  return (await callFunction('world', body)) as WorldView<V, R>
+  const res = (await callFunction('world', body)) as WorldView<V, R>
+  // 지갑을 쓰는 게임은 최상위 gold(잔액)를 보낸다. 헤더 배지가 추가 요청 없이 갱신된다
+  if (typeof res?.gold === 'number' && Number.isFinite(res.gold)) setBalance(res.gold)
+  return res
 }
