@@ -3,7 +3,7 @@
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
-import type { Bar, BarParams } from './minigame.ts'
+import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
 import { TILE, tileAt, type MapDef, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
@@ -109,6 +109,7 @@ const C = {
   clockPlate: 'rgba(20, 16, 40, 0.65)',
   rain: '#bfe6f7',
   snow: '#ffffff',
+  surgeEdge: '#ffd23f', // 신화 용솟음 동안 트랙 테두리가 이 색과 외곽선을 번갈아
 }
 
 // 비·눈 입자(화면 좌표). 개수 상한 80.
@@ -601,8 +602,9 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
   const inner = { x: tx + 3, y: ty + 3, w: TRACK_W - 6, h: trackH - 6 }
   const meterX = tx + TRACK_W + METER_GAP
 
-  // 틀
-  rect(ctx, tx - 1, ty - 1, TRACK_W + 2, trackH + 2, C.outline)
+  // 틀. 신화 용솟음 동안은 테두리가 깜박인다
+  const surging = params.behavior === 'surge' && surgePhase(bar.t) === 'surge'
+  rect(ctx, tx - 1, ty - 1, TRACK_W + 2, trackH + 2, surging && Math.floor(tMs / 120) % 2 === 0 ? C.surgeEdge : C.outline)
   rect(ctx, tx, ty, TRACK_W, trackH, C.trackWood)
   rect(ctx, tx, ty, TRACK_W, 1, C.trackWoodLight)
   rect(ctx, tx, ty, 1, trackH, C.trackWoodLight)
@@ -611,7 +613,7 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
   for (let y = inner.y + 6; y < inner.y + inner.h; y += 12) rect(ctx, inner.x + 2, y, inner.w - 4, 1, C.trackInnerLine)
 
   // 바: 위치 0 = 트랙 아래
-  const barH = Math.max(4, Math.round(params.barSize * inner.h))
+  const barH = Math.max(4, Math.round(effectiveBarSize(params, bar.t) * inner.h))
   const barTop = Math.round(inner.y + (1 - bar.barPos) * inner.h - barH / 2)
   const top = Math.max(inner.y, Math.min(inner.y + inner.h - barH, barTop))
   rect(ctx, inner.x, top, inner.w, barH, C.bar)

@@ -5,7 +5,8 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
 export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island'
-export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker'
+/** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
+export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
   id: string
   name: string

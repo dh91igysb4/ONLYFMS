@@ -1005,3 +1005,30 @@ describe('옷 입은 캐릭터', () => {
     expect(colors(plain).has('#eaa53c')).toBe(true) // 원래 바람막이
   })
 })
+
+describe('신화 용솟음(surge) 트랙', () => {
+  const W = 195, H = 280
+  const p = player(tileCentre(10, 10))
+  const frameOf = (ctx: RecordingCtx, box: Box) => ctx.rects.filter((r) => r.x === box.x && r.y === box.y && r.w === 20 && r.h === box.h)
+  const draw = (tMs: number, barT: number, behavior: BarParams['behavior']) => {
+    const ctx = new RecordingCtx()
+    const s = scene('fighting', p, { w: W, h: H }, { tMs, bar: { ...bar, t: barT }, barParams: { ...barParams, behavior } })
+    drawWorld(asCtx(ctx), s, { w: W, h: H })
+    const box = hudLayout(Math.round(p.pos.x) - Math.round(s.camera.x), W, H, 0).track
+    return { ctx, box }
+  }
+  test('용솟음 단계 동안 트랙 테두리 색이 번갈아 바뀌고, 고요·다른 유형은 늘 외곽선 색', () => {
+    const colors = (barT: number, behavior: BarParams['behavior']) =>
+      new Set([0, 120, 240, 360].map((t) => { const { ctx, box } = draw(t, barT, behavior); return frameOf(ctx, box)[0]?.color }))
+    expect(colors(2000, 'surge').size).toBe(2)
+    expect(colors(100, 'surge').size).toBe(1)
+    expect(colors(2000, 'dart').size).toBe(1)
+  })
+  test('용솟음 동안 바는 줄어든 크기(effectiveBarSize)로 그린다', () => {
+    const barRects = (barT: number) => { const { ctx } = draw(0, barT, 'surge'); return ctx.rects.filter((r) => r.color === '#6fdc7e') }
+    const calm = barRects(100)[0].h
+    const surge = barRects(2000)[0].h
+    expect(surge).toBeLessThan(calm)
+    expect(surge / calm).toBeCloseTo(0.21 / 0.3, 1)
+  })
+})

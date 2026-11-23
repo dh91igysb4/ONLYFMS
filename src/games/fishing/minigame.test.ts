@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES, TACKLE_FX, tackleSlots, type Behavior, type RodTier, type TackleId } from './data.ts'
-import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
+import { BUFF_FX, RODS, SPECIES, TACKLE_FX, tackleSlots, type Behavior, type BuffId, type RodTier, type TackleId } from './data.ts'
+import { MAX_DT_MS, barParams, barResult, effectiveBarSize, gaugeAt, initBar, stepBar, surgePhase, type Bar, type BarParams } from './minigame.ts'
+import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 
 function seeded(n: number): () => number {
   const seed = new Uint8Array(16)
@@ -410,5 +411,99 @@ describe('난이도는 그대로 (사람 비슷한 봇의 잡는 비율, 바꾸�
   it.each(cases)('%s 낚싯대 %i %j: 옛 값 %f', (id, tier, eq, old) => {
     const v = rate(barParams(id, tier, eq), human200, 40, 900)
     expect(Math.abs(v - old)).toBeLessThanOrEqual(0.15)
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M1: 신화 용솟음(surge)·백룡의 숨결
+describe('barParams 버프', () => {
+  it('dragon-breath → barSize ×dragonBar, 코르크와 곱; 다른·모르는 버프는 무시', () => {
+    const base = barParams('anchovy', 4).barSize
+    expect(barParams('anchovy', 4, [], ['dragon-breath']).barSize).toBeCloseTo(base * BUFF_FX.dragonBar)
+    expect(barParams('anchovy', 4, ['cork'], ['dragon-breath']).barSize).toBeCloseTo(base * TACKLE_FX.corkBar * BUFF_FX.dragonBar)
+    expect(barParams('anchovy', 4, [], ['imugi-scale', 'dragon-pearl']).barSize).toBe(base)
+    expect(barParams('anchovy', 4, [], ['zzz' as BuffId]).barSize).toBe(base)
+  })
+  it('최대 바: 6단계 + 코르크 + 숨결 = 0.22 × 1.5 × 1.2 × 1.08', () => {
+    expect(barParams('anchovy', 6, ['cork'], ['dragon-breath']).barSize).toBeCloseTo(0.22 * 1.5 * 1.2 * 1.08)
+  })
+})
+
+describe('surgePhase', () => {
+  it('3,400ms 주기, 앞 1,000ms 고요', () => {
+    expect([0, 999, 1000, 3399, 3400, 5000, 6799, 6800, -1].map(surgePhase)).toEqual(['calm', 'calm', 'surge', 'surge', 'calm', 'surge', 'surge', 'calm', 'surge'])
+  })
+  it('effectiveBarSize: 용솟음 동안만 0.21까지 줄고, 다른 유형·고요·작은 바는 그대로', () => {
+    const p = barParams('anchovy', 6, ['cork'])
+    expect(effectiveBarSize({ ...p, behavior: 'surge' }, 2000)).toBe(0.21)
+    expect(effectiveBarSize({ ...p, behavior: 'surge' }, 500)).toBe(p.barSize)
+    expect(effectiveBarSize({ ...p, behavior: 'dart' }, 2000)).toBe(p.barSize)
+    expect(effectiveBarSize({ ...p, barSize: 0.15, behavior: 'surge' }, 2000)).toBe(0.15)
+  })
+})
+
+describe('surge 움직임', () => {
+  const params = (d = 1): BarParams => ({ barSize: 0.22, difficulty: d, behavior: 'surge', drain: 1, pull: 0 })
+  it('용솟음 구간 ms당 이동량 > 고요 구간의 3배(여러 시드), 위치는 [0, 1]', () => {
+    for (const d of [0.97, 1]) {
+      let calm = 0, calmMs = 0, surge = 0, surgeMs = 0
+      for (const n of [21, 22, 23, 24, 25]) {
+        const rng = seeded(n)
+        let bar = initBar()
+        for (let i = 0; i < 60000 / 16; i++) {
+          const ph = surgePhase(bar.t)
+          const next = stepBar({ ...bar, progress: 0.5 }, false, 16, params(d), rng)
+          expect(next.fishPos).toBeGreaterThanOrEqual(0)
+          expect(next.fishPos).toBeLessThanOrEqual(1)
+          if (ph === 'calm') { calm += Math.abs(next.fishPos - bar.fishPos); calmMs += 16 } else { surge += Math.abs(next.fishPos - bar.fishPos); surgeMs += 16 }
+          bar = next
+        }
+      }
+      expect(surge / surgeMs).toBeGreaterThan(3 * (calm / calmMs))
+    }
+  })
+  it('고요 구간에는 트랙 가운데(0.3~0.7) 근처에 머문다', () => {
+    const rng = seeded(31)
+    let bar: Bar = { ...initBar(), t: 0 }
+    const calmPos: number[] = []
+    for (let i = 0; i < 60000 / 16; i++) {
+      bar = stepBar({ ...bar, progress: 0.5 }, false, 16, params(), rng)
+      if (surgePhase(bar.t) === 'calm' && bar.t % 3400 > 600) calmPos.push(bar.fishPos)
+    }
+    const inside = calmPos.filter((p) => p >= 0.25 && p <= 0.75).length / calmPos.length
+    expect(inside).toBeGreaterThan(0.8)
+  })
+})
+
+describe('신화 surge: 안 누르면 못 잡고, 사람 비슷한 봇은 잡을 수 있다', () => {
+  withTempData(M1_FIXTURE)
+  const combos = (tier: number): TackleId[][] => {
+    const slots = tackleSlots(tier)
+    const out: TackleId[][] = [[]]
+    if (slots >= 1) out.push(['cork'], ['barbed'], ['trap'])
+    if (slots >= 2) out.push(['cork', 'barbed'], ['barbed', 'trap'])
+    if (slots >= 3) out.push(['cork', 'barbed', 'trap'])
+    return out
+  }
+  it('surge 어종(난이도 .97·1.0) × 낚싯대 5·6 × 찌 조합 × 버프 {없음, 숨결}: 60초 안 누르면 0', () => {
+    for (const id of ['tmp-mythic', 'tmp-mythic2']) for (const tier of [5, 6] as const) for (const eq of combos(tier)) for (const buffs of [[], ['dragon-breath']] as BuffId[][]) {
+      const p = barParams(id, tier, eq, buffs)
+      expect(p.behavior).toBe('surge')
+      expect(rate(p, () => false, 20, 500), `${id} ${tier} ${eq.join('+')} ${buffs.join()}`).toBe(0)
+    }
+  })
+  it('기존 모든 어종 × 낚싯대 × 찌 조합 × 백룡의 숨결: 60초 안 누르면 0', () => {
+    for (const s of SPECIES) {
+      if (s.area.startsWith('tmp-')) continue
+      for (const r of RODS) {
+        if (r.tier < s.minRod) continue
+        for (const eq of combos(r.tier)) expect(rate(barParams(s.id, r.tier, eq, ['dragon-breath']), () => false, 20, 500), `${s.id} ${r.tier} ${eq.join('+')}`).toBe(0)
+      }
+    }
+  })
+  it('사람 비슷한 봇(200ms): 난이도 1.0, 6단계 + 코르크·가시 → 25~70%; 5단계 찌 없음 → 10% 이상', () => {
+    const best = rate(barParams('tmp-mythic2', 6, ['cork', 'barbed']), human200, 100, 900)
+    expect(best).toBeGreaterThanOrEqual(0.25)
+    expect(best).toBeLessThanOrEqual(0.7)
+    expect(rate(barParams('tmp-mythic2', 5, []), human200, 100, 900)).toBeGreaterThanOrEqual(0.1)
   })
 })

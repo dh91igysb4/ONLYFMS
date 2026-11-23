@@ -59,11 +59,11 @@ export const M1_FIXTURE: Required<Pick<TempData, 'species' | 'areas' | 'unlocks'
     { ...base, id: 'tmp-common', name: '시험 붕어', rarity: 'common', basePrice: 100, minRod: 1, area: TMP_MYTH },
     { ...base, id: 'tmp-legend', name: '시험 전설', rarity: 'legend', basePrice: 5000, minRod: 3, area: TMP_MYTH, spots: ['den'], legend: { power: 0.95 } },
     {
-      ...base, id: 'tmp-mythic', name: '시험 신화', rarity: 'mythic', basePrice: 20000, minCm: 300, maxCm: 600, difficulty: 0.97, behavior: 'dart',
+      ...base, id: 'tmp-mythic', name: '시험 신화', rarity: 'mythic', basePrice: 20000, minCm: 300, maxCm: 600, difficulty: 0.97, behavior: 'surge',
       minRod: 5, area: TMP_MYTH, spots: ['den'], legend: { power: 0.95, needs: ['tmp-legend', 'grouper'], buff: 'imugi-scale' },
     },
     {
-      ...base, id: 'tmp-mythic2', name: '시험 신화 둘', rarity: 'mythic', basePrice: 30000, minCm: 400, maxCm: 900, difficulty: 1, behavior: 'dart',
+      ...base, id: 'tmp-mythic2', name: '시험 신화 둘', rarity: 'mythic', basePrice: 30000, minCm: 400, maxCm: 900, difficulty: 1, behavior: 'surge',
       minRod: 5, area: TMP_MYTH, spots: ['lair'], legend: { power: 0, needs: ['grouper'], buff: 'dragon-pearl' },
     },
     { ...base, id: 'tmp-flat-a', name: '시험 망둑', rarity: 'common', basePrice: 50, minRod: 1, area: TMP_FLAT },
