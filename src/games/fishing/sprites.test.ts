@@ -184,6 +184,15 @@ describe('SPRITES', () => {
     }
   })
 
+  it('찌 5종은 16×16이고 서로 다르다', () => {
+    const names = ['tackle-cork', 'tackle-trap', 'tackle-barbed', 'tackle-spinner', 'tackle-curious']
+    for (const name of names) {
+      expect(SPRITES[name], name).toBeDefined()
+      expect([SPRITES[name].w, SPRITES[name].h], name).toEqual([16, 16])
+    }
+    expect(new Set(names.map((n) => SPRITES[n].rows.join('\n'))).size).toBe(5)
+  })
+
   it('walk frames 0 and 1 differ in every direction', () => {
     for (const dir of ['down', 'up', 'side']) {
       const a = SPRITES[`player-walk-${dir}-0`].rows.join('\n')
