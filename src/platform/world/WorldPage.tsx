@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getWorld } from '../../games/index.ts'
 import { getWorldComponent } from '../../games/ui.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { useGameScreen } from '../games/useGameScreen.ts'
 
 /** 지속형 게임 화면 틀 (/world/:game). 게임 화면은 등록부에서 찾아 gameId만 넘긴다. */
 export function WorldPage() {
@@ -11,6 +12,7 @@ export function WorldPage() {
   // 숨김 게임은 관리자에게만 있는 게임이다. 그 밖의 사람에게는 없는 게임과 똑같이 보인다.
   const mod = found && (!found.manifest.hidden || !!profile?.is_admin) ? found : undefined
   const Component = getWorldComponent(game)
+  useGameScreen(!!mod && !!Component)
 
   if (!mod || !Component) {
     return (
