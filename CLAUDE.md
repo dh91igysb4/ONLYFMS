@@ -18,6 +18,7 @@
 - `supabase/functions/suggest/` 제안 워커용 Edge Function. 브라우저는 부르지 않고 헤더 `x-worker-token`으로만 인증한다. 워커 절차는 `docs/suggest-worker.md`
 - `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`. `world_saves`는 클라이언트에서 읽을 수 없다. 화면에 필요한 값은 `WorldLogic.view`로만 내보낸다.
 - 등록부 `src/games/index.ts`의 `worlds`/`getWorld`(지속형 게임), 화면은 `src/games/ui.ts`의 `getWorldComponent`
+- 지속형 게임 프로필 캐릭터: manifest `avatar` + `WorldLogic.avatar(state)`(문자열) → `world` 함수가 `game_records` 키 `avatar`(값 0, detail)에 쓰고, 화면은 `src/games/ui.ts`의 `getAvatarComponent`, 플랫폼은 `src/platform/profile/AvatarSection.tsx`(요약 탭). 낚시 옷장 품목은 `src/games/fishing/wardrobe.ts`(서버 공용), 그림은 `wearArt.ts`, 합성은 `outfit.ts`(화면 전용)
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차

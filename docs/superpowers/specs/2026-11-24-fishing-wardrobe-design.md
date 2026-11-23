@@ -220,7 +220,7 @@ State += {
 - `Manifest.avatar?: { label: string }`: 이 지속형 게임은 프로필에 캐릭터를 보여 준다.
 - `WorldLogic.avatar?(state): string`: 캐릭터를 그릴 짧은 문자열(낚시는 옷차림 JSON).
 - `world` 함수: 행동(`act`) 뒤 `records`를 쓸 때, `logic.avatar`가 있으면 `game_records`에 키 `avatar`(값 0, `detail` = 문자열)를 함께 upsert한다. **DB 변경 없음**(`game_records`는 키 제한이 없고 `user_records`가 모든 행을 돌려준다).
-- 화면 등록: `src/games/ui.ts`의 `getAvatarComponent(id)` → `ComponentType<{ data: string; size: number }>`. 낚시는 `Avatar.tsx`가 앞모습 대기 그림을 캔버스에 그린다(모르는 값은 기본 옷차림).
+- 화면 등록: `src/games/ui.ts`의 `getAvatarComponent(id)` → `ComponentType<AvatarProps>`(`{ data: string; scale: number }`). 낚시는 `Avatar.tsx`가 앞모습 대기 그림을 캔버스에 그린다(모르는 값은 기본 옷차림).
 - 프로필 요약 탭 맨 위 `AvatarSection`: `user_records`에서 `key = 'avatar'`인 행 중 manifest에 `avatar`가 있고 화면이 등록된 게임만 그린다. 없으면 아무것도 그리지 않는다. 기록 탭(`RecordsSection`)은 manifest `records`에 선언된 키만 그리므로 `avatar` 행은 거기 나오지 않는다.
 - 등록부 테스트: `avatar` manifest ⇔ `logic.avatar` ⇔ `getAvatarComponent` 셋이 같이 있고, `records` 키에 `avatar`가 없다.
 - 배포 직후에는 행이 없다. 낚시에서 행동을 한 번이라도 하면(던지기 등) 생긴다.
