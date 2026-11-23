@@ -188,7 +188,7 @@
 ```ts
 type Outfit = { hat: string; top: string; bottom: string; hair: string; hairColor: string; rodSkin: string }
 State += {
-  /** 산 옷 id(영구, 중복 없음). 무료·업적 품목은 넣지 않는다 */
+  /** 산 옷 `부위:id`(영구, 중복 없음. 검정은 바지·머리·낚싯대에 다 있어 부위를 붙인다). 무료·업적 품목은 넣지 않는다 */
   wardrobe: string[]
   /** 입은 옷 */
   outfit: Outfit
@@ -205,7 +205,7 @@ State += {
 
 ### 5.3 migrate
 - v9 이하: `wardrobe = []`, `outfit = 기본`(비니·바람막이·남색 바지·짧은 머리·갈색·대나무).
-- v10: `wardrobe`는 알려진 상점 품목 id만 중복 없이. `outfit`은 부위마다 그 부위의 알려진 품목이고 가진 것일 때만 남기고, 아니면 그 부위 기본값.
+- v10: `wardrobe`는 알려진 상점 품목 키(`부위:id`)만 중복 없이. `outfit`은 부위마다 그 부위의 알려진 품목이고 가진 것일 때만 남기고, 아니면 그 부위 기본값.
 
 ### 5.4 view
 - `view`는 지금처럼 `state`에서 `pending`만 바꾼 것이라 `wardrobe`·`outfit`이 그대로 나간다. 업적 소유는 화면이 같은 `ownsWear`로 계산한다(값이 view에 다 있다).
