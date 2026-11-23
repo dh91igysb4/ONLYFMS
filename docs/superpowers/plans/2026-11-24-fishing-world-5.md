@@ -4,7 +4,7 @@
 
 **Goal:** 새 지역 네 곳(갯벌·늪지·산정 호수·난파선 앞바다)과 전설 위 "신화" 등급(세이브당 한 마리, 잡으면 영구 버프)을 세 PR로 넣는다. 기존 가격·기존 56종 값은 그대로, 새 쓸 곳은 지역 해금 넷(360,000 G).
 
-**Architecture:** M1이 공통 체계를 깐다 — 물때(`clock.ts` 순수 함수)와 자리 단위 열림(`spotOpen`), 지역 최소 낚싯대(`areaMinRod`, 서버가 해금·던지기에서 확인), 맵의 움직이는 상태(`MapDynamic`: 진흙·얼음 구멍), 장면 효과(물때 캐시·안개·늘 눈), 신화 등급(`legend` 필드 재사용 + `rarity: 'mythic'`, r0 공유로 rng 5번 계약 유지, 미니게임 `surge`), 신화 버프(`State.buffs`, 서버 추첨·판매가와 화면 바 크기에 적용). M2·M3는 그 위에 맵·어종·과제·이동기·해금을 데이터로 더한다. 각 PR이 `logic.version`을 올린다(10 / 11 / 12).
+**Architecture:** M1이 공통 체계를 깐다 — 물때(`clock.ts` 순수 함수)와 자리 단위 열림(`spotOpen`), 지역 최소 낚싯대(`areaMinRod`, 서버가 해금·던지기에서 확인), 맵의 움직이는 상태(`MapDynamic`: 진흙·얼음 구멍), 장면 효과(물때 캐시·안개·늘 눈), 신화 등급(`legend` 필드 재사용 + `rarity: 'mythic'`, r0 공유로 rng 5번 계약 유지, 미니게임 `surge`), 신화 버프(`State.buffs`, 서버 추첨·판매가와 화면 바 크기에 적용). M2·M3는 그 위에 맵·어종·과제·이동기·해금을 데이터로 더한다. 각 PR이 `logic.version`을 올린다(11 / 12 / 13 — 옷장 브랜치가 10을 먼저 쓴다).
 
 **Tech Stack:** TypeScript, React 18, Canvas 2D, vitest, Deno(`world` 함수 테스트). 새 의존성 없음.
 
@@ -19,7 +19,7 @@
 - 도전과제는 어떤 계절에도 깰 수 있다. 서버 권위(골드·해금·도감·전설·신화·버프·과제는 서버 상태만). 맵 40×30 ~ 56×40칸. 마을 상점·`SPAWN`·부두 끝→문 37칸 불변.
 - 플랫폼 코드(`src/platform/`, `src/app/`)와 DB는 바꾸지 않는다. 마이그레이션 없음.
 - 화면 문구 한국어, 모바일 우선. 캔버스 밖 색은 `theme.css` 토큰만(`--sky`는 팔레트에 없으니 쓰지 않는다). 그림은 새로 그린 16px 픽셀 아트(`sprites.ts` 형식), 원작 그림·맵·이름 금지.
-- `logic.version`: M1 10, M2 11, M3 12. 각 PR에서 한 번만 올린다. `migrate`는 v2~v(n−1)을 모두 읽는다.
+- `logic.version`: M1 11, M2 12, M3 13 (10은 먼저 머지되는 옷장(캐릭터 옷) 브랜치가 쓴다). 각 PR에서 한 번만 올린다. `migrate`는 v2~v(n−1)을 모두 읽는다(M1은 v9 이하와 옷장 v10을 모두 읽는다).
 - 커밋 `type: 내용`, 마지막 두 줄 트레일러(Co-Authored-By: <작성 모델 이름> <noreply@anthropic.com> / Claude-Session: https://claude.ai/code/session_01T7oyVpQAuQkbAiCkNHahWh). 경로 지정 스테이징, 푸시 금지.
 
 ## Review Focus
@@ -34,7 +34,7 @@
 
 ---
 
-# M1 — 공통 체계와 신화 등급 (`logic.version` 10)
+# M1 — 공통 체계와 신화 등급 (`logic.version` 11)
 
 브랜치: `feat/fishing-world-5-m1` (base `feat/fishing-polish` 머지 뒤 main). 새 지역·실제 신화 어종은 없다. 신화·물때·구멍 테스트는 테스트용 어종(`SPECIES`에 `beforeEach`로 넣고 `afterEach`로 빼는 도우미 `withTempSpecies`)과 합성 `defineMap` 맵으로 한다.
 
@@ -84,7 +84,7 @@
 - [ ] **Step 4: 통과 확인** — `npx vitest run src/games/fishing && npm run typecheck`
 - [ ] **Step 5: 커밋** — `feat: 낚시 물때·자리 열림·지역 최소 낚싯대와 신화 등급 데이터 형식`
 
-### Task 2: 서버 — 신화 추첨·버프·`need_rod`·`spot_closed`, `logic.version` 10
+### Task 2: 서버 — 신화 추첨·버프·`need_rod`·`spot_closed`, `logic.version` 11
 
 **Files:**
 - Modify: `src/games/fishing/logic.ts`
@@ -105,7 +105,7 @@
   // sell: sellPrice 합
   // migrate: buffs = (저장된 알려진 BuffId) ∪ (legends의 신화 buff), BUFFS 순서
   ```
-- `logic.version` 10. 주석: `// 10: 신화 등급·버프 상태, 물때 자리·지역 최소 낚싯대 확인`.
+- `logic.version` 11. 주석: `// 11: 신화 등급·버프 상태, 물때 자리·지역 최소 낚싯대 확인`.
 
 - [ ] **Step 1: 실패하는 테스트** (`withTempSpecies`로 신화·전설·물때 자리를 잠시 넣는다. 합성 지역은 `AREAS`에도 잠시 넣는다)
   - `rng 5번: 신화 후보가 있을 때도, 뽑힐 때도 정확히 5번`
@@ -119,11 +119,11 @@
   - `cast need_rod: 합성 지역 minRod 5, rodTier 4 → need_rod, 5 → 정상`
   - `cast spot_closed: tideSpots 자리, 밀물 시각 → spot_closed; 썰물 끝 5초 뒤 → 받음(여유); 15초 뒤 → spot_closed; 썰물 → 정상`
   - `unlockArea need_rod: UNLOCKS.minRod 5 지역, rodTier 4 + 골드 충분 → need_rod(상태 불변), 5 → 열림`
-  - `migrate: v9 세이브 → buffs [] 나머지 그대로; buffs에 모르는 id·중복 → 걸러짐; legends에 신화가 있는데 buffs가 비었으면 다시 생김; version 10`
+  - `migrate: v9 세이브 → buffs [] 나머지 그대로; buffs에 모르는 id·중복 → 걸러짐; legends에 신화가 있는데 buffs가 비었으면 다시 생김; v10(옷장) 세이브도 읽음; version 11`
 - [ ] **Step 2: 실패 확인** — `npx vitest run src/games/fishing/logic.test.ts`
 - [ ] **Step 3: 구현** — `econSim.ts`의 `s.rarity !== 'legend'`도 `!s.legend`로(Task 7과 함께 확인).
 - [ ] **Step 4: 통과 확인** — `npx vitest run src/games/fishing && npm run typecheck && npm run fn:test`
-- [ ] **Step 5: 커밋** — `feat: 낚시 신화 추첨·신화 버프·낚싯대·물때 확인과 로직 버전 10`
+- [ ] **Step 5: 커밋** — `feat: 낚시 신화 추첨·신화 버프·낚싯대·물때 확인과 로직 버전 11`
 
 ### Task 3: 맵의 움직이는 상태 — 진흙·얼음 구멍·`drill` 상호작용
 
@@ -288,13 +288,13 @@
 
 **Files:** Modify `docs/deploy-checklist.md`
 
-- [ ] **Step 1** — 낚시 절에 "낚시 5부 M1(신화 등급·공통 체계)": `logic.version` 10, `world` 재배포(PR 브랜치에서 → 미리보기 확인 → 머지 → main에서 다시 → Vercel), DB 변경 없음, 새로고침 안내, 9로 되돌리지 않기(되돌려도 버프는 `legends`에서 다시 생기지만 v10 응답을 아는 화면이 깨질 수 있다), 수동 확인(기존 지역 낚시·전설 표시·상점 예상가 그대로, 호기심 찌 설명 "희귀·전설·신화", 가방 "신화의 힘 0/3"과 "???" 셋, 오류 문구는 M2 뒤 확인).
+- [ ] **Step 1** — 낚시 절에 "낚시 5부 M1(신화 등급·공통 체계)": `logic.version` 11, `world` 재배포(PR 브랜치에서 → 미리보기 확인 → 머지 → main에서 다시 → Vercel), DB 변경 없음, 새로고침 안내, 10(옷장)·9로 되돌리지 않기(되돌려도 버프는 `legends`에서 다시 생기지만 v11 응답을 아는 화면이 깨질 수 있다), 수동 확인(기존 지역 낚시·전설 표시·상점 예상가 그대로, 호기심 찌 설명 "희귀·전설·신화", 가방 "신화의 힘 0/3"과 "???" 셋, 오류 문구는 M2 뒤 확인).
 - [ ] **Step 2** — `npm test && npm run typecheck && npm run build && npm run fn:test` 모두 PASS
 - [ ] **Step 3** — 커밋 `docs: 낚시 5부 M1 배포 안내`
 
 ---
 
-# M2 — 갯벌·늪지 (`logic.version` 11)
+# M2 — 갯벌·늪지 (`logic.version` 12)
 
 브랜치: `feat/fishing-world-5-m2` (M1 머지 뒤 main).
 
@@ -361,12 +361,12 @@
 - `CHALLENGES += tideflat-creek { spot: 'creek', count 5 }, swamp-rain-night { weather: 'rain', night: true, count 3 }` (설계 §4.7). 기존 "어떤 계절에도 깰 수 있다" 검사가 새 과제도(계절마다 rod 1 후보, 갯골은 열린 시각만).
 - [ ] 테스트 → 구현 → 커밋 `feat: 낚시 갯벌·늪지 도전과제`
 
-### Task 6: 갯벌·늪지 어종 19종과 이무기, `logic.version` 11
+### Task 6: 갯벌·늪지 어종 19종과 이무기, `logic.version` 12
 
 **Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` tideflat 45·swamp 90); Test `data.test.ts`, `logic.test.ts`, `Game.test.tsx`
 
 **Interfaces:**
-- Produces: `SPECIES` 75종(설계 §5.1·§5.2 표 그대로). `logic.version` 11. `migrate`: v10 → 그대로(새 지역 id·어종을 알게 됨).
+- Produces: `SPECIES` 75종(설계 §5.1·§5.2 표 그대로). `logic.version` 12. `migrate`: v11 → 그대로(새 지역 id·어종을 알게 됨).
 - [ ] **Step 1: 실패하는 테스트**
   - `75종, 기존 56종 스냅숏 불변, 새 19종 스냅숏`
   - `보장: 모든 지역 × 자리 × 계절 × 정각 × 날씨(열린 자리만) × areaMinRod로 common ≥ 1`
@@ -374,9 +374,9 @@
   - `신화 규칙: 이무기의 지역·자리에서 나올 수 있는 전설(천년 자라)이 needs에 있다; needs는 모두 전설 id; buff imugi-scale` (Review Focus 2)
   - `logic: 갯벌 열린 세이브에서 creek 썰물 → 짱뚱어·낙지 등, 밀물 → spot_closed; estuary 늘 정상; 늪지 bog 비 오는 밤 rod 5 + 두 전설 잡음 + 힘 0.95 + r0 0 → 이무기, buffs에 imugi-scale`
   - `records dex 'n/75', challenges 'n/8'`
-  - `migrate v10 세이브(areas에 tideflat) → 유지, version 11`
+  - `migrate v11 세이브(areas에 tideflat) → 유지, version 12`
 - [ ] **Step 2~4** — `npx vitest run src/games/fishing && npm run typecheck && npm run fn:test`
-- [ ] **Step 5: 커밋** — `feat: 낚시 갯벌·늪지 어종 19종과 신화 이무기, 로직 버전 11`
+- [ ] **Step 5: 커밋** — `feat: 낚시 갯벌·늪지 어종 19종과 신화 이무기, 로직 버전 12`
 
 ### Task 7: 경제 갱신
 
@@ -387,13 +387,13 @@
 
 ### Task 8: M2 배포 체크리스트와 전체 검증
 
-- [ ] `docs/deploy-checklist.md` "낚시 5부 M2(갯벌·늪지)": `logic.version` 11, `world` 재배포 순서(M1과 같음), 새로고침 안내(옛 화면은 새 어종에 중립값으로 싸우지만 맵이 없다), 10으로 되돌리지 않기(옛 migrate가 갯벌·늪지 해금(9만 G)과 새 어종·도감을 지운다). 수동 확인: 마을 서쪽 끝 통나무 더미 해금·가격, 갯벌에서 썰물(2~6시·14~18시)에 진흙으로 걸어 들어가 갯골 낚시, 밀물이 들어오면 물가로 옮겨짐·"곧 밀물이에요", 밀물에 갯골 낚시 불가, HUD 물때 아이콘, 숲 서쪽 덩굴 해금, 늪지 안개(밤·비에 더 짙음, 찌가 보임), 폰에서 안개·물때 바뀔 때 끊김 없음, 도전과제 둘·순간이동기 둘(요금 36 G 안팎), 도감·지도 탭 8개, 이무기(테스트 계정)를 잡으면 "신화의 물고기!"·새 힘·입질 빨라짐.
+- [ ] `docs/deploy-checklist.md` "낚시 5부 M2(갯벌·늪지)": `logic.version` 12, `world` 재배포 순서(M1과 같음), 새로고침 안내(옛 화면은 새 어종에 중립값으로 싸우지만 맵이 없다), 11로 되돌리지 않기(옛 migrate가 갯벌·늪지 해금(9만 G)과 새 어종·도감을 지운다). 수동 확인: 마을 서쪽 끝 통나무 더미 해금·가격, 갯벌에서 썰물(2~6시·14~18시)에 진흙으로 걸어 들어가 갯골 낚시, 밀물이 들어오면 물가로 옮겨짐·"곧 밀물이에요", 밀물에 갯골 낚시 불가, HUD 물때 아이콘, 숲 서쪽 덩굴 해금, 늪지 안개(밤·비에 더 짙음, 찌가 보임), 폰에서 안개·물때 바뀔 때 끊김 없음, 도전과제 둘·순간이동기 둘(요금 36 G 안팎), 도감·지도 탭 8개, 이무기(테스트 계정)를 잡으면 "신화의 물고기!"·새 힘·입질 빨라짐.
 - [ ] `npm test && npm run typecheck && npm run build && npm run fn:test`
 - [ ] 커밋 `docs: 낚시 5부 M2 배포 안내`
 
 ---
 
-# M3 — 산정 호수·난파선 앞바다 (`logic.version` 12)
+# M3 — 산정 호수·난파선 앞바다 (`logic.version` 13)
 
 브랜치: `feat/fishing-world-5-m3` (M2 머지 뒤 main).
 
@@ -449,7 +449,7 @@
 - `CHALLENGES += summit-perfect { spot: 'ice', perfect: true, count 3 }, wreck-abyss-night { spot: 'abyss', night: true, count 5 }`. 계절 검사는 `areaMinRod`로(난파선 5).
 - [ ] 테스트 → 구현 → 커밋 `feat: 낚시 산정 호수·난파선 도전과제`
 
-### Task 6: 산정·난파선 어종 19종과 신화 둘, `logic.version` 12
+### Task 6: 산정·난파선 어종 19종과 신화 둘, `logic.version` 13
 
 **Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` summit 90·wreck 120); Test `data.test.ts`, `logic.test.ts`, `gold.test.ts`(minRod 검사 고침)
 
@@ -461,9 +461,9 @@
   - `gold.test "새 장비는 어떤 어종에도 필요 없다" → "난파선 어종·신화를 뺀 모든 어종이 4단계 이하, 난파선 어종은 5 이상, 용왕 6"`
   - `logic: 난파선 열린 세이브 rod 5 abyss 정상, rod 4(꼬인 세이브) → need_rod (Review Focus 5); 산정 ice·hotspring 정상(서버는 구멍을 모른다); 천지 백룡(맑은 0~4시, 두 전설) → buffs dragon-breath; 용왕(비, rod 6, 세 전설, 힘 0.98) → dragon-pearl`
   - `records dex 'n/94', challenges 'n/10'`
-  - `migrate v11 → 그대로, version 12`
+  - `migrate v12 → 그대로, version 13`
 - [ ] **Step 2~4** — `npx vitest run src/games/fishing && npm run typecheck && npm run fn:test`
-- [ ] **Step 5: 커밋** — `feat: 낚시 산정 호수·난파선 어종 19종과 신화 천지 백룡·용왕, 로직 버전 12`
+- [ ] **Step 5: 커밋** — `feat: 낚시 산정 호수·난파선 어종 19종과 신화 천지 백룡·용왕, 로직 버전 13`
 
 ### Task 7: 경제 최종 고정
 
@@ -481,7 +481,7 @@
 
 ### Task 8: M3 배포 체크리스트와 전체 검증
 
-- [ ] `docs/deploy-checklist.md` "낚시 5부 M3(산정 호수·난파선)": `logic.version` 12, `world` 재배포 순서, 새로고침 안내, 11로 되돌리지 않기(옛 migrate가 산정·난파선 해금(27만 G)과 새 어종을 지운다; 버프는 legends에서 다시 생기지만 신화 어종을 모르면 legends에서도 빠진다 — 절대 되돌리지 말 것). 수동 확인: 산 호수 북동쪽 눈더미 해금, 산정 얼음 위를 걸어 구멍 뚫기(1.2초, 넷째 구멍이면 첫째가 얼어붙음, 다시 오면 구멍 없음), 여름에도 눈, 온천 낚시, 섬 남쪽 선착장 — 명장 낚싯대면 막힘 문구, 백골이면 구매 → 난파선 왕복, 심해·난파선 낚시, 순간이동 요금(섬 43, 마을 146 안팎), 도감·지도 탭 10개, 천지 백룡·용왕(테스트 계정)의 신화 알림·버프(바가 길어짐, 판매 예상가 +8%), "신화의 힘 3/3", 프로필 기록 n/94·n/10. 배포 뒤 관찰: 하루 버는 양이 시뮬레이션(늦은 수입 약 13만 G/h)과 크게 다르면 난파선 어종 가격을 다시 잡는다.
+- [ ] `docs/deploy-checklist.md` "낚시 5부 M3(산정 호수·난파선)": `logic.version` 13, `world` 재배포 순서, 새로고침 안내, 12로 되돌리지 않기(옛 migrate가 산정·난파선 해금(27만 G)과 새 어종을 지운다; 버프는 legends에서 다시 생기지만 신화 어종을 모르면 legends에서도 빠진다 — 절대 되돌리지 말 것). 수동 확인: 산 호수 북동쪽 눈더미 해금, 산정 얼음 위를 걸어 구멍 뚫기(1.2초, 넷째 구멍이면 첫째가 얼어붙음, 다시 오면 구멍 없음), 여름에도 눈, 온천 낚시, 섬 남쪽 선착장 — 명장 낚싯대면 막힘 문구, 백골이면 구매 → 난파선 왕복, 심해·난파선 낚시, 순간이동 요금(섬 43, 마을 146 안팎), 도감·지도 탭 10개, 천지 백룡·용왕(테스트 계정)의 신화 알림·버프(바가 길어짐, 판매 예상가 +8%), "신화의 힘 3/3", 프로필 기록 n/94·n/10. 배포 뒤 관찰: 하루 버는 양이 시뮬레이션(늦은 수입 약 13만 G/h)과 크게 다르면 난파선 어종 가격을 다시 잡는다.
 - [ ] `npm test && npm run typecheck && npm run build && npm run fn:test`
 - [ ] 커밋 `docs: 낚시 5부 M3 배포 안내`
 
