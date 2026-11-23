@@ -5,6 +5,11 @@ import { duels, getDuel } from '../../games/index.ts'
 import type { Manifest } from '../../games/types.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { POLL_MS, type DuelList, type DuelListItem } from './data.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
+import { refreshWallet, useWallet } from '../wallet/useWallet.ts'
+import { formatGold } from '../wallet/format.ts'
+import { StakePicker } from './StakePicker.tsx'
+import { parseStake, stakeOf, stakeProblem } from './stake.ts'
 
 
 const gameName = (id: string) => getDuel(id)?.manifest.name ?? id
@@ -22,6 +27,12 @@ function CreateForm({ visible }: { visible: Manifest[] }) {
   const [turn, setTurn] = useState(() => (manifest ? turnOf(manifest).default : 60))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stakeText, setStakeText] = useState('0')
+  const { balance } = useWallet()
+  // 판돈은 지갑 게임이 있을 때만(서버도 그때만 > 0을 받는다), 숨김 게임은 0만
+  const stakeOn = walletEnabled() && !!manifest && !manifest.hidden
+  const stake = stakeOn ? parseStake(stakeText) : 0
+  const stakeIssue = stakeOn ? stakeProblem(stake, balance) : null
 
   function pickGame(id: string) {
     setGameId(id)
@@ -34,13 +45,14 @@ function CreateForm({ visible }: { visible: Manifest[] }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (busy || !manifest) return
+    if (busy || !manifest || stakeIssue !== null || stake === null) return
     setBusy(true)
     setError(null)
     try {
       const r = await duel<DuelCreated>({
-        action: 'create', game_id: manifest.id, options, rated, visibility, turn_seconds: turn,
+        action: 'create', game_id: manifest.id, options, rated, visibility, turn_seconds: turn, stake,
       })
+      if (stake > 0) void refreshWallet()
       navigate(`/duel/${r.match_id}`, { state: { inviteCode: r.invite_code } })
     } catch (e2) {
       setError(duelErrorMessage(e2 instanceof ApiError ? e2.code : 'network'))
@@ -84,14 +96,17 @@ function CreateForm({ visible }: { visible: Manifest[] }) {
           {turnOf(manifest).choices.map((c) => <option key={c} value={String(c)}>{c}초</option>)}
         </select>
       </label>
+      {stakeOn && <StakePicker text={stakeText} onText={setStakeText} balance={balance} />}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <button type="submit" className="btn btn-primary" disabled={busy}>대국 만들기</button>
+      <button type="submit" className="btn btn-primary" disabled={busy || stakeIssue !== null}>대국 만들기</button>
     </form>
   )
 }
 
 function meta(m: DuelListItem): string {
-  return `${gameName(m.game_id)} · ${m.rated ? '랭크' : '친선'} · 턴 ${m.turn_seconds}초`
+  const stake = stakeOf(m)
+  // 판돈은 실제로 걸린 돈이라 지갑 표시 여부와 무관하게 보여 준다
+  return `${gameName(m.game_id)} · ${m.rated ? '랭크' : '친선'} · 턴 ${m.turn_seconds}초${stake > 0 ? ` · 판돈 ${formatGold(stake)}` : ''}`
 }
 
 function resultText(m: DuelListItem, myId: string | undefined): string {
@@ -161,12 +176,15 @@ export function DuelHomePage() {
     return () => { alive.current = false; clearInterval(t) }
   }, [load])
 
-  async function join(id: string) {
+  async function join(m: DuelListItem) {
     if (joining) return
-    setJoining(id)
+    setJoining(m.id)
     setJoinError(null)
+    const stake = stakeOf(m)
     try {
-      const v = await duel({ action: 'join', match_id: id })
+      // 목록에서 본 판돈을 함께 보낸다. 다르면 서버가 stake_mismatch
+      const v = await duel({ action: 'join', match_id: m.id, stake })
+      if (stake > 0) void refreshWallet()
       navigate(`/duel/${v.match_id}`)
     } catch (e) {
       setJoinError(duelErrorMessage(e instanceof ApiError ? e.code : 'network'))
@@ -211,7 +229,9 @@ export function DuelHomePage() {
                     <li key={m.id} className="list-row">
                       <div className="row between">
                         <span>{m.created_by_handle ?? '알 수 없음'} <span className="muted">({m.players[0]?.rating ?? 1000})</span></span>
-                        <button type="button" className="btn btn-primary" disabled={joining !== null} onClick={() => void join(m.id)}>참가</button>
+                        <button type="button" className="btn btn-primary" disabled={joining !== null} onClick={() => void join(m)}>
+                          {stakeOf(m) > 0 ? `${formatGold(stakeOf(m))} 걸고 참가` : '참가'}
+                        </button>
                       </div>
                       <span className="muted">{meta(m)}</span>
                     </li>

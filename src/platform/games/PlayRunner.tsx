@@ -4,6 +4,11 @@ import { now, syncFromView } from '../../lib/serverTime.ts'
 import { getGame } from '../../games/index.ts'
 import { getGameComponent } from '../../games/ui.ts'
 import type { Ctx } from '../../games/types.ts'
+import { freeGold } from '../../games/economy.ts'
+import { getWallet } from '../../lib/walletStore.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
+import { refreshWallet } from '../wallet/useWallet.ts'
+import '../wallet/wallet.css'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import * as freeQueue from './freeQueue.ts'
 import * as freeLogQueue from './freeLogQueue.ts'
@@ -231,6 +236,8 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
   const seedRef = useRef<Uint8Array>(init?.seed ?? new Uint8Array(16))
   const [error, setError] = useState<string | null>(null)
   const submitted = useRef(false)
+  // 이번 판 골드 미리 계산(서버 트리거와 같은 식, 설계 §7.4). saved: null 저장 중, false 대기열에 남음
+  const [earned, setEarned] = useState<{ asked: number; got: number; capReached: boolean; saved: boolean | null } | null>(null)
 
   if (!mod || !Game || !init) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
 
@@ -257,6 +264,13 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
       const final = mod.logic.score(r.state, ctx())
       const clientId = crypto.randomUUID()
       const userId = profile?.id ?? ''
+      const g = walletEnabled() ? mod.manifest.gold : undefined
+      if (g) {
+        const w = getWallet()
+        const used = w.today[gameId] ?? 0
+        const { asked, got } = freeGold(final, g, used, w.earnedToday)
+        setEarned({ asked, got, capReached: asked === 0 && used >= g.dailyCap, saved: null })
+      }
       const p = freeQueue.submit({
         client_id: clientId,
         user_id: userId,
@@ -271,6 +285,13 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
         { client_id: clientId, user_id: userId, seed: seedHex(seedRef.current), actions: [...actionsRef.current] },
         p,
       )
+      if (g) {
+        void Promise.resolve(p).then((ok) => {
+          const saved = ok !== false
+          setEarned((e) => (e ? { ...e, saved } : e))
+          if (saved) void refreshWallet()
+        }, () => setEarned((e) => (e ? { ...e, saved: false } : e)))
+      }
     }
   }
 
@@ -286,7 +307,20 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
         remainingMs={null}
         onAction={onAction}
       />
+      {finished && earned && <FreeGoldLine {...earned} />}
       {finished && onNext && <button className="btn btn-primary" onClick={onNext}>한 판 더</button>}
     </div>
   )
+}
+
+/** 자유 플레이 결과의 번 골드 한 줄 (설계 §7.4). 게임 id를 모른다: manifest gold로만 정해진다 */
+function FreeGoldLine({ asked, got, capReached, saved }: { asked: number; got: number; capReached: boolean; saved: boolean | null }) {
+  let text: string | null = null
+  if (capReached) text = '오늘 이 게임 골드는 다 벌었어요'
+  else if (got > 0 && saved === false) text = `+${got.toLocaleString('ko-KR')} G · 저장되면 골드가 들어가요`
+  else if (got > 0 && got < asked) text = `+${got.toLocaleString('ko-KR')} G · 오늘 상한을 넘어 일부만`
+  else if (got > 0) text = `+${got.toLocaleString('ko-KR')} G`
+  else if (asked > 0) text = '+0 G · 오늘 골드 상한을 넘었어요'
+  if (!text) return null
+  return <p className="free-gold" role="status">{text}</p>
 }

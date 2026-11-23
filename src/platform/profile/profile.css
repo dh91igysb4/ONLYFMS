@@ -11,6 +11,8 @@
 }
 .pf-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .pf-name { min-width: 0; overflow-wrap: anywhere; }
+.pf-gold { margin: 8px 0 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pf-gold strong { color: var(--accent-strong); }
 
 .pf-chips {
   list-style: none; margin: 0; padding: 0;

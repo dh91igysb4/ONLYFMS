@@ -1,4 +1,5 @@
 import { supabase, supabaseUrl, supabaseKey } from './supabase.ts'
+import { notifyGoldCapped, setBalance } from './walletStore.ts'
 
 export type PlayView = {
   item_id: string
@@ -23,6 +24,8 @@ export type DuelView = {
   visibility: 'public' | 'invite'
   status: 'waiting' | 'active' | 'finished' | 'void'
   turn_seconds: number
+  /** 판돈(한 사람이 맡긴 금액, 지갑 설계 §9). 옛 함수면 없음 = 0 */
+  stake?: number
   players: { id: string; handle: string | null; rating: number }[]
   my_seat: 0 | 1 | null
   to_move: 0 | 1 | null
@@ -34,10 +37,12 @@ export type DuelView = {
   end_reason: string | null
   final_scores: [number, number] | null
   rating_change?: { before: number; after: number }
+  /** 끝난 판돈 대국의 내 장부 기준 금액(맡김·지급·환불). 옛 함수면 없음 */
+  stake_settled?: { staked: number; payout: number; refund: number }
 }
 
 /** duel({action:'create'})의 응답 */
-export type DuelCreated = { match_id: string; invite_code: string }
+export type DuelCreated = { match_id: string; invite_code: string; stake?: number }
 
 export class ApiError extends Error {
   code: string
@@ -93,6 +98,11 @@ const MESSAGES: Record<string, string> = {
   not_waiting: '이미 끝났거나 취소된 대국이에요',
   not_player: '참가한 대국이 아니에요',
   not_found: '없는 대국이에요',
+  not_enough_gold: '골드가 부족해요',
+  fee_invalid: '참가비를 0~41,000 G로 적어 주세요',
+  fee_not_allowed: '숨김 게임이 든 대회는 참가비를 받을 수 없어요',
+  fee_mismatch: '참가비를 확인하고 대회 페이지에서 다시 참가해 주세요',
+  fee_immutable: '참가비는 만든 뒤 바꿀 수 없어요',
 }
 
 export function errorMessage(code: string): string {
@@ -105,6 +115,8 @@ const DUEL_MESSAGES: Record<string, string> = {
   version_changed: '규칙이 바뀌어 이 대국은 무효가 됐어요',
   finished: '이미 끝난 대국이에요',
   not_due: '',
+  stake_mismatch: '판돈이 바뀌었어요. 다시 확인해 주세요',
+  invalid_stake: '판돈을 다시 적어 주세요',
 }
 
 export function duelErrorMessage(code: string): string {
@@ -133,16 +145,17 @@ function notifyDenied(e: ApiError): ApiError {
 
 const NETWORK_RE = /Failed to fetch|NetworkError|Load failed|fetch failed/i
 
-function rpcError(e: { message: string; code?: string; status?: number }): ApiError {
+function rpcError(e: { message: string; code?: string; status?: number; details?: string | null }): ApiError {
   // supabase.rpc는 fetch 실패를 throw하지 않고 code 없는 error로 돌려준다.
   if (!e.code || e.status === 0 || NETWORK_RE.test(e.message)) return new ApiError('network', 0)
-  if (e.code === 'P0001') return new ApiError(e.message, 400)
+  // DETAIL은 body.details로 넘긴다 (fee_mismatch가 지금 참가비를 싣는다)
+  if (e.code === 'P0001') return new ApiError(e.message, 400, e.details ? { details: e.details } : undefined)
   if (e.code === '42501') return new ApiError('forbidden', 403)
   return new ApiError('unknown', 400)
 }
 
 export async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
-  let res: { data: unknown; error: { message: string; code?: string } | null }
+  let res: { data: unknown; error: { message: string; code?: string; details?: string | null } | null }
   try {
     res = (await supabase.rpc(name, args)) as typeof res
   } catch {
@@ -191,12 +204,27 @@ export async function duel<T = DuelView>(body: Record<string, unknown>): Promise
   return (await callFunction('duel', body)) as T
 }
 
-/** 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null. */
-export type WorldView<V = unknown, R = unknown> = { view: V; result: R | null; server_now: number }
+/**
+ * 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null.
+ * gold(지갑 잔액)·gold_capped(사이트 하루 상한으로 줄었을 때)는 플랫폼 필드로,
+ * 지갑을 쓰는 게임(WorldLogic.wallet)만 보낸다(설계 §6).
+ */
+export type WorldView<V = unknown, R = unknown> = {
+  view: V
+  result: R | null
+  server_now: number
+  gold?: number
+  gold_capped?: { asked: number; got: number }
+}
 
 /** 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act). */
 export async function world<V = unknown, R = unknown>(
   body: { game: string; action: 'load' } | { game: string; action: 'act'; payload: unknown },
 ): Promise<WorldView<V, R>> {
-  return (await callFunction('world', body)) as WorldView<V, R>
+  const res = (await callFunction('world', body)) as WorldView<V, R>
+  // 지갑을 쓰는 게임은 최상위 gold(잔액)를 보낸다. 헤더 배지가 추가 요청 없이 갱신된다
+  if (typeof res?.gold === 'number' && Number.isFinite(res.gold)) setBalance(res.gold)
+  const c = res?.gold_capped
+  if (c && typeof c.asked === 'number' && typeof c.got === 'number') notifyGoldCapped({ asked: c.asked, got: c.got })
+  return res
 }

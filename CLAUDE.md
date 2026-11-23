@@ -19,6 +19,9 @@
 - `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`. `world_saves`는 클라이언트에서 읽을 수 없다. 화면에 필요한 값은 `WorldLogic.view`로만 내보낸다.
 - 등록부 `src/games/index.ts`의 `worlds`/`getWorld`(지속형 게임), 화면은 `src/games/ui.ts`의 `getWorldComponent`
 - 지속형 게임 프로필 캐릭터: manifest `avatar` + `WorldLogic.avatar(state)`(문자열) → `world` 함수가 `game_records` 키 `avatar`(값 0, detail)에 쓰고, 화면은 `src/games/ui.ts`의 `getAvatarComponent`, 플랫폼은 `src/platform/profile/AvatarSection.tsx`(요약 탭). 낚시 옷장 품목은 `src/games/fishing/wardrobe.ts`(서버 공용), 그림은 `wearArt.ts`, 합성은 `outfit.ts`(화면 전용)
+- 지갑(설계 `docs/superpowers/specs/2026-11-23-wallet-design.md`): 테이블 `wallets`(잔액)·`gold_ledger`(장부, `unique (user_id, reason, ref)`, 상한으로 줄기 전 금액 `raw_delta`). 골드를 바꾸는 길은 SQL `_gold_move` 하나이고, 사이트 하루 상한(KST 하루 들어간 합계 `REF × 1.5`까지 다, `REF × 2`까지 20%, 그 위 4%)도 그 안에서만 적용한다. 잠금 순서는 세이브·대국·대회 행 먼저, 지갑 나중. 끝난 대회 정산은 예약 작업 없이 `my_wallet()`(승인 사용자면 지갑 표시와 무관하게 앱 로드마다 `Layout`이 부름)이 부르는 `settle_due()`(끝나고 1분 지난 대회 행 `for no key update skip locked` → 지급 목록을 모아 전체 `user_id` 오름차순으로 `_gold_move`, `settled_at`). 데일리 상금은 `_contest_payouts`(리더보드 순위에서 행동 1번 이상인 사람만 다시 센 등수, `_economy()->'daily_prizes'`). 대회 참가비(`contests.entry_fee`, 0~41,000, 만들 때 고정, 데일리·숨김 게임 0만)는 참가 한 곳 `_contest_enter`가 처음 참가 때 `contest_fee`로 빼고(화면이 본 참가비가 다르면 `fee_mismatch`), 취소는 `cancel_contest`가 즉시 환불, 분배는 같은 `_contest_payouts`(0명 환불, 1·2명 1등 독식, 3명 이상 60/30/10·나머지 1등)가 정산 때 한다. 새 참가비 대회는 SQL `_wallet_enabled()`(등록부 `walletEnabled()`의 사본, `walletFlag.test.ts`가 비교)가 true일 때만 만들 수 있다 — 지갑 게임을 켜는 PR은 새 마이그레이션에서 이 함수를 `select true`로 바꾼다
+- `src/games/economy.ts` 경제 상수 원본(`REF`, `DAILY_SOFT_CAP`, `SOFT_CAP_RATE`, `DAILY_SOFT_CAP_2`, `SOFT_CAP_RATE_2`, `softCap`). 상한 모양을 바꾸면 `economyPace.test.ts`(낚시 진행 날짜)도 함께 본다. SQL 사본은 `_economy()`이고 `economy.test.ts`가 마이그레이션의 마지막 정의와 비교한다. 수치를 바꾸면 새 마이그레이션에서 `_economy()`를 `create or replace`한다
+- `src/lib/walletStore.ts` 내 잔액 저장소(React 밖, 구독 모듈). `world` 응답 최상위 `gold`와 `my_wallet()`이 채운다. `src/platform/wallet/` 지갑 데이터 계층·헤더 배지·관리자 골드 섹션
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차
@@ -31,23 +34,27 @@
 
 점수로 겨루는 게임은 manifest에 `freeStats: 'score'`를 둔다. 자유 플레이 리더보드가 플레이·평균·최고만 보여 주고 최고 점수 순으로 고정되며, 홈 블록도 최고 점수를 보여 준다.
 점수 상한이 10이 아닌 자유 플레이 점수 게임은 manifest `scoreMax`·`scoreDecimals`와 마이그레이션의 `game_modes.score_max`를 맞춘다 (`registry.test.ts`가 `scoreMax`와 `score_max`를 비교한다).
+자유 플레이 점수 게임에 골드를 주려면 manifest `gold: { perPoint, playCap, dailyCap: FREE_DAILY_CAP }`과 새 마이그레이션의 고정 형식 한 줄 `update game_modes set gold_per_point = X, gold_play_cap = Y, gold_daily_cap = 20500 where game_id = '…';`을 맞춘다(`registry.test.ts`가 비교, 없으면 지급 없음). 수치는 `src/games/<id>/gold.test.ts`로 기준 플레이(평균 점수·한 판 시간, 출처 주석) 시간당 골드가 `REF` ±20%, `playCap`은 기준 한 판의 5배(10 단위), 봇이 있으면 봇 평균 점수도 검사한다(지갑 설계 §7.3). 지급은 `free_plays` 트리거가 하고 숨김·`free = false` 게임은 주지 않는다.
 
 대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):
 - manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).
 - 등록은 `src/games/index.ts`의 `duels`, 화면은 `src/games/ui.ts`의 `getDuelComponent`(`DuelGameProps`).
 - 마이그레이션에 `game_modes` (false, false, false) 행과 숨김이면 `hidden_games` 행.
+- 판돈(`duel_matches.stake`, 0~41,000, 숨김 게임 0만, 지갑 게임이 없으면 함수가 0만 받음)은 `duel` 함수가 `create`·`join`에서 `duel_stake`로 맡기고, 지급·환불은 트리거 `_duel_settle_stakes` 한 곳(`status`가 `finished`/`void`로 바뀔 때, 장부 기준). 대국을 끝내거나 무효로 만드는 새 길을 더해도 `status` update만 하면 된다. 참가는 화면이 본 `stake`를 보내고 다르면 409 `stake_mismatch`.
 - `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
 
 지속형(world) 게임은 대전과 비슷하게 추가한다:
 - manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
+- 골드는 세이브에 두지 않는다. 지갑을 쓰는 게임은 logic에 `wallet: true`를 두고 `ctx.gold`(잔액)를 읽어 지출을 검사한 뒤 `apply`의 `gold`(정수 증감)로 돌려준다. 옛 세이브의 골드는 `legacyGold`가 한 번 지갑으로 옮긴다(reason `migrate`). 사이트 하루 상한은 게임이 몰라도 된다(핸들러가 `gold_capped`를 응답에 넣고 `WorldPage`가 알린다).
 
 ## 낚시 데이터 갱신 (`fishing`)
 `src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
 1. `logic.ts`의 `logic.version`을 올린다.
 2. `migrate`가 옛 버전 세이브를 읽는지 `logic.test.ts`에 테스트를 추가한다 (세이브는 서버에 계속 남아 있다).
 3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
+4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 + 사이트 상한으로 약 30일, 지갑 설계 §4.1)를 다시 잰다: `src/games/economyPace.test.ts`의 수입 곡선(낚시 `econSim` 결과)을 고치고 날짜 검사가 통과해야 한다.
 
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
@@ -84,6 +91,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
+- 골드는 `_gold_move`로만 바꾼다. `wallets`·`gold_ledger`를 직접 update/insert하지 않는다(테스트 픽스처 제외).
 - 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색, 네온 라이더 캔버스 내부 색, 낚시 캔버스 내부 색 예외). 문구 예외는 네온 라이더 착지 감탄 문구(영어 소문자) 하나뿐이다.
 
 ## 비밀값 위치

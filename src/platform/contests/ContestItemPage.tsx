@@ -35,6 +35,8 @@ export function ContestItemPage() {
           await rpc('join_contest', { p_id: id })
         } catch (e) {
           const code = e instanceof ApiError ? e.code : 'network'
+          // 참가비 대회는 대회 페이지에서 금액을 확인하고 참가한다
+          if (code === 'fee_mismatch') return navigate(`/contests/${id}`, { replace: true })
           // 이미 끝난 대회는 종료 화면을 보이도록 그대로 연다
           if (code !== 'contest_closed') return set({ kind: 'error', message: errorMessage(code) })
         }
@@ -42,7 +44,7 @@ export function ContestItemPage() {
       set({ kind: 'ready', itemId: it.id })
     })().catch((e) => set({ kind: 'error', message: errorMessage(e instanceof ApiError ? e.code : 'network') }))
     return () => { alive = false }
-  }, [id, position, profile?.id, attempt])
+  }, [id, position, profile?.id, attempt, navigate])
 
   if (state.kind === 'loading') return <p className="page-note" role="status">불러오는 중…</p>
   if (state.kind === 'error') {

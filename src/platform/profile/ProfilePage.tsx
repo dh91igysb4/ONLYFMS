@@ -11,6 +11,9 @@ import { useAuth } from '../auth/AuthProvider.tsx'
 import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { Avatar } from './Avatar.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
+import { fetchUserPrizeTotal, fetchUserWallet } from '../wallet/api.ts'
+import { formatGold } from '../wallet/format.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
 import '../leaderboard/leaderboard.css'
 import './profile.css'
 
@@ -59,6 +62,10 @@ export function ProfilePage() {
   // 상단 카드·요약용. 실패해도 페이지는 그대로 보이고 해당 숫자만 '–' (대전 탭은 DuelSection이 따로 불러온다)
   const [duelStats, setDuelStats] = useState<DuelStat[] | null | undefined>(undefined)
   const [h2h, setH2h] = useState<Wdl | null>(null)
+  // 그 사람의 골드 잔액 (설계 §5.5). 실패·null이면 줄을 그리지 않는다
+  const [gold, setGold] = useState<number | null>(null)
+  // 데일리 상금 누적 (지갑 3단계). 0·null이면 줄을 그리지 않는다
+  const [prizeTotal, setPrizeTotal] = useState<number | null>(null)
   const uid = useId()
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({})
 
@@ -78,6 +85,26 @@ export function ProfilePage() {
     rpc<DuelStat[] | null>('duel_stats', { p_handle: handle, p_game: null })
       .then((s) => { if (alive) setDuelStats(s ?? []) })
       .catch(() => { if (alive) setDuelStats(null) })
+    return () => { alive = false }
+  }, [handle, attempt])
+
+  useEffect(() => {
+    let alive = true
+    setGold(null)
+    if (!walletEnabled()) return
+    fetchUserWallet(handle)
+      .then((g) => { if (alive) setGold(g) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [handle, attempt])
+
+  useEffect(() => {
+    let alive = true
+    setPrizeTotal(null)
+    if (!walletEnabled()) return
+    fetchUserPrizeTotal(handle)
+      .then((n) => { if (alive) setPrizeTotal(n) })
+      .catch(() => {})
     return () => { alive = false }
   }, [handle, attempt])
 
@@ -158,6 +185,16 @@ export function ProfilePage() {
           <Avatar handle={handle} size="lg" />
           <h2 className="page-title pf-name" id={`${uid}-name`}>{handle}</h2>
         </div>
+        {gold !== null && (
+          <p className="pf-gold" aria-label={`골드 ${formatGold(gold)}`}>
+            골드 <strong>{formatGold(gold)}</strong>
+          </p>
+        )}
+        {prizeTotal !== null && prizeTotal > 0 && (
+          <p className="pf-gold" aria-label={`데일리 상금 누적 ${formatGold(prizeTotal)}`}>
+            데일리 상금 누적 <strong>{formatGold(prizeTotal)}</strong>
+          </p>
+        )}
         <ul className="pf-chips" aria-label="요약 기록">
           {chips.map((c) => (
             <li key={c.label} className="pf-chip">

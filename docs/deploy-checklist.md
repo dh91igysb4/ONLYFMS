@@ -399,6 +399,132 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] 데스크톱(1280px)에서 방향키로 걷고 스페이스로 낚시·상점이 된다
 - [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부되고, `supabase.from('world_saves').select('state')`는 행 없이 오류(권한 거부)를 돌려준다
 
+## 지갑 배포 (1단계, `feat/wallet-core`)
+설계 `docs/superpowers/specs/2026-11-23-wallet-design.md`, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 1단계. 이 브랜치는 지갑 핵심(Task 1·1b·2·3·5·6·7)만 담고, **낚시 골드 이전(Task 4)은 낚시 다듬기 PR 뒤 따로 들어온다**. 그래서 이 PR만 배포하면 어떤 게임도 아직 지갑을 쓰지 않는다(`WorldLogic.wallet`이 있는 게임 없음): 낚시는 지금처럼 세이브 안 골드를 쓰고, 헤더 배지·프로필 골드 줄은 **보이지 않는다**(등록부에 `wallet: true` 게임이 생기면 저절로 켜진다, `src/platform/wallet/enabled.ts`). `/admin` 골드 섹션은 처음부터 보인다.
+
+- **권장**: Task 4(낚시 → 지갑, 낚시 `logic.version` = 다듬기 버전 + 1) PR과 같은 새벽(KST)에 이어서 배포한다. 이 PR만 먼저 배포해도 낚시·다른 게임은 그대로 동작하고 사용자 화면에는 바뀌는 것이 없다.
+
+순서: DB push → `world` 함수 → Vercel. (테이블·함수만 더하므로 옛 `world`·옛 화면과 호환. 새 `world`는 `wallet`이 없는 게임에 지금과 똑같이 동작하고 응답에 `gold`를 넣지 않는다)
+
+- [ ] `npx supabase@2 db push` → `20261123181545_wallet.sql`(테이블 `wallets`·`gold_ledger`, `_wallet_lock`·`_gold_move`(사이트 하루 상한)·`_economy()`, RPC `my_wallet`·`user_wallet`·`admin_gold_adjust`·`admin_gold_ledger`)
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (지갑 잠금·이전·증감 경로. 낚시 로직은 바뀌지 않았으므로 버전 변화 없음)
+- [ ] PR 머지 → Vercel 배포
+- [ ] 수동 확인(미리보기 → 운영, 폰 390px·PC):
+  - [ ] 헤더·프로필에 골드가 **보이지 않는다**(지갑 게임 없음). Task 4 뒤에는 헤더 오른쪽(아이디 메뉴 왼쪽)에 `N G`가 줄바꿈 없이(360px 폭 포함), 다른 계정 프로필 요약에 "골드 N G", 대기 계정에는 없음
+  - [ ] `/admin` 골드 섹션: 내 아이디로 +100 → "반영했어요. … 잔액 100 G", 장부 맨 위에 "관리자 조정 +100"과 메모. −1000 → "잔액보다 많이 뺄 수 없어요", 메모 비움 → 브라우저가 막거나 "메모를 1~100자로 적어 주세요", 없는 아이디 → "없는 아이디예요". 끝나면 −100으로 되돌린다
+  - [ ] 비관리자 계정 브라우저 콘솔: `supabase.from('gold_ledger').select('*')`는 본인 줄만, `supabase.from('wallets').update({balance: 1})`·`supabase.rpc('_gold_move', …)`는 거부
+  - [ ] 낚시가 지금과 똑같이 동작한다(팔기·사기·새로고침 뒤 골드 유지). 네트워크 탭의 `world` 응답에 최상위 `gold`가 없다
+- 확인 쿼리(SQL 편집기): `select count(*), sum(balance) from wallets;` `select reason, count(*), sum(delta) from gold_ledger group by 1;`
+
+### Task 4(낚시 → 지갑) 배포 때 더할 것
+Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
+- **새 마이그레이션에서 `_wallet_enabled()`를 `create or replace … select true`로 바꾼다**(5단계 대회 참가비가 이 값으로 새 참가비 대회를 막는다). `src/games/walletFlag.test.ts`가 마지막 정의와 등록부 `walletEnabled()`를 비교하므로 빠뜨리면 `npm test`가 실패한다. 순서는 DB push가 먼저라 그 사이(새 DB·옛 화면)에는 참가비 입력이 아직 없을 뿐이다.
+- 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다. 옛 로직은 세이브에 gold가 없어 0으로 시작하고, 그 사이 번 골드는 다시 배포해도 **사라진다**: 이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시되기 때문이다.
+- 수동 확인: 낚시를 열기 전 헤더 `0 G`(지연 이전), 낚시를 열면 헤더와 낚시 화면 골드가 옛 골드와 같음, 새로고침해도 같음; 물고기 팔기 → 헤더가 바로 오름; 낚싯대·가방·찌·해금·순간이동·고급 장비 구매 → 헤더가 바로 내림, 모자라면 "골드가 부족해요".
+- 확인 쿼리: 아직 이전되지 않은 세이브 `select count(*) from world_saves where game_id = 'fishing' and logic_version <= <LAST_GOLD_IN_SAVE>;`, 이전 합계 `select count(*), sum(delta) from gold_ledger where reason = 'migrate';`, 이중 이전 없음 `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행).
+- 사이트 하루 상한 확인: 관리자 계정으로 낚시를 해 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림이 3초 뜨고 헤더 증가가 넘은 몫의 20%; 관리자 장부에 "(상한, 원래 …)" (2단계 PR 뒤에는 들어간 합계 41,000 위 몫은 4%).
+- 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표(`REF × 40`)를 다시 본다.
+
+## 지갑 배포 (2단계 자유 플레이 지급, `feat/wallet-free`)
+설계 §5.6(2단 상한 개정)·§7, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 2단계(Task 8~12). 1단계(`feat/wallet-core`) 뒤에 쌓인 브랜치라 **1단계 PR이 먼저 머지·배포**돼야 한다. 낚시 다듬기 PR(#81)·Task 4(낚시 → 지갑)와는 독립이다(낚시 코드를 건드리지 않는다).
+
+바뀌는 것:
+- 마이그레이션 `20261123191621_soft_cap_tier2.sql`: 사이트 하루 상한 2단(들어간 합계 30,750까지 100%, 41,000까지 20%, 그 위 4%). `_economy()`·`_gold_move`를 `create or replace`.
+- 마이그레이션 `20261123192423_free_gold.sql`: `game_modes.gold_per_point·gold_play_cap·gold_daily_cap`과 다섯 게임 수치, `free_plays` after insert 트리거 `free_plays_gold`.
+- 화면: 자유 플레이 결과에 `+N G`(지갑을 쓰는 게임이 등록돼 있을 때만, 헤더 배지와 같은 조건 `walletEnabled()`).
+
+**Task 4 전에 배포하면**: 트리거는 바로 지급하지만(지갑에 쌓임) 헤더·결과 화면에는 골드가 보이지 않는다. Task 4가 배포되면 낚시 옛 골드와 합쳐져 한꺼번에 보인다(사라지는 골드 없음). 사용자에게 "미니게임 골드가 미리 쌓이고 있다"고 알릴지는 운영 판단.
+
+순서: DB push → PR 머지 → Vercel. (함수 재배포 없음: `play`·`world`는 바뀌지 않았다. `world`는 `_gold_move`를 SQL로 부르므로 2단 상한이 DB push 때 바로 적용된다)
+
+- [ ] `npx supabase@2 db push` → 위 두 마이그레이션. 트리거가 이때부터 지급한다(옛 화면에서 끝낸 판도 받는다)
+- [ ] PR 머지 → Vercel 배포
+- [ ] 수동 확인(미리보기 → 운영, 폰 390px·PC). 결과 화면의 골드 줄은 Task 4 뒤에만 보이므로, Task 4 전이면 장부 쿼리로 확인한다:
+  - [ ] 양치·몰래 수능·볼 런·네온 라이더·후알야 자유 플레이 한 판씩 → (Task 4 뒤) `+N G`와 헤더 증가가 같다. 관리자 장부에 `free` 줄과 게임 이름
+  - [ ] 비행기 모드로 끝낸 판 → "+N G · 저장되면 골드가 들어가요", 온라인 복귀 뒤 장부에 한 번만 들어온다
+  - [ ] 같은 게임 하루 상한: 관리자가 SQL로 오늘 free 장부 확인 `select game_id, sum(coalesce(raw_delta, delta)) asked, sum(delta) got from gold_ledger where reason = 'free' and created_at >= date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' group by 1;` → 게임마다 `asked` ≤ 20,500
+  - [ ] 사이트 상한과 함께: 같은 날 30,750을 넘긴 계정(관리자 조정은 세지 않으니 낚시로)으로 자유 플레이 한 판 → `+N G · 오늘 상한을 넘어 일부만`, 헤더 증가가 N과 같다
+  - [ ] 2단 상한: 오늘 들어간 합계가 41,000을 넘은 계정의 `free`·`world` 줄은 원래 금액의 4%(관리자 장부 "(상한, 원래 …)")
+- 일주일 뒤 기준 플레이 확인: `select game_id, count(*), avg(score), percentile_cont(0.5) within group (order by score) from free_plays where played_at > now() - interval '7 days' group by 1;` → 설계 §7.3 표의 `avgScore`(양치 5.81, 몰래 수능 921, 볼 런 60, 네온 라이더 30, 후알야 6)에서 ±30% 넘게 벗어난 게임은 수치 조정 PR(manifest `gold`·새 마이그레이션 `update game_modes set gold_…`·`gold.test.ts` 함께). 특히 가정으로 둔 볼 런·네온 라이더·후알야.
+- 일주일 뒤 한 판 시간 확인(가정 `playSec`: 볼 런 30, 네온 라이더 45, 후알야 90초 + 판 사이 5초): 같은 사람·게임의 연속 판 간격 중앙값 `select game_id, count(*), percentile_cont(0.5) within group (order by gap) from (select game_id, extract(epoch from played_at - lag(played_at) over (partition by user_id, game_id order by played_at)) gap from free_plays where played_at > now() - interval '7 days') t where gap between 1 and 600 group by 1;` → `playSec + 5`보다 30% 넘게 짧으면 시간당 골드가 그만큼 크다(예: 후알야 판당 30초면 약 REF × 3). 그 게임의 `perPoint`·`playCap`을 다시 잡는다(`gold.test.ts`의 `PLAY_SEC` 함께).
+- 일주일 뒤 상한 모양 확인: 1단계 절의 "사람별 하루 들어옴" 쿼리에서 하루 여러 시간 하는 사람의 `earned`가 41,000 근처에 몰리고 4% 구간 수입이 거의 없으면 정상. 하루 1시간쯤 하는 사람의 `earned`가 41,000을 자주 넘으면(데일리 상금 등) 41,000·4%를 다시 본다(`economyPace.test.ts`로 날짜를 다시 재서).
+- 낚시 다듬기 PR(#81)을 이 뒤에 머지할 때: 그 PR의 `fishing/gold.test.ts` "하루 여러 시간 (지금 값 기록)"(16.4·11.4일, 1단 20%로 계산)과 `econSim.ts`의 `DayPlan {cap, rate}`를 2단 상한(`SOFT_CAP_TIERS`)으로 바꾸고 기록 값을 25.0·22.0일로 고친다. 이 브랜치의 `src/games/economyPace.test.ts`는 그때 `econSim`을 직접 import해도 된다.
+
+## 지갑 배포 (3단계 정산과 데일리 상금, `feat/wallet-daily`)
+설계 §8·§8.1, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 3단계(Task 13~18). 2단계(`feat/wallet-free`) 뒤에 쌓인 브랜치라 **2단계 PR이 먼저 머지·배포**돼야 한다.
+
+바뀌는 것:
+- 마이그레이션 `20261123200515_settle_daily.sql`: `_economy()`에 상금 표·`stake_max`·`fee_max`, `contests.settled_at`(+ 부분 인덱스, **이미 끝난 대회는 모두 정산 표시 = 소급 없음**), `gold_ledger (ref, reason)` 인덱스, `_contest_payouts`·`settle_due`·`contest_prizes`·`user_prize_total`, `my_wallet()`을 volatile로 바꿔 처음에 `settle_due()`(실패는 경고만)와 `prizes`(최근 3일 받은 상금).
+- 화면: 헤더 아래 상금 알림(처음 보는 상금만, 확인하면 다시 안 뜸), 끝난 대회 순위의 "상금" 열과 "내 상금", 프로필 "데일리 상금 누적". 모두 헤더 배지와 같은 조건(`walletEnabled()`)일 때만.
+
+순서: DB push → PR 머지 → Vercel. (함수 재배포 없음: `play`·`duel`·`world`는 바뀌지 않았다)
+
+- [ ] `npx supabase@2 db push`. **이 시각이 소급 없음의 기준이다**: 이미 끝난 데일리·대회는 표시만 되고 지급되지 않는다. 그날 진행 중인 데일리는 끝난 뒤(끝나고 1분이 지나 누군가 앱을 열 때) 지급된다. 그래서 **새벽(KST)에 push하면 전날 데일리(자정에 끝남)는 상금이 없다**. 전날 데일리까지 주려면 자정 전에 push한다(판단: 새벽 배포 권장을 따르고 하루치는 주지 않는다 — 소급 없음 원칙과 같다).
+- [ ] 정산은 **새 화면(Vercel)부터** 돈다: 새 `Layout`은 지갑 화면이 보이든 말든(`walletEnabled()`와 무관하게) 승인 사용자면 앱 로드 때 `my_wallet()`(= `settle_due`)을 부른다. 옛 화면은 지갑 게임이 없으면 `my_wallet()`을 부르지 않으므로, DB push와 Vercel 사이에 끝난 데일리는 Vercel 뒤 첫 접속 때 정산된다(그 사이가 짧으면 문제없다).
+- [ ] PR 머지 → Vercel 배포
+- [ ] 수동 확인(다음 날, 미리보기 → 운영, 폰 390px·PC). Task 4(낚시 → 지갑) 전이면 지갑 화면이 없어 아래 화면 항목은 보이지 않지만 **정산·지급은 일어난다**(앱 로드 때 `my_wallet()`). 그때는 아래 확인 쿼리로 장부를 본다:
+  - [ ] 첫 접속 → 헤더 잔액이 상금만큼 오르고, 헤더 아래 "데일리 상금이 들어왔어요 · 후알야 k등 +N G"와 "보기"·"확인". 확인 뒤 새로고침해도 안 뜬다
+  - [ ] 어제 데일리 대회 페이지: 최종 순위에 "상금" 열(행동한 사람만, 6등 이하 +2,050 G), 표 위 "내 상금 +N G (k등)"
+  - [ ] 다른 계정 프로필: "데일리 상금 누적 N G"
+  - [ ] `/admin` 골드 장부: "데일리 상금" 줄, 메모 `k등`, 상한 표시 없음(상금은 줄지 않는다)
+- 확인 쿼리: 정산 안 된 끝난 대회 `select count(*) from contests where settled_at is null and ends_at <= now() - interval '1 minute';`(누가 앱을 열었으면 0 근처. 계속 늘면 Postgres 로그에서 `settle_due:` 경고(실패한 대회 id)를 찾는다), 이중 지급 없음 `select user_id, ref, count(*) from gold_ledger where reason = 'daily_prize' group by 1, 2 having count(*) > 1;`(0행), 날마다 지급 `select ref, count(*), sum(delta) from gold_ledger where reason = 'daily_prize' group by 1 order by max(created_at) desc limit 7;`
+- 데일리 게임이 늘면 `src/games/economy.test.ts`의 "데일리 게임 수 × 1등 상금 ≤ REF"가 넷째 게임에서 실패한다 → 설계 §8.1대로 상금 표를 줄이는 PR(`economy.ts`와 새 마이그레이션의 `_economy()` 함께).
+- 되돌리기: 화면만 문제면 Vercel 이전 배포로. DB의 `my_wallet()` 정산은 그대로 둬도 옛 화면과 호환된다. 정산 자체를 멈춰야 하면 새 마이그레이션으로 `my_wallet()`에서 `settle_due()` 호출을 뺀다(지급된 장부는 그대로 두고, 잘못 지급됐으면 `admin_gold_adjust`).
+
+## 지갑 배포 (4단계 대전 판돈, `feat/wallet-duel`)
+설계 §9·§14, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 4단계(Task 19~22). 3단계(`feat/wallet-daily`) 뒤에 쌓인 브랜치라 **3단계 PR이 먼저 머지·배포**돼야 한다.
+
+바뀌는 것:
+- 마이그레이션 `20261124010000_duel_stake.sql`: `duel_matches.stake`(0~41,000, 기본 0, 만든 뒤 변경 금지, 숨김 게임은 0만 — 트리거 `_duel_stake_guard`), 지급·환불 트리거 `_duel_settle_stakes`(`status`가 `finished`/`void`로 바뀌는 순간 장부 `duel_stake` 줄 기준: 승자 독식 `duel_payout`, 무승부·무효 `duel_refund`, `user_id` 오름차순), `_duel_item`에 `stake`, `duel_list()`의 10분 만료 정리를 만든 사람 순서로 하나씩(`for update skip locked`) 바꿈.
+- `duel` 함수: `create`의 `stake`(대국 insert 뒤 만든 사람 지갑에서 맡김), `join`의 `stake`(화면이 본 판돈, 다르면 409 `stake_mismatch { stake }`, 같으면 참가자 지갑에서 맡김), 잔액 부족 409 `not_enough_gold`(트랜잭션 전체 롤백), 잘못된 판돈·숨김 게임 판돈·**지갑 게임이 등록부에 없을 때 판돈 > 0** → 400 `invalid_stake`, 응답 `view.stake`.
+- 화면: 대국 만들기의 판돈(빠른 선택 0·100·500·1,000·5,000·10,000 중 상한 이하 + 직접 입력, 상한 min(내 골드, 41,000), "내 골드 N G"; 지갑 게임이 없거나 숨김 게임이면 입력 없음), 대기실·내 대국 "판돈 N G"와 "N G 걸고 참가", 초대 링크 참가 확인 화면, 대국 머리 "판돈 N G" 배지·대기 중 "맡겼어요" 안내, 결과 "+N G"/"−N G"/"판돈을 돌려받았어요", 재대결은 같은 판돈. `/duel/local`은 그대로.
+
+순서: DB push → `duel` 함수 → PR 머지 → Vercel.
+
+- [ ] `npx supabase@2 db push`. 옛 함수·옛 화면은 `stake`를 모르므로 모든 대국이 판돈 0(기본값)으로 지금과 같다.
+- [ ] `npx supabase@2 functions deploy duel --no-verify-jwt` (함수가 `src/games/economy.ts`·등록부를 번들한다). 새 함수 + 옛 화면: 옛 화면은 판돈을 보내지 않아 0으로만 만들고 0으로만 참가한다.
+- [ ] PR 머지 → Vercel 배포
+- [ ] **낚시 Task 4(지갑 이전) 전에는 판돈을 걸 수 없다**: 등록부에 `wallet: true` 게임이 없으면 함수가 판돈 > 0을 거절하고 화면에 입력이 없다(볼 수 없는 골드를 걸지 않게). 이때는 아래 수동 확인 가운데 "판돈 0 대국이 지금과 같다"만 본다. Task 4 배포 뒤 판돈 항목을 확인한다(Task 4 배포 때 `duel` 함수도 다시 배포해야 등록부의 `wallet: true`가 함수에 들어간다).
+- [ ] 수동 확인(두 계정 A·B, 미리보기 → 운영, 폰 390px·PC):
+  - [ ] 판돈 0 대국: 만들기·참가·끝까지 지금과 같다(골드 문구 없음)
+  - [ ] A가 판돈 500 대국을 만든다 → A 헤더 −500, 대기 화면 "판돈 500 G를 맡겼어요"
+  - [ ] B가 초대 링크를 연다 → "판돈 500 G를 걸고 참가할까요? · 이기면 1,000 G를 받아요 · 내 골드 N G" → 참가 → B 헤더 −500. 대기실(공개 대국)에서는 "500 G 걸고 참가" 버튼
+  - [ ] 끝까지 둔다 → 이긴 쪽 결과 "+1,000 G"·헤더 +1,000, 진 쪽 "−500 G". 비기면 둘 다 "판돈을 돌려받았어요"
+  - [ ] 판돈 대국을 만들고 "대국 취소" → 환불. 대기 10분 방치 → 대전 탭을 열거나 다음 대국을 만들 때 환불
+  - [ ] 참가 뒤 아무도 두기 전에 기권 → 무효, 둘 다 환불. 둘 다 둔 뒤 기권·시간 초과 → 패배(상대가 1,000)
+  - [ ] 잔액보다 큰 판돈 입력 → "골드가 부족해요"와 만들기 버튼 비활성. 잔액이 모자란 B의 링크 참가 → 확인 화면에 "골드가 부족해요", 참가 버튼 비활성
+  - [ ] 숨김 대전 게임(관리자) 선택 → 판돈 입력 없음
+  - [ ] `/admin` 골드 장부: "판돈"·"판돈 획득"·"판돈 환불" 줄(게임 이름 함께), 상한 표시 없음
+- 확인 쿼리: 끝난 대국의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'duel\_%' and l.ref in (select id::text from duel_matches where status in ('finished','void')) group by 1 having sum(l.delta) <> 0;`(0행. 진 사람 계정이 지워진 대국만 예외로 나올 수 있다 — 그 사람 장부가 계정과 함께 지워진다), 진행 중 맡긴 돈 `select sum(-delta) from gold_ledger where reason = 'duel_stake' and ref in (select id::text from duel_matches where status in ('waiting','active'));`(예약 작업이 없으므로 **둘 다 떠난 진행 중 대국·아무도 열지 않은 만료 대기 대국도 누가 열거나(view·tick·기권·대전 탭) 다음 대국을 만들 때까지 여기에 남는다**. 게임이 등록부에서 빠진 대국은 시간 초과가 돌지 않아 기권으로만 끝난다), 이중 지급 없음은 장부 unique가 보장한다.
+- 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 판돈 0으로만 만들고, 판돈 > 0 대국에 링크로 들어오면 `stake_mismatch` 오류 문구). 함수 문제면 이전 `duel` 함수로 되돌린다 — 옛 함수는 `stake`를 모르고 맡기지 않으므로 판돈 0으로만 만든다. 이미 판돈이 걸린 대국은 트리거가 끝날 때 그대로 지급·환불한다(DB는 되돌리지 않는다).
+
+## 지갑 배포 (5단계 대회 참가비, `feat/wallet-contest`)
+설계 §10·§14, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 5단계(Task 23~25). 4단계(`feat/wallet-duel`) 뒤에 쌓인 브랜치라 **4단계 PR이 먼저 머지·배포**돼야 한다.
+
+바뀌는 것:
+- 마이그레이션 `20261124020000_contest_fee.sql`: `contests.entry_fee`(0~41,000, 기본 0, 데일리는 0만 — check, 만든 뒤 변경 금지 — 트리거 `_contest_fee_guard`, 숨김 게임 문제가 든 참가비 대회 금지 — `contest_items` 트리거 `_contest_item_fee_guard`), 참가 한 곳 `_contest_enter`(처음 참가일 때만 `contest_fee`, 화면이 본 참가비가 다르면 `fee_mismatch` + DETAIL 지금 참가비), `create_contest(…, p_entry_fee int default 0)`(옛 6인자 함수는 지움, 옛 인자 조합은 그대로 맞음), `join_contest(p_id, p_invite_code, p_entry_fee default 0)`·`join_by_invite_code(p_code, p_entry_fee default 0)`(대회 행 `for no key update` 뒤 참가), `cancel_contest`(취소와 같은 트랜잭션에서 전원 `contest_refund`, `user_id` 오름차순), `_contest_payouts`에 공식·친선 분배(순위 = 리더보드 가운데 행동 1번 이상, 0명 전원 환불, 1·2명 1등 독식, 3명 이상 30%·10% 내림·나머지 1등, `contest_prize` note `k등`). 분배는 3단계 정산(`settle_due`) 한 길로만 한다.
+- 화면: 대회 만들기의 참가비(빠른 선택 + 직접 입력, 상한 min(내 골드, 41,000), "모인 참가비를 1~3등이 6:3:1로 나눠 가져요 · 만든 뒤에는 바꿀 수 없어요", 버튼 "참가비 N G 내고 만들기"; 지갑 게임이 없거나 숨김 게임이 들어 있으면 입력 없음), 목록 카드·대회 페이지 "참가비 N G · 모인 돈 M G", 참가 버튼 "참가비 N G 내고 참가" → 확인 한 번(잔액 부족이면 비활성 + "골드가 부족해요"), 진행 중 공개 참가비 대회는 자동 참가하지 않음, 초대 링크는 참가비 0으로 먼저 들어가 보고 `fee_mismatch`면 확인 화면, 끝난 대회는 3단계 "상금" 열이 `contest_prize`를 보임, 취소·순위 0명이면 "참가비를 돌려받았어요". 함수 재배포 없음(참가비는 SQL RPC).
+
+순서: DB push → PR 머지 → Vercel.
+
+- [ ] `npx supabase@2 db push`. DB만 먼저: 옛 화면은 `p_entry_fee`를 보내지 않아 참가비 0 대회만 만든다. 옛 화면이 참가비 대회에 참가하려 하면 `fee_mismatch`(돈이 빠지지 않음).
+- [ ] PR 머지 → Vercel 배포 (Vercel이 먼저 올라가도 대회 화면은 `entry_fee` 열이 없으면 없이 다시 읽어 깨지지 않는다)
+- [ ] **낚시 Task 4(지갑 이전) 전에는 참가비 대회를 만들 수 없다**: 화면은 `walletEnabled()`로 참가비 입력·표시를 가리고, 서버는 `create_contest`가 `_wallet_enabled()`(등록부의 사본, 이 PR에서는 `false`)를 보고 참가비 > 0을 `fee_invalid`로 거절한다. 자유 플레이·데일리 상금으로 이미 골드가 있는 사람도 마찬가지다. 이때는 아래 수동 확인 가운데 "참가비 0 대회가 지금과 같다"만 본다.
+- 참고: 참가비 대회에 든 게임을 나중에 숨기면 `_lb_contest_rows(…, false)`가 그 기록을 빼므로 순위가 바뀌거나(재정렬) 순위 0명이 되어 전원 환불된다. 돈은 보존된다. 진행 중 참가비 대회가 있으면 게임 숨김을 끝날 때까지 미룬다.
+- 참고: 만든 사람이 아닌 누군가 참가비를 낸 뒤에는 `update_contest`가 시작 시각·제한 시간·문제 구성 변경을 `not_editable`로 거절한다(제목·공개 범위는 가능). 바꾸려면 취소(전원 환불) 뒤 다시 만든다.
+- [ ] 수동 확인(세 계정 A·B·C, 미리보기 → 운영, 폰 390px·PC):
+  - [ ] 참가비 0 대회: 만들기·참가·자동 참가·결과가 지금과 같다(골드 문구 없음)
+  - [ ] A가 참가비 1,000 친선 대회를 만든다(버튼 "참가비 1,000 G 내고 만들기") → A 헤더 −1,000, 대회 페이지 "참가비 1,000 G · 모인 돈 1,000 G"
+  - [ ] B가 대회 페이지에서 "참가비 1,000 G 내고 참가" → 확인 → 참가 → B 헤더 −1,000, 모인 돈 2,000. C는 초대 대회면 초대 링크 → "참가비가 있는 대회예요" 확인 화면 → 참가
+  - [ ] 셋 다 풀고 끝난 뒤 다음 접속 → 1·2·3등 +1,800/+900/+300, 상금 띠 "대회 상금이 들어왔어요", 대회 페이지 "상금" 열·"내 상금"
+  - [ ] 둘만 풀면 1등이 3,000. 아무도 풀지 않으면(열기만 포함) 전원 "참가비를 돌려받았어요"
+  - [ ] 시작 전 A가 취소 → 전원 환불, "참가비를 돌려받았어요". 관리자가 진행 중 취소 → 환불
+  - [ ] 잔액보다 큰 참가비 입력 → "골드가 부족해요"와 만들기 버튼 비활성. 잔액이 모자란 사람의 참가 버튼 비활성
+  - [ ] 숨김 게임이 든 대회(관리자) → 참가비 입력 없음, "숨김 게임이 든 대회는 참가비를 받을 수 없어요"
+  - [ ] `/admin` 골드 장부: "참가비"·"대회 상금"·"참가비 환불" 줄, 상한 표시 없음
+- 확인 쿼리: 정산·취소된 대회의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'contest\_%' and l.ref in (select id::text from contests where settled_at is not null or cancelled_at is not null) group by 1 having sum(l.delta) <> 0;`(0행. 순위에 들지 않은 사람의 계정이 지워진 경우만 예외), 진행 중 모인 돈 `select sum(-delta) from gold_ledger where reason = 'contest_fee' and ref in (select id::text from contests where settled_at is null and cancelled_at is null);`(끝난 대회는 누가 접속해 정산할 때까지 여기에 남는다).
+- 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 참가비 0으로만 만들고, 참가비 대회 참가는 `fee_mismatch` 오류 문구). DB는 되돌리지 않는다 — 이미 모인 참가비는 취소·정산이 그대로 돌려주거나 나눈다.
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

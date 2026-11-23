@@ -15,6 +15,8 @@ export type DuelListItem = {
   visibility: 'public' | 'invite'
   turn_seconds: number
   status: DuelView['status']
+  /** 판돈(20261124010000_duel_stake.sql). 옛 DB면 없음 = 0 */
+  stake?: number
   players: { id: string; handle: string | null; rating: number }[]
   created_by_handle: string | null
   created_at: string

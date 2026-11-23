@@ -91,7 +91,7 @@ export function flushLogs(): Promise<void> {
 }
 
 /** 로그를 대기열에 넣고, 점수 행 전송(after)이 끝나면 로그를 보낸다. 점수 기록에는 영향을 주지 않는다. */
-export async function submitLog(row: Omit<FreeLogRow, 'attempts'>, after: Promise<void>): Promise<void> {
+export async function submitLog(row: Omit<FreeLogRow, 'attempts'>, after: Promise<unknown>): Promise<void> {
   try {
     const next = [...read().filter((r) => r.client_id !== row.client_id), { ...row, attempts: 0 }]
     write(next.length > MAX_LOG_QUEUE ? next.slice(next.length - MAX_LOG_QUEUE) : next)

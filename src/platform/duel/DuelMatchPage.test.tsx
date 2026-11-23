@@ -53,6 +53,12 @@ vi.mock('../../games/ui.ts', () => ({
         ),
 }))
 
+const refreshMock = vi.fn(async () => {})
+vi.mock('../wallet/useWallet.ts', async (orig) => ({
+  ...(await orig<typeof import('../wallet/useWallet.ts')>()),
+  refreshWallet: () => refreshMock(),
+}))
+
 import { ApiError, type DuelView } from '../../lib/api.ts'
 import { resetServerTime } from '../../lib/serverTime.ts'
 import { DuelMatchPage } from './DuelMatchPage.tsx'
@@ -108,6 +114,7 @@ beforeEach(() => {
   subscribeStatus = 'SUBSCRIBED'
   channelThrows = false
   boardMissing = false
+  refreshMock.mockClear()
   current = dv()
   duelMock.mockImplementation(async (b: { action: string }) => {
     if (b.action === 'view') return current
@@ -277,7 +284,10 @@ test('match_result', async () => {
   })
   fireEvent.click(screen.getByRole('button', { name: '재대결' }))
   await flush()
-  expect(calls('create')).toEqual([[{ action: 'create', game_id: 'yacht', options: {}, rated: true, visibility: 'invite', turn_seconds: 60 }]])
+  expect(calls('create')).toEqual([[{ action: 'create', game_id: 'yacht', options: {}, rated: true, visibility: 'invite', turn_seconds: 60, stake: 0 }]])
+  // 판돈 없는 대국은 골드 문구도, 잔액 다시 읽기도 없다
+  expect(screen.queryByText(/판돈/)).toBeNull()
+  expect(refreshMock).not.toHaveBeenCalled()
   expect(screen.getByTestId('where')).toHaveTextContent('/duel/m2')
   await flush()
   expect(screen.getByDisplayValue(`${location.origin}/duel/join/abcde12345`)).toBeInTheDocument()
@@ -418,4 +428,67 @@ test('no early tick when the browser clock runs ahead of the server', async () =
   expect(calls('tick')).toHaveLength(0)
   await advance(3000)
   expect(calls('tick')).toHaveLength(1)
+})
+
+// ---------------------------------------------------------------- 판돈 (지갑 4단계)
+const ended = (over: Partial<DuelView>) => dv({ status: 'finished', to_move: null, turn_deadline: null, stake: 1000, ...over })
+
+test('match_stake_badge_and_waiting_note', async () => {
+  current = dv({ status: 'waiting', my_seat: null, to_move: null, turn_deadline: null, stake: 1000,
+    players: [{ id: 'u1', handle: 'kane', rating: 1000 }] })
+  rpcMock.mockResolvedValue('abcde12345')
+  renderAt()
+  await flush()
+  expect(screen.getByText('판돈 1,000 G')).toBeInTheDocument()
+  expect(screen.getByText(/판돈 1,000 G를 맡겼어요/)).toBeInTheDocument()
+})
+
+test('match_stake_result: win shows +2,000 G and refreshes wallet', async () => {
+  current = ended({ winner: 0, end_reason: 'normal' })
+  renderAt()
+  await flush()
+  expect(screen.getByText('+2,000 G')).toBeInTheDocument()
+  expect(refreshMock).toHaveBeenCalledTimes(1)
+})
+
+test('match_stake_result: loss shows −1,000 G', async () => {
+  current = ended({ winner: 1, end_reason: 'timeout' })
+  renderAt()
+  await flush()
+  expect(screen.getByText('−1,000 G')).toBeInTheDocument()
+})
+
+test('match_stake_result: draw and void refund', async () => {
+  current = ended({ winner: null, end_reason: 'normal' })
+  const r = renderAt()
+  await flush()
+  expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
+  r.unmount()
+  current = ended({ status: 'void', winner: null, end_reason: 'void' })
+  renderAt()
+  await flush()
+  expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
+})
+
+test('match_stake_rematch_keeps_stake', async () => {
+  current = ended({ winner: 0, end_reason: 'normal' })
+  renderAt()
+  await flush()
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'create') return { match_id: 'm2', invite_code: 'abcde12345', stake: 1000 }
+    if (b.action === 'view') return current
+    throw new Error(b.action)
+  })
+  fireEvent.click(screen.getByRole('button', { name: '재대결 (판돈 1,000 G)' }))
+  await flush()
+  expect((calls('create')[0][0] as { stake: number }).stake).toBe(1000)
+})
+
+test('match_stake_result: uses server ledger amounts when present', async () => {
+  // 이긴 사람 계정이 지워져 트리거가 환불한 경우: 진 사람에게 '−'가 아니라 환불
+  current = ended({ winner: 1, end_reason: 'normal', stake_settled: { staked: 1000, payout: 0, refund: 1000 } })
+  renderAt()
+  await flush()
+  expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
+  expect(screen.queryByText('−1,000 G')).toBeNull()
 })

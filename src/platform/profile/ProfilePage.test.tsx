@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 const rpcMock = vi.fn()
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'x', supabaseKey: 'k' }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
@@ -32,7 +34,7 @@ const renderAt = (h: string, search = '') => render(
 )
 const where = () => screen.getByTestId('where').textContent
 
-beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane' })
+beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane'; wallet.enabled = true })
 
 function setup(over: Record<string, unknown>) {
   rpcMock.mockImplementation(async (name: string) => (name in over ? over[name] : name === 'duel_stats' ? [] : null))
@@ -359,4 +361,49 @@ test('profile_records_tab_direct_entry_shows_record', async () => {
   expect(await screen.findByText('1,234')).toBeTruthy()
   expect(screen.getByText('횟수')).toBeTruthy()
   expect(rpcMock).toHaveBeenCalledWith('user_records', { p_handle: 'kane' })
+})
+
+test('profile_gold: 다른 사람 프로필 요약에 골드', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000 })
+  renderAt('messi')
+  expect(await screen.findByLabelText('골드 5,000 G')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' })
+})
+
+test('profile_gold: null이면 줄 없음', async () => {
+  setup({ user_stats: emptyStats })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' }))
+  expect(screen.queryByLabelText(/^골드/)).toBeNull()
+})
+
+test('profile_gold: 지갑을 쓰는 게임이 없으면 user_wallet을 부르지 않고 줄도 없다', async () => {
+  wallet.enabled = false
+  setup({ user_stats: emptyStats, user_wallet: 5000 })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  expect(rpcMock).not.toHaveBeenCalledWith('user_wallet', expect.anything())
+  expect(screen.queryByLabelText(/^골드/)).toBeNull()
+})
+
+test('profile_prize: 데일리 상금 누적 (지갑 3단계)', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 12300 })
+  renderAt('messi')
+  expect(await screen.findByLabelText('데일리 상금 누적 12,300 G')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_prize_total', { p_handle: 'messi' })
+})
+
+test('profile_prize: 0이거나 지갑 게임이 없으면 줄 없음', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 0 })
+  const v = renderAt('messi')
+  await screen.findByLabelText('골드 5,000 G')
+  expect(screen.queryByLabelText(/데일리 상금/)).toBeNull()
+  v.unmount()
+  rpcMock.mockClear()
+  wallet.enabled = false
+  setup({ user_stats: emptyStats, user_prize_total: 12300 })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  expect(rpcMock).not.toHaveBeenCalledWith('user_prize_total', expect.anything())
 })

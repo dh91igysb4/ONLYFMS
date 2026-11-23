@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase.ts'
 import { ApiError, onAccessDenied, rpc } from '../../lib/api.ts'
+import { resetWallet } from '../../lib/walletStore.ts'
 
 export type Profile = {
   id: string
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback(async (next: Session | null) => {
     sessionRef.current = next
     setSession(next)
+    // 로그아웃·다른 사용자로 바뀌면 이전 사람의 잔액을 지운다
+    resetWallet()
     if (!next) {
       setProfile(null)
       setError(null)

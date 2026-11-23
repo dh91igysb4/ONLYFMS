@@ -7,15 +7,20 @@ const signOut = vi.hoisted(() => vi.fn(async () => ({ error: null })))
 vi.mock('../../lib/supabase.ts', () => ({
   supabase: { from: () => ({ upsert: (...a: unknown[]) => (upsert as (...x: unknown[]) => unknown)(...a) }), auth: { signOut } },
 }))
-const auth = vi.hoisted(() => ({ isAdmin: false }))
+const auth = vi.hoisted(() => ({ isAdmin: false, status: 'approved' }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
-  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: auth.isAdmin } }),
+  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: auth.status, is_admin: auth.isAdmin } }),
 }))
+const fetchMyWallet = vi.hoisted(() => vi.fn())
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
+vi.mock('../wallet/api.ts', () => ({ fetchMyWallet }))
 const pendingCount = vi.hoisted(() => vi.fn())
 vi.mock('../suggest/adminApi.ts', () => ({ suggestionPendingCount: pendingCount }))
 
 import { Layout } from './Layout.tsx'
 import { resetFreeQueue } from '../games/freeQueue.ts'
+import { resetWallet, setWallet } from '../../lib/walletStore.ts'
 
 const row = {
   client_id: 'q1', user_id: 'u1', game_id: 'test-guess', options: {},
@@ -28,6 +33,15 @@ beforeEach(() => {
   pendingCount.mockReset()
   pendingCount.mockResolvedValue(0)
   auth.isAdmin = false
+  auth.status = 'approved'
+  wallet.enabled = true
+  resetWallet()
+  fetchMyWallet.mockReset()
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 1234, today: {}, earnedToday: 0 }
+    setWallet(w)
+    return w
+  })
   localStorage.clear()
   resetFreeQueue()
   localStorage.setItem('onlyfms:freeQueue', JSON.stringify([row]))
@@ -209,4 +223,53 @@ test('경로가 바뀐 뒤 조회가 실패하면 조용히 이전 배지를 유
   fireEvent.click(screen.getByRole('link', { name: '제안' }))
   await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(2))
   expect(screen.getByLabelText('결정 대기 제안 3건')).toBeTruthy()
+})
+
+test('로드 때 my_wallet을 한 번 읽고 헤더에 잔액을 보여 준다', async () => {
+  mount()
+  expect(await screen.findByLabelText('내 골드 1,234 G')).toBeTruthy()
+  expect(fetchMyWallet).toHaveBeenCalledTimes(1)
+})
+
+test('승인되지 않은 사용자에게는 배지가 없고 my_wallet도 부르지 않는다', async () => {
+  auth.status = 'pending'
+  mount()
+  await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
+  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(fetchMyWallet).not.toHaveBeenCalled()
+})
+
+test('지갑을 쓰는 게임이 없어도(낚시 이전 전) my_wallet은 불러 정산시키고, 배지·상금 알림은 없다 (지갑 3단계 리뷰 I1)', async () => {
+  wallet.enabled = false
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 7384, today: {}, earnedToday: 0 }
+    setWallet(w)
+    setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+    return w
+  })
+  mount()
+  await vi.waitFor(() => expect(fetchMyWallet).toHaveBeenCalledTimes(1))
+  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
+})
+
+test('받은 상금이 있으면 헤더 아래 상금 알림 (지갑 3단계)', async () => {
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 7384, today: {}, earnedToday: 0 }
+    setWallet(w)
+    setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+    return w
+  })
+  mount()
+  expect((await screen.findByRole('status')).textContent).toContain('데일리 상금이 들어왔어요 · 1등 +6,150 G')
+})
+
+test('지갑 게임이 없으면 상금 알림도 없다', async () => {
+  wallet.enabled = false
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+  mount()
+  expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
 })
