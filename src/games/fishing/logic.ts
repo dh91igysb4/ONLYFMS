@@ -2,9 +2,10 @@
 import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
-  AREAS, areaHasSpecies, BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
-  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
-  type AreaId, type BagTier, type Challenge, type Rod, type RodTier, type Species, type TackleId,
+  AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
+  LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
+  TIDE_GRACE_MIN, UNLOCKS,
+  type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
@@ -21,6 +22,8 @@ export type CastCtx = {
   legends: readonly string[]
   /** 장착한 찌. 서버 추첨에 쓰이는 건 spinner·curious */
   equipped: readonly TackleId[]
+  /** 신화 버프. 서버 추첨에 쓰이는 건 imugi-scale(입질). 없으면 빈 목록 */
+  buffs?: readonly BuffId[]
 }
 
 type NormalRarity = keyof Rod['weights']
@@ -40,8 +43,10 @@ export function pickPool(byRarity: Record<NormalRarity, Species[]>, rarity: Norm
   return []
 }
 
-// rng 호출 순서 고정, 항상 5번: 전설 판정(r0) → 등급(r1) → 등급 안 어종(r2) → 크기(r3) → 입질(r4).
-// 전설이 뽑혀도 r1·r2는 쓰지 않고 소비한다.
+// rng 호출 순서 고정, 항상 5번: 전설·신화 판정(r0) → 등급(r1) → 등급 안 어종(r2) → 크기(r3) → 입질(r4).
+// 전설·신화가 뽑혀도 r1·r2는 쓰지 않고 소비한다.
+// 신화는 r0를 전설과 함께 쓴다: 후보 = 자격 있는 전설 ?? 자격 있는 신화(needs를 모두 잡음). 신화의 needs에 그 자리
+// 전설이 모두 들어 있어(data.test) 둘이 동시에 후보일 수 없으므로, 신화가 없는 기존 판의 결과는 그대로다.
 export function rollCatch(rng: () => number, c: CastCtx): Catch {
   const rod = RODS.find((r) => r.tier === c.rodTier)
   if (!rod) throw new Error(`unknown rod tier: ${c.rodTier}`)
@@ -52,11 +57,16 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
   const r0 = rng()
   const r1 = rng()
   const r2 = rng()
-  const legend = available.find((s) => s.legend && c.power >= s.legend.power && !c.legends.includes(s.id))
+  const special = specialCandidate(available, c)
+  const chance = !special
+    ? 0
+    : special.rarity === 'mythic'
+      ? MYTHIC_CHANCE * (curious ? TACKLE_FX.curiousMythic : 1)
+      : LEGEND_CHANCE * (curious ? TACKLE_FX.curiousLegend : 1)
 
   let species: Species
-  if (legend && r0 < LEGEND_CHANCE * (curious ? TACKLE_FX.curiousLegend : 1)) {
-    species = legend
+  if (special && r0 < chance) {
+    species = special
   } else {
     const weight = (r: NormalRarity) => rod.weights[r] * (curious && r === 'rare' ? TACKLE_FX.curiousRare : 1)
     const total = RARITIES.reduce((sum, r) => sum + weight(r), 0)
@@ -79,14 +89,30 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
 
   const p = rng() ** (1.5 - Math.min(1.25, c.power + c.sizeBonus))
   const sizeCm = Math.round(species.minCm + p * (species.maxCm - species.minCm))
-  const biteDelayMs = Math.round((1500 + rng() * 4500) * rod.biteScale * (spinner ? TACKLE_FX.spinnerBite : 1))
+  const imugi = c.buffs?.includes('imugi-scale') ?? false
+  const biteDelayMs = Math.round((1500 + rng() * 4500) * rod.biteScale * (spinner ? TACKLE_FX.spinnerBite : 1) * (imugi ? BUFF_FX.imugiBite : 1))
   return { species: species.id, sizeCm, biteDelayMs }
+}
+
+/** 이 판의 전설·신화 후보 하나: 자격 있는 전설(힘·안 잡음), 없으면 자격 있는 신화(힘·안 잡음·needs 모두 잡음) */
+function specialCandidate(available: readonly Species[], c: CastCtx): Species | undefined {
+  const eligible = (s: Species) => !!s.legend && c.power >= s.legend.power && !c.legends.includes(s.id)
+  return (
+    available.find((s) => s.rarity === 'legend' && eligible(s)) ??
+    available.find((s) => s.rarity === 'mythic' && eligible(s) && (s.legend!.needs ?? []).every((id) => c.legends.includes(id)))
+  )
 }
 
 export function sizePercentile(speciesId: string, sizeCm: number): number {
   const s = speciesById(speciesId)
   const p = (sizeCm - s.minCm) / (s.maxCm - s.minCm)
   return Math.min(1, Math.max(0, p))
+}
+
+/** 실제로 팔리는 값: 용왕의 여의주(dragon-pearl)면 물고기마다 ×1.08 반올림. 화면 예상가도 이 함수를 쓴다 */
+export function sellPrice(f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): number {
+  const p = price(f.species, f.sizeCm, f.perfect)
+  return buffs.includes('dragon-pearl') ? Math.round((p * BUFF_FX.pearlSell) / 100) : p
 }
 
 export function price(speciesId: string, sizeCm: number, perfect: boolean): number {
@@ -179,7 +205,7 @@ export type State = {
   areas: AreaId[]
   bag: Fish[]
   dex: Record<string, { count: number; maxCm: number }>
-  /** 이미 잡은 전설 어종 id */
+  /** 이미 잡은 전설·신화 어종 id (세이브당 한 마리) */
   legends: string[]
   /** 산 찌(영구). 장착은 equipped */
   tackles: TackleId[]
@@ -191,6 +217,8 @@ export type State = {
   wardrobe: string[]
   /** 입은 옷. 부위마다 가진 품목 */
   outfit: Outfit
+  /** 신화 버프(영구, 늘 켜짐). BUFFS 순서, 중복 없음. 신화를 잡는 resolve에서 더한다 */
+  buffs: BuffId[]
   pending: Pending | null
 }
 export type Action =
@@ -208,7 +236,8 @@ export type Action =
   | { type: 'buyWear'; slot: string; id: string }
   | { type: 'wear'; slot: string; id: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
-export type View = Omit<State, 'pending'> & { pending: PendingView | null }
+// buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
+export type View = Omit<State, 'pending' | 'buffs'> & { pending: PendingView | null; buffs?: BuffId[] }
 
 type Out = { state: State; result?: unknown } | { error: string }
 
@@ -237,6 +266,7 @@ const init = (): State => ({
   challenges: {},
   wardrobe: [],
   outfit: { ...DEFAULT_OUTFIT },
+  buffs: [],
   pending: null,
 })
 
@@ -252,9 +282,11 @@ function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng:
   if (!area || !state.areas.includes(area.id) || !areaHasSpecies(area.id)) return { error: 'bad_area' }
   const spot = a.spot === undefined ? (area.id === 'village' ? 'shore' : area.spots[0]) : a.spot
   if (typeof spot !== 'string' || !area.spots.includes(spot)) return { error: 'bad_spot' }
+  const cond = conditionsAt(ctx.now)
+  const closed = castClosed(state, area.id, spot, cond.gameMinute)
+  if (closed) return { error: closed }
   if (!isNum(a.power) || a.power < 0 || a.power > 1) return { error: 'bad_power' }
   if (state.bag.length >= bagSize(state.bagTier)) return { error: 'bag_full' }
-  const cond = conditionsAt(ctx.now)
   const c = rollCatch(ctx.rng, {
     rodTier: state.rodTier,
     power: a.power,
@@ -264,10 +296,29 @@ function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng:
     cond,
     legends: state.legends,
     equipped: state.equipped,
+    buffs: state.buffs ?? [],
   })
   const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power }
   return { state: { ...state, pending }, result: pendingView(pending) }
 }
+
+/**
+ * 지역 최소 낚싯대(need_rod)와 물때 자리(spot_closed). 화면·서버 시계 차이를 봐주려고 TIDE_GRACE_MIN분 전에
+ * 열려 있었어도 받는다(추첨은 실제 now 조건).
+ */
+function castClosed(state: State, area: AreaId, spot: string, gameMinute: number): 'need_rod' | 'spot_closed' | null {
+  if (state.rodTier < areaMinRod(area)) return 'need_rod'
+  if (!spotOpen(area, spot, gameMinute) && !spotOpen(area, spot, gameMinute - TIDE_GRACE_MIN)) return 'spot_closed'
+  return null
+}
+
+/** 잡은 어종이 주는 신화 버프(아직 없을 때만). 버프 목록은 BUFFS 순서 */
+function gainBuff(buffs: readonly BuffId[], speciesId: string): { buffs: BuffId[]; buff?: BuffId } {
+  const b = speciesById(speciesId).legend?.buff
+  if (!b || buffs.includes(b)) return { buffs: [...buffs] }
+  return { buffs: orderBuffs([...buffs, b]), buff: b }
+}
+const orderBuffs = (ids: readonly BuffId[]): BuffId[] => BUFFS.map((b) => b.id).filter((id) => ids.includes(id))
 
 function hook(state: State, now: number): Out {
   const p = state.pending
@@ -298,9 +349,14 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   // 과제는 던질 때 저장한 지역·자리·조건으로 센다. 그 값이 없는(비정상) pending이면 과제만 건너뛴다
   const facts = catchFacts(p, a.perfect)
   const judged = facts ? progressChallenges(state.challenges, facts) : { challenges: state.challenges, completed: [] }
+  const gained = gainBuff(state.buffs ?? [], p.species)
   return {
-    state: { ...state, bag: [...state.bag, fish], dex, legends, challenges: judged.challenges, pending: null },
-    result: judged.completed.length > 0 ? { caught: fish, completed: judged.completed } : { caught: fish },
+    state: { ...state, bag: [...state.bag, fish], dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null },
+    result: {
+      caught: fish,
+      ...(judged.completed.length > 0 ? { completed: judged.completed } : {}),
+      ...(gained.buff ? { buff: gained.buff } : {}),
+    },
   }
 }
 
@@ -316,7 +372,7 @@ function sell(state: State): Out {
   // 잠긴 물고기는 팔지 않고 순서 그대로 남긴다
   const selling = state.bag.filter((f) => !f.locked)
   if (selling.length === 0) return { error: 'bag_empty' }
-  const earned = selling.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
+  const earned = selling.reduce((sum, f) => sum + sellPrice(f, state.buffs ?? []), 0)
   return {
     state: { ...state, gold: state.gold + earned, totalEarned: state.totalEarned + earned, bag: state.bag.filter((f) => f.locked) },
     result: { earned },
@@ -364,6 +420,7 @@ function unlockArea(state: State, a: Record<string, unknown>): Out {
   const u = UNLOCKS[area]!
   if (state.pending) return { error: 'busy' }
   if (state.areas.includes(area)) return { error: 'already_open' }
+  if (u.minRod !== undefined && state.rodTier < u.minRod) return { error: 'need_rod' }
   if (state.gold < u.price) return { error: 'not_enough_gold' }
   return { state: { ...state, gold: state.gold - u.price, areas: [...state.areas, area] } }
 }
@@ -491,6 +548,7 @@ function migrate(raw: unknown, fromVersion: number): State {
     const id = Object.prototype.hasOwnProperty.call(rawOutfit, slot) ? rawOutfit[slot] : undefined
     if (typeof id === 'string' && ownsWear(facts, slot, id)) outfit[slot] = id
   }
+  const buffs = migrateBuffs(raw.buffs, legends)
   return {
     gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
@@ -505,8 +563,19 @@ function migrate(raw: unknown, fromVersion: number): State {
     challenges,
     wardrobe,
     outfit,
+    buffs,
     pending: null,
   }
+}
+
+/** 버프 = 저장된 알려진 BuffId ∪ legends에 든 신화의 buff (v10 이하에는 없다: 전설 목록이 근거라 잃지 않는다) */
+function migrateBuffs(saved: unknown, legends: readonly string[]): BuffId[] {
+  const fromSave = Array.isArray(saved) ? saved.filter(isBuffId) : []
+  const fromLegends = legends.flatMap((id) => {
+    const b = SPECIES.find((s) => s.id === id)?.legend?.buff
+    return b ? [b] : []
+  })
+  return orderBuffs([...fromSave, ...fromLegends])
 }
 
 function records(state: State): WorldRecord[] {
@@ -528,7 +597,8 @@ function records(state: State): WorldRecord[] {
 export const logic: WorldLogic<State, Action, View> = {
   // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
   // 10: 옷장(wardrobe·outfit, buyWear·wear). v9 세이브는 빈 옷장·기본 옷차림
-  version: 10,
+  // 11: 신화 등급·버프 상태(buffs), 물때 자리(spot_closed)·지역 최소 낚싯대(need_rod) 확인
+  version: 11,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
