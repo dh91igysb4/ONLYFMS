@@ -52,6 +52,7 @@ export function subscribeWallet(fn: () => void): () => void {
 /** 로그아웃·테스트 */
 export function resetWallet(): void {
   emit(EMPTY)
+  setPrizes([])
 }
 
 // ---- 사이트 하루 상한 알림 (설계 §5.5) ----
@@ -68,4 +69,66 @@ export function notifyGoldCapped(c: GoldCapped): void {
 export function subscribeGoldCapped(fn: (c: GoldCapped) => void): () => void {
   cappedListeners.add(fn)
   return () => { cappedListeners.delete(fn) }
+}
+
+// ---- 받은 상금 (지갑 3단계, 설계 §8) ----
+// my_wallet()의 prizes(최근 3일 본인 장부 daily_prize·contest_prize)를 담는다. 잔액 스냅숏과 따로 두어
+// 잔액만 쓰는 화면이 상금 목록 때문에 다시 그려지지 않게 한다.
+export type Prize = {
+  /** 장부 id. 알림 확인 기록은 확인한 가장 큰 id다 */
+  id: number
+  reason: 'daily_prize' | 'contest_prize'
+  contestId: string
+  gameId: string | null
+  amount: number
+  /** 'k등' */
+  note: string | null
+  at: string
+}
+
+let prizes: Prize[] = []
+const prizeListeners = new Set<() => void>()
+
+export function getPrizes(): Prize[] {
+  return prizes
+}
+
+export function setPrizes(next: Prize[]): void {
+  if (next.length === 0 && prizes.length === 0) return
+  prizes = next
+  for (const fn of prizeListeners) {
+    try { fn() } catch { /* 구독자 오류가 다른 구독자를 막지 않게 */ }
+  }
+}
+
+export function subscribePrizes(fn: () => void): () => void {
+  prizeListeners.add(fn)
+  return () => { prizeListeners.delete(fn) }
+}
+
+const seenKey = (uid: string) => `onlyfms:prize-seen:${uid}`
+
+function seenId(uid: string): number {
+  try {
+    const n = Number(localStorage.getItem(seenKey(uid)))
+    return Number.isFinite(n) ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+/** 아직 확인하지 않은 상금(확인한 가장 큰 장부 id보다 큰 것) */
+export function unseenPrizes(uid: string, list: Prize[]): Prize[] {
+  const seen = seenId(uid)
+  return list.filter((p) => p.id > seen)
+}
+
+/** 목록을 확인한 것으로 기록한다. 더 작은 id로 되돌리지 않는다. 저장에 실패해도 던지지 않는다 */
+export function markPrizesSeen(uid: string, list: Prize[]): void {
+  const max = Math.max(seenId(uid), ...list.map((p) => p.id))
+  try {
+    localStorage.setItem(seenKey(uid), String(max))
+  } catch {
+    /* 사파리 비공개 창 등: 이번 화면에서만 닫힌다 */
+  }
 }

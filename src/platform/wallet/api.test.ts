@@ -10,9 +10,11 @@ vi.mock('../../lib/supabase.ts', () => ({
   supabaseKey: 'pub',
 }))
 
-import { getWallet, resetWallet, setBalance } from '../../lib/walletStore.ts'
+import { getPrizes, getWallet, resetWallet, setBalance } from '../../lib/walletStore.ts'
 import { world, type ApiError } from '../../lib/api.ts'
-import { adminGoldAdjust, adminGoldLedger, fetchMyWallet, fetchUserWallet } from './api.ts'
+import {
+  adminGoldAdjust, adminGoldLedger, fetchContestPrizes, fetchMyWallet, fetchUserPrizeTotal, fetchUserWallet,
+} from './api.ts'
 import { refreshWallet } from './useWallet.ts'
 
 beforeEach(() => rpcMock.mockReset())
@@ -91,4 +93,41 @@ test('fetchMyWallet: 요청 중 world 잔액이 들어오면 늦은 my_wallet이
   resolve({ data: { balance: 0, today: { a: 1 }, earned_today: 7 }, error: null })
   expect(await p).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
   expect(getWallet()).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
+})
+
+// ---- 받은 상금 (지갑 3단계) ----
+test('fetchMyWallet: prizes를 상금 저장소에 넣는다(문자열 숫자 포함)', async () => {
+  rpcMock.mockResolvedValue({
+    data: { balance: 1, today: {}, earned_today: 0, prizes: [
+      { id: '12', reason: 'daily_prize', contest_id: 'c1', game_id: 'who-are-ya', amount: '6150', note: '1등', at: '2026-11-25T00:00:00Z' },
+    ] },
+    error: null,
+  })
+  const w = await fetchMyWallet()
+  expect(w).toEqual({ balance: 1, today: {}, earnedToday: 0 })
+  expect(getPrizes()).toEqual([
+    { id: 12, reason: 'daily_prize', contestId: 'c1', gameId: 'who-are-ya', amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' },
+  ])
+})
+
+test('fetchMyWallet: prizes가 없는 응답(2단계 DB)이면 빈 목록', async () => {
+  rpcMock.mockResolvedValue({ data: { balance: 1 }, error: null })
+  await fetchMyWallet()
+  expect(getPrizes()).toEqual([])
+})
+
+test('fetchContestPrizes: contest_prizes(p_contest), 숫자 변환', async () => {
+  rpcMock.mockResolvedValue({ data: [{ user_id: 'u1', handle: 'kane', amount: '6150', note: '1등' }], error: null })
+  expect(await fetchContestPrizes('c1')).toEqual([{ userId: 'u1', handle: 'kane', amount: 6150, note: '1등' }])
+  expect(rpcMock).toHaveBeenCalledWith('contest_prizes', { p_contest: 'c1' })
+  rpcMock.mockResolvedValue({ data: null, error: null })
+  expect(await fetchContestPrizes('c1')).toEqual([])
+})
+
+test('fetchUserPrizeTotal: user_prize_total(p_handle), null 그대로', async () => {
+  rpcMock.mockResolvedValue({ data: '12300', error: null })
+  expect(await fetchUserPrizeTotal('kane')).toBe(12300)
+  expect(rpcMock).toHaveBeenCalledWith('user_prize_total', { p_handle: 'kane' })
+  rpcMock.mockResolvedValue({ data: null, error: null })
+  expect(await fetchUserPrizeTotal('nobody')).toBeNull()
 })

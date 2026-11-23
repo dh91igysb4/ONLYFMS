@@ -1,6 +1,6 @@
 // 지갑 RPC 데이터 계층 (설계 §5.3·§5.4). 잔액 쓰기는 서버 함수만 한다.
 import { rpc } from '../../lib/api.ts'
-import { getWallet, setWallet, walletVersion } from '../../lib/walletStore.ts'
+import { getWallet, setPrizes, setWallet, walletVersion, type Prize } from '../../lib/walletStore.ts'
 
 export type MyWallet = { balance: number; today: Record<string, number>; earnedToday: number }
 
@@ -30,14 +30,41 @@ const num = (v: unknown): number => (typeof v === 'number' ? v : Number(v ?? 0))
  */
 export async function fetchMyWallet(): Promise<MyWallet> {
   const started = walletVersion()
-  const d = await rpc<{ balance: number | string; today?: Record<string, number | string>; earned_today?: number | string }>('my_wallet')
+  const d = await rpc<{
+    balance: number | string; today?: Record<string, number | string>; earned_today?: number | string; prizes?: RawPrize[]
+  }>('my_wallet')
   const today: Record<string, number> = {}
   for (const [k, v] of Object.entries(d?.today ?? {})) today[k] = num(v)
   const fresh = { balance: num(d?.balance), today, earnedToday: num(d?.earned_today) }
   const kept = getWallet().balance
   const w = walletVersion() !== started && kept !== null ? { ...fresh, balance: kept } : fresh
   setWallet(w)
+  setPrizes(Array.isArray(d?.prizes) ? d.prizes.map(toPrize) : [])
   return w
+}
+
+type RawPrize = {
+  id: number | string; reason: Prize['reason']; contest_id: string; game_id: string | null
+  amount: number | string; note: string | null; at: string
+}
+
+function toPrize(r: RawPrize): Prize {
+  return { id: num(r.id), reason: r.reason, contestId: r.contest_id, gameId: r.game_id, amount: num(r.amount), note: r.note, at: r.at }
+}
+
+export type ContestPrize = { userId: string; handle: string | null; amount: number; note: string | null }
+
+/** 대회 하나에서 받은 상금(데일리 상금·대회 상금). 금액 큰 순 */
+export async function fetchContestPrizes(contestId: string): Promise<ContestPrize[]> {
+  const rows = await rpc<{ user_id: string; handle: string | null; amount: number | string; note: string | null }[] | null>(
+    'contest_prizes', { p_contest: contestId })
+  return (rows ?? []).map((r) => ({ userId: r.user_id, handle: r.handle, amount: num(r.amount), note: r.note }))
+}
+
+/** 프로필용 데일리 상금 누적. 승인된 대상이 아니면 null */
+export async function fetchUserPrizeTotal(handle: string): Promise<number | null> {
+  const v = await rpc<number | string | null>('user_prize_total', { p_handle: handle })
+  return v === null || v === undefined ? null : num(v)
 }
 
 /** 프로필용 잔액. 승인된 대상이 아니면 null */
