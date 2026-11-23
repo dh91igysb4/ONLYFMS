@@ -440,12 +440,8 @@ describe('안 잡은 물고기 실루엣', () => {
 
   it('모양만: 실루엣은 색 하나로만 칠한다', () => {
     const colors = new Set<string>()
-    const ctx = {
-      fillStyle: '',
-      fillRect() {
-        colors.add(this.fillStyle)
-      },
-    } as unknown as CanvasRenderingContext2D
+    const fake = { fillStyle: '', fillRect: () => colors.add(fake.fillStyle) }
+    const ctx = fake as unknown as CanvasRenderingContext2D
     for (const s of SPECIES) drawSprite(ctx, `fish-${s.id}`, 0, 0, 1, { silhouette: true })
     expect([...colors]).toEqual([SILHOUETTE])
   })
