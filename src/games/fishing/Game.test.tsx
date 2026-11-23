@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import { availableHeight, canvasScale, fitScene, Game, hudTopFor, TOUCH_HINT_BAND } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
+import { releaseMinimapCache } from './minimap.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
@@ -35,6 +36,10 @@ const mapGate = vi.hoisted(() => ({ hideRiver: false }))
 vi.mock('./maps/index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./maps/index.ts')>()
   return { ...orig, mapFor: (area: AreaId) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area)) }
+})
+vi.mock('./minimap.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./minimap.ts')>()
+  return { ...orig, minimapUrl: vi.fn(() => 'data:mini'), spotHighlightUrl: vi.fn(() => 'data:hl'), releaseMinimapCache: vi.fn() }
 })
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
@@ -583,7 +588,11 @@ describe('fishing Game', () => {
     await flush()
     expect(screen.getByRole('button', { name: '가방' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '도감' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '지도' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '전체화면' })).toBeDisabled()
+    // 낚시 중에는 M 키도 지도를 열지 않는다
+    fireEvent.keyDown(window, { code: 'KeyM', key: 'm' })
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
   })
 
   test('canvas size uses the height left below the stage, not a fixed allowance', async () => {
@@ -1066,10 +1075,10 @@ describe('fishing Game: walking and interaction', () => {
     expect(actionButton()).not.toHaveAttribute('disabled')
   })
 
-  test('the bottom row has bag, dex, challenges and fullscreen but no shop; the bag says where to sell', async () => {
+  test('the bottom row has bag, dex, challenges, map and fullscreen but no shop; the bag says where to sell', async () => {
     const { container } = await mount()
     const bottom = container.querySelector('.fish-bottom') as HTMLElement
-    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '전체화면'])
+    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '전체화면'])
     expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
@@ -2415,5 +2424,61 @@ describe('도전과제·순간이동기', () => {
     expect(lastScene().teleporterOn).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
     expect(screen.getByText('깬 과제 0/6')).toBeInTheDocument()
+  })
+})
+
+describe('큰 지도', () => {
+  const mapPanel = () => screen.getByRole('region', { name: '지도' })
+  const pressM = () => fireEvent.keyDown(window, { code: 'KeyM', key: 'ㅡ' })
+
+  test('지도 버튼으로 열고 닫고, 제목은 지도, 처음 탭은 지금 지역', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(screen.getByRole('heading', { name: '지도' })).toBeInTheDocument()
+    expect(within(mapPanel()).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+    expect(within(mapPanel()).getByLabelText('현재 위치')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+  })
+
+  test('M 키로 열고 닫는다(한글 입력 상태 e.key와 무관), 가방이 열려 있으면 무시', async () => {
+    await mount(makeView(), SAND)
+    pressM()
+    expect(mapPanel()).toBeInTheDocument()
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '가방' })).toBeInTheDocument()
+  })
+
+  test('레이어를 끄고 닫았다 다시 열면 꺼진 그대로', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    fireEvent.click(within(mapPanel()).getByRole('button', { name: '길' }))
+    expect(within(mapPanel()).queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(mapPanel()).getByRole('button', { name: '길' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(mapPanel()).queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
+  })
+
+  test('지도 안 어떤 버튼을 눌러도 서버 행동을 부르지 않는다', async () => {
+    await mount(makeView(), SAND)
+    const before = worldMock.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    for (let round = 0; round < 2; round++) {
+      for (const b of within(mapPanel()).getAllByRole('button')) fireEvent.click(b)
+    }
+    expect(worldMock.mock.calls.length).toBe(before)
+  })
+
+  test('떠나면 축소 그림 캐시를 비운다', async () => {
+    vi.mocked(releaseMinimapCache).mockClear()
+    const { unmount } = await mount()
+    expect(releaseMinimapCache).not.toHaveBeenCalled()
+    unmount()
+    expect(releaseMinimapCache).toHaveBeenCalledTimes(1)
   })
 })

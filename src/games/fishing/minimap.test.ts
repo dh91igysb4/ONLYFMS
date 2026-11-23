@@ -87,10 +87,13 @@ describe('minimapUrl / spotHighlightUrl', () => {
 })
 
 describe('minimapScale', () => {
-  it('정수 배율', () => {
-    const m = MAPS.village! // 48칸
+  it('2배 이상은 정수 배, 1~2배 사이는 폭을 채우는 소수 배, 더 좁으면 1', () => {
+    const m = MAPS.village! // 48칸 → 1배 144px
     expect(minimapScale(300, m)).toBe(2)
-    expect(minimapScale(100, m)).toBe(1)
     expect(minimapScale(600, m)).toBe(4)
+    expect(minimapScale(100, m)).toBe(1)
+    const s = minimapScale(276, m)
+    expect(s).toBeGreaterThan(1.9)
+    expect(s * 144).toBeLessThanOrEqual(276)
   })
 })

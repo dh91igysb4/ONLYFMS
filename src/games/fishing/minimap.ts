@@ -123,7 +123,12 @@ export function releaseMinimapCache(): void {
   highlightCache.clear()
 }
 
-/** 표시 배율(정수): max(1, floor(안쪽 폭 / (맵 칸 수 × MINIMAP_PX))) */
+/**
+ * 표시 배율. 2배 이상 들어가면 정수 배(또렷하게), 1~2배 사이 폭이면 폭을 꽉 채우는 소수 배
+ * (320px 폰에서 1배 144px은 너무 작다. 3px 무늬라 소수 배로 늘려도 칸 경계가 1px 안쪽으로만 흔들린다), 더 좁으면 1.
+ */
 export function minimapScale(innerWidth: number, map: MapDef): number {
-  return Math.max(1, Math.floor(innerWidth / (map.w * MINIMAP_PX)))
+  const fit = innerWidth / (map.w * MINIMAP_PX)
+  if (fit >= 2) return Math.floor(fit)
+  return Math.max(1, Math.floor(fit * 100) / 100)
 }

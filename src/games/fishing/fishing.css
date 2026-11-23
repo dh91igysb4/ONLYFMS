@@ -216,7 +216,99 @@
 .fish-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .fish-bag-count { color: var(--muted); }
 .fish-bag-count strong { color: var(--ink); font-variant-numeric: tabular-nums; }
-.fish-menu { display: flex; gap: 6px; }
+.fish-menu { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* 좁은 폰(≈320~380px): 메뉴 다섯 개가 한 줄을 다 쓰고 버튼 여백을 줄여 한 줄에 들어간다 */
+@media (max-width: 400px) {
+  .fish-menu { flex: 1 1 100%; flex-wrap: nowrap; gap: 4px; }
+  .fish-menu .btn { flex: 1 1 auto; padding: 0 6px; }
+}
+
+/* 큰 지도: 축소 그림(<img>) 위에 표시 버튼을 퍼센트 좌표로 띄운다. 그림 안 색은 minimap.ts(캔버스 예외), 여기는 토큰만 */
+.fish-map-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.fish-map-tabs::-webkit-scrollbar { display: none; }
+.fish-map-tabs .fish-dex-tab { flex-shrink: 0; white-space: nowrap; }
+.fish-map-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fish-map-chip-label { min-width: 40px; font-size: 13px; color: var(--muted); }
+.fish-map-chip {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  cursor: pointer;
+}
+.fish-map-chip-on { color: var(--on-accent); background: var(--accent-strong); box-shadow: none; }
+.fish-map {
+  position: relative;
+  flex-shrink: 0;
+  align-self: center;
+  max-width: 100%;
+  margin: 6px 0;
+  border-radius: 4px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--edge);
+  cursor: pointer;
+}
+.fish-panel-body .fish-map-img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.fish-map-marker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fish-map-marker img { width: 18px; height: 18px; }
+.fish-map-marker:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 0; }
+.fish-map-marker-on { box-shadow: 0 0 0 2px var(--accent-strong); }
+.fish-map-marker-hop { outline: 2px dashed var(--accent-strong); outline-offset: -2px; }
+.fish-map-marker-dim { opacity: 0.4; }
+.fish-map-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  color: var(--on-accent);
+  background: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.fish-map-you { position: absolute; width: 18px; height: 18px; transform: translate(-50%, -50%); pointer-events: none; }
+.fish-map-you img { display: block; width: 18px; height: 18px; }
+/* 보는 방향: 작은 삼각형 */
+.fish-map-you::after { content: ''; position: absolute; border: 4px solid transparent; }
+.fish-map-you-down::after { top: 100%; left: 50%; margin-left: -4px; border-bottom-width: 0; border-top-color: var(--ink); }
+.fish-map-you-up::after { bottom: 100%; left: 50%; margin-left: -4px; border-top-width: 0; border-bottom-color: var(--ink); }
+.fish-map-you-left::after { right: 100%; top: 50%; margin-top: -4px; border-left-width: 0; border-right-color: var(--ink); }
+.fish-map-you-right::after { left: 100%; top: 50%; margin-top: -4px; border-right-width: 0; border-left-color: var(--ink); }
+.fish-map-detail { display: flex; flex-direction: column; gap: 6px; }
+.fish-map-detail p { margin: 0; }
+.fish-map-detail-title { margin: 0; font-size: 15px; }
+.fish-map-route { color: var(--ink); font-weight: 600; }
+.fish-map-locked { align-items: flex-start; }
+.fish-map-now-chip {
+  align-self: flex-start;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--on-accent);
+  background: var(--win-text);
+}
 
 /* 전체화면: 게임 전체가 사이트 머리·탭 위를 덮는 고정 덮개. 위 줄 - 캔버스 칸(남는 높이 전부) - 아래 버튼 줄. */
 .fish-full {

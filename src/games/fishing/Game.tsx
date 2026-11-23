@@ -1,6 +1,6 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
 // 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
@@ -16,6 +16,8 @@ import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './
 import { loadPosition, savePosition, startPosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
+import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
+import { releaseMinimapCache } from './minimap.ts'
 import './fishing.css'
 
 const OUTCOME_MS = 1200
@@ -69,10 +71,13 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
   return innerH - stageTop - belowH - FIT_MARGIN
 }
 
-/** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges'
+/** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport'])
+const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
+/** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
+const PANEL_PAD = 12
 type Outcome =
   | { kind: 'caught'; fish: Fish; isNew: boolean }
   | { kind: 'lost'; early: boolean }
@@ -246,6 +251,8 @@ export function Game({ gameId }: WorldGameProps) {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
+  /** 큰 지도 레이어·필터(창을 닫아도 접속 동안 유지) */
+  const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_LAYERS)
 
   const rootRef = useRef<HTMLElement>(null)
   /** 사용자가 지금 전체화면을 원하는지, 요소 전체화면 요청이 아직 끝나지 않았는지 */
@@ -278,6 +285,8 @@ export function Game({ gameId }: WorldGameProps) {
     }
   })
   const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
+  /** 서버 보정 시각. 큰 지도에도 넘기므로 같은 함수를 유지한다(지도 타이머를 다시 걸지 않게) */
+  const serverNow = useCallback(() => Date.now() + rt.offset, [rt])
   const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
@@ -343,7 +352,6 @@ export function Game({ gameId }: WorldGameProps) {
     for (const id of timers.current) window.clearTimeout(id)
     timers.current.clear()
   }
-  const serverNow = () => Date.now() + rt.offset
   const resetFight = () => {
     rt.bar = null
     rt.params = null
@@ -682,8 +690,9 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
-  const handlers = useRef({ press, release, frame })
-  handlers.current = { press, release, frame }
+  const toggleMap = () => toggleMenu('map')
+  const handlers = useRef({ press, release, frame, toggleMap })
+  handlers.current = { press, release, frame, toggleMap }
 
   // ------------------------------------------------------------ 효과
   useEffect(() => {
@@ -700,6 +709,7 @@ export function Game({ gameId }: WorldGameProps) {
 
   // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
   useEffect(() => releaseSceneCache, [])
+  useEffect(() => releaseMinimapCache, [])
 
   // 마지막 위치: 걸음이 멈출 때(프레임), 탭이 가려질 때, 화면을 떠날 때 저장한다.
   // 창이 초점을 잃거나 가려지면 키·손가락을 뗀 알림을 놓칠 수 있으므로 누르고 있던 입력을 모두 놓는다.
@@ -863,6 +873,21 @@ export function Game({ gameId }: WorldGameProps) {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
+  }, [rt])
+
+  // M 키 = 큰 지도 열고 닫기(e.code라 한글 입력 상태에서도). 입력칸·낚시 중·다른 창이 열려 있으면 무시한다.
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select') !== null)) return
+      if (rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting') return
+      if (menuRef.current && menuRef.current !== 'map') return
+      e.preventDefault()
+      handlers.current.toggleMap()
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
   }, [rt])
 
   // ------------------------------------------------------------ 메뉴 행동
@@ -1071,7 +1096,7 @@ export function Game({ gameId }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', unlock: unlockName, dex: '도감', challenges: '도전과제', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1170,6 +1195,16 @@ export function Game({ gameId }: WorldGameProps) {
               )}
               {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
               {menu === 'challenges' && <ChallengePanel view={view} />}
+              {menu === 'map' && (
+                <MapPanel
+                  view={view}
+                  here={{ area: rt.map.id, ...tileOf(rt.player.pos), facing: rt.player.facing }}
+                  now={serverNow}
+                  innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
+                  layers={mapLayers}
+                  onLayers={setMapLayers}
+                />
+              )}
               {menu === 'teleport' && (
                 <TeleportPanel view={view} area={tpArea} busy={busy} onTeleport={(to) => void teleport(to)} />
               )}
@@ -1186,7 +1221,7 @@ export function Game({ gameId }: WorldGameProps) {
           가방 <strong>{view.bag.length}/{bagSize(view.bagTier)}</strong>
         </span>
         <div className="fish-menu">
-          {(['bag', 'dex', 'challenges'] as const).map((m) => (
+          {(['bag', 'dex', 'challenges', 'map'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -1195,7 +1230,7 @@ export function Game({ gameId }: WorldGameProps) {
               disabled={menuLocked}
               onClick={() => toggleMenu(m)}
             >
-              {m === 'bag' ? '가방' : m === 'dex' ? '도감' : '과제'}
+              {MENU_LABELS[m]}
             </button>
           ))}
           <button
