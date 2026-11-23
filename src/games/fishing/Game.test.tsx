@@ -397,6 +397,7 @@ describe('fishing Game', () => {
     release()
     await flush()
     expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '전체화면' })).toBeDisabled()
   })
 
   test('canvas size uses the height left below the stage, not a fixed allowance', async () => {
@@ -428,6 +429,133 @@ describe('fishing Game', () => {
       expect(last?.[2]).toEqual({ w: fit.w, h: fit.h })
     } finally {
       restore()
+    }
+  })
+
+  test('fullscreen toggle covers the page, locks scroll, and Escape leaves', async () => {
+    document.documentElement.style.overflow = 'auto'
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    const toggle = screen.getByRole('button', { name: '전체화면' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(root).not.toHaveClass('fish-full')
+
+    fireEvent.click(toggle)
+    expect(root).toHaveClass('fish-full')
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    const exit = screen.getByRole('button', { name: '나가기' })
+    expect(exit).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).not.toHaveClass('fish-full')
+    expect(document.documentElement.style.overflow).toBe('auto')
+    expect(screen.getByRole('button', { name: '전체화면' })).toHaveAttribute('aria-pressed', 'false')
+
+    // 나가기 버튼으로도 나간다
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+    expect(root).not.toHaveClass('fish-full')
+    document.documentElement.style.overflow = ''
+  })
+
+  test('Escape with a menu open keeps fullscreen; menus open inside the overlay', async () => {
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    const shop = screen.getByRole('region', { name: '상점' })
+    expect(root.contains(shop)).toBe(true)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).toHaveClass('fish-full')
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).not.toHaveClass('fish-full')
+  })
+
+  test('unmounting in fullscreen restores page scroll', async () => {
+    const { unmount } = await mount()
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    unmount()
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+
+  test('in fullscreen the canvas fits the canvas area box', async () => {
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      await mount()
+      expect((canvas() as HTMLCanvasElement).height).toBe(280) // 보통: 남은 높이 560
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      const fit = fitScene(390, 700)
+      expect(fit).toEqual({ scale: 2, w: 195, h: 350 })
+      const c = canvas() as HTMLCanvasElement
+      expect([c.width, c.height]).toEqual([fit.w, fit.h])
+      expect(c.style.height).toBe('700px')
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect((canvas() as HTMLCanvasElement).height).toBe(280)
+    } finally {
+      restore()
+    }
+  })
+
+  test('uses element fullscreen when available and leaves when the browser exits it', async () => {
+    let fsEl: Element | null = null
+    const request = vi.fn(function (this: Element) {
+      fsEl = this
+      return Promise.resolve()
+    })
+    const exitFs = vi.fn(() => {
+      fsEl = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+      return Promise.resolve()
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request })
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fsEl })
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFs })
+    try {
+      const { container, unmount } = await mount()
+      const root = container.querySelector('.fish') as HTMLElement
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(request.mock.contexts[0]).toBe(root)
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) }) // 들어감 알림: 그대로
+      expect(root).toHaveClass('fish-full')
+
+      // Esc·뒤로 가기로 브라우저가 전체화면을 끝냄
+      fsEl = null
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
+      expect(root).not.toHaveClass('fish-full')
+      expect(document.documentElement.style.overflow).toBe('')
+
+      // 버튼으로 나가면 브라우저 전체화면도 끝낸다
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+      expect(exitFs).toHaveBeenCalledTimes(1)
+
+      // 전체화면 중 페이지를 떠나도 끝낸다
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      unmount()
+      expect(exitFs).toHaveBeenCalledTimes(2)
+      expect(fsEl).toBeNull()
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement
+      delete (document as { exitFullscreen?: unknown }).exitFullscreen
+    }
+  })
+
+  test('a rejected element fullscreen request still shows the overlay', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: () => Promise.reject(new Error('denied')),
+    })
+    try {
+      const { container } = await mount()
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      await flush()
+      expect(container.querySelector('.fish')).toHaveClass('fish-full')
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
     }
   })
 

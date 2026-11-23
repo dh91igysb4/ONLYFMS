@@ -73,6 +73,15 @@ type Runtime = {
   lastFrame: number
 }
 
+/** 전체화면 요청·해제는 실패해도(거절·미지원) 조용히 넘긴다. */
+function ignoreRejection(fn: () => Promise<void> | void): void {
+  try {
+    void Promise.resolve(fn()).catch(() => {})
+  } catch {
+    /* 지원하지 않는 브라우저 */
+  }
+}
+
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
@@ -111,7 +120,9 @@ export function Game({ gameId }: WorldGameProps) {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
+  const [fullscreen, setFullscreen] = useState(false)
 
+  const rootRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -392,16 +403,21 @@ export function Game({ gameId }: WorldGameProps) {
   // 무대 위(사이트 머리·제목·골드 줄)는 무대의 문서 위치로, 무대 아래는 늘 있는 가방·메뉴 줄과 간격만 잰다.
   // 안내 줄과 메뉴 창은 캔버스 위에 겹쳐 뜨고, 잠깐 뜨는 알림은 재지 않아 캔버스 크기가 흔들리지 않는다.
   // 캔버스 자신의 높이는 쓰지 않으므로 크기가 바뀌어도 다시 재는 값은 그대로다.
+  // 전체화면에서는 화면을 채우는 캔버스 칸(무대) 자신의 상자를 잰다.
   useEffect(() => {
     const el = stageRef.current
     if (!loaded || !el) return
-    const measure = () => {
+    const available = (): [number, number] => {
+      if (fullscreen) return [el.clientWidth, el.clientHeight]
       const bottom = bottomRef.current
       const root = el.parentElement
       const gap = root ? parseFloat(getComputedStyle(root).rowGap) || 0 : 0
       const belowH = (bottom?.offsetHeight ?? 0) + gap
       const stageTop = el.getBoundingClientRect().top + window.scrollY
-      const next = fitScene(el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH))
+      return [el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH)]
+    }
+    const measure = () => {
+      const next = fitScene(...available())
       setFit((prev) => (prev.scale === next.scale && prev.w === next.w && prev.h === next.h ? prev : next))
     }
     measure()
@@ -414,7 +430,34 @@ export function Game({ gameId }: WorldGameProps) {
       window.removeEventListener('resize', measure)
       window.removeEventListener('orientationchange', measure)
     }
-  }, [loaded])
+  }, [loaded, fullscreen])
+
+  // 전체화면: 게임 전체가 화면을 덮는 고정 덮개가 된다(아이폰 사파리처럼 요소 전체화면이 없어도 동작).
+  // 있는 동안 페이지 스크롤을 막고, Esc(메뉴 창이 없을 때)나 브라우저 전체화면 종료로 나간다.
+  // 나가거나 페이지를 떠나면 스크롤을 되돌리고 브라우저 전체화면도 끝낸다.
+  useEffect(() => {
+    if (!fullscreen) return
+    const root = rootRef.current
+    const html = document.documentElement
+    const prevOverflow = html.style.overflow
+    html.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !menuRef.current) setFullscreen(false)
+    }
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      html.style.overflow = prevOverflow
+      if (root && document.fullscreenElement === root && typeof document.exitFullscreen === 'function') {
+        ignoreRejection(() => document.exitFullscreen())
+      }
+    }
+  }, [fullscreen])
 
   // 스페이스 키 = 누르기. 버튼·입력칸에 초점이 있으면 그쪽 동작에 맡긴다.
   useEffect(() => {
@@ -461,6 +504,17 @@ export function Game({ gameId }: WorldGameProps) {
 
   const toggleMenu = (m: Menu) => setMenu(menuRef.current === m ? null : m)
 
+  function toggleFullscreen() {
+    if (fullscreen) {
+      setFullscreen(false)
+      return
+    }
+    setFullscreen(true)
+    // 데스크톱·안드로이드에서는 브라우저 화면 요소까지 숨긴다. 거절돼도 덮개는 그대로 쓴다.
+    const root = rootRef.current
+    if (root && typeof root.requestFullscreen === 'function') ignoreRejection(() => root.requestFullscreen())
+  }
+
   // ------------------------------------------------------------ 그리기
   if (!view) {
     if (loadError) {
@@ -480,7 +534,7 @@ export function Game({ gameId }: WorldGameProps) {
   const hint = menu ? null : HINTS[phase]
 
   return (
-    <section className="fish">
+    <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef}>
       <div className="fish-top">
         <strong className="fish-gold">{gold(view.gold)}</strong>
       </div>
@@ -571,6 +625,15 @@ export function Game({ gameId }: WorldGameProps) {
               {m === 'bag' ? '가방' : m === 'shop' ? '상점' : '도감'}
             </button>
           ))}
+          <button
+            type="button"
+            className={`btn btn-sm ${fullscreen ? 'btn-primary' : 'btn-ghost'}`}
+            aria-pressed={fullscreen}
+            disabled={phase === 'fighting'}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? '나가기' : '전체화면'}
+          </button>
         </div>
       </div>
     </section>
