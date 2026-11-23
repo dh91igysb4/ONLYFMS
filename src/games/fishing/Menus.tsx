@@ -1,8 +1,9 @@
-// 낚시 메뉴(가방·상점·도감·지역 해금). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
+// 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, CHALLENGES, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { price, type View } from './logic.ts'
+import { price, teleporterOpen, type View } from './logic.ts'
+import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
 const ICON_SCALE = 2
@@ -255,6 +256,102 @@ export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
           열기
         </button>
       </div>
+    </section>
+  )
+}
+
+const areaName = (id: AreaId) => AREAS.find((a) => a.id === id)?.name ?? id
+/** 옛 서버 응답(challenges 없음)은 빈 진행으로 읽는다 */
+const progressOf = (view: View) => view.challenges ?? {}
+/** 진행 표시: 깬 뒤에는 count를 넘지 않는다 */
+const progressLabel = (view: View, id: string, count: number) => `${Math.min(progressOf(view)[id]?.progress ?? 0, count)}/${count}`
+
+/** 도전과제 목록: 지역 순서, 진행도, 깬 과제는 순간이동기가 켜졌다고 알려 준다 */
+export function ChallengePanel({ view }: { view: View }) {
+  const progress = progressOf(view)
+  const done = CHALLENGES.filter((c) => progress[c.id]?.done).length
+  return (
+    <section className="fish-panel-body" aria-label="도전과제">
+      <p className="muted">{`깬 과제 ${done}/${CHALLENGES.length}`}</p>
+      <p className="muted">과제를 깨면 그 지역 순간이동기가 켜져요</p>
+      <ul className="fish-rods" aria-label="도전과제 목록">
+        {CHALLENGES.map((c) => {
+          const finished = progress[c.id]?.done === true
+          return (
+            <li key={c.id} className={`fish-rod${finished ? ' fish-rod-owned' : ''}`}>
+              <div className="fish-rod-info">
+                <strong>{`${areaName(c.area)} · ${c.title}`}</strong>
+                <span className="muted">{c.desc}</span>
+                {finished
+                  ? <span className="fish-rod-state">완료 · 순간이동기 켜짐</span>
+                  : <span className="muted">{progressLabel(view, c.id, c.count)}</span>}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
+type TeleportProps = { view: View; area: AreaId; busy: boolean; onTeleport(to: AreaId): void }
+
+/**
+ * 순간이동기 창. 꺼져 있으면 켜는 과제를, 켜져 있으면 켜진 다른 이동기와 요금(teleportFee, 서버와 같은 값)을 보여 준다.
+ * 골드가 모자란 곳은 이동을 끈다.
+ */
+export function TeleportPanel({ view, area, busy, onTeleport }: TeleportProps) {
+  const state = { areas: view.areas, challenges: progressOf(view) }
+  const challenge = CHALLENGES.find((c) => c.area === area)
+  if (!teleporterOpen(state, area)) {
+    return (
+      <section className="fish-panel-body" aria-label="순간이동기">
+        <p className="fish-shop-note">아직 꺼져 있어요</p>
+        <p className="muted">도전과제를 깨면 켜져요</p>
+        {challenge && (
+          <div className="fish-rod">
+            <div className="fish-rod-info">
+              <strong>{challenge.title}</strong>
+              <span className="muted">{challenge.desc}</span>
+              <span className="muted">{progressLabel(view, challenge.id, challenge.count)}</span>
+            </div>
+          </div>
+        )}
+      </section>
+    )
+  }
+  const others = AREAS.filter((a) => a.id !== area && teleporterOpen(state, a.id))
+  return (
+    <section className="fish-panel-body" aria-label="순간이동기">
+      <p className="muted">{`보유 ${gold(view.gold)}`}</p>
+      {others.length === 0 ? (
+        <p className="fish-shop-note">다른 지역의 순간이동기를 켜면 오갈 수 있어요</p>
+      ) : (
+        <ul className="fish-rods" aria-label="갈 수 있는 순간이동기">
+          {others.map((a) => {
+            const fee = teleportFee(area, a.id)
+            const short = view.gold < fee
+            return (
+              <li key={a.id} className="fish-rod">
+                <div className="fish-rod-info">
+                  <strong>{a.name}</strong>
+                  <span className="fish-unlock-price">{gold(fee)}</span>
+                  {short && <span className="fish-shop-note">골드가 모자라요</span>}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  aria-label={`${a.name} 이동`}
+                  disabled={busy || short}
+                  onClick={() => onTeleport(a.id)}
+                >
+                  이동
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }

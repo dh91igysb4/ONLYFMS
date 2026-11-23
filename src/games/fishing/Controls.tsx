@@ -8,7 +8,7 @@ import { joystickVector, type MoveInput } from './walk.ts'
 const STICK_RADIUS = 36
 const STOP: MoveInput = { x: 0, y: 0 }
 
-export type ActionState = { label: '낚시' | '상점' | '살펴보기' | '배 타기'; enabled: true } | { label: '낚시'; enabled: false }
+export type ActionState = { label: '낚시' | '상점' | '살펴보기' | '배 타기' | '순간이동'; enabled: true } | { label: '낚시'; enabled: false }
 
 type Props = {
   /** 조이스틱 입력(길이 ≤ 1). 놓으면 {0,0} */
