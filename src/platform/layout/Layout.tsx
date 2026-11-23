@@ -18,10 +18,12 @@ export function Layout() {
   // 지갑을 쓰는 게임이 등록돼 있을 때만 잔액을 읽고 보여 준다
   const showGold = approved && walletEnabled()
   const uid = profile?.id
-  // 앱 로드(또는 사용자가 바뀔 때) 잔액을 읽는다. 이후 갱신은 world 응답·각 화면이 맡는다(설계 §5.5)
+  // 앱 로드(또는 사용자가 바뀔 때) my_wallet()을 부른다. 이후 갱신은 world 응답·각 화면이 맡는다(설계 §5.5).
+  // my_wallet()은 끝난 대회 정산(settle_due, 설계 §8)도 맡으므로 지갑 화면이 보이지 않아도 승인 사용자면 언제나 부른다
+  // (보이지 않는 동안 정산이 밀렸다가 지갑을 켜는 날 한꺼번에 들어와 그날 사이트 상한을 채우지 않게). 표시만 showGold로 가린다
   useEffect(() => {
-    if (showGold && uid) void refreshWallet()
-  }, [showGold, uid])
+    if (approved && uid) void refreshWallet()
+  }, [approved, uid])
   const { pathname } = useLocation()
   const [pending, setPending] = useState(0)
   useEffect(() => {

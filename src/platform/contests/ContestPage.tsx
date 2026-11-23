@@ -9,7 +9,7 @@ import { walletEnabled } from '../wallet/enabled.ts'
 import { formatGold } from '../wallet/format.ts'
 import { refreshWallet } from '../wallet/useWallet.ts'
 import { syncServerTime } from './clock.ts'
-import { getContest, getEntries, getItems, type ContestRow, type ItemRow } from './data.ts'
+import { getContest, getEntries, getItems, getSettledAt, type ContestRow, type ItemRow } from './data.ts'
 import { countdown, kindLabel, kstLabel, phaseOf } from './format.ts'
 import { InviteLink } from './InviteLink.tsx'
 
@@ -116,7 +116,8 @@ export function ContestPage() {
     return () => { alive = false; clearInterval(t) }
   }, [phase, id, lbAttempt])
 
-  // 끝난 대회의 상금. 데일리인데 아직 없으면 정산이 안 됐을 수 있으므로 my_wallet()(= settle_due)을 한 번 부르고 다시 읽는다
+  // 끝난 대회의 상금. 데일리인데 아직 없고 정산 표시도 없으면(settled_at null) my_wallet()(= settle_due)을 한 번 부르고 다시 읽는다.
+  // 이미 정산된 대회(3단계 배포 전에 끝나 표시만 된 것, 행동한 사람이 없던 것, 숨김 게임)는 "정산 중"을 보이지 않는다
   const kind = contest?.kind
   useEffect(() => {
     if (phase !== 'ended' || !walletEnabled()) return
@@ -124,7 +125,7 @@ export function ContestPage() {
     void (async () => {
       try {
         let rows = await fetchContestPrizes(id)
-        if (alive && rows.length === 0 && kind === 'daily') {
+        if (alive && rows.length === 0 && kind === 'daily' && (await getSettledAt(id)) === null && alive) {
           setSettling(true)
           await refreshWallet()
           if (!alive) return

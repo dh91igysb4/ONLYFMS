@@ -9,6 +9,7 @@ const dataMock = {
   getContest: vi.fn(),
   getItems: vi.fn(),
   getEntries: vi.fn(),
+  getSettledAt: vi.fn(),
 }
 let admin = false
 const wallet = vi.hoisted(() => ({ enabled: true }))
@@ -27,6 +28,7 @@ vi.mock('./data.ts', () => ({
   getContest: (...a: unknown[]) => dataMock.getContest(...a),
   getItems: (...a: unknown[]) => dataMock.getItems(...a),
   getEntries: (...a: unknown[]) => dataMock.getEntries(...a),
+  getSettledAt: (...a: unknown[]) => dataMock.getSettledAt(...a),
 }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
@@ -273,9 +275,10 @@ const lb2 = [
   { rank: 2, user_id: 'u2', handle: 'son', score: 7, solved_items: 1, action_count: 4, last_finished_at: null },
 ]
 
-function setupPrizes(prizes: unknown[][]) {
+function setupPrizes(prizes: unknown[][], settledAt: string | null | undefined = null) {
   // contest_prizes를 부를 때마다 다음 값을 돌려준다(마지막 값 유지)
   let i = 0
+  dataMock.getSettledAt.mockResolvedValue(settledAt)
   dataMock.getItems.mockResolvedValue([item(1)])
   dataMock.getEntries.mockResolvedValue(['u1', 'u2'])
   rpcMock.mockImplementation(async (name: string) => {
@@ -345,4 +348,24 @@ test('no_prize_ui_when_wallet_disabled', async () => {
   expect(await screen.findByText('kane')).toBeInTheDocument()
   expect(calls).not.toContain('contest_prizes')
   expect(screen.queryByText(/내 상금/)).toBeNull()
+})
+
+test('ended_daily_already_settled_without_prizes_does_not_show_pending_or_settle', async () => {
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[]], '2026-11-24T00:00:00Z')
+  renderAt()
+  expect(await screen.findByText('kane')).toBeInTheDocument()
+  await vi.waitFor(() => expect(dataMock.getSettledAt).toHaveBeenCalled())
+  expect(screen.queryByText('상금을 정산하는 중이에요')).toBeNull()
+  expect(calls).not.toContain('my_wallet')
+})
+
+test('ended_daily_settled_at_unreadable_does_not_settle', async () => {
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[]])
+  dataMock.getSettledAt.mockResolvedValue(undefined) // 3단계 DB 전: 열이 없어 읽지 못함
+  renderAt()
+  expect(await screen.findByText('kane')).toBeInTheDocument()
+  await vi.waitFor(() => expect(dataMock.getSettledAt).toHaveBeenCalled())
+  expect(calls).not.toContain('my_wallet')
 })

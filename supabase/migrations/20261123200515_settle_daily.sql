@@ -63,36 +63,69 @@ begin
 end
 $$;
 
--- 끝났고 정산 안 된 대회를 최대 20개 정산한다. 잡은 대회 수를 돌려준다. 승인 사용자 누구나.
-create function public.settle_due() returns int
+-- 잡은 대회들의 지급 목록을 모아 트랜잭션 전체에서 user_id 오름차순으로 지급하고 settled_at을 찍는다.
+-- 대회 행은 부르는 쪽이 이미 잡고 있어야 한다(내부 함수).
+create function public._settle_contests(p_ids uuid[]) returns void
 language plpgsql volatile security definer set search_path = public as $$
 declare
-  v_ids uuid[];
-  r     record;
+  r record;
 begin
-  perform public._require_approved();
-  -- 1) 대회 행을 먼저 잡는다. 다른 정산이 잡고 있는 대회는 기다리지 않고 건너뛴다
-  select coalesce(array_agg(t.id), '{}') into v_ids
-    from (select c.id from public.contests c
-           where c.settled_at is null and c.ends_at <= now()
-           order by c.ends_at, c.id
-           limit 20
-           for update skip locked) t;
-  if cardinality(v_ids) = 0 then
-    return 0;
-  end if;
-  -- 2) 지급 목록을 모아 트랜잭션 전체에서 user_id 오름차순으로 (지갑 잠금 순서)
   for r in
     select p.user_id, p.amount, p.reason, p.game_id, p.note, x.id as contest_id
-      from unnest(v_ids) as x(id)
+      from unnest(p_ids) as x(id)
       cross join lateral public._contest_payouts(x.id) p
      order by p.user_id, x.id
   loop
     perform public._gold_move(r.user_id, r.amount, r.reason, r.contest_id::text, r.game_id, r.note);
   end loop;
-  -- 3) 표시
-  update public.contests set settled_at = now() where id = any(v_ids);
-  return cardinality(v_ids);
+  update public.contests set settled_at = now() where id = any(p_ids);
+end
+$$;
+
+-- 끝났고 정산 안 된 대회를 최대 20개 정산한다. 정산한 대회 수를 돌려준다. 승인 사용자 누구나.
+--   * ends_at에서 1분이 지난 대회만: play 함수가 ends_at 직전에 받은 행동을 커밋하기 전에 점수를 읽지 않게.
+--   * for no key update skip locked: 정산끼리는 서로 배타적이고, 다른 정산이 잡은 대회는 기다리지 않고 건너뛴다
+--     (for update와 달리 contest_items·contest_entries 삽입의 외래 키 확인과 부딪히지 않는다).
+--   * lock_timeout 2초: 지갑 잠금을 오래 기다리면 오류로 끝내고(my_wallet이 삼킴) 다음 접속 때 다시 한다.
+--   * 묶음 지급이 실패하면 대회 하나씩 다시 해 본다(실패한 대회 id를 경고로 남기고 건너뜀). 대회 하나는 그 안에서
+--     user_id 오름차순이다. 하나씩 할 때는 앞서 지급한 대회의 지갑 잠금을 쥔 채 다음 대회를 하므로 드물게 교착이
+--     날 수 있지만, 그 대회만 실패로 건너뛰고(교착 오류도 잡힌다) 다음 접속 때 다시 한다.
+create function public.settle_due() returns int
+language plpgsql volatile security definer set search_path = public as $$
+declare
+  v_ids uuid[];
+  v_id  uuid;
+  v_n   int := 0;
+begin
+  perform public._require_approved();
+  perform set_config('lock_timeout', '2s', true);
+  -- 1) 대회 행을 먼저 잡는다 (예외 블록 밖이라 아래 묶음이 실패해도 잠금은 남는다)
+  select coalesce(array_agg(t.id), '{}') into v_ids
+    from (select c.id from public.contests c
+           where c.settled_at is null and c.ends_at <= now() - interval '1 minute'
+           order by c.ends_at, c.id
+           limit 20
+           for no key update skip locked) t;
+  if cardinality(v_ids) = 0 then
+    return 0;
+  end if;
+  -- 2) 묶음으로: 지급 목록 전체를 user_id 오름차순으로 (지갑 잠금 순서)
+  begin
+    perform public._settle_contests(v_ids);
+    return cardinality(v_ids);
+  exception when others then
+    raise warning 'settle_due: batch % failed: % (%)', v_ids, sqlerrm, sqlstate;
+  end;
+  -- 3) 묶음이 실패하면 하나씩. 나쁜 대회 하나가 나머지를 막지 않게
+  foreach v_id in array v_ids loop
+    begin
+      perform public._settle_contests(array[v_id]);
+      v_n := v_n + 1;
+    exception when others then
+      raise warning 'settle_due: contest % failed: % (%)', v_id, sqlerrm, sqlstate;
+    end;
+  end loop;
+  return v_n;
 end
 $$;
 
@@ -168,6 +201,7 @@ end
 $$;
 
 revoke execute on function public._contest_payouts(uuid)  from public, anon, authenticated;
+revoke execute on function public._settle_contests(uuid[]) from public, anon, authenticated;
 revoke execute on function public.settle_due()            from public, anon, authenticated;
 revoke execute on function public.my_wallet()             from public, anon, authenticated;
 revoke execute on function public.contest_prizes(uuid)    from public, anon, authenticated;

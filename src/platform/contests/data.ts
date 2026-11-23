@@ -85,3 +85,18 @@ export async function getMyContestIds(userId: string): Promise<Set<string>> {
   )
   return new Set((data ?? []).map((r) => r.contest_id))
 }
+
+/**
+ * 대회 정산 시각(지갑 3단계). 정산 안 됐으면 null, 읽지 못하면(3단계 DB 전이라 열이 없음, 네트워크) undefined.
+ * CONTEST_COLS에 넣지 않고 따로 읽어, Vercel이 DB보다 먼저 배포돼도 대회 화면이 깨지지 않게 한다.
+ */
+export async function getSettledAt(id: string): Promise<string | null | undefined> {
+  try {
+    const res = await supabase.from('contests').select('settled_at').eq('id', id).limit(1)
+    if (res.error) return undefined
+    const row = (res.data as { settled_at: string | null }[] | null)?.[0]
+    return row ? row.settled_at : undefined
+  } catch {
+    return undefined
+  }
+}

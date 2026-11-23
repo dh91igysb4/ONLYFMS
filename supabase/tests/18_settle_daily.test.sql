@@ -2,7 +2,7 @@
 -- 슈퍼유저로 대회·문제·기록을 직접 넣고, 승인 사용자 역할로 settle_due()·my_wallet()을 부른다.
 -- 끝난 대회: starts_at = now() − 2일, ends_at = now() − 1일.
 begin;
-select plan(45);
+select plan(51);
 
 \set d1 '00000000-0000-0000-0000-0000000005d1'
 \set d2 '00000000-0000-0000-0000-0000000005d2'
@@ -92,10 +92,12 @@ select has_function('public', 'settle_due', 'has settle_due');
 select has_function('public', 'contest_prizes', array['uuid'], 'has contest_prizes');
 select has_function('public', 'user_prize_total', array['text'], 'has user_prize_total');
 select is(public._economy() -> 'daily_prizes', '[6150, 5120, 4100, 3070, 2460, 2050]'::jsonb, '_economy daily_prizes');
-select ok(position('for update skip locked' in pg_get_functiondef('public.settle_due()'::regprocedure)) > 0,
-  'settle_due: for update skip locked (다른 정산이 잡은 대회는 건너뛴다)');
-select ok(position('order by p.user_id' in pg_get_functiondef('public.settle_due()'::regprocedure)) > 0,
-  'settle_due: 지급은 트랜잭션 전체 user_id 오름차순');
+select ok(position('for no key update skip locked' in pg_get_functiondef('public.settle_due()'::regprocedure)) > 0,
+  'settle_due: for no key update skip locked (다른 정산이 잡은 대회는 건너뛴다)');
+select ok(position('order by p.user_id' in pg_get_functiondef('public._settle_contests(uuid[])'::regprocedure)) > 0,
+  '_settle_contests: 지급은 트랜잭션 전체 user_id 오름차순');
+select ok(position('lock_timeout' in pg_get_functiondef('public.settle_due()'::regprocedure)) > 0,
+  'settle_due: 짧은 lock_timeout으로 시작한다');
 select ok(position('soft_cap' in pg_get_functiondef('public.settle_due()'::regprocedure)) = 0
       and position('soft_cap' in pg_get_functiondef('public._contest_payouts(uuid)'::regprocedure)) = 0,
   '정산: 사이트 상한 계산 없음(_gold_move 한 곳)');
@@ -196,6 +198,41 @@ select is(public.settle_due(), 20, '끝난 대회 21개 → 첫 호출 20');
 select is(public.settle_due(), 1, '둘째 호출 1');
 reset role;
 
+-- ---------------------------------------------------------------- ends_at 1분 유예
+insert into public.contests (id, kind, title, visibility, starts_at, ends_at, daily_key) values
+  ('00000000-0000-0000-0000-000000000d0a', 'daily', 'grace', 'public', now() - interval '1 day', now() - interval '10 seconds', 'g-daily:2000-01-10');
+set local role authenticated;
+set local request.jwt.claims = :'D3';
+select is(public.settle_due(), 0, 'ends_at 10초 전에 끝난 대회는 아직 정산하지 않는다(1분 유예)');
+reset role;
+select is((select settled_at from public.contests where id = '00000000-0000-0000-0000-000000000d0a'), null::timestamptz,
+  '유예 중인 대회 settled_at은 null');
+delete from public.contests where id = '00000000-0000-0000-0000-000000000d0a';
+
+-- ---------------------------------------------------------------- 나쁜 대회 하나가 나머지를 막지 않는다
+create or replace function public._contest_payouts(p_contest uuid)
+returns table (user_id uuid, amount bigint, reason text, game_id text, note text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if p_contest = '00000000-0000-0000-0000-000000000d0b' then
+    raise exception 'bad contest';
+  end if;
+  return query select '00000000-0000-0000-0000-0000000005d2'::uuid, 1::bigint, 'daily_prize'::text, 'g-daily'::text, '1등'::text;
+end
+$$;
+insert into public.contests (id, kind, title, visibility, starts_at, ends_at, daily_key) values
+  ('00000000-0000-0000-0000-000000000d0b', 'daily', 'bad', 'public', now() - interval '3 days', now() - interval '2 days', 'g-daily:2000-01-11'),
+  ('00000000-0000-0000-0000-000000000d0c', 'daily', 'good', 'public', now() - interval '2 days', now() - interval '1 day', 'g-daily:2000-01-12');
+set local role authenticated;
+set local request.jwt.claims = :'D3';
+select is(public.settle_due(), 1, '묶음이 실패하면 하나씩: 좋은 대회 하나는 정산된다');
+reset role;
+select is((select array_agg(id::text order by id) from public.contests where id in ('00000000-0000-0000-0000-000000000d0b', '00000000-0000-0000-0000-000000000d0c') and settled_at is null),
+  array['00000000-0000-0000-0000-000000000d0b'], '나쁜 대회만 정산 안 됨(다음에 다시 시도)');
+select is((select delta from public.gold_ledger where reason = 'daily_prize' and ref = '00000000-0000-0000-0000-000000000d0c'), 1::bigint,
+  '좋은 대회 지급은 들어갔다');
+delete from public.contests where id = '00000000-0000-0000-0000-000000000d0b';
+
 -- ---------------------------------------------------------------- 정산이 실패해도 my_wallet은 잔액을 돌려준다
 create or replace function public._contest_payouts(p_contest uuid)
 returns table (user_id uuid, amount bigint, reason text, game_id text, note text)
@@ -208,7 +245,7 @@ insert into public.contests (id, kind, title, visibility, starts_at, ends_at, da
   ('00000000-0000-0000-0000-000000000d09', 'daily', 'fail', 'public', now() - interval '2 days', now() - interval '1 day', 'g-daily:2000-01-09');
 set local role authenticated;
 set local request.jwt.claims = :'D2';
-select is((public.my_wallet() ->> 'balance')::bigint, 5120::bigint, '정산이 오류를 내도 my_wallet은 잔액을 돌려준다');
+select is((public.my_wallet() ->> 'balance')::bigint, 5121::bigint, '정산이 오류를 내도 my_wallet은 잔액을 돌려준다');
 reset role;
 select is((select settled_at from public.contests where id = '00000000-0000-0000-0000-000000000d09'), null::timestamptz,
   '실패한 정산은 되돌려져 다음에 다시 시도된다');

@@ -115,6 +115,8 @@ t('my_wallet()을 여러 사용자가 동시에 불러도 한 사람 × 한 데�
   assert.deepEqual(bal.map((b) => b.balance), [6150, 5120, 4100, 3070, 2460, 2050, 2050, 2050])
 })
 
+// 주의: 이 테스트는 두 정산이 동시에 끝나는지만 본다. 겹치는 지갑을 동시에 쥐는 위험한 순서를 강제하지는 못하므로
+// "지급은 트랜잭션 전체 user_id 오름차순"의 실제 보증은 18_settle_daily.test.sql의 _settle_contests 본문 검사다.
 t('사람이 겹치는 두 데일리를 서로 다른 정산이 동시에 잡아도 교착 없이 끝난다', async () => {
   await clearDue()
   const users = await makeUsers(4)

@@ -356,14 +356,15 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
 
 순서: DB push → PR 머지 → Vercel. (함수 재배포 없음: `play`·`duel`·`world`는 바뀌지 않았다)
 
-- [ ] `npx supabase@2 db push`. **이 시각이 소급 없음의 기준이다**: 이미 끝난 데일리·대회는 표시만 되고 지급되지 않는다. 그날 진행 중인 데일리는 끝난 뒤(다음 날 누군가 앱을 열 때) 지급된다. 옛 화면도 앱 로드 때 `my_wallet()`을 부르므로 정산은 DB push 직후부터 돈다(옛 화면은 응답의 `prizes`를 무시한다).
+- [ ] `npx supabase@2 db push`. **이 시각이 소급 없음의 기준이다**: 이미 끝난 데일리·대회는 표시만 되고 지급되지 않는다. 그날 진행 중인 데일리는 끝난 뒤(끝나고 1분이 지나 누군가 앱을 열 때) 지급된다. 그래서 **새벽(KST)에 push하면 전날 데일리(자정에 끝남)는 상금이 없다**. 전날 데일리까지 주려면 자정 전에 push한다(판단: 새벽 배포 권장을 따르고 하루치는 주지 않는다 — 소급 없음 원칙과 같다).
+- [ ] 정산은 **새 화면(Vercel)부터** 돈다: 새 `Layout`은 지갑 화면이 보이든 말든(`walletEnabled()`와 무관하게) 승인 사용자면 앱 로드 때 `my_wallet()`(= `settle_due`)을 부른다. 옛 화면은 지갑 게임이 없으면 `my_wallet()`을 부르지 않으므로, DB push와 Vercel 사이에 끝난 데일리는 Vercel 뒤 첫 접속 때 정산된다(그 사이가 짧으면 문제없다).
 - [ ] PR 머지 → Vercel 배포
-- [ ] 수동 확인(다음 날, 미리보기 → 운영, 폰 390px·PC). Task 4 전이면 화면 표시는 없으니 장부 쿼리로 확인한다:
+- [ ] 수동 확인(다음 날, 미리보기 → 운영, 폰 390px·PC). Task 4(낚시 → 지갑) 전이면 지갑 화면이 없어 아래 화면 항목은 보이지 않지만 **정산·지급은 일어난다**(앱 로드 때 `my_wallet()`). 그때는 아래 확인 쿼리로 장부를 본다:
   - [ ] 첫 접속 → 헤더 잔액이 상금만큼 오르고, 헤더 아래 "데일리 상금이 들어왔어요 · 후알야 k등 +N G"와 "보기"·"확인". 확인 뒤 새로고침해도 안 뜬다
   - [ ] 어제 데일리 대회 페이지: 최종 순위에 "상금" 열(행동한 사람만, 6등 이하 +2,050 G), 표 위 "내 상금 +N G (k등)"
   - [ ] 다른 계정 프로필: "데일리 상금 누적 N G"
   - [ ] `/admin` 골드 장부: "데일리 상금" 줄, 메모 `k등`, 상한 표시 없음(상금은 줄지 않는다)
-- 확인 쿼리: 정산 안 된 끝난 대회 `select count(*) from contests where settled_at is null and ends_at <= now();`(접속이 있으면 0 근처), 이중 지급 없음 `select user_id, ref, count(*) from gold_ledger where reason = 'daily_prize' group by 1, 2 having count(*) > 1;`(0행), 날마다 지급 `select ref, count(*), sum(delta) from gold_ledger where reason = 'daily_prize' group by 1 order by max(created_at) desc limit 7;`
+- 확인 쿼리: 정산 안 된 끝난 대회 `select count(*) from contests where settled_at is null and ends_at <= now() - interval '1 minute';`(누가 앱을 열었으면 0 근처. 계속 늘면 Postgres 로그에서 `settle_due:` 경고(실패한 대회 id)를 찾는다), 이중 지급 없음 `select user_id, ref, count(*) from gold_ledger where reason = 'daily_prize' group by 1, 2 having count(*) > 1;`(0행), 날마다 지급 `select ref, count(*), sum(delta) from gold_ledger where reason = 'daily_prize' group by 1 order by max(created_at) desc limit 7;`
 - 데일리 게임이 늘면 `src/games/economy.test.ts`의 "데일리 게임 수 × 1등 상금 ≤ REF"가 넷째 게임에서 실패한다 → 설계 §8.1대로 상금 표를 줄이는 PR(`economy.ts`와 새 마이그레이션의 `_economy()` 함께).
 - 되돌리기: 화면만 문제면 Vercel 이전 배포로. DB의 `my_wallet()` 정산은 그대로 둬도 옛 화면과 호환된다. 정산 자체를 멈춰야 하면 새 마이그레이션으로 `my_wallet()`에서 `settle_due()` 호출을 뺀다(지급된 장부는 그대로 두고, 잘못 지급됐으면 `admin_gold_adjust`).
 

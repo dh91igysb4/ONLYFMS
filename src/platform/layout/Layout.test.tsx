@@ -239,12 +239,19 @@ test('승인되지 않은 사용자에게는 배지가 없고 my_wallet도 부�
   expect(fetchMyWallet).not.toHaveBeenCalled()
 })
 
-test('지갑을 쓰는 게임이 없으면(낚시 이전 전) 배지가 없고 my_wallet도 부르지 않는다', async () => {
+test('지갑을 쓰는 게임이 없어도(낚시 이전 전) my_wallet은 불러 정산시키고, 배지·상금 알림은 없다 (지갑 3단계 리뷰 I1)', async () => {
   wallet.enabled = false
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 7384, today: {}, earnedToday: 0 }
+    setWallet(w)
+    setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+    return w
+  })
   mount()
-  await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
+  await vi.waitFor(() => expect(fetchMyWallet).toHaveBeenCalledTimes(1))
   expect(screen.queryByLabelText(/내 골드/)).toBeNull()
-  expect(fetchMyWallet).not.toHaveBeenCalled()
+  expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
 })
 
 test('받은 상금이 있으면 헤더 아래 상금 알림 (지갑 3단계)', async () => {
