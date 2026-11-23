@@ -117,6 +117,9 @@ export const CHALLENGES: readonly Challenge[] = [
   // 낚시 5부 M2: 갯골은 하루 두 번 열리고 짱뚱어·낙지가 사계절, 늪지는 동사리가 사계절·밤낮
   { id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } },
   { id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } },
+  // 낚시 5부 M3: 산정 호수·난파선은 계절 조건이 없는 지역. 얼음 구멍은 곤들매기·금강모치가, 밤 심해는 가다랑어가 늘 나온다
+  { id: 'summit-perfect', area: 'summit', title: '얼음 위의 인내', desc: '얼음 구멍에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'ice', perfect: true } },
+  { id: 'wreck-abyss-night', area: 'wreck', title: '심해의 밤', desc: '밤(20~5시) 심해에서 5마리 낚기', count: 5, filter: { spot: 'abyss', night: true } },
 ]
 /** 순간이동 요금 = TP_BASE + ceil(두 이동기 세계 거리(칸) / 10) * TP_PER_10 */
 export const TP_BASE = 30

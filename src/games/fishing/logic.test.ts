@@ -820,14 +820,14 @@ describe('fishing WorldLogic', () => {
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
       { key: 'dex', value: 0, detail: '0/94' },
-      { key: 'challenges', value: 0, detail: '0/8' },
+      { key: 'challenges', value: 0, detail: '0/10' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
       { key: 'dex', value: 2, detail: '2/94' },
-      { key: 'challenges', value: 0, detail: '0/8' },
+      { key: 'challenges', value: 0, detail: '0/10' },
     ])
   })
 
@@ -1197,10 +1197,10 @@ describe('도전과제', () => {
     expect(logic.migrate(v9, 9)).toEqual({ ...v9, ...W0, buffs: [], wardrobe: ['hat:crown', 'rodSkin:coral'] })
   })
 
-  it('records: 도전과제 n/6', () => {
-    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/8' })
+  it('records: 도전과제 n/10', () => {
+    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/10' })
     const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
-    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/8' })
+    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/10' })
   })
 })
 
@@ -1775,5 +1775,39 @@ describe('산정 호수·난파선 (logic.version 13)', () => {
     // 버프는 legends의 신화에서 다시 만든다(BUFFS 순서)
     expect(m.buffs).toEqual(['dragon-breath', 'dragon-pearl'])
     expect(logic.version).toBe(13)
+  })
+})
+
+describe('산정 호수·난파선 도전과제·순간이동기 (낚시 5부 M3)', () => {
+  const castAt = (s: State, area: string, spot: string, now: number) =>
+    logic.apply(s, { type: 'cast', area, power: 0.5, spot } as unknown as Action, { now, rng: () => 0.5 })
+  const catchAt = (st: State, area: string, spot: string, now: number, perfect: boolean) => {
+    const cast = ok(castAt(st, area, spot, now)).state
+    const hooked = ok(logic.apply(cast, { type: 'hook' }, ctx(now + cast.pending!.biteDelayMs))).state
+    return ok(logic.apply(hooked, { type: 'resolve', success: true, perfect }, ctx(now + cast.pending!.biteDelayMs + MIN_FIGHT_MS))).state
+  }
+  it('얼음 구멍에서 완벽하게 잡으면 summit-perfect 진행, 완벽하지 않거나 온천이면 세지 않는다(어느 계절에나)', () => {
+    let s = fresh({ areas: [...DEFAULT_AREAS, 'lake', 'summit'] })
+    s = catchAt(s, 'summit', 'ice', nowAt(1, 10), true)
+    expect(s.challenges['summit-perfect']).toEqual({ progress: 1, done: false })
+    s = catchAt(s, 'summit', 'ice', nowAt(3, 10), false)
+    s = catchAt(s, 'summit', 'hotspring', nowAt(3, 11), true)
+    expect(s.challenges['summit-perfect']).toEqual({ progress: 1, done: false })
+  })
+  it('밤 심해에서 잡으면 wreck-abyss-night 진행, 낮이나 난파선 곁은 세지 않는다', () => {
+    let s = fresh({ rodTier: 5, areas: [...DEFAULT_AREAS, 'island', 'wreck'] })
+    s = catchAt(s, 'wreck', 'abyss', nowAt(0, 23), false)
+    expect(s.challenges['wreck-abyss-night']).toEqual({ progress: 1, done: false })
+    s = catchAt(s, 'wreck', 'abyss', nowAt(0, 12), false)
+    s = catchAt(s, 'wreck', 'wreck', nowAt(0, 22), false)
+    expect(s.challenges['wreck-abyss-night']).toEqual({ progress: 1, done: false })
+  })
+  it('과제를 깨면 산정·난파선 이동기가 켜지고 요금은 거리대로(순간이동은 낚싯대를 보지 않는다)', () => {
+    const done = { 'pier-perfect': { progress: 3, done: true }, 'wreck-abyss-night': { progress: 5, done: true } }
+    const s = fresh({ gold: 500, rodTier: 4, areas: [...DEFAULT_AREAS, 'island', 'wreck'], challenges: done })
+    expect(teleporterOpen(s, 'wreck')).toBe(true)
+    const r = ok(logic.apply(s, { type: 'teleport', from: 'village', to: 'wreck' } as unknown as Action, ctx()))
+    expect(r.result).toEqual({ from: 'village', to: 'wreck', fee: teleportFee('village', 'wreck') })
+    expect(teleporterOpen(fresh({ areas: [...DEFAULT_AREAS, 'lake', 'summit'], challenges: { 'summit-perfect': { progress: 3, done: true } } }), 'summit')).toBe(true)
   })
 })
