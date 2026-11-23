@@ -4,6 +4,7 @@ import {
   AIR_SPIN_KEEP,
   BOOST_V,
   COLLIDE_WINDOW,
+  CRUSH_DEPTH,
   DRIVE_ACC,
   FALL_DEPTH,
   G,
@@ -31,7 +32,7 @@ import type { Template } from './pieces.ts'
 import type { HazardDef } from './hazards.ts'
 import { poseAt, type Motion } from './motion.ts'
 import { moverSegsAt, type MoverDef } from './movers.ts'
-import { bodyAngle, flipsOf, initSim, initSimAt, scoreOf, step } from './sim.ts'
+import { bodyAngle, flipsOf, initSim, initSimAt, moverRuns, scoreOf, step } from './sim.ts'
 import type { SimState, Wheel } from './sim.ts'
 import { TRIG_ONE, TURN, angDiff, cosT, isqrt, sinT } from './trig.ts'
 
@@ -972,6 +973,71 @@ describe('움직이는 길', () => {
     s = run(s, 60, () => true, c)
     expect(s.movers).toEqual([])
     expect(s.moversDone).toEqual([0])
+  })
+
+  it('pass 길: pass.x가 길 오른쪽(움직임 상자 밖)이어도 차 중심이 넘는 틱에 시작한다', () => {
+    const drop: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 30, dx: 0, dy: -mm(3000), a: 0 }] }
+    // 길은 템플릿 원점 + 10~14 m, 땅 위 6 m. pass.x는 원점 + 30 m(길 끝보다 16 m 뒤).
+    const c = withRoads([[mm(10000), mm(6000), flatRoad(mm(4000), drop, { k: 'pass', x: mm(20000), delay: 3 })]])
+    const passX = TPL_X + mm(30000)
+    let s = initSimAt(c, TPL_X, V_MAX)
+    let crossed = -1
+    for (let i = 0; i < 400 && crossed < 0; i++) {
+      const n = step(s, true, c)
+      if (Math.floor((n.rear.x + n.front.x) / 2) > passX) crossed = n.tick
+      else expect(n.movers).toEqual([])
+      s = n
+    }
+    expect(crossed).toBeGreaterThan(0)
+    expect(s.movers).toEqual([{ id: 0, t0: crossed + 3 }])
+  })
+
+  it('떨어진 fall 길은 끝난다: moversDone으로 옮겨지고, 더는 판정·그림에 쓰지 않는다', () => {
+    // 2 m 틈 위에 2.4 m 일회성 조각. 차가 V_MAX로 지나간 뒤(delay 20) 떨어진다.
+    const piece = flatRoad(mm(2400), { k: 'fall', w: 0 }, { k: 'touch', delay: 20 })
+    const ground: Template['prims'] = [
+      { t: 'line', dx: mm(10000), dy: 0 },
+      { t: 'gap', dx: mm(2000), dy: 0 },
+      { t: 'line', dx: mm(400000), dy: 0 },
+    ]
+    const c = withRoads([[mm(9800), 0, piece]], ground)
+    let s = initSimAt(c, TPL_X, V_MAX)
+    let doneAt = -1
+    for (let i = 0; i < 300 && doneAt < 0; i++) {
+      s = step(s, true, c)
+      if (s.moversDone.includes(0)) doneAt = s.tick
+    }
+    expect(s.dead).toBeNull()
+    expect(doneAt).toBeGreaterThan(20)
+    expect(s.movers).toEqual([])
+    const all = c.moversNear({ x0: TPL_X, y0: -mm(1000000), x1: TPL_X + mm(20000), y1: mm(1000000) })
+    expect(all.map((m) => m.id)).toEqual([0]) // 코스에는 남아 있지만
+    expect(moverRuns(s, all)).toEqual([]) // 판정·그림 목록에서 빠진다
+    // 조각이 있던 자리(틈 위) 바로 위에 차를 떨어뜨리면 그대로 틈으로 빠진다.
+    let t = { ...s, ...restOn(c, TPL_X + mm(10300), mm(200), 0, 0, false), tick: s.tick, movers: s.movers, moversDone: s.moversDone }
+    t = run(t, 30, () => false, c)
+    expect(t.rear.y).toBeLessThan(-mm(1000))
+  })
+
+  it('끼임: §5.2 한계 가까이 빠르게 도는 막대에도 crash, 죽는 순간 바퀴 깊이는 CRUSH_DEPTH + 이동 단계 하나의 막대 이동 이내', () => {
+    const L = mm(1900)
+    const a = (150 * Math.PI) / 180
+    for (const w of [128, 160]) {
+      const tip = Math.round((w * L * 2 * Math.PI) / TURN / SUBSTEPS) // 막대 끝의 이동 단계당 이동(160이면 ≈ 2490 < WHEEL_R)
+      expect(tip).toBeLessThan(WHEEL_R)
+      const bar = road([{ x0: 0, y0: 0, x1: Math.round(L * Math.cos(a)), y1: Math.round(L * Math.sin(a)) }], { k: 'rotate', a0: 0, w })
+      const c = withRoads([[WHEELBASE + mm(1500), mm(300), bar]])
+      let s = initSimAt(c, TPL_X, 0)
+      let lowest = Infinity
+      for (let i = 0; i < 100 && !s.dead; i++) {
+        s = step(s, false, c)
+        lowest = Math.min(lowest, s.front.y, s.rear.y)
+      }
+      expect(s.dead).toBe('crash')
+      // 지면 y = 0, 쉬는 바퀴 중심 y = WHEEL_R. 깊이 = WHEEL_R − y.
+      expect(WHEEL_R - lowest, `w ${w}`).toBeLessThanOrEqual(CRUSH_DEPTH + tip)
+      expect(lowest, `w ${w}`).toBeGreaterThan(0) // 측정값: 이 배치에서는 중심이 지면 아래로 가지 않는다(가장 낮은 값 366, w = 128)
+    }
   })
 
   it('Review Focus 1: 평지에 정지한 차 쪽으로 돌아 들어온 막대 길이 바퀴를 지면 쪽으로 밀면 바퀴가 지면 아래로 가지 않고 crash', () => {

@@ -55,7 +55,7 @@ export function moverBox(m: Mover): Box {
 // 움직이는 길 선분 후보의 번호: −1 − id × SEG_SLOTS − 선분 번호(음수라 진행 번호를 바꾸지 않는다).
 const SEG_SLOTS = 1000
 // 끝난 keys 길의 T0: 어느 시각에서도 마지막 키를 지난 것으로 본다.
-const LONG_AGO = -(2 ** 40)
+const LONG_AGO = -1099511627776 // −2^40
 
 /** 이번 틱에 판정에 쓰는 길과 그 시작 부분 틱 T0(null = 아직 시작 안 함). */
 export type MoverRun = { m: Mover; T0: number | null }

@@ -229,8 +229,8 @@ function crushed(w: Work, ox: number, oy: number, cands: readonly Cand[]): boole
   return (dm > CRUSH_DEPTH && df > -GROUND_TOL) || (df > CRUSH_DEPTH && dm > -GROUND_TOL)
 }
 
-// 이번 틱에 판정할 길과 그 T0. 끝난 fall 길은 뺀다.
-function moverRuns(s: SimState, near: readonly Mover[]): MoverRun[] {
+/** near 중 판정·그림에 쓰는 길과 그 T0(상태 s 기준). 끝난 fall 길은 뺀다. */
+export function moverRuns(s: SimState, near: readonly Mover[]): MoverRun[] {
   const out: MoverRun[] = []
   for (const m of near) {
     const done = s.moversDone.includes(m.id)
@@ -441,7 +441,11 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   const progress = touched >= 0 ? touched : s.progress
   const cx = Math.floor((r.x + f.x) / 2)
   const rode = r.rode.concat(f.rode.filter((id) => !r.rode.includes(id)))
-  const passing = course.moversNear({ x0: cx, y0: -Infinity, x1: cx, y1: Infinity }).filter((m) => m.start.k === 'pass')
+  // pass: 이번 틱에 차 중심이 지나간 x 범위로 찾는다(색인 상자는 pass.x까지 넓혀 두었으므로 pass.x가 길 어느 쪽이든 넘는 틱에 찾는다).
+  const oldCx = Math.floor((s.rear.x + s.front.x) / 2)
+  const passing = course
+    .moversNear({ x0: Math.min(oldCx, cx), y0: -Infinity, x1: Math.max(oldCx, cx), y1: Infinity })
+    .filter((m) => m.start.k === 'pass')
   const base = {
     ...s,
     tick: s.tick + 1,
