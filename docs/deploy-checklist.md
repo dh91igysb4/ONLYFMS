@@ -167,6 +167,30 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
+## 낚시(숨김, 지속형 world 게임) 배포
+`feat/fishing-ui` 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `hidden: true`로 들어간다.
+
+순서: DB push → `world` 함수 배포 → Vercel.
+
+- [ ] 마이그레이션 먼저: `npx supabase@2 db push` → `20261122191800_world.sql`(테이블 `world_saves`·`game_records`, RPC `user_records`), `20261122193304_fishing.sql`(`game_modes`·`hidden_games` 행)
+- [ ] 함수 배포. `world`는 `src/games/**` 로직·데이터를 번들하므로 `src/games/fishing/data.ts`·`logic.ts`가 바뀔 때마다 다시 배포한다.
+```bash
+npx supabase@2 functions deploy world --no-verify-jwt
+```
+  - 번들 오류면 출력 전문을 보고.
+- [ ] 그다음 Vercel 배포(머지)
+
+### 낚시 미리보기 확인
+브라우저 폭 390px와 1280px 모두, 관리자 계정으로.
+
+- [ ] 게임 목록에 "낚시" 카드와 "들어가기"가 관리자에게만 보인다
+- [ ] 캐스팅 → 입질 → 챔 → 미니게임 → 가방 → 판매 → 골드 증가 한 바퀴
+- [ ] 1,500 G 모아 유리섬유 낚싯대 구매 후 바가 길어지고 희귀 어종이 나온다
+- [ ] 새로고침·다른 브라우저에서 세이브가 이어진다
+- [ ] 프로필 기록 탭에 누적 수익·최대어·도감이 뜨고, 낚싯대를 사도 누적 수익이 줄지 않는다
+- [ ] 터치(개발자 도구 모바일 모드)로 전 과정이 된다, 길게 눌러도 화면이 스크롤·확대되지 않는다
+- [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부되고, `supabase.from('world_saves').select('state')`는 행 없이 오류(권한 거부)를 돌려준다
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

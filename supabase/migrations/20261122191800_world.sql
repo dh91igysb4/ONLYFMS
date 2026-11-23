@@ -1,5 +1,7 @@
 -- 월드(지속형) 게임: 사용자별 저장 상태, 게임 기록, 프로필용 user_records (fishing Task 2)
--- 쓰기는 world Edge Function이 소유자 연결로만 한다. 브라우저(authenticated)는 읽기만.
+-- world_saves는 브라우저(authenticated)가 읽지도 쓰지도 못한다(정책·권한 없음). state에 서버만 알아야 하는 값
+-- (챔 전의 어종·크기)이 들어 있으므로 world Edge Function이 소유자 연결로만 읽고 쓴다. 화면 값은 WorldLogic.view로만 나간다.
+-- game_records는 승인된 사용자가 읽기만 하고, 쓰기는 같은 Edge Function만 한다.
 
 create table public.world_saves (
   user_id       uuid not null references public.profiles(id) on delete cascade,
@@ -23,18 +25,16 @@ create table public.game_records (
 alter table public.world_saves  enable row level security;
 alter table public.game_records enable row level security;
 
-create policy world_saves_select on public.world_saves
-  for select to authenticated
-  using (user_id = auth.uid() and public.is_approved());
+-- world_saves: RLS만 켜 두고 정책 없음 (클라이언트 읽기·쓰기 모두 불가)
 
 create policy game_records_select on public.game_records
   for select to authenticated
   using (public.is_approved() and (public.is_admin() or not public._is_hidden_game(game_id)));
 
--- insert/update/delete 정책 없음
+-- game_records: insert/update/delete 정책 없음
 
 revoke all on table public.world_saves, public.game_records from public, anon, authenticated;
-grant select on table public.world_saves, public.game_records to authenticated;
+grant select on table public.game_records to authenticated;
 
 -- ------------------------------------------------------------------ user_records
 -- 프로필에 보여 줄 게임 기록. 승인된 대상만, 관리자가 아니면 숨김 게임 제외. 없으면 null.

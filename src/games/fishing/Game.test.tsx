@@ -1,0 +1,440 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import { availableHeight, canvasScale, Game } from './Game.tsx'
+import { ApiError, world } from '../../lib/api.ts'
+import { drawScene } from './scene.ts'
+import { barResult } from './minigame.ts'
+import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { price, type PendingView, type View } from './logic.ts'
+
+vi.mock('../../lib/api.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../../lib/api.ts')>()
+  return { ...orig, world: vi.fn() }
+})
+vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('./sprites.ts', () => ({
+  spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
+    `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
+}))
+// 미니게임 결과만 테스트에서 정할 수 있게 하고 나머지는 실제 물리를 쓴다.
+vi.mock('./minigame.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./minigame.ts')>()
+  return { ...orig, barResult: vi.fn(orig.barResult) }
+})
+
+// jsdom의 PointerEvent는 pointerId를 빠뜨릴 수 있어 MouseEvent를 상속한 최소 폴리필을 쓴다.
+class TestPointerEvent extends MouseEvent {
+  pointerId: number
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init)
+    this.pointerId = init.pointerId ?? 1
+  }
+}
+const OriginalPointerEvent = window.PointerEvent
+beforeAll(() => {
+  ;(window as unknown as { PointerEvent: unknown }).PointerEvent = TestPointerEvent
+})
+afterAll(() => {
+  ;(window as unknown as { PointerEvent: unknown }).PointerEvent = OriginalPointerEvent
+})
+
+const worldMock = vi.mocked(world)
+const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
+
+function makeView(over: Partial<View> = {}): View {
+  return { gold: 1234, totalEarned: 0, rodTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null, ...over }
+}
+
+type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
+type Handler = (body: Body) => Promise<{ view: View; result: unknown; server_now: number }>
+
+/** world 요청을 행동 종류별로 응답한다. 없는 종류는 실패로 둔다. */
+function route(handlers: Record<string, Handler>) {
+  worldMock.mockImplementation(((body: Body) => {
+    const key = body.action === 'load' ? 'load' : body.payload.type
+    const h = handlers[key]
+    if (!h) return Promise.reject(new Error(`unexpected ${key}`))
+    return h(body)
+  }) as unknown as typeof world)
+}
+const ok = (view: View, result: unknown = null) =>
+  Promise.resolve({ view, result, server_now: Date.now() })
+
+const calls = (type: string) =>
+  worldMock.mock.calls
+    .map(([b]) => b as Body)
+    .filter((b) => (type === 'load' ? b.action === 'load' : b.action === 'act' && b.payload.type === type))
+
+function pending(biteDelayMs = 3000): PendingView {
+  return { biteDelayMs, startedAt: Date.now(), hooked: false, species: null, sizeCm: null }
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', 'Date', 'performance'],
+  })
+  vi.setSystemTime(1_700_000_000_000)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    () => ({}) as unknown as CanvasRenderingContext2D,
+  )
+  worldMock.mockReset()
+  vi.mocked(drawScene).mockClear()
+  vi.mocked(barResult).mockReset().mockImplementation(actualMinigame.barResult)
+})
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
+
+const flush = () => act(async () => { await Promise.resolve() })
+const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+const canvas = () => screen.getByLabelText('낚시터')
+const press = () => fireEvent.pointerDown(canvas())
+const release = () => fireEvent.pointerUp(canvas())
+
+async function mount(view = makeView()) {
+  route({ load: () => ok(view) })
+  const r = render(<Game gameId="fishing" />)
+  await flush()
+  return r
+}
+
+/** 던지고 cast 응답까지 받은 상태(waiting)로 만든다. */
+async function castAndWait(view = makeView(), biteDelayMs = 3000) {
+  await mount(view)
+  // 서버가 cast를 처리한 시각이 startedAt이다
+  route({ load: () => ok(view), cast: () => { const p = pending(biteDelayMs); return ok({ ...view, pending: p }, p) } })
+  press()
+  await advance(400)
+  release()
+  await flush()
+}
+
+describe('fishing Game', () => {
+  test('loads and shows gold and bag count', async () => {
+    await mount(makeView({ gold: 12345, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] }))
+    expect(worldMock).toHaveBeenCalledWith({ game: 'fishing', action: 'load' })
+    expect(screen.getByText('12,345 G')).toBeInTheDocument()
+    expect(screen.getByText('1/20')).toBeInTheDocument()
+  })
+
+  test('load failure shows retry and retries', async () => {
+    worldMock.mockRejectedValueOnce(new ApiError('network', 0))
+    render(<Game gameId="fishing" />)
+    await flush()
+    expect(screen.getByText('연결이 불안정해요. 다시 시도해 주세요')).toBeInTheDocument()
+    route({ load: () => ok(makeView({ gold: 7 })) })
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    await flush()
+    expect(calls('load')).toHaveLength(2)
+    expect(screen.getByText('7 G')).toBeInTheDocument()
+  })
+
+  test('press-release sends cast with power in [0,1]', async () => {
+    await mount()
+    const p = pending()
+    route({ cast: () => ok(makeView({ pending: p }), p) })
+    press()
+    await advance(400)
+    release()
+    await flush()
+    const sent = calls('cast')
+    expect(sent).toHaveLength(1)
+    const payload = (sent[0] as unknown as { payload: { area: string; power: number } }).payload
+    expect(payload.area).toBe('pier')
+    expect(payload.power).toBeGreaterThanOrEqual(0)
+    expect(payload.power).toBeLessThanOrEqual(1)
+    expect(payload.power).toBeGreaterThan(0.3) // 400ms 모으면 게이지가 절반쯤 찬다
+  })
+
+  test('pressing before the bite sends resolve success:false', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({ resolve: () => ok(view, { caught: null }) })
+    await advance(1000)
+    press()
+    release()
+    await flush()
+    expect(calls('hook')).toHaveLength(0)
+    expect(calls('resolve')).toEqual([
+      { game: 'fishing', action: 'act', payload: { type: 'resolve', success: false, perfect: false } },
+    ])
+  })
+
+  test('missing the hook window sends resolve success:false', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({ resolve: () => ok(view, { caught: null }) })
+    await advance(3000 + HOOK_WINDOW_MS - 100)
+    expect(calls('resolve')).toHaveLength(0)
+    await advance(300)
+    expect(calls('resolve')).toEqual([
+      { game: 'fishing', action: 'act', payload: { type: 'resolve', success: false, perfect: false } },
+    ])
+  })
+
+  test('a won fight waits for MIN_FIGHT_MS, sends resolve success:true and shows the catch', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({
+      hook: () => ok(view, { species: 'mackerel', sizeCm: 40 }),
+      resolve: (b) => {
+        const perfect = (b as unknown as { payload: { perfect: boolean } }).payload.perfect
+        const fish = { species: 'mackerel', sizeCm: 40, perfect }
+        return ok({ ...view, bag: [fish], dex: { mackerel: { count: 1, maxCm: 40 } } }, { caught: fish })
+      },
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    expect(calls('hook')).toHaveLength(1)
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(200)
+    expect(calls('resolve')).toHaveLength(0) // 2초가 지나기 전에는 보내지 않는다
+    await advance(MIN_FIGHT_MS)
+    const sent = calls('resolve') as unknown as { payload: { success: boolean; perfect: boolean } }[]
+    expect(sent).toHaveLength(1)
+    expect(sent[0].payload.success).toBe(true)
+    expect(screen.getByText('새로운 물고기!')).toBeInTheDocument()
+    expect(screen.getByText(/고등어 40cm/)).toBeInTheDocument()
+    expect(screen.getByText(`${price('mackerel', 40, sent[0].payload.perfect).toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    await advance(1300)
+    expect(screen.queryByText('새로운 물고기!')).not.toBeInTheDocument()
+  })
+
+  test('shop: sell calls act sell and updates gold from the response', async () => {
+    const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
+    await mount(view)
+    route({ sell: () => ok({ ...view, gold: 1600, bag: [] }, { earned: 1500 }) })
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
+    await flush()
+    expect(calls('sell')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'sell' } }])
+    expect(screen.getByText('1,600 G')).toBeInTheDocument()
+    expect(screen.getByText('1,500 G를 벌었어요')).toBeInTheDocument()
+    expect(screen.getByText('0/20')).toBeInTheDocument()
+  })
+
+  test('shop: buy button disabled when gold is short; enabled and calls buyRod when enough', async () => {
+    const { unmount } = await mount(makeView({ gold: 1000 }))
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    expect(screen.getByRole('button', { name: '구매' })).toBeDisabled()
+    expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
+    expect(screen.getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(2)
+    unmount()
+
+    const rich = makeView({ gold: 2000 })
+    await mount(rich)
+    route({ buyRod: () => ok({ ...rich, gold: 500, rodTier: 2 }) })
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    const buy = screen.getByRole('button', { name: '구매' })
+    expect(buy).toBeEnabled()
+    fireEvent.click(buy)
+    await flush()
+    expect(calls('buyRod')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyRod', tier: 2 } }])
+    expect(screen.getByText('500 G')).toBeInTheDocument()
+  })
+
+  test('shop: a not_enough_gold failure on buy shows the Korean message', async () => {
+    const rich = makeView({ gold: 2000 })
+    await mount(rich)
+    route({ buyRod: () => Promise.reject(new ApiError('not_enough_gold', 400)), load: () => ok(rich) })
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+  })
+
+  test('shop shows the top-tier message when the best rod is owned', async () => {
+    await mount(makeView({ rodTier: 4 }))
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '구매' })).not.toBeInTheDocument()
+  })
+
+  test('dex shows silhouettes for undiscovered species and names for discovered', async () => {
+    await mount(makeView({ dex: { anchovy: { count: 3, maxCm: 14 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('멸치')).toBeInTheDocument()
+    expect(within(dex).queryByText('망둥어')).not.toBeInTheDocument()
+    expect(within(dex).getAllByText('???')).toHaveLength(SPECIES.length - 1)
+    const imgs = within(dex).getAllByRole('img') as HTMLImageElement[]
+    expect(imgs.filter((i) => i.src.endsWith(':silhouette'))).toHaveLength(SPECIES.length - 1)
+    expect(imgs.some((i) => i.src === 'data:fish-anchovy')).toBe(true)
+  })
+
+  test('bag_full on cast shows the shop hint', async () => {
+    await mount()
+    route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
+    press()
+    await advance(200)
+    release()
+    await flush()
+    const hint = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+    expect(hint).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '상점 열기' }))
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeInTheDocument()
+  })
+
+  test('no_pending on resolve reloads and returns to idle without an error screen', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    const reloaded = makeView({ gold: 999 })
+    route({ resolve: () => Promise.reject(new ApiError('no_pending', 400)), load: () => ok(reloaded) })
+    await advance(500)
+    press()
+    release()
+    await flush()
+    await flush()
+    expect(calls('load')).toHaveLength(2)
+    expect(screen.getByText('999 G')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+    // idle로 돌아와 다시 던질 수 있다
+    const p = pending()
+    route({ cast: () => ok({ ...reloaded, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    expect(calls('cast')).toHaveLength(2)
+  })
+
+  test('network error on resolve reloads', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({ resolve: () => Promise.reject(new ApiError('network', 0)), load: () => ok(makeView({ gold: 42 })) })
+    await advance(500)
+    press()
+    release()
+    await flush()
+    await flush()
+    expect(calls('load')).toHaveLength(2)
+    expect(screen.getByText('42 G')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+  })
+
+  test('input is ignored while a request is in flight', async () => {
+    await mount()
+    route({ cast: () => new Promise(() => {}) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    press()
+    await advance(300)
+    release()
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' })
+    fireEvent.keyUp(window, { key: ' ', code: 'Space' })
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+  })
+
+  test('input is ignored while a resolve request is in flight', async () => {
+    await castAndWait(makeView(), 3000)
+    route({ resolve: () => new Promise(() => {}) })
+    await advance(500)
+    press()
+    release()
+    await flush()
+    press()
+    release()
+    await flush()
+    expect(calls('resolve')).toHaveLength(1)
+  })
+
+  test('space key casts like a press', async () => {
+    await mount()
+    const p = pending()
+    route({ cast: () => ok(makeView({ pending: p }), p) })
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' })
+    await advance(300)
+    fireEvent.keyUp(window, { key: ' ', code: 'Space' })
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+  })
+
+  test('canvas input is ignored while a menu is open; menus are disabled while fighting', async () => {
+    const view = makeView()
+    await mount(view)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    press()
+    await advance(300)
+    release()
+    await flush()
+    expect(calls('cast')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+
+    route({
+      cast: () => { const p = pending(); return ok({ ...view, pending: p }, p) },
+      hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }),
+    })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
+  })
+
+  test('canvas scale uses the height left below the stage, not a fixed allowance', async () => {
+    const innerH = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 650 })
+    const rect = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('fish-stage') ? new DOMRect(0, 191, 688, 0) : rect.call(this)
+    })
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('fish-stage') ? 688 : 0
+    })
+    try {
+      await mount()
+      expect(canvas().style.width).toBe('160px')
+      expect(canvas().style.height).toBe('240px')
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+    }
+  })
+
+  test('stops drawing after unmount', async () => {
+    const { unmount } = await mount()
+    await advance(100)
+    expect(vi.mocked(drawScene).mock.calls.length).toBeGreaterThan(0)
+    unmount()
+    const n = vi.mocked(drawScene).mock.calls.length
+    await advance(200)
+    expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+  })
+})
+
+describe('canvasScale', () => {
+  test('largest integer scale that fits both width and height, between 1 and 4', () => {
+    expect(canvasScale(688, 600)).toBe(2)
+    expect(canvasScale(358, 700)).toBe(2)
+    expect(canvasScale(288, 700)).toBe(1)
+    expect(canvasScale(1000, 2000)).toBe(4)
+    expect(canvasScale(0, 0)).toBe(1)
+  })
+})
+
+describe('availableHeight', () => {
+  test('window height minus stage top, controls below and an 8px margin', () => {
+    expect(availableHeight(650, 191, 80)).toBe(371)
+    expect(canvasScale(688, 371)).toBe(1)
+    expect(availableHeight(844, 191, 80)).toBe(565)
+    expect(canvasScale(358, 565)).toBe(2)
+    expect(availableHeight(1300, 191, 80)).toBe(1021)
+    expect(canvasScale(688, 1021)).toBe(4)
+  })
+
+  test('a negative result still gives scale 1', () => {
+    const h = availableHeight(200, 191, 80)
+    expect(h).toBeLessThan(0)
+    expect(canvasScale(688, h)).toBe(1)
+  })
+})
