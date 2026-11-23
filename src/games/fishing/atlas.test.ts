@@ -240,3 +240,28 @@ describe('teleporterInfo', () => {
     for (const a of AREAS) expect(teleporterInfo(a.id, { areas: [...DEFAULT_AREAS] }, 'village')).not.toBeNull()
   })
 })
+
+describe('spotAnchors: 움직이는 맵(낚시 5부 M1)', () => {
+  it('물때 맵: 썰물 기준으로 진흙을 걸어 들어가 갯골 자리 대표점이 생기고, 설 자리는 진흙 위', () => {
+    const flat = defineMap('village', ['........', '.mmmmmm.', '.mmrrmm.', '.mmmmmm.', '~~~~~~~~'], {
+      tidal: true, spots: { water: 'shore', mud: 'shore', river: 'creek' },
+    })
+    const a = spotAnchors(flat).find((x) => x.spot === 'creek')!
+    expect(a).toBeDefined()
+    expect(tileAt(flat, a.tx, a.ty)).toBe('mud')
+    expect(spotTiles(flat, 'creek').waters.every((w) => tileAt(flat, w.tx, w.ty) === 'river')).toBe(true)
+    expect(spotAtTile(flat, 3, 2)).toBe('creek')
+    expect(spotAtTile(flat, 1, 1)).toBe('shore')
+  })
+  it('얼음 맵: 뚫을 수 있는 얼음을 보는 칸이 얼음 구멍 자리의 설 자리, 그 얼음 칸이 물 칸', () => {
+    const ice = defineMap('village', [',,,,,,', ',iiii,', ',iiii,', ',,,,,,'], { snowy: true, spots: { hole: 'ice' } })
+    const a = spotAnchors(ice).find((x) => x.spot === 'ice')!
+    expect(a).toBeDefined()
+    expect(isWalkable(ice, a.tx, a.ty, ALL_AREAS_OPEN)).toBe(true)
+    const t = spotTiles(ice, 'ice')
+    expect(t.waters.length).toBe(8)
+    expect(t.waters.every((w) => tileAt(ice, w.tx, w.ty) === 'ice')).toBe(true)
+    expect(spotAtTile(ice, 2, 1)).toBe('ice')
+    expect(spotAtTile(ice, 0, 0)).toBeNull()
+  })
+})

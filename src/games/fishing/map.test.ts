@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   ALL_AREAS_OPEN,
+  MAX_HOLES,
+  STATIC_DYNAMIC,
   TILE,
   TILE_CHARS,
   WATER_KINDS,
@@ -18,8 +20,11 @@ import {
   tileOf,
   type Dock,
   type Exit,
+  addHole,
+  nearestDryTile,
   type Facing,
   type Gate,
+  type MapDynamic,
   type Opened,
   type Teleporter,
   type TileKind,
@@ -675,5 +680,101 @@ describe('순간이동기', () => {
     // 옆이나 위에 붙은 도착 자리는 된다
     expect(() => make({ ...TP, front: { tx: 6, ty: 2, facing: 'right' } })).not.toThrow()
     expect(() => make({ ...TP, front: { tx: 5, ty: 1, facing: 'up' } })).not.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M1: 움직이는 맵 상태(진흙·얼음 구멍)
+
+describe('움직이는 맵 상태: 진흙(물때)', () => {
+  // 모래 / 진흙 / 진흙 가운데 갯골(강물 r) / 진흙 / 바다
+  const FLAT = defineMap('village', ['........', '.mmmmmm.', '.mmrrmm.', '.mmmmmm.', '~~~~~~~~'], {
+    tidal: true, spots: { water: 'shore', mud: 'shore', river: 'creek' },
+  })
+  const LOW: MapDynamic = { tide: 'low', holes: new Set() }
+  const HIGH: MapDynamic = { tide: 'high', holes: new Set() }
+
+  it('defineMap 옵션: tidal·fog·snowy 기본 false, STATIC_DYNAMIC은 밀물·구멍 없음', () => {
+    expect(FLAT.tidal).toBe(true)
+    expect([FLAT.fog, FLAT.snowy]).toEqual([false, false])
+    expect(VILLAGE.tidal || VILLAGE.fog || VILLAGE.snowy).toBe(false)
+    expect(STATIC_DYNAMIC.tide).toBe('high')
+    expect(STATIC_DYNAMIC.holes.size).toBe(0)
+    expect(TILE_CHARS.m).toBe('mud')
+    expect(TILE_CHARS.i).toBe('ice')
+  })
+  it('mud: 밀물이면 못 걷고 그 칸을 보면 fish(spots.mud), 썰물이면 걷고 낚시 불가', () => {
+    expect(isWalkable(FLAT, 1, 1, ALL_AREAS_OPEN)).toBe(false)
+    expect(isWalkable(FLAT, 1, 1, ALL_AREAS_OPEN, HIGH)).toBe(false)
+    expect(isWalkable(FLAT, 1, 1, ALL_AREAS_OPEN, LOW)).toBe(true)
+    expect(interactionAt(FLAT, center(1, 0), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'shore' })
+    expect(interactionAt(FLAT, center(1, 0), 'down', ALL_AREAS_OPEN, LOW)).toBeNull()
+  })
+  it('썰물에만 진흙 위에서 갯골을 본다; 밀물에는 모래에서 갯골에 닿지 않는다', () => {
+    expect(interactionAt(FLAT, center(3, 1), 'down', ALL_AREAS_OPEN, LOW)).toEqual({ kind: 'fish', spot: 'creek' })
+    const reachHigh = reachableTiles(FLAT, [{ tx: 0, ty: 0 }], ALL_AREAS_OPEN)
+    expect(reachHigh.has('3,1')).toBe(false)
+    const reachLow = reachableTiles(FLAT, [{ tx: 0, ty: 0 }], ALL_AREAS_OPEN, LOW)
+    expect(reachLow.has('3,1')).toBe(true)
+    expect(reachLow.has('3,2')).toBe(false)
+  })
+  it('castTarget: 밀물 진흙 위로 찌가 날아가고, 썰물이면 앞 칸에서 멈춘다', () => {
+    expect(castTarget(FLAT, center(2, 0), 'down', 1)).toEqual(center(2, 4))
+    expect(castTarget(FLAT, center(2, 0), 'down', 1, HIGH)).toEqual(center(2, 4))
+    expect(castTarget(FLAT, center(2, 0), 'down', 1, LOW)).toEqual(center(2, 1))
+  })
+  it('walk: 썰물에만 진흙으로 걸어 들어간다', () => {
+    const p: Player = { pos: center(1, 0), facing: 'down', moving: false, walkMs: 0 }
+    expect(feetBlocked(FLAT, center(1, 1).x, center(1, 1).y, ALL_AREAS_OPEN)).toBe(true)
+    expect(feetBlocked(FLAT, center(1, 1).x, center(1, 1).y, ALL_AREAS_OPEN, LOW)).toBe(false)
+    let a = p
+    let b = p
+    for (let i = 0; i < 20; i++) {
+      a = stepWalk(FLAT, a, { x: 0, y: 1 }, 50, ALL_AREAS_OPEN)
+      b = stepWalk(FLAT, b, { x: 0, y: 1 }, 50, ALL_AREAS_OPEN, LOW)
+    }
+    expect(tileOf(a.pos).ty).toBe(0)
+    expect(tileOf(b.pos).ty).toBeGreaterThanOrEqual(1)
+  })
+  it('nearestDryTile: 진흙을 지나 가장 가까운 늘 걷는 칸, 같은 거리면 ty·tx 작은 쪽, 땅 위면 그 칸', () => {
+    expect(nearestDryTile(FLAT, { tx: 3, ty: 3 }, ALL_AREAS_OPEN)).toEqual({ tx: 0, ty: 3 })
+    expect(nearestDryTile(FLAT, { tx: 1, ty: 1 }, ALL_AREAS_OPEN)).toEqual({ tx: 1, ty: 0 })
+    expect(nearestDryTile(FLAT, { tx: 6, ty: 2 }, ALL_AREAS_OPEN)).toEqual({ tx: 7, ty: 2 })
+    expect(nearestDryTile(FLAT, { tx: 4, ty: 0 }, ALL_AREAS_OPEN)).toEqual({ tx: 4, ty: 0 })
+    // 진흙에 갇힌 칸(둘레가 물뿐)은 null
+    const sealed = defineMap('village', ['..~~', '~~m~', '~~~~'], { tidal: true })
+    expect(nearestDryTile(sealed, { tx: 2, ty: 1 }, ALL_AREAS_OPEN)).toBeNull()
+  })
+})
+
+describe('움직이는 맵 상태: 얼음 구멍', () => {
+  const ICE = defineMap('village', [',,,,,,', ',iiii,', ',iiii,', ',,,,,,'], { snowy: true, spots: { hole: 'ice' } })
+  const holes = (...keys: string[]): MapDynamic => ({ tide: 'high', holes: new Set(keys) })
+
+  it('ice는 걷는다; 구멍이 되면 못 걷는다', () => {
+    expect(ICE.snowy).toBe(true)
+    expect(isWalkable(ICE, 2, 1, ALL_AREAS_OPEN)).toBe(true)
+    expect(isWalkable(ICE, 2, 1, ALL_AREAS_OPEN, holes('2,1'))).toBe(false)
+    expect(isWalkable(ICE, 3, 1, ALL_AREAS_OPEN, holes('2,1'))).toBe(true)
+  })
+  it('ice를 보면 drill(얼음 위·물가 둘 다), 구멍을 보면 fish(spots.hole)', () => {
+    expect(interactionAt(ICE, center(1, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'drill' })
+    expect(interactionAt(ICE, center(0, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'drill' })
+    expect(interactionAt(ICE, center(1, 1), 'right', ALL_AREAS_OPEN, holes('2,1'))).toEqual({ kind: 'fish', spot: 'ice' })
+  })
+  it('spots.hole이 없는 맵의 얼음은 뚫지 않는다', () => {
+    const plain = defineMap('village', [',i,'])
+    expect(interactionAt(plain, center(0, 0), 'right', ALL_AREAS_OPEN)).toBeNull()
+  })
+  it('castTarget: 구멍 하나면 그 구멍 칸 가운데; 구멍 없으면 앞 칸', () => {
+    expect(castTarget(ICE, center(1, 1), 'right', 1, holes('2,1'))).toEqual(center(2, 1))
+    expect(castTarget(ICE, center(1, 1), 'right', 1)).toEqual(center(2, 1))
+  })
+  it('addHole: 같은 칸 두 번은 하나, MAX_HOLES 넘으면 가장 오래된 것을 뺀다, 입력은 그대로', () => {
+    expect(MAX_HOLES).toBe(3)
+    expect(addHole([], 1, 2)).toEqual(['1,2'])
+    expect(addHole(['1,2'], 1, 2)).toEqual(['1,2'])
+    const three = ['1,1', '2,1', '3,1']
+    expect(addHole(three, 4, 1)).toEqual(['2,1', '3,1', '4,1'])
+    expect(three).toEqual(['1,1', '2,1', '3,1'])
   })
 })

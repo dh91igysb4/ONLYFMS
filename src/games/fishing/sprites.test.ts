@@ -446,3 +446,16 @@ describe('안 잡은 물고기 실루엣', () => {
     expect([...colors]).toEqual([SILHOUETTE])
   })
 })
+
+describe('낚시 5부 M1 타일: 진흙·얼음·구멍', () => {
+  const NEW = ['tile-mud', 'tile-mud-wet-0', 'tile-mud-wet-1', 'tile-ice', 'tile-hole-0', 'tile-hole-1']
+  it('16×16이고 서로 다르며, 기존 물·땅 타일과도 다르다', () => {
+    for (const n of NEW) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    const key = (n: string) => SPRITES[n].rows.join('|') + JSON.stringify(SPRITES[n].palette)
+    expect(new Set(NEW.map(key)).size).toBe(NEW.length)
+    for (const old of ['water-0', 'water-1', 'tile-sand', 'tile-path', 'lake-0', 'lake-1']) for (const n of NEW) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
+  })
+  it('땅 타일(진흙·얼음)은 칸을 꽉 채운다(투명 칸 없음)', () => {
+    for (const n of NEW) for (const r of SPRITES[n].rows) expect(r.includes('.'), n).toBe(false)
+  })
+})

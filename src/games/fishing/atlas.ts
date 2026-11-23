@@ -6,7 +6,7 @@ import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, type AreaI
 import { inHours, type Conditions } from './clock.ts'
 import {
   ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, shopSpot, tileAt,
-  type Facing, type MapDef, type Opened, type Rect,
+  type Facing, type MapDef, type MapDynamic, type Opened, type Rect,
 } from './map.ts'
 import { MAPS, mapFor } from './maps/index.ts'
 import { teleporterOpen, type View } from './logic.ts'
@@ -77,7 +77,10 @@ export function fixedCells(map: MapDef): Cell[] {
   return out
 }
 
-/** 걸어서 닿는 칸(모두 열린 기준): 시작 위치·출구 칸·선착장·이동기 앞에서 */
+/** 지도가 설 자리를 셀 때의 맵 상태: 썰물(진흙으로 걸어 들어가는 갯골도 자리), 구멍 없음(얼음은 drill로 센다) */
+const ATLAS_DYN: MapDynamic = { tide: 'low', holes: new Set<string>() }
+
+/** 걸어서 닿는 칸(모두 열린 기준, 썰물): 시작 위치·출구 칸·선착장·이동기 앞에서 */
 function walkableReach(map: MapDef): ReadonlySet<string> {
   const starts: Cell[] = [{ tx: Math.floor(map.spawn.pos.x / TILE), ty: Math.floor(map.spawn.pos.y / TILE) }]
   for (const e of map.exits) {
@@ -86,13 +89,16 @@ function walkableReach(map: MapDef): ReadonlySet<string> {
   }
   for (const d of map.docks) starts.push(d.front)
   if (map.teleporter) starts.push(map.teleporter.front)
-  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN)
+  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN, ATLAS_DYN)
 }
 
 type StandInfo = { stands: Map<string, Cell[]>; waters: Map<string, Cell[]> }
 const standCache = new WeakMap<MapDef, StandInfo>()
 
-/** 자리별 설 자리(걸어서 닿고, 네 방향 중 하나에서 그 자리 낚시)와 그 칸에서 보는 물 칸 */
+/**
+ * 자리별 설 자리(걸어서 닿고, 네 방향 중 하나에서 그 자리 낚시)와 그 칸에서 보는 물 칸.
+ * 썰물 기준이고, 뚫을 수 있는 얼음을 보는 칸은 얼음 구멍 자리(map.spots.hole)의 설 자리로 친다.
+ */
 function standInfo(map: MapDef): StandInfo {
   const hit = standCache.get(map)
   if (hit) return hit
@@ -105,15 +111,16 @@ function standInfo(map: MapDef): StandInfo {
       if (!reach.has(`${tx},${ty}`)) continue
       const spots = new Set<string>()
       for (const f of FACINGS) {
-        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN)
-        if (it?.kind !== 'fish') continue
-        spots.add(it.spot)
+        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN, ATLAS_DYN)
+        const spot = it?.kind === 'fish' ? it.spot : it?.kind === 'drill' ? map.spots.hole : undefined
+        if (spot === undefined) continue
+        spots.add(spot)
         const w = { tx: tx + STEP[f].tx, ty: ty + STEP[f].ty }
-        const seen = seenWater.get(it.spot) ?? new Set<string>()
-        seenWater.set(it.spot, seen)
+        const seen = seenWater.get(spot) ?? new Set<string>()
+        seenWater.set(spot, seen)
         if (!seen.has(`${w.tx},${w.ty}`)) {
           seen.add(`${w.tx},${w.ty}`)
-          waters.set(it.spot, [...(waters.get(it.spot) ?? []), w])
+          waters.set(spot, [...(waters.get(spot) ?? []), w])
         }
       }
       for (const s of spots) stands.set(s, [...(stands.get(s) ?? []), { tx, ty }])
@@ -160,9 +167,14 @@ export function spotTiles(map: MapDef, spot: string): { stands: Cell[]; waters: 
   return { stands: info.stands.get(spot) ?? [], waters: info.waters.get(spot) ?? [] }
 }
 
-/** 물 칸이고 map.spots에 그 물의 자리가 있으면 그 자리(부두 옆 바다는 'shore' 같은 물 자리), 아니면 null */
+/**
+ * 물 칸이고 map.spots에 그 물의 자리가 있으면 그 자리(부두 옆 바다는 'shore' 같은 물 자리), 아니면 null.
+ * 진흙은 밀물 자리(spots.mud), 얼음은 구멍 자리(spots.hole)로 본다.
+ */
 export function spotAtTile(map: MapDef, tx: number, ty: number): string | null {
   const kind = tileAt(map, tx, ty)
+  if (kind === 'mud') return map.spots.mud ?? null
+  if (kind === 'ice') return map.spots.hole ?? null
   if (kind === null || !WATER_KINDS.has(kind)) return null
   return (map.spots as Record<string, string | undefined>)[kind] ?? null
 }

@@ -41,6 +41,9 @@ export const MINIMAP_LOOK: Readonly<Record<TileKind, Look>> = {
   'cave-floor': look('#4a4553', '#4a4553'),
   'cave-wall': look('#25212c', '#25212c'),
   'cave-mouth': look('#8f8993', '#2a2433', ['bbb', 'bmb', 'bmb']),
+  // 낚시 5부: 진흙은 물때와 무관한 갯벌 무늬(축소 그림은 한 번만 만든다), 얼음은 흰 바탕 금무늬
+  mud: look('#8a7356', '#5f4d39', ['bmb', 'bbb', 'mbb']),
+  ice: look('#e6f2f8', '#9fc3d6', ['mbb', 'bmb', 'bbm']),
 }
 
 /** 고른 낚시 자리 칸에 겹칠 밝은 색(반투명) */

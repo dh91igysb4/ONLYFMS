@@ -3,12 +3,15 @@
 // 맵 자체(행 문자열)는 maps/<지역>.ts에서 defineMap으로 만든다.
 
 import { AREAS, type AreaId } from './data.ts'
+import type { Tide } from './clock.ts'
 
 export const TILE = 16
 
 export type TileKind = 'water' | 'sand' | 'grass' | 'path' | 'pier' | 'tree' | 'flower' | 'fence' | 'rock' | 'building' | 'door'
   | 'river' | 'pond' | 'basin' | 'falls' | 'bridge' | 'cliff'
   | 'lake' | 'cave-floor' | 'cave-wall' | 'cave-pool' | 'crystal' | 'lava' | 'cave-mouth' | 'palm' | 'lagoon' | 'dock'
+  // 낚시 5부: 진흙(썰물이면 땅, 밀물이면 물), 얼음(걷는 칸, 구멍을 뚫으면 물). 구멍은 행 글자 없이 MapDynamic으로만
+  | 'mud' | 'ice'
 export type Facing = 'up' | 'down' | 'left' | 'right'
 export type Vec = { x: number; y: number } // 월드 픽셀. 캐릭터 pos는 발 중앙
 
@@ -40,6 +43,8 @@ export const TILE_CHARS: Readonly<Record<string, TileKind>> = {
   P: 'palm', // 야자수
   l: 'lagoon', // 석호
   K: 'dock', // 선착장
+  m: 'mud', // 진흙(물때)
+  i: 'ice', // 얼음
 }
 
 const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock'])
@@ -48,6 +53,24 @@ const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'pat
 type WaterKind = 'water' | 'river' | 'pond' | 'basin' | 'lake' | 'cave-pool' | 'crystal' | 'lava' | 'lagoon'
 const WATER_LIST: readonly WaterKind[] = ['water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon']
 export const WATER_KINDS: ReadonlySet<TileKind> = new Set<TileKind>(WATER_LIST)
+/** 맵 spots의 열쇠: 늘 물인 종류 + 밀물 진흙(mud) + 얼음 구멍(hole) */
+export type SpotKey = WaterKind | 'mud' | 'hole'
+
+/**
+ * 맵의 움직이는 상태(낚시 5부). tide: 진흙 칸이 땅(low)인지 물(high)인지. holes: 얼음 구멍 칸("tx,ty").
+ * 맵 계산 함수들이 마지막 인자로 받고, 넘기지 않으면 STATIC_DYNAMIC(밀물·구멍 없음)이라 기존 맵은 그대로다.
+ */
+export type MapDynamic = { tide: Tide; holes: ReadonlySet<string> }
+export const STATIC_DYNAMIC: MapDynamic = { tide: 'high', holes: new Set<string>() }
+/** 한 방문에 열어 둘 수 있는 얼음 구멍 수 */
+export const MAX_HOLES = 3
+
+/** 구멍을 하나 더한다. 같은 칸은 한 번, MAX_HOLES를 넘으면 가장 오래된 것이 다시 언다. 입력은 바꾸지 않는다 */
+export function addHole(holes: readonly string[], tx: number, ty: number): string[] {
+  const k = `${tx},${ty}`
+  if (holes.includes(k)) return [...holes]
+  return [...holes, k].slice(-MAX_HOLES)
+}
 
 const STEP: Readonly<Record<Facing, { dx: number; dy: number }>> = {
   up: { dx: 0, dy: -1 },
@@ -102,8 +125,8 @@ export type MapDef = {
   /** 상점 건물 자리(타일, 문 줄 포함). 문은 맨 아래 줄의 doorTx 열. 문이 없는 맵은 null */
   shop: { tx: number; ty: number; w: number; h: number; doorTx: number } | null
   spawn: { pos: Vec; facing: Facing }
-  /** 물 종류 → 낚시 자리 id. 여기 없는 물은 낚시할 수 없다 */
-  spots: Partial<Record<WaterKind, string>>
+  /** 물 종류(밀물 진흙 mud, 얼음 구멍 hole 포함) → 낚시 자리 id. 여기 없는 물은 낚시할 수 없다 */
+  spots: Partial<Record<SpotKey, string>>
   exits: readonly Exit[]
   gates: readonly Gate[]
   docks: readonly Dock[]
@@ -113,6 +136,12 @@ export type MapDef = {
   world: { tx: number; ty: number }
   /** 순간이동기. 없는 맵은 null */
   teleporter: Teleporter | null
+  /** 물때가 있는 맵(진흙 칸 그림·걷기가 물때를 따른다) */
+  tidal: boolean
+  /** 안개(장면 효과만) */
+  fog: boolean
+  /** 늘 눈: 비 오는 날을 계절과 무관하게 눈으로 그린다(출현 조건은 그대로 rain) */
+  snowy: boolean
 }
 
 export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
@@ -120,17 +149,27 @@ export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
   return TILE_CHARS[map.rows[ty][tx]] ?? null
 }
 
-/** rows의 칸만 본 걷기 가능 여부(문 잠김 무시) */
-function tileWalkable(map: MapDef, tx: number, ty: number): boolean {
+/** rows의 칸만 본 걷기 가능 여부(문 잠김 무시). 진흙은 썰물에만, 얼음은 구멍이 아닐 때 */
+function tileWalkable(map: MapDef, tx: number, ty: number, dyn: MapDynamic = STATIC_DYNAMIC): boolean {
   const kind = tileAt(map, tx, ty)
+  if (kind === 'mud') return dyn.tide === 'low'
+  if (kind === 'ice') return !dyn.holes.has(`${tx},${ty}`)
   return kind !== null && WALKABLE.has(kind)
+}
+
+/** 그 칸이 지금 물이면 spots 열쇠(늘 물 종류·밀물 진흙 'mud'·얼음 구멍 'hole'), 아니면 null */
+function waterKeyAt(map: MapDef, tx: number, ty: number, dyn: MapDynamic): SpotKey | null {
+  const kind = tileAt(map, tx, ty)
+  if (kind === 'mud') return dyn.tide === 'high' ? 'mud' : null
+  if (kind === 'ice') return dyn.holes.has(`${tx},${ty}`) ? 'hole' : null
+  return kind !== null && WATER_KINDS.has(kind) ? (kind as WaterKind) : null
 }
 
 const inRect = (r: Rect, tx: number, ty: number): boolean => tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h
 
 /** 걸을 수 있는 칸인가. 순간이동기 칸과 잠긴 문(opened에 그 지역이 없음)의 칸은 못 걷고, 열린 문 칸은 rows 원래 칸의 규칙대로. */
-export function isWalkable(map: MapDef, tx: number, ty: number, opened: Opened): boolean {
-  if (!tileWalkable(map, tx, ty)) return false
+export function isWalkable(map: MapDef, tx: number, ty: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): boolean {
+  if (!tileWalkable(map, tx, ty, dyn)) return false
   if (map.teleporter && inRect(map.teleporter.tiles, tx, ty)) return false
   return !map.gates.some((g) => !opened.has(g.area) && inRect(g.tiles, tx, ty))
 }
@@ -166,6 +205,7 @@ function computeShop(map: MapDef): MapDef['shop'] {
 type MapOpts = {
   spots?: MapDef['spots']; exits?: Exit[]; gates?: Gate[]; docks?: Dock[]; indoor?: boolean
   world?: MapDef['world']; teleporter?: Teleporter
+  tidal?: boolean; fog?: boolean; snowy?: boolean
 }
 
 const rectInside = (map: MapDef, r: Rect): boolean =>
@@ -213,6 +253,7 @@ export function defineMap(id: AreaId, rows: readonly string[], opts: MapOpts = {
     id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' },
     spots: opts.spots ?? {}, exits: opts.exits ?? [], gates: opts.gates ?? [], docks: opts.docks ?? [], indoor: opts.indoor ?? false,
     world: opts.world ?? { tx: 0, ty: 0 }, teleporter: opts.teleporter ?? null,
+    tidal: opts.tidal ?? false, fog: opts.fog ?? false, snowy: opts.snowy ?? false,
   }
   checkPlaces(map)
   map.shop = computeShop(map)
@@ -269,12 +310,14 @@ export function openExitAt(map: MapDef, pos: Vec, opened: Opened): Exit | null {
  * 시작 칸들에서 4방향으로 걸어 닿는 칸들("tx,ty"). 열린 지역 기준(잠긴 문 칸은 못 지난다).
  * 못 걷는 시작 칸은 무시한다.
  */
-export function reachableTiles(map: MapDef, starts: readonly { tx: number; ty: number }[], opened: Opened): ReadonlySet<string> {
+export function reachableTiles(
+  map: MapDef, starts: readonly { tx: number; ty: number }[], opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC,
+): ReadonlySet<string> {
   const seen = new Set<string>()
   const queue: { tx: number; ty: number }[] = []
   const visit = (tx: number, ty: number) => {
     const k = `${tx},${ty}`
-    if (seen.has(k) || !isWalkable(map, tx, ty, opened)) return
+    if (seen.has(k) || !isWalkable(map, tx, ty, opened, dyn)) return
     seen.add(k)
     queue.push({ tx, ty })
   }
@@ -286,12 +329,41 @@ export function reachableTiles(map: MapDef, starts: readonly { tx: number; ty: n
   return seen
 }
 
+/**
+ * 밀물이 들어올 때 진흙 위 캐릭터를 세울 칸: from에서 진흙 칸만 지나(4방향) 닿는 가장 가까운 "늘 걷는 칸"
+ * (밀물 기준으로 걸을 수 있는 칸). 같은 거리면 ty, 그다음 tx가 작은 쪽. from이 이미 늘 걷는 칸이면 from. 없으면 null.
+ */
+export function nearestDryTile(map: MapDef, from: { tx: number; ty: number }, opened: Opened): { tx: number; ty: number } | null {
+  const dry = (tx: number, ty: number) => isWalkable(map, tx, ty, opened, STATIC_DYNAMIC)
+  if (dry(from.tx, from.ty)) return { tx: from.tx, ty: from.ty }
+  const seen = new Set<string>([`${from.tx},${from.ty}`])
+  let layer = [{ tx: from.tx, ty: from.ty }]
+  while (layer.length > 0) {
+    const next: { tx: number; ty: number }[] = []
+    const found: { tx: number; ty: number }[] = []
+    for (const c of layer) {
+      for (const { dx, dy } of Object.values(STEP)) {
+        const n = { tx: c.tx + dx, ty: c.ty + dy }
+        const k = `${n.tx},${n.ty}`
+        if (seen.has(k)) continue
+        seen.add(k)
+        if (dry(n.tx, n.ty)) found.push(n)
+        else if (tileAt(map, n.tx, n.ty) === 'mud') next.push(n)
+      }
+    }
+    if (found.length > 0) return found.sort((a, b) => a.ty - b.ty || a.tx - b.tx)[0]
+    layer = next
+  }
+  return null
+}
+
 export type Interaction =
   | { kind: 'shop' }
   | { kind: 'fish'; spot: string }
   | { kind: 'gate'; area: AreaId }
   | { kind: 'dock'; target: AreaId }
   | { kind: 'teleporter' }
+  | { kind: 'drill' }
   | null
 
 /** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'(선착장 dock은 부두가 아니라 그 물의 자리 그대로). */
@@ -309,7 +381,8 @@ const standsAt = (here: { tx: number; ty: number }, facing: Facing, at: TileFaci
 // 잠긴 문의 front에서 그 방향을 보면 gate, 선착장 front에서 그 방향을 보면 dock(열림과 무관: 화면이 구매/출발을 가른다).
 // 앞 칸이 순간이동기 구조물이면 teleporter(켜짐과 무관: 화면이 목록/안내를 가른다).
 // 그 외: 앞이 상점 문이고 위를 보면 상점, 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
-export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Opened): Interaction {
+// 낚시 5부: 앞이 얼음이고 구멍이 아니면(맵에 얼음 구멍 자리가 있을 때) drill, 앞이 구멍·밀물 진흙이면 그 자리 낚시.
+export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
   const here = tileOf(pos)
   const gate = map.gates.find((g) => !opened.has(g.area) && standsAt(here, facing, g.front))
   if (gate) return { kind: 'gate', area: gate.area }
@@ -317,8 +390,16 @@ export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Ope
   if (dock) return { kind: 'dock', target: dock.target }
   const { dx, dy } = STEP[facing]
   if (map.teleporter && inRect(map.teleporter.tiles, here.tx + dx, here.ty + dy)) return { kind: 'teleporter' }
-  const front = tileAt(map, here.tx + dx, here.ty + dy)
+  const fx = here.tx + dx
+  const fy = here.ty + dy
+  const front = tileAt(map, fx, fy)
   if (front === 'door') return facing === 'up' ? { kind: 'shop' } : null
+  if (front === 'ice' && map.spots.hole !== undefined && !dyn.holes.has(`${fx},${fy}`)) return { kind: 'drill' }
+  const key = waterKeyAt(map, fx, fy, dyn)
+  if (key === 'mud' || key === 'hole') {
+    const spot = map.spots[key]
+    return spot === undefined ? null : { kind: 'fish', spot }
+  }
   const spot = spotFor(map, tileAt(map, here.tx, here.ty), front)
   return spot === null ? null : { kind: 'fish', spot }
 }
@@ -328,7 +409,8 @@ const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 // 찌가 떨어질 월드 위치. 발에서 facing 방향으로 (1.5 + 3.5 * power) 타일.
 // 앞 타일부터 한 칸씩 나아가다(물 종류가 섞여도 계속) 물이 아닌 타일(맵 밖 포함)을 만나면 그 직전 물 타일의 중앙.
 // 끝 지점 타일까지 모두 물이면 끝 지점 그대로. 앞 타일부터 물이 아니면(낚시 불가 자리) 앞 타일 중앙.
-export function castTarget(map: MapDef, pos: Vec, facing: Facing, power: number): Vec {
+// 밀물 진흙·얼음 구멍도 물로 본다(dyn).
+export function castTarget(map: MapDef, pos: Vec, facing: Facing, power: number, dyn: MapDynamic = STATIC_DYNAMIC): Vec {
   const { dx, dy } = STEP[facing]
   const dist = (1.5 + 3.5 * clamp01(power)) * TILE
   const end = { x: pos.x + dx * dist, y: pos.y + dy * dist }
@@ -336,8 +418,7 @@ export function castTarget(map: MapDef, pos: Vec, facing: Facing, power: number)
   const to = tileOf(end)
   const steps = Math.abs(to.tx - from.tx) + Math.abs(to.ty - from.ty)
   for (let k = 1; k <= steps; k++) {
-    const kind = tileAt(map, from.tx + dx * k, from.ty + dy * k)
-    if (kind === null || !WATER_KINDS.has(kind)) {
+    if (waterKeyAt(map, from.tx + dx * k, from.ty + dy * k, dyn) === null) {
       const back = Math.max(1, k - 1)
       return tileCenter(from.tx + dx * back, from.ty + dy * back)
     }

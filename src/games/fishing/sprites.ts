@@ -3463,7 +3463,151 @@ const MAP_TELEPORTER = sprite({ k: MAP_INK, y: '#ffd23f', r: '#d9483b', w: '#fbf
   '.kkkkkkk.',
 ])
 
+// ── 낚시 5부 M1: 갯벌 진흙(썰물 땅 / 밀물 얕은 흙탕물 두 장), 얼음판, 얼음 구멍(두 장) ──
+const MUD: Record<string, string> = {
+  a: '#8a7356', // 진흙
+  b: '#76603f', // 젖은 결
+  c: '#a38c6a', // 마른 결
+  w: '#6f8f96', // 물웅덩이
+  W: '#a9c8cb', // 웅덩이 빛
+  h: '#4a3a29', // 게 구멍
+}
+const MUD_WET: Record<string, string> = {
+  a: '#5f8a86', // 얕은 흙탕물
+  d: '#557c78', // 깊은 결
+  b: '#79a39c', // 물결 몸
+  c: '#c2dcd2', // 물결 마루
+  m: '#7d6d55', // 비치는 진흙
+}
+const ICE: Record<string, string> = {
+  a: '#dcecf4', // 얼음
+  b: '#c4dcea', // 그늘
+  w: '#ffffff', // 빛
+  l: '#9fc3d6', // 금
+}
+const HOLE: Record<string, string> = {
+  ...ICE,
+  k: '#7fa6bd', // 구멍 테
+  d: '#1f4a66', // 깊은 물
+  D: '#2f6488', // 물
+  c: '#8fc8e4', // 물결 빛
+}
+const TILE_MUD = sprite(MUD, [
+  'aaaaaaaabaaaaaaa',
+  'aacaaaaaaaaaaaba',
+  'aaaaabbaaaaaaaaa',
+  'aaaaaaaaaaahaaaa',
+  'abaaaaaaaaaaaaaa',
+  'aaaawwwaaaaaacaa',
+  'aaawWwwwaaaaaaaa',
+  'aaaawwwaaabbaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaacaaaaaaaa',
+  'aahaaaaaaaaaaaaa',
+  'aaaaaaaaaawwwaaa',
+  'abbaaaaaawWwwaaa',
+  'aaaaacaaaawwaaaa',
+  'aaaaaaaaaaaaaaba',
+  'aaaaaaabaaaaaaaa',
+])
+const MUD_WET_0 = sprite(MUD_WET, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aaacccaaaaaaaaaa',
+  'aabaaabaaaamaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aamaaaaddaaaaaaa',
+  'aaaaaaaaaaaccaaa',
+  'aaaaaaaaaabaabaa',
+  'aaaaaaaaaaaaaaaa',
+  'adaaaaaaaaaaaama',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaccaaaaaaaaa',
+  'aaaabaabaaaaadaa',
+  'aaaaaaaaamaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+const MUD_WET_1 = sprite(MUD_WET, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaada',
+  'aaaaaaaaaaaaaaaa',
+  'aaaacccaaaamaaaa',
+  'aaabaaabaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aamaaaaaddaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaacccaa',
+  'aaaaaaaaaabaaaba',
+  'aaaaaaaaaaaaaama',
+  'aadaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaacaaaaaaaaa',
+  'aaaaabaabmaaaaaa',
+  'aaaaaaaaaaaaadaa',
+])
+const TILE_ICE = sprite(ICE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'awaaaaaalaaaaaaa',
+  'aaaaaaaallaaaaaa',
+  'aaaaaaaaalaaaaaa',
+  'aaaaaaaaaallaaaa',
+  'aaabaaaaaaalaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaawwa',
+  'aalaaaaaaaaaawaa',
+  'aaallaaaaabaaaaa',
+  'aaaaalaaaaaaaaaa',
+  'aaaaaalaaaaaaaaa',
+  'aaaaaaaaaaaaabaa',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+const HOLE_0 = sprite(HOLE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'aaaaakkkkkkaaaaa',
+  'aaaakddddddkaaaa',
+  'aaakdDDDDDDdkaaa',
+  'aakdDDcDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDDDDcDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDcDDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aaakdDDDDDDdkaaa',
+  'aaaakddddddkaaaa',
+  'aaaaakkkkkkaaaba',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+const HOLE_1 = sprite(HOLE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'aaaaakkkkkkaaaaa',
+  'aaaakddddddkaaaa',
+  'aaakdDDDDDDdkaaa',
+  'aakdDDDDDcDDdkaa',
+  'aakdDcDDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDDcDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDcDDDDdkaa',
+  'aaakdDDDDDDdkaaa',
+  'aaaakddddddkaaaa',
+  'aaaaakkkkkkaaaba',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+
 export const SPRITES: Record<string, Sprite> = {
+  'tile-mud': TILE_MUD,
+  'tile-mud-wet-0': MUD_WET_0,
+  'tile-mud-wet-1': MUD_WET_1,
+  'tile-ice': TILE_ICE,
+  'tile-hole-0': HOLE_0,
+  'tile-hole-1': HOLE_1,
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
   'player-reel': PLAYER_REEL,
