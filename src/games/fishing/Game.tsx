@@ -1,14 +1,17 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
-// 바 미니게임만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임은 rAF 한 개.
+// 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
+import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
 import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, SPAWN } from './map.ts'
-import { cameraFor } from './walk.ts'
+import { castTarget, interactionAt, SHOP_SPOT, SPAWN, tileOf, type Interaction, type Vec } from './map.ts'
+import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
+import { loadPosition, savePosition, type SavedPosition } from './position.ts'
+import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
@@ -56,6 +59,9 @@ type Outcome =
   | { kind: 'caught'; fish: Fish; isNew: boolean }
   | { kind: 'lost'; early: boolean }
 type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: 'info'; text: string }
+type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
+/** 누르기를 보낸 곳. 낚시 시작(충전·던지기)과 상점은 행동(버튼·스페이스)으로만, 챔·감기는 캔버스로도 된다. */
+type Source = 'action' | 'canvas'
 
 /** 렌더와 무관하게 프레임·타이머가 읽고 쓰는 진행 상태 */
 type Runtime = {
@@ -65,6 +71,15 @@ type Runtime = {
   chargeStart: number
   gauge: number
   castPower: number
+  player: Player
+  /** 조이스틱 입력. 0이 아니면 키보드보다 먼저 */
+  stick: MoveInput
+  keys: Keys
+  /** 지금 서 있는 자리의 상호작용 (화면 상태와 비교해 바뀔 때만 다시 그린다) */
+  hereKey: string
+  castSpot: 'pier' | 'shore'
+  /** 던진 찌의 월드 위치 */
+  bobber: Vec | null
   /** 서버 시각 - 로컬 시각 (마지막 응답 기준) */
   offset: number
   hookServerNow: number
@@ -105,15 +120,44 @@ const FISHING_MESSAGES: Record<string, string> = {
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 
+const DESKTOP_IDLE_HINT = '방향키로 이동 · 스페이스로 낚시/상점'
 const HINTS: Partial<Record<Phase, string>> = {
-  idle: '화면을 눌러 힘을 모으고, 떼면 던져요',
   charging: '떼면 던져요',
   waiting: '입질을 기다리는 중…',
   bite: '지금 눌러요!',
   fighting: '누르고 있으면 막대가 올라가요',
 }
 
+const STOP: MoveInput = { x: 0, y: 0 }
+const NO_KEYS: Keys = { up: false, down: false, left: false, right: false }
+/** 방향키와 WASD. e.code(자판 위치)로 읽어 한글 입력 상태에서도 된다. */
+const MOVE_KEYS: Record<string, keyof Keys> = {
+  ArrowUp: 'up', KeyW: 'up',
+  ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
+}
+const COARSE_QUERY = '(pointer: coarse)'
+const coarseQuery = (): MediaQueryList | null =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(COARSE_QUERY) : null
+
+/**
+ * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
+ * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
+ */
+function interactionFor(p: SavedPosition): Interaction {
+  const front = interactionAt(p.pos, p.facing)
+  if (front) return front
+  const t = tileOf(p.pos)
+  return t.tx === SHOP_SPOT.tx && t.ty === SHOP_SPOT.ty ? { kind: 'shop' } : null
+}
+const interactionKey = (i: Interaction): string => (i ? (i.kind === 'fish' ? `fish-${i.spot}` : 'shop') : '')
+
 export function Game({ gameId }: WorldGameProps) {
+  const { profile } = useAuth()
+  const userId = profile?.id ?? null
+  const userIdRef = useRef(userId)
+  userIdRef.current = userId
   const [view, setView] = useState<View | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -135,17 +179,38 @@ export function Game({ gameId }: WorldGameProps) {
   const menuRef = useRef<Menu | null>(null)
   const alive = useRef(true)
   const timers = useRef(new Set<number>())
-  const rt = useRef<Runtime>({
-    phase: 'idle', busy: false, pointer: false, chargeStart: 0, gauge: 0, castPower: 0, offset: 0,
-    hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0,
-  }).current
+  const [rt] = useState<Runtime>(() => {
+    // 마지막 위치(못 쓰는 값이면 상점 문 앞)에서 시작한다
+    const start = (userId !== null ? loadPosition(userId) : null) ?? SPAWN
+    const player: Player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
+    return {
+      phase: 'idle', busy: false, pointer: false, chargeStart: 0, gauge: 0, castPower: 0,
+      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(player)), castSpot: 'shore', bobber: null,
+      offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0,
+    }
+  })
+  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.player))
+  const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
   const setPhase = (p: Phase) => {
     rt.phase = p
     setPhaseState(p)
   }
+  /** 걷기 입력을 모두 놓는다. 키를 뗀 알림은 창이 초점을 잃으면 오지 않을 수 있다. */
+  const clearMove = () => {
+    rt.stick = STOP
+    rt.keys = { ...NO_KEYS }
+  }
+  const savePlayer = () => {
+    const id = userIdRef.current
+    if (id !== null) savePosition(id, { pos: rt.player.pos, facing: rt.player.facing })
+  }
   const setMenu = (m: Menu | null) => {
+    if (m) {
+      clearMove()
+      rt.pointer = false
+    }
     menuRef.current = m
     setMenuState(m)
   }
@@ -223,9 +288,10 @@ export function Game({ gameId }: WorldGameProps) {
   // ------------------------------------------------------------ 단계
   async function cast(power: number) {
     rt.castPower = power
+    rt.bobber = castTarget(rt.player.pos, rt.player.facing, power)
     let res: WorldView<View, PendingView>
     try {
-      res = await act<PendingView>({ type: 'cast', area: AREA, power })
+      res = await act<PendingView>({ type: 'cast', area: AREA, power, spot: rt.castSpot })
     } catch (e) {
       if (!alive.current) return
       const code = codeOf(e)
@@ -306,16 +372,27 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   // ------------------------------------------------------------ 입력
-  function press() {
+  function press(source: Source) {
     rt.pointer = true
     if (rt.busy || menuRef.current || !viewRef.current) return
     switch (rt.phase) {
-      case 'idle':
+      case 'idle': {
+        if (source !== 'action') break
+        const at = interactionFor(rt.player)
+        if (!at) break
+        if (at.kind === 'shop') {
+          setNotice(null)
+          setMenu('shop')
+          break
+        }
+        // 충전부터는 걷지 않으므로 자리와 방향이 그대로 고정된다
         setNotice(null)
+        rt.castSpot = at.spot
         rt.chargeStart = performance.now()
         rt.gauge = 0
         setPhase('charging')
         break
+      }
       case 'waiting':
         void lose(true)
         break
@@ -327,33 +404,55 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
-  function release() {
+  function release(source: Source) {
     rt.pointer = false
-    if (rt.phase !== 'charging' || rt.busy) return
+    // 충전은 시작한 행동(버튼·스페이스)을 뗄 때만 던진다. 다른 손가락으로 캔버스를 건드려도 끊기지 않는다.
+    if (source !== 'action' || rt.phase !== 'charging' || rt.busy) return
     const power = gaugeAt(performance.now() - rt.chargeStart)
     rt.gauge = power
     void cast(power)
   }
 
+  /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
+  function syncHere() {
+    const at = interactionFor(rt.player)
+    const k = interactionKey(at)
+    if (k === rt.hereKey) return
+    rt.hereKey = k
+    setHere(at)
+  }
+
   function frame(ctx: CanvasRenderingContext2D, now: number) {
     const dt = now - rt.lastFrame
     rt.lastFrame = now
+    // 걷기는 대기 중이고 메뉴가 닫혀 있을 때만. 충전부터 결과 표시까지는 자리·방향이 고정된다.
+    const wasMoving = rt.player.moving
+    if (rt.phase === 'idle' && !menuRef.current) {
+      const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
+      rt.player = stepWalk(rt.player, input, dt)
+    } else if (rt.player.moving) {
+      rt.player = { ...rt.player, moving: false, walkMs: 0 }
+    }
+    if (wasMoving && !rt.player.moving) savePlayer()
+    syncHere()
+
     if (rt.phase === 'charging' && !rt.busy) rt.gauge = gaugeAt(now - rt.chargeStart)
     if (rt.phase === 'fighting' && rt.bar && rt.params && !rt.settling) {
       rt.bar = stepBar(rt.bar, rt.pointer, dt, rt.params, Math.random)
       const r = barResult(rt.bar)
       if (r !== 'playing') endFight(r === 'caught', rt.bar.perfect)
     }
-    // 이동은 아직 없다: 캐릭터는 시작 위치에 서 있고 찌는 그 앞으로 던진 자리(다음 작업에서 이동·입력을 붙인다)
     const size = { w: fit.w, h: fit.h }
     const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
+    const { pos } = rt.player
     drawWorld(ctx, {
       phase: rt.phase,
       tMs: now,
       gauge: rt.gauge,
-      player: { pos: SPAWN.pos, facing: SPAWN.facing, moving: false, walkMs: 0 },
-      camera: cameraFor(SPAWN.pos, size),
-      bobber: fishing ? castTarget(SPAWN.pos, SPAWN.facing, rt.castPower) : null,
+      player: rt.player,
+      // 캐릭터는 반올림한 자리에 그려지므로 카메라도 반올림한 자리를 따라간다(홀수 폭에서 1px 흔들림 방지)
+      camera: cameraFor({ x: Math.round(pos.x), y: Math.round(pos.y) }, size),
+      bobber: fishing ? rt.bobber : null,
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
@@ -379,6 +478,34 @@ export function Game({ gameId }: WorldGameProps) {
 
   // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
   useEffect(() => releaseSceneCache, [])
+
+  // 마지막 위치: 걸음이 멈출 때(프레임), 탭이 가려질 때, 화면을 떠날 때 저장한다.
+  // 창이 초점을 잃거나 가려지면 키를 뗀 알림을 놓칠 수 있으므로 걷기 입력도 놓는다.
+  useEffect(() => {
+    const onBlur = () => clearMove()
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return
+      clearMove()
+      savePlayer()
+    }
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
+      savePlayer()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 터치 기기((pointer: coarse))에서만 조이스틱·행동 버튼을 보인다
+  useEffect(() => {
+    const mq = coarseQuery()
+    if (!mq || typeof mq.addEventListener !== 'function') return
+    const onChange = () => setTouch(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const loaded = view !== null
 
@@ -478,20 +605,35 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }, [fullscreen])
 
-  // 스페이스 키 = 누르기. 버튼·입력칸에 초점이 있으면 그쪽 동작에 맡긴다.
+  // 스페이스 키 = 행동. 버튼·입력칸에 초점이 있으면 그쪽 동작에 맡긴다.
+  // 방향키·WASD = 걷기. 입력칸에서 칠 때와 메뉴가 열려 있을 때(창 스크롤)는 건드리지 않는다. 떼기는 늘 받는다.
   useEffect(() => {
     const isSpace = (e: KeyboardEvent) => e.code === 'Space' || e.key === ' '
     const onControl = (t: EventTarget | null) =>
       t instanceof HTMLElement && t.closest('button, a, input, textarea, select') !== null
+    const onTextField = (t: EventTarget | null) =>
+      t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select') !== null)
     const down = (e: KeyboardEvent) => {
+      const dir = MOVE_KEYS[e.code]
+      if (dir) {
+        if (e.ctrlKey || e.metaKey || e.altKey || onTextField(e.target) || menuRef.current) return
+        e.preventDefault()
+        rt.keys = { ...rt.keys, [dir]: true }
+        return
+      }
       if (!isSpace(e) || onControl(e.target)) return
       e.preventDefault()
-      if (!e.repeat) handlers.current.press()
+      if (!e.repeat) handlers.current.press('action')
     }
     const up = (e: KeyboardEvent) => {
+      const dir = MOVE_KEYS[e.code]
+      if (dir) {
+        rt.keys = { ...rt.keys, [dir]: false }
+        return
+      }
       if (!isSpace(e) || onControl(e.target)) return
       e.preventDefault()
-      handlers.current.release()
+      handlers.current.release('action')
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -499,7 +641,7 @@ export function Game({ gameId }: WorldGameProps) {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [])
+  }, [rt])
 
   // ------------------------------------------------------------ 메뉴 행동
   async function sell() {
@@ -516,6 +658,15 @@ export function Game({ gameId }: WorldGameProps) {
     setNotice(null)
     try {
       await act({ type: 'buyRod', tier })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
+  async function buyBag(tier: number) {
+    setNotice(null)
+    try {
+      await act({ type: 'buyBag', tier })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
@@ -570,20 +721,24 @@ export function Game({ gameId }: WorldGameProps) {
   const notices = notice && (
     <>
       {notice.kind === 'bag_full' && (
-        <div className="notice fish-notice" role="alert">
-          <span>가방이 가득 찼어요. 상점에서 팔아 주세요</span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setMenu('shop')}>
-            상점 열기
-          </button>
-        </div>
+        <p className="notice" role="alert">가방이 가득 찼어요. 상점에 가서 팔아 주세요</p>
       )}
       {notice.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
       {notice.kind === 'info' && <p className="fish-info">{notice.text}</p>}
     </>
   )
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
-  // 전체화면에서는 알림이 캔버스 아래쪽에 겹쳐 뜨므로 그동안 안내 줄은 숨긴다
-  const hint = menu || (fullscreen && notices) ? null : HINTS[phase]
+  // 전체화면에서는 알림이 캔버스 아래쪽에 겹쳐 뜨므로 그동안 안내 줄은 숨긴다.
+  // 터치에서는 아래쪽에 조작이 있으므로 안내 줄을 위에 띄우고, 대기 중 안내는 데스크톱에만 둔다.
+  const idleHint = touch ? undefined : DESKTOP_IDLE_HINT
+  const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
+  const atShop = here?.kind === 'shop'
+  // 낚시가 시작되면(충전~결과) 챔·감기를 위해 늘 누를 수 있다
+  const action: ActionState =
+    phase !== 'idle' ? { label: '낚시', enabled: true }
+      : atShop ? { label: '상점', enabled: true }
+        : here ? { label: '낚시', enabled: true }
+          : { label: '낚시', enabled: false }
 
   return (
     <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef} tabIndex={-1}>
@@ -607,11 +762,21 @@ export function Game({ gameId }: WorldGameProps) {
               } catch {
                 /* 포인터 캡처를 못 해도 입력은 받는다 */
               }
-              handlers.current.press()
+              handlers.current.press('canvas')
             }}
-            onPointerUp={() => handlers.current.release()}
-            onPointerCancel={() => handlers.current.release()}
+            onPointerUp={() => handlers.current.release('canvas')}
+            onPointerCancel={() => handlers.current.release('canvas')}
           />
+          {touch && !menu && (
+            <Controls
+              onMove={(v) => {
+                rt.stick = v
+              }}
+              action={action}
+              onActionDown={() => handlers.current.press('action')}
+              onActionUp={() => handlers.current.release('action')}
+            />
+          )}
           {outcome && (
             <div className="fish-toast" aria-live="polite">
               {outcome.kind === 'caught' ? (
@@ -630,7 +795,7 @@ export function Game({ gameId }: WorldGameProps) {
               )}
             </div>
           )}
-          {hint && !outcome && <p className="fish-hint">{hint}</p>}
+          {hint && !outcome && <p className={touch ? 'fish-hint fish-hint-top' : 'fish-hint'}>{hint}</p>}
           {menu && (
             <div className="fish-panel">
               <div className="fish-panel-head">
@@ -639,9 +804,15 @@ export function Game({ gameId }: WorldGameProps) {
                   닫기
                 </button>
               </div>
-              {menu === 'bag' && <BagPanel view={view} />}
+              {menu === 'bag' && <BagPanel view={view} atShop={atShop} />}
               {menu === 'shop' && (
-                <ShopPanel view={view} busy={busy} onSell={() => void sell()} onBuy={(t) => void buyRod(t)} />
+                <ShopPanel
+                  view={view}
+                  busy={busy}
+                  onSell={() => void sell()}
+                  onBuy={(t) => void buyRod(t)}
+                  onBuyBag={(t) => void buyBag(t)}
+                />
               )}
               {menu === 'dex' && <DexPanel view={view} />}
             </div>
@@ -657,7 +828,7 @@ export function Game({ gameId }: WorldGameProps) {
           가방 <strong>{view.bag.length}/{bagSize(view.bagTier)}</strong>
         </span>
         <div className="fish-menu">
-          {(['bag', 'shop', 'dex'] as const).map((m) => (
+          {(['bag', 'dex'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -666,7 +837,7 @@ export function Game({ gameId }: WorldGameProps) {
               disabled={menuLocked}
               onClick={() => toggleMenu(m)}
             >
-              {m === 'bag' ? '가방' : m === 'shop' ? '상점' : '도감'}
+              {m === 'bag' ? '가방' : '도감'}
             </button>
           ))}
           <button
