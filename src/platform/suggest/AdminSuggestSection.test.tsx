@@ -16,6 +16,7 @@ vi.mock('../../games/index.ts', () => ({
     { manifest: { id: 'clubs', name: '클럽 맞추기', hidden: false } },
   ],
   duels: [],
+  worlds: [],
 }))
 
 import { ApiError } from '../../lib/api.ts'

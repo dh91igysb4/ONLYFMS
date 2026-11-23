@@ -16,7 +16,7 @@
 - `src/platform/chat/` 데일리 채팅(데이터 계층·화면). 권한은 화면이 아니라 DB `can_chat`(RLS·RPC·Storage 정책)이 정한다. 사진은 비공개 Storage 버킷 `daily-chat`에 올리고 서명 주소로만 연다
 - `src/platform/suggest/` 제안 게시판(데이터 계층·화면). 읽기는 RLS, 쓰기는 RPC. 분류·진행 기록은 워커가 `supabase/functions/suggest/`로만 쓴다
 - `supabase/functions/suggest/` 제안 워커용 Edge Function. 브라우저는 부르지 않고 헤더 `x-worker-token`으로만 인증한다. 워커 절차는 `docs/suggest-worker.md`
-- `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`
+- `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`. `world_saves`는 클라이언트에서 읽을 수 없다. 화면에 필요한 값은 `WorldLogic.view`로만 내보낸다.
 - 등록부 `src/games/index.ts`의 `worlds`/`getWorld`(지속형 게임), 화면은 `src/games/ui.ts`의 `getWorldComponent`
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
@@ -41,6 +41,12 @@
 - manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
+
+## 낚시 데이터 갱신 (`fishing`)
+`src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
+1. `logic.ts`의 `logic.version`을 올린다.
+2. `migrate`가 옛 버전 세이브를 읽는지 `logic.test.ts`에 테스트를 추가한다 (세이브는 서버에 계속 남아 있다).
+3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
 
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
@@ -77,7 +83,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
-- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색 예외).
+- 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색, 낚시 캔버스 내부 색 예외).
 
 ## 비밀값 위치
 - Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (공개용 키)

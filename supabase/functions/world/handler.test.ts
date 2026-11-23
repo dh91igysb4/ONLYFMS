@@ -238,6 +238,37 @@ t('missing or unknown action 400 invalid_action', async () => {
   }
 })
 
+t('real fishing registry: load, cast, resolve, sell writes game_records', async () => {
+  const admin = await user('approved', true) // 숨김 게임이라 관리자만
+  let now = NOW
+  const real = async (body: unknown): Promise<Res> => {
+    const d: WorldDeps = { ...deps(), now: () => now, registry: undefined }
+    const req = new Request('http://localhost/functions/v1/world', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${admin}` },
+      body: JSON.stringify(body),
+    })
+    const res = await handle(req, d)
+    return { status: res.status, body: await res.json() }
+  }
+  const game = 'fishing'
+  assert.equal((await real({ game, action: 'load' })).status, 200)
+  const cast = await real({ game, action: 'act', payload: { type: 'cast', area: 'pier', power: 0.5 } })
+  assert.equal(cast.status, 200)
+  const pending = cast.body.result as { biteDelayMs: number }
+  now += pending.biteDelayMs
+  const hook = await real({ game, action: 'act', payload: { type: 'hook' } })
+  assert.equal(hook.status, 200)
+  now += 2000
+  const res = await real({ game, action: 'act', payload: { type: 'resolve', success: true, perfect: false } })
+  assert.equal(res.status, 200)
+  const sold = await real({ game, action: 'act', payload: { type: 'sell' } })
+  assert.equal(sold.status, 200)
+  assert.ok((sold.body.view as { gold: number }).gold > 0)
+  const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
+  assert.deepEqual(rows.map((r) => r.key), ['biggest', 'dex', 'total_earned'])
+})
+
 t('teardown', async () => {
   await sql`delete from public.hidden_games where game_id = 'test-world-hidden'`
   await sql.end()
