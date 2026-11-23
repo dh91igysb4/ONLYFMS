@@ -41,8 +41,10 @@ export const START_LEN = 12000 * MM
 // 시작 평지가 코스 시작점(x = 0) 뒤로 이어지는 길이. 첫 구간(tier 1)에서 되굴러 나오는 속력은 많아야 약 3500 u/틱이고
 // ROLL_DRAG(1 u/틱²)로 멈추기까지 v²/2 ≈ 380 m를 간다(hill 오르막에서 떼면 실측 약 195 m). 그보다 넉넉히 둔다. 측정 대상 아님
 export const START_BACK = 500000 * MM
+// 구간 번호(from)부터 쓰는 티어 1~4 가중치. 티어 1만으로도 11종이라 첫 구간부터 여러 종류가 나온다.
+// 녹화에서는 점수 1~5에서도 컬·구덩이·'9'자 고리가 나와(영상 장애물 목록 "순서와 리듬") 높은 티어를 예전(4·12·30)보다 일찍 섞는다.
 export const TIER_WEIGHTS: readonly { from: number; w: readonly [number, number, number, number] }[] =
-  [{ from: 0, w: [1, 0, 0, 0] }, { from: 4, w: [3, 2, 0, 0] }, { from: 12, w: [2, 3, 2, 0] }, { from: 30, w: [1, 2, 3, 2] }]
+  [{ from: 0, w: [1, 0, 0, 0] }, { from: 3, w: [3, 2, 0, 0] }, { from: 8, w: [3, 3, 1, 0] }, { from: 16, w: [2, 3, 2, 1] }]
 export const SEND_TICKS = 30
 export const PASS_AFTER_TICKS = 30 // 통과 게이트(bots.ts): 구간 끝을 넘은 뒤 이만큼 더 살아 있어야 그 구간을 넘은 것으로 본다
 export const MAX_ACTION_TICKS = 120
