@@ -1,7 +1,8 @@
 // 장애물 템플릿 → 선분. 순수 정수 TS (설계 §6). 좌표 x 앞, y 위, 단위 u.
 import type { BlockDef } from './blocks.ts'
 import { LEAD_FLAT_MAX, MM, SEG_LEN, TAIL_FLAT_MAX } from './constants.ts'
-import type { HazardDef, HazardShape } from './hazards.ts'
+import type { HazardDef, HazardLook, HazardShape } from './hazards.ts'
+import type { Motion } from './motion.ts'
 import type { MoverDef } from './movers.ts'
 import { TRIG_ONE, TURN, cosT, sinT } from './trig.ts'
 
@@ -179,6 +180,14 @@ const gem = (dx: number, dy: number): Prim => ({ t: 'gem', dx: mm(dx), dy: mm(dy
 const boost = (len: number): Prim => ({ t: 'boost', len: mm(len) })
 const tanDeg = (d: number, dx: number): number => Math.floor((dx * sinT(deg(d))) / cosT(deg(d))) // 기울기 d°인 직선이 dx만큼 갈 때의 높이(mm)
 
+// 위험물 prim. 위치·치수는 mm, 각도는 TURN. 기준점은 펜 + (dx, dy)이고 도형은 그 점에 놓인다(설계 §4.3).
+const STILL: Motion = { k: 'none' }
+const hazard = (dx: number, dy: number, shape: HazardShape, motion: Motion, look: HazardLook): Prim => ({ t: 'hazard', dx: mm(dx), dy: mm(dy), h: { shape, motion, look } })
+const saw = (dx: number, dy: number, r: number, motion: Motion = STILL): Prim => hazard(dx, dy, { s: 'disc', x: 0, y: 0, r: mm(r) }, motion, 'saw')
+// 도는 날 n개(폭 w TURN). 시작각 a0, 각속도 w TURN/틱(음수면 시계 방향).
+const blades = (dx: number, dy: number, rIn: number, rOut: number, n: number, width: number, a0: number, w: number, look: HazardLook): Prim =>
+  hazard(dx, dy, { s: 'blades', x: 0, y: 0, rIn: mm(rIn), rOut: mm(rOut), n, w: width }, { k: 'rotate', a0, w }, look)
+
 // 템플릿마다 근거가 된 녹화 시각(s)을 적는다. 목록은 측정 기록의 "영상 장애물 목록"(S1~S33)이다.
 // 치수는 녹화의 차 길이(약 2 m, 화면 폭의 1/9) 비율로 쟀다. "대" = 차 한 대 길이.
 
@@ -201,8 +210,12 @@ const hill: Template = {
 
 // [S2, 59–63·178·208–219·237·290 s] 낮은 물결: 반지름 10 m 호로 진행 방향을 ±20° 사이로 흔든다. 마루 3개,
 // 마루–골 약 2.4 m(1.2대), 마루 간격 약 13.7 m(6.8대). 첫 마루 위 공중에 비스듬한 보석 3개(208–211 s, 앞 절벽에서 날아온 궤적).
+// 골 위의 빨간 톱니 둘(M3): 첫 골 위 높이 뜬 큰 톱니(62–63.5 s, 지름 약 4.5대, 아래 끝이 골에서 약 2.7대 위)와
+// 둘째 골 위 톱니(216–217.75 s, 지름 약 2.2대, 아래 끝이 마루 높이쯤. 녹화에서는 마루에서 뜬 차가 여기 박혀 죽었다).
+// 길을 따라 달리면(V_MAX에서 바퀴가 뜨지 않는다) 닿지 않고, 마루에서 뜨면 닿는다.
 const WAVE_R = mm(10000)
 const WAVE_A = deg(20)
+const WAVE_HALF = 3410 // 호 하나의 가로 절반(mm): 호 끝(변곡점)에서 골·마루까지
 const waves: Template = {
   id: 'waves',
   tier: 1,
@@ -213,8 +226,10 @@ const waves: Template = {
     gem(3900, 2600),
     gem(4900, 1600),
     bend(WAVE_R, WAVE_A, -WAVE_A),
+    saw(WAVE_HALF, 9400, 4500), // 첫 골 위
     bend(WAVE_R, -WAVE_A, WAVE_A),
     bend(WAVE_R, WAVE_A, -WAVE_A),
+    saw(WAVE_HALF, 3200, 2250), // 둘째 골 위
     bend(WAVE_R, -WAVE_A, WAVE_A),
     bend(WAVE_R, WAVE_A, -WAVE_A),
     bend(WAVE_R, -WAVE_A, 0),
@@ -370,6 +385,8 @@ const quarter: Template = {
 // [S9·S30, 155.6–158·284.8 s] 부스터 + 점프대: 부스터(»») 6 m → 30° 점프대 → 틈 17 m(1.5 m 낮아짐) → −20° 내리막 → +10° 오르막 → 평지.
 // 녹화는 화살표가 휘어 오르는 킥커 위에 있지만 부스터 선분은 수평이라 킥커 바로 앞에 둔다.
 // 부스터가 어느 진입 속도든 BOOST_V로 올려 주므로 체공은 늘 약 76틱이다. 비행 궤적 위에 보석 4개.
+// 비행 경로 위·아래의 빨간 톱니(M3, 54·156.5–158·285.5–287.5 s): 킥커 앞 위쪽의 큰 톱니(지름 약 2.5대)와 틈 가운데 아래쪽 톱니.
+// 궤적(차 중심)에서 톱니 가장자리까지 약 2 m라 공중에서 돌아도 닿지 않는다(차 중심에서 차 끝까지 약 1 m).
 const boostjump: Template = {
   id: 'boostjump',
   tier: 2,
@@ -382,6 +399,8 @@ const boostjump: Template = {
     gem(6500, 2350),
     gem(10000, 2420),
     gem(13500, 1680),
+    saw(5500, 7000, 2500),
+    saw(13000, -1700, 1800),
     gap(17000, -1500),
     line(10000, -3640),
     bend(mm(12000), -deg(20), deg(10)),
@@ -400,9 +419,13 @@ const spikefloor: Template = {
   prims: [line(4000, 0), bend(mm(5000), 0, deg(55)), gap(7000, -2100), line(12000, 0)],
 }
 
-// [S19, 181.4–182 s] 가시 구덩이: S자(반지름 7.5 m, 30°)로 2 m 올라선 고원 3 m → 너비 5.2 m(2.6대) 구덩이 → 2.4 m 낮은 반대편 2 m
-// → S자 내리막 → 평지. 구덩이 바닥의 빨간 가시는 바닥 없는 틈으로 대신한다. 녹화의 구덩이는 6.3 m(3.2대)이지만
-// V_MAX 수평 비행(2.4 m 떨어지는 동안 약 5.8 m)으로는 앞바퀴가 반대편 모서리에 걸려 떨어져 5.2 m로 줄였다.
+// [S19, 181.4–182 s] 가시 구덩이: S자(반지름 7.5 m, 30°)로 2 m 올라선 고원 3 m → 너비 5.2 m(2.6대)·깊이 4.6 m(2.3대)의 네모 구덩이
+// → 2.4 m 낮은 반대편 2 m → S자 내리막 → 평지. 녹화의 구덩이는 6.3 m(3.2대)이지만 V_MAX 수평 비행(2.4 m 떨어지는 동안 약 5.8 m)으로는
+// 앞바퀴가 반대편 모서리에 걸려 5.2 m로 줄였다. 구덩이 바닥은 길로 메우고 그 위 전체에 빨간 가시 막대(높이 0.4 m)를 얹는다.
+// 막대 양 끝은 벽에서 0.1 m 안쪽이라 벽(옆 길)에 닿지 않는다. 빠지면 가시에 닿아 crash.
+const PIT_W = 5200
+const PIT_SPIKE_R = 200
+const PIT_SPIKE_IN = PIT_SPIKE_R + 100 // 벽에서 막대 끝점까지
 const spikepit: Template = {
   id: 'spikepit',
   tier: 2,
@@ -411,7 +434,10 @@ const spikepit: Template = {
     bend(mm(7500), 0, deg(30)),
     bend(mm(7500), deg(30), 0),
     line(3000, 0),
-    gap(5200, -2400),
+    line(0, -4600),
+    hazard(0, 0, { s: 'bar', x0: mm(PIT_SPIKE_IN), y0: mm(PIT_SPIKE_R), x1: mm(PIT_W - PIT_SPIKE_IN), y1: mm(PIT_SPIKE_R), r: mm(PIT_SPIKE_R) }, STILL, 'spikes'),
+    line(PIT_W, 0),
+    line(0, 2200),
     line(2000, 0),
     bend(mm(6000), 0, -deg(30)),
     bend(mm(6000), -deg(30), 0),
@@ -436,6 +462,7 @@ const stepup: Template = {
 }
 
 // [S21, 52–53·214 s] 마루 사이 틈: S자(반지름 8 m)로 오르다 15° 위를 향한 채 끊김 → 틈 5 m → 0.6 m 낮은 볼록 내리막 → 평지.
+// 빨간 톱니(M3) 둘: 틈 안, 턱보다 약 0.75 m 아래가 위 끝인 톱니(32.5 s, 지름 약 1.3대)와 건너편 위 높이 뜬 톱니(213–215.5 s).
 const crestgap: Template = {
   id: 'crestgap',
   tier: 2,
@@ -443,6 +470,8 @@ const crestgap: Template = {
     line(4000, 0),
     bend(mm(8000), 0, deg(30)),
     bend(mm(8000), deg(30), deg(15)),
+    saw(2500, -2050, 1300),
+    saw(6570, 3200, 1300),
     gap(5000, -600),
     bend(mm(8000), 0, -deg(30)),
     bend(mm(8000), -deg(30), 0),
@@ -482,11 +511,161 @@ const bowldrop: Template = {
   ],
 }
 
+// [M3, 316.8–320.5 s] 톱니 밭: 부스터 4 m → 30° 짧은 직선 킥커(부스터 킥커 S9) → 공중에 빨간 톱니 9개가 엇갈린 줄로 떠 있고
+// 그 사이로 날아간다 → 공중에서 시작하는 35° 직선 내리막(S30, 318.5 s)에 내려 평지로. 톱니 지름 약 1.6대.
+// 부스터가 진입 속도와 상관없이 BOOST_V로 올려 주므로 궤적이 늘 같다. 톱니는 궤적(차 중심)에서 가장자리까지 1.5 m 넘게 띄웠다.
+const sawfield: Template = {
+  id: 'sawfield',
+  tier: 2,
+  prims: [
+    line(4000, 0),
+    boost(4000),
+    line(2000, tanDeg(30, 2000)),
+    // 킥커 끝 기준. 궤적 위 줄(+3.6 m)·아래 줄(−3.6 m)이 엇갈리고, 더 위(+8 m)와 더 아래(−8 m)에 몇 개
+    saw(4000, 5650, 1600),
+    saw(9500, 6800, 1600),
+    saw(15000, 6350, 1600),
+    saw(6500, -800, 1600),
+    saw(12000, -400, 1600),
+    saw(17500, -1550, 1600),
+    saw(9000, -4850, 1600),
+    saw(14500, -5150, 1600),
+    saw(12000, 11150, 1600),
+    gap(21500, -1650),
+    line(3000, -tanDeg(35, 3000)),
+    bend(mm(8000), -deg(35), 0),
+    line(8000, 0),
+  ],
+}
+
+// [위키 5쪽(2점), M3] 왕복 톱니: S자로 1.5 m 내려간 골 위에서 큰 빨간 톱니(지름 5 m, 약 2.5대)가 2초마다 위아래로 오간다.
+// 위키 그림은 골 위에 떠 있는 큰 톱니이고, 본문에 "움직이며 왕복운동을 할 때도 있으니 주의하도록 하자"고 되어 있다.
+// 가장 낮을 때는 길을 막고, 가장 높을 때는 아래 끝이 길 위 3.4 m다. V_MAX 도착 때 12위상 중 10에서 지나간다.
+const SWING_R = 2500
+const SWING_HALF = 3381 // 골 호 시작에서 골 바닥까지 가로(8 m · sin 25°)
+const SWING_LOW = 1950 // 가장 낮을 때 톱니 중심: 골 바닥(호 시작보다 0.75 m 아래) 위 2.7 m. 아래 끝이 길 위 0.2 m라 차를 막는다
+const SWING_RISE = 3200 // 가장 높을 때 아래 끝이 길 위 3.4 m
+const SWING_P = 120
+const sawswing: Template = {
+  id: 'sawswing',
+  tier: 2,
+  prims: [
+    line(5000, 0),
+    bend(mm(8000), 0, -deg(25)),
+    saw(SWING_HALF, SWING_LOW, SWING_R, { k: 'swing', ax: 0, ay: mm(SWING_RISE), period: SWING_P, phase: 0 }),
+    bend(mm(8000), -deg(25), deg(25)),
+    bend(mm(8000), deg(25), 0),
+    line(8000, 0),
+  ],
+}
+
+// [위키 10·11쪽(16·49점)] 배럴형 바퀴: 45° 직선 오르막(4.8 m)이 공중에서 끊김 → 틈 → 같은 높이에서 시작하는 45° 내리막 → 평지.
+// 틈 위에 마주 보는 두 부채꼴(나비넥타이, 각 100°) 모양 빨간 바퀴 둘이 위아래로 놓여 함께 돈다. 아래 바퀴 중심은 턱보다 약 1.2 m 아래,
+// 위 바퀴는 약 7.5 m 위, 반지름 약 2.4 m(1.2대). 위키: "그냥 넘어갈 수 있다", "충분히 속도를 낸 후 돌지만 않으면 타이밍과 상관없이 건널 수 있다".
+const BARREL_GAP = 6500
+const barrel: Template = {
+  id: 'barrel',
+  tier: 2,
+  prims: [
+    line(4000, 0),
+    line(4800, 4800),
+    blades(BARREL_GAP / 2, -1200, 0, 2400, 2, deg(100), 0, 23, 'blades'),
+    blades(BARREL_GAP / 2, 7500, 0, 2400, 2, deg(100), 0, 23, 'blades'),
+    gap(BARREL_GAP, 0),
+    line(4000, -4000),
+    bend(mm(6000), -deg(45), 0),
+    line(8000, 0),
+  ],
+}
+
+// [M4, 280.5–281.9 s] 팩맨 원반: 37° 직선 오르막(3.5 m)이 공중에서 끊김 → 틈 → 같은 높이에서 시작하는 37° 내리막(3.7 m) → 평지.
+// 오르막 끝 옆(틈 위)에 빨간 원반 둘이 위아래로 놓여 돈다. 아래 원반 중심은 턱보다 0.9 m 아래, 위 원반은 5.6 m 위, 반지름 1.9 m.
+// 녹화에서 확대된 장면(281.3 s)은 입이 뚫린 원반(팩맨)처럼 보이고, 멀리서 본 장면(281.8 s)은 마주 보는 부채꼴처럼 보인다.
+// 위키의 배럴형 바퀴(barrel)와 같은 배치라, 여기서는 3/4바퀴 원반(입 90°)으로 만들고 위·아래가 반대로 돈다.
+const PAC_GAP = 6000
+const pacman: Template = {
+  id: 'pacman',
+  tier: 2,
+  prims: [
+    line(4000, 0),
+    line(4600, tanDeg(37, 4600)),
+    blades(PAC_GAP / 2, -900, 0, 1900, 1, (TURN * 3) / 4, 0, 20, 'pacman'),
+    blades(PAC_GAP / 2, 5600, 0, 1900, 1, (TURN * 3) / 4, TURN / 2, -20, 'pacman'),
+    gap(PAC_GAP, 0),
+    line(4900, -tanDeg(37, 4900)),
+    bend(mm(6000), -deg(37), 0),
+    line(8000, 0),
+  ],
+}
+
+// [위키 15~17쪽(23점)] 굽은 길: 45° 직선 오르막(4.8 m)이 공중에서 끊기고, 큰 원호 세 개가 바람개비처럼 놓인다.
+// ① 오르막 끝 위의 볼록한 호(반지름 4.5 m) ② 그 오른쪽 아래의 그릇 호(반지름 3.1 m) ③ 그 오른쪽 위의 '(' 모양 호(반지름 3.2 m),
+// 그리고 아래의 26° 내리막 → 평지. 위키 그림(1화면 = 9대, 1 m = 40 px)에서 잰 원 중심을 쓴다.
+// 차는 오르막에서 날아 ①의 안쪽(천장)에 닿고 ②에 떨어져 그릇을 타고 오른쪽 벽으로 솟아, ③의 열린 쪽 안을 지나 높이 뜬 뒤 내리막에 내린다
+// (계속 누르면 공중에서 한 바퀴 돌아 내린다).
+// 그림과 다른 점: 틈은 앞으로만 끊겨야 해서(코스 규칙) ①의 왼쪽 끝(오르막 위로 겹치는 부분)과 ②의 왼쪽 벽을 잘랐다. ②는 그림(29°)보다
+// 일찍(−10°) 끝내 차가 거의 곧게 솟게 했다(그림대로면 차가 ②에서 왼쪽 위로 날아 ③에 거꾸로 닿는다). ③은 아래 끝이 ②의 끝보다 오른쪽에 오고
+// ②의 오른쪽 벽을 타는 차와 1 m 넘게 떨어지도록 중심을 다시 잡았다(그림에서는 ③의 아래 끝이 ②의 벽에서 약 1.5 m 안쪽).
+// 호는 모두 차가 지나가는 방향으로 그린다(구동 방향이 선분 방향이다).
+const CURVE_A = { cx: 6275, cy: 2200, r: 4500, a0: 108, a1: 48 } // 시계 방향
+const CURVE_B = { cx: 10500, cy: 6250, r: 3075, a0: 250, a1: 350 } // 반시계
+const CURVE_C = { cx: 14150, cy: 9271, r: 3200, a0: 240, a1: 117 } // 시계
+const CURVE_LAND = { x: 14575, y: 2825 }
+// 오르막 끝(4800, 4800)에서 시작해 호마다 [그 시작점까지 gap, 호]를 잇고, 마지막에 착지 내리막 시작점까지 gap.
+function curveArcs(): Prim[] {
+  const out: Prim[] = []
+  let px = mm(4800)
+  let py = mm(4800)
+  for (const c of [CURVE_A, CURVE_B, CURVE_C]) {
+    const s = arcPoint(mm(c.cx), mm(c.cy), mm(c.r), deg(c.a0))
+    const e = arcPoint(mm(c.cx), mm(c.cy), mm(c.r), deg(c.a1))
+    out.push({ t: 'gap', dx: s.x - px, dy: s.y - py }, { t: 'arc', r: mm(c.r), a0: deg(c.a0), a1: deg(c.a1) })
+    px = e.x
+    py = e.y
+  }
+  out.push({ t: 'gap', dx: mm(CURVE_LAND.x) - px, dy: mm(CURVE_LAND.y) - py })
+  return out
+}
+const curve: Template = {
+  id: 'curve',
+  tier: 2,
+  prims: [line(4000, 0), line(4800, 4800), ...curveArcs(), line(4000, -tanDeg(26, 4000)), bend(mm(8000), -deg(26), 0), line(8000, 0)],
+}
+
+// [위키 17쪽] 스마일: "복잡해 보이는 구조이지만 모양이 스마일이다. 그냥 쭉 눌러주면 지나가지는 쉬운 장애물"(그림 없음, 본문만).
+// 얼굴 모양으로 만들었다: 둥근 턱(반지름 4 m)으로 내려가 입 모양 오목호(반지름 9 m, ±30°)를 지나 둥근 턱으로 올라온다.
+// 입 위 양쪽(입 가운데에서 ±2.5 m, 바닥 위 약 4.5 m)에 눈 고리(반지름 1 m. 더 작으면 선분 사이 꺾임이 15°를 넘는다), 그 위로 얼굴 윤곽 반원(반지름 6.5 m, 끝이 평지 위 2.5 m)이 떠 있다.
+// 떠 있는 고리·반원은 길 위 공중에 있어 계속 누르고 달리면 닿지 않는다.
+const SMILE_R = mm(9000)
+const SMILE_A = deg(30)
+const SMILE_EYE = deg(16) // 입 가운데에서 ±2.5 m(9 m · sin 16°)
+// 펜(길 위) 1 mm 앞·h 위가 아래 끝인 반지름 r 고리를 한 바퀴 긋고, 펜 2 mm 앞으로 돌아온다(길에 2 mm 틈).
+const eye = (h: number, r: number): Prim[] => [gap(1, h), { t: 'arc', r: mm(r), a0: -Q, a1: TURN - Q }, gap(1, -h)]
+const smile: Template = {
+  id: 'smile',
+  tier: 1,
+  prims: [
+    line(5000, 0),
+    bend(mm(4000), 0, -SMILE_A),
+    bend(SMILE_R, -SMILE_A, -SMILE_EYE),
+    ...eye(3150, 1000),
+    bend(SMILE_R, -SMILE_EYE, SMILE_EYE),
+    ...eye(3150, 1000),
+    bend(SMILE_R, SMILE_EYE, SMILE_A),
+    bend(mm(4000), SMILE_A, 0),
+    { t: 'gap', dx: mm(1), dy: mm(2500) },
+    { t: 'arc', r: mm(6500), a0: 0, a1: TURN / 2 },
+    { t: 'gap', dx: mm(13002), dy: -mm(2500) },
+    line(6000, 0),
+  ],
+}
+
 // ---- tier 3 ----
 
 // [S23, 64.5–67 s] 루프: 완만한 오르막(2 m) → 반지름 3.7 m 루프(안쪽 보석 6개) → 완만한 내리막.
 // 입구·출구가 겹치는 루프 아래쪽 선분은 진행 번호로 90개쯤 떨어져 있어 충돌 창(±40) 밖이다.
-// 녹화 루프 안의 회전하는 빨간 호(M2)는 움직이는 구조물이라 넣지 않았다.
+// 루프 안의 회전하는 빨간 호(M2, 64.8–66.6 s): 루프와 같은 중심, 루프 반지름의 약 0.6배인 원 위의 두꺼운 호 2개(각 약 80°)가
+// 0.5초에 약 60° 돈다(23 TURN/틱). 루프를 타는 차(안쪽으로 약 0.56 m)와 호 바깥 사이는 약 0.7 m라, 루프에서 떨어질 때만 닿는다.
 const LOOP_R = mm(3700)
 const LOOP_INSET = mm(600)
 const loopGem = (k: number): Prim => ({ t: 'gem', ...onArc(LOOP_R, -Q, -Q + Math.floor((TURN * k) / 7), LOOP_INSET) })
@@ -504,6 +683,7 @@ const loop: Template = {
     loopGem(4),
     loopGem(5),
     loopGem(6),
+    blades(0, 3700, 2000, 2400, 2, deg(80), 0, 23, 'ring'),
     bend(LOOP_R, 0, TURN),
     bend(mm(8000), 0, -deg(20)),
     line(3000, -tanDeg(20, 3000)),
@@ -607,12 +787,66 @@ const hook: Template = {
   ],
 }
 
+// [위키 13쪽(34점)] 원형 배럴: "가운데가 뚫려있는 원형 배럴. 별로 어렵지 않다. 저 장애물이 나온다면 사진처럼 그냥 밑으로 빠지는 것도 방법".
+// 그림처럼 둥근 마루에서 길이 가파르게 깊은 골(약 6 m)로 떨어졌다가 반대편으로 올라온다. 골 위, V_MAX로 마루를 떠난 궤적에
+// 가운데가 빈 고리(바깥 반지름 2.4 m, 두께 0.4 m의 호 2개)가 시계 방향으로 천천히(약 11초에 한 바퀴) 돈다. 위키 그림의 호는 70°쯤이지만
+// V_MAX 도착 때 절반 넘는 위상에서 지나가도록 50°로 줄였다(12위상 중 7). 고리 틈이 맞을 때 가운데로 날아 지나가거나,
+// 떼고 천천히 마루를 넘어 골을 타고 고리 밑으로 빠져나간다. 건너편은 볼록 마루 뒤 35° 내리막이라 V_MAX로 날아온 차가 내리막에 내린다.
+const RING_OUT = 2400
+const RING_IN = 2000
+const RING_W = deg(50)
+const ringbarrel: Template = {
+  id: 'ringbarrel',
+  tier: 3,
+  prims: [
+    line(4000, 0),
+    bend(mm(4000), 0, deg(25)),
+    bend(mm(1500), deg(25), -deg(70)),
+    blades(2270, 1270, RING_IN, RING_OUT, 2, RING_W, Q, -6, 'ring'), // 마루 끝 기준. V_MAX 궤적이 고리 가운데를 지난다
+    line(1200, -tanDeg(70, 1200)),
+    bend(mm(2000), -deg(70), deg(65)),
+    bend(mm(1500), deg(65), -deg(35)),
+    line(6000, -tanDeg(35, 6000)),
+    bend(mm(6000), -deg(35), 0),
+    line(8000, 0),
+  ],
+}
+
+// [위키 9쪽(38점)] 길쭉한 창: 물결 길(마루–골 1.3 m, 마루 간격 13.5 m) 밑에서 빨간 창 셋(골·마루·골, 6.7 m 간격)이
+// "플레이어의 접근에 상관없이 일정한 시간을 두고 땅 위로 튀어오른다". 창은 길 아래 5 m에서 길 위 2.5 m까지 솟는다(폭 0.2 m).
+// 주기 2초(숨음 1초 → 솟음 0.2초 → 서 있음 0.4초 → 내려감 0.4초). 창 사이의 위상 차는 V_MAX로 창 사이를 달리는 시간(약 34틱)이라,
+// V_MAX로 달리면 세 창을 같은 위상에서 만난다.
+const SPEAR_R = mm(9000)
+const SPEAR_A = deg(22)
+const SPEAR_HALF = 3371 // 호 하나의 가로 절반(mm): 9 m · sin 22°
+const SPEAR_DIP = 655 // 호 하나의 높이(mm): 9 m · (1 − cos 22°)
+const SPEAR_LAG = 34 // 틱
+const spear = (dy: number, lag: number): Prim =>
+  hazard(SPEAR_HALF, dy, { s: 'bar', x0: 0, y0: mm(-5000), x1: 0, y1: mm(-1500), r: mm(100) },
+    { k: 'pop', period: 120, phase: -lag, hide: 60, rise: 12, up: 24, fall: 24, height: mm(4000) }, 'spear')
+const spears: Template = {
+  id: 'spears',
+  tier: 3,
+  prims: [
+    line(5000, 0),
+    bend(SPEAR_R, 0, -SPEAR_A),
+    spear(-SPEAR_DIP, 0), // 골(호 시작보다 SPEAR_DIP 아래)
+    bend(SPEAR_R, -SPEAR_A, SPEAR_A),
+    spear(SPEAR_DIP, SPEAR_LAG), // 마루
+    bend(SPEAR_R, SPEAR_A, -SPEAR_A),
+    spear(-SPEAR_DIP, 2 * SPEAR_LAG), // 골
+    bend(SPEAR_R, -SPEAR_A, SPEAR_A),
+    bend(SPEAR_R, SPEAR_A, 0),
+    line(6000, 0),
+  ],
+}
+
 // ---- tier 4 ----
 
 // [S30, 316.8–321.2 s] 떠 있는 호 징검다리: 점프대에서 떠서 오목 호(가운데가 낮은 짧은 그릇) 3개를 차례로 건넌다.
 // 각 호는 내려가며 받아 주고(-30°) 올라가며 다음 호로 던진다(+30°). 호는 1.5 m 틈마다 1 m씩 낮아진다:
 // 진입 속도가 0 ~ BOOST_V 어디든 날아간 궤적이 틈에 빠지지 않고 뒤의 호나 착지 평지에 걸린다.
-// 녹화의 톱날 원반 배열(M3)은 넣지 않았다.
+// 녹화에서 이 앞에 있던 톱날 원반 배열(M3, 318–320 s)은 따로 톱니 밭(sawfield)으로 만들었다.
 const ARC_R = mm(5000)
 const ARC_A = deg(30)
 const ARC_GAP = 1500
@@ -651,13 +885,31 @@ const spiral: Template = {
   ],
 }
 
+// [위키 12쪽(91점), 36쪽 '여담'] 환풍기: 평지 길이 빨간 환풍기 위를 지난다. 위키 그림의 환풍기는 마주 보는 날 2개(각 약 75°)와
+// 가운데 둥근 축이고, 중심이 길 아래(반지름의 약 절반)에 있어 위쪽 날이 길 위로 솟는다. 위키: "환풍기가 배럴형 끝판왕. 일단 살아남을
+// 확률이 적다", "환풍기가 연속으로 두 개가 이어지는 코스가 있는데, 하나를 넘어가고 속도가 줄어들어야 안정적으로 넘어갈 수 있다".
+// 그래서 환풍기 둘을 12 m 간격으로 둔다. 날(반지름 3.5 m, 각 65°)은 시계 방향(길 위에서 차와 같은 방향)으로 돈다.
+// 중심을 길 2.5 m 아래에 두어 날이 길 위로 1 m 솟는다(그림은 약 2 m). 그림대로면 어떤 위상에서도 거의 지나갈 수 없어 낮췄다.
+// 그래도 V_MAX 도착 때 지나가는 위상은 12개 중 5개로 절반에 못 미친다(가장 어려운 tier 4, 위키도 "살아남을 확률이 적다").
+// V_MAX로 달리면 두 환풍기 사이(12 m, 약 66틱)에 날이 반 바퀴쯤 돌아 둘째 환풍기를 거의 같은 위상에서 만난다.
+const FAN_R = 3500
+const FAN_DEPTH = 2500 // 길에서 환풍기 중심까지
+const FAN_GAP = 12000
+const fan = (): Prim => blades(0, -FAN_DEPTH, 0, FAN_R, 2, deg(65), 0, -32, 'blades')
+const fans: Template = {
+  id: 'fans',
+  tier: 4,
+  // 환풍기 자리마다 길에 1 mm 틈: 앞뒤 평지 자르기(trimFlats)가 길 전체를 맨 평지로 보지 않게 한다
+  prims: [line(6000, 0), fan(), gap(1, 0), line(FAN_GAP, 0), fan(), gap(1, 0), line(8000, 0)],
+}
+
 export const TEMPLATES: readonly Template[] = [
   // tier 1
-  hill, waves, bowl, boostflat, spikes, valley, cliff, ledge, bigdrop, rampflat, ramp,
+  hill, waves, bowl, boostflat, spikes, valley, cliff, ledge, bigdrop, rampflat, ramp, smile,
   // tier 2
-  cup, quarter, boostjump, spikefloor, spikepit, roofs, stepup, crestgap, stairs, bowldrop,
+  cup, quarter, boostjump, spikefloor, spikepit, roofs, stepup, crestgap, stairs, bowldrop, sawfield, sawswing, barrel, pacman, curve,
   // tier 3
-  loop, humps, sinuous, vplat, curl, hook,
+  loop, humps, sinuous, vplat, curl, hook, ringbarrel, spears,
   // tier 4
-  arcs, loop2, spiral,
+  arcs, loop2, spiral, fans,
 ].map((t) => ({ ...t, trimFlats: true }))

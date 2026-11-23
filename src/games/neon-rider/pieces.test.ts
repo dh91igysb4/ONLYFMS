@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLLIDE_WINDOW, LEAD_FLAT_MAX, MM, SEG_LEN } from './constants.ts'
+import { COLLIDE_WINDOW, LEAD_FLAT_MAX, MM, SEG_LEN, SUBSTEPS, WHEEL_R } from './constants.ts'
 import type { HazardShape } from './hazards.ts'
 import { TEMPLATES, buildTemplate, type Prim, type Seg, type Template } from './pieces.ts'
 import { TURN, angDiff, atan2T, isqrt } from './trig.ts'
@@ -203,7 +203,11 @@ describe('TEMPLATES', () => {
   // 그보다 큰 꺾임은 직선끼리 일부러 만든 모서리뿐이다(템플릿마다 개수를 적어 둔다). 호 방향을 잘못 쓰면 거의 반 바퀴 꺾여 걸린다.
   const MAX_JOINT = Math.floor(TURN / 24) // 15°
   // 직선끼리 만나는 모서리: 삼각 열(△ 4개의 오르막·꼭대기·내리막 + ▽ 꼭짓점 3개 = 12 … 아래 테스트가 센다), 직선 봉우리·경사·계단.
-  const SHARP: Record<string, number> = { spikes: 12, valley: 2, rampflat: 2, roofs: 3, stairs: 7, vplat: 2, curl: 5, spiral: 5 }
+  // 가시 구덩이 벽 4, 직선 경사로 시작(배럴형 바퀴·팩맨·굽은 길·톱니 밭 킥커)
+  const SHARP: Record<string, number> = {
+    spikes: 12, valley: 2, rampflat: 2, roofs: 3, stairs: 7, vplat: 2, curl: 5, spiral: 5,
+    spikepit: 4, barrel: 1, pacman: 1, curve: 1, sawfield: 1,
+  }
   for (const t of TEMPLATES) {
     it(`${t.id}: 이음 꺾임 < 15°, 일부러 만든 모서리 ${SHARP[t.id] ?? 0}개`, () => {
       const s = buildTemplate(t).segs
@@ -216,15 +220,79 @@ describe('TEMPLATES', () => {
       expect(sharp).toBe(SHARP[t.id] ?? 0)
     })
   }
-  it('템플릿 30종(영상 장애물 목록의 정적 지형), 티어별 개수', () => {
+  it('템플릿 39종(영상 장애물 목록의 정적 지형 + 위험물·굽은 길·스마일, 설계 §9), 티어별 목록', () => {
     expect(TEMPLATES.map((t) => t.id).sort()).toEqual(
       [
-        'arcs', 'bigdrop', 'boostflat', 'boostjump', 'bowl', 'bowldrop', 'cliff', 'crestgap', 'cup', 'curl',
-        'hill', 'hook', 'humps', 'ledge', 'loop', 'loop2', 'quarter', 'ramp', 'rampflat', 'roofs',
-        'sinuous', 'spikefloor', 'spikepit', 'spikes', 'spiral', 'stairs', 'stepup', 'valley', 'vplat', 'waves',
+        'arcs', 'barrel', 'bigdrop', 'boostflat', 'boostjump', 'bowl', 'bowldrop', 'cliff', 'crestgap', 'cup',
+        'curl', 'curve', 'fans', 'hill', 'hook', 'humps', 'ledge', 'loop', 'loop2', 'pacman',
+        'quarter', 'ramp', 'rampflat', 'ringbarrel', 'roofs', 'sawfield', 'sawswing', 'sinuous', 'smile', 'spears',
+        'spikefloor', 'spikepit', 'spikes', 'spiral', 'stairs', 'stepup', 'valley', 'vplat', 'waves',
       ],
     )
-    expect([1, 2, 3, 4].map((k) => TEMPLATES.filter((t) => t.tier === k).length)).toEqual([11, 10, 6, 3])
+    const byTier = (k: number): string[] => TEMPLATES.filter((t) => t.tier === k).map((t) => t.id).sort()
+    // 설계 §9 표의 tier: 톱니 밭·왕복 톱니·팩맨·배럴형 바퀴·굽은 길 2, 원형 배럴·창 3, 환풍기 4, 스마일 1. 톱니를 더한 기존 템플릿은 tier 그대로
+    expect(byTier(1)).toEqual(['bigdrop', 'boostflat', 'bowl', 'cliff', 'hill', 'ledge', 'ramp', 'rampflat', 'smile', 'spikes', 'valley', 'waves'])
+    expect(byTier(2)).toEqual([
+      'barrel', 'boostjump', 'bowldrop', 'crestgap', 'cup', 'curve', 'pacman', 'quarter', 'roofs', 'sawfield', 'sawswing', 'spikefloor', 'spikepit', 'stairs', 'stepup',
+    ])
+    expect(byTier(3)).toEqual(['curl', 'hook', 'humps', 'loop', 'ringbarrel', 'sinuous', 'spears', 'vplat'])
+    expect(byTier(4)).toEqual(['arcs', 'fans', 'loop2', 'spiral'])
+  })
+  it('위험물 수: 녹화·위키에 나온 자리(톱니 밭 9개 이상, 왕복 톱니 1, 바퀴·원반 둘씩, 창 3, 환풍기 2, 루프 안 호, 기존 템플릿의 톱니)', () => {
+    const want: Record<string, number> = {
+      waves: 2, boostjump: 2, crestgap: 2, loop: 1, spikepit: 1,
+      sawfield: 9, sawswing: 1, barrel: 2, pacman: 2, ringbarrel: 1, spears: 3, fans: 2,
+    }
+    for (const t of TEMPLATES) expect(buildTemplate(t).hazards.length, t.id).toBe(want[t.id] ?? 0)
+    const saws = buildTemplate(TEMPLATES.find((t) => t.id === 'sawfield')!).hazards
+    expect(saws.every((h) => h.shape.s === 'disc' && h.look === 'saw' && h.motion.k === 'none')).toBe(true)
+  })
+  it('빠른 날(설계 §5.2): 도는 위험물·길의 끝이 이동 단계 하나에 바퀴 반지름보다 덜 움직인다', () => {
+    // 끝 속도 |ω| · rOut · 2π / TURN / SUBSTEPS < WHEEL_R. 2π를 44/7(2π보다 크다)로 잡아 보수적으로, 정수로 비교한다.
+    const fast = (w: number, reach: number): boolean => Math.abs(w) * reach * 44 >= WHEEL_R * TURN * SUBSTEPS * 7
+    let checked = 0
+    for (const t of TEMPLATES) {
+      const b = buildTemplate(t)
+      for (const h of b.hazards) {
+        if (h.motion.k !== 'rotate') continue
+        const s = h.shape
+        // blades는 중심에서 rOut, bar는 (x0, y0) 둘레로 돈다. disc는 돌아도 모양이 그대로다.
+        const reach = s.s === 'blades' ? s.rOut : s.s === 'bar' ? isqrt((s.x1 - s.x0) ** 2 + (s.y1 - s.y0) ** 2) + s.r : 0
+        expect(fast(h.motion.w, reach), `${t.id} 위험물`).toBe(false)
+        checked++
+      }
+      for (const m of b.movers) {
+        if (m.motion.k !== 'rotate') continue
+        const reach = Math.max(...m.segs.flatMap((g) => [[g.x0, g.y0], [g.x1, g.y1]]).map(([x, y]) => isqrt((x - m.pivotX) ** 2 + (y - m.pivotY) ** 2)))
+        expect(fast(m.motion.w, reach), `${t.id} 움직이는 길`).toBe(false)
+        checked++
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+    // 조건 자체: 끝 속도가 바퀴 반지름을 넘는 날은 걸린다
+    expect(fast(Math.ceil((WHEEL_R * TURN * SUBSTEPS * 7) / (44 * 3000 * MM)), 3000 * MM)).toBe(true)
+  })
+  it('spikepit: 구덩이에 바닥 길이 있고(끊김 없음), 가시 막대는 바닥 위에 얹혀 양 끝이 벽 안쪽이라 옆 길과 겹치지 않는다', () => {
+    const b = buildTemplate(TEMPLATES.find((t) => t.id === 'spikepit')!)
+    for (let i = 1; i < b.segs.length; i++) expect([b.segs[i].x0, b.segs[i].y0]).toEqual([b.segs[i - 1].x1, b.segs[i - 1].y1])
+    const bars = b.hazards.filter((h) => h.shape.s === 'bar' && h.look === 'spikes')
+    expect(bars.length).toBe(1)
+    const bar = bars[0].shape as Extract<HazardShape, { s: 'bar' }>
+    expect(bars[0].motion.k).toBe('none')
+    expect(bar.y0).toBe(bar.y1)
+    // 바닥: 막대 바로 밑(막대 반지름만큼 아래)의 수평 선분. 막대는 그 x 범위 안에 있다
+    const floor = b.segs.filter((s) => s.y0 === s.y1 && s.y0 === bar.y0 - bar.r)
+    expect(floor.length).toBe(1)
+    const f = floor[0]
+    expect(Math.min(bar.x0, bar.x1) - bar.r).toBeGreaterThan(Math.min(f.x0, f.x1))
+    expect(Math.max(bar.x0, bar.x1) + bar.r).toBeLessThan(Math.max(f.x0, f.x1))
+    expect(f.y0).toBeLessThan(b.minY + 1) // 구덩이 바닥이 템플릿에서 가장 낮다
+    // 바닥 말고는 어느 선분(벽·고원·반대편)과도 막대 둘레(캡슐)가 닿지 않는다
+    const cap: Seg = { x0: bar.x0, y0: bar.y0, x1: bar.x1, y1: bar.y1, boost: false }
+    for (const s of b.segs) {
+      if (s === f) continue
+      expect(Math.min(segDist(cap, s), segDist(s, cap)), `${s.x0},${s.y0}→${s.x1},${s.y1}`).toBeGreaterThan(bar.r)
+    }
   })
   it('루프: 몸으로는 가깝지만 길로는 먼 선분 쌍은 진행 번호가 충돌 창(±COLLIDE_WINDOW)보다 멀다', () => {
     // 접지한 차가 루프를 지날 때 입구 쪽에서 출구 쪽 선분(또는 그 반대)에 부딪히지 않으려면 둘이 창 밖이어야 한다.
