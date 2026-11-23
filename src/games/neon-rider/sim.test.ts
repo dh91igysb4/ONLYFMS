@@ -24,6 +24,7 @@ import {
 import { collideWheel, windowCands } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { Course } from './course.ts'
+import { TEMPLATES } from './pieces.ts'
 import type { Template } from './pieces.ts'
 import { bodyAngle, flipsOf, initSim, initSimAt, scoreOf, step } from './sim.ts'
 import type { SimState, Wheel } from './sim.ts'
@@ -498,9 +499,11 @@ describe('neon-rider 시뮬', () => {
     expect(omega(a1, a2)).toBeGreaterThan(0)
   })
 
-  it('코스 시작점 뒤로 되굴러가도 길이 있다: hill 오르막 중간에 떼면 x = 0 뒤로 가지만 3000틱 뒤에도 살아 있다', () => {
-    for (const release of [100, 150, 190]) {
-      const c = courseOf(['hill'])
+  it('코스 시작점 뒤로 되굴러가도 길이 있다: hill 오르막 전후에 떼면 x = 0 뒤로 가지만 3000틱 뒤에도 살아 있다', () => {
+    // 템플릿 앞뒤 평지 자르기(trimFlats)를 끈 hill로 잰다: 이 시험은 코스 시작점 뒤의 길을 보는 것이고, 긴 도움닫기가 있어야 오르막 중간에서 떼게 된다.
+    const hillRaw = { ...(TEMPLATES.find((t) => t.id === 'hill') as Template), trimFlats: false }
+    for (const release of [100, 115, 130]) {
+      const c = courseFromTemplates([hillRaw])
       let s = initSim(c)
       let minX = centreX(s)
       for (let i = 0; i < 3000; i++) {
@@ -575,8 +578,8 @@ describe('neon-rider 시뮬', () => {
 
   it('틈으로 떨어지면 fall', () => {
     const c = courseOf(['ramp'])
-    // ramp의 틈(템플릿 x 11.5~19.5 m) 한가운데에 멈춘 채로 둔다. 틈 뒤 내리막 시작 높이에서 떨어지기 시작한다.
-    const s = run(airborne(c, TPL_X + mm(15500), 0, 0, 0), 600, () => false, c)
+    // ramp의 틈(앞쪽 평지를 8 m → 2 m로 자른 뒤 템플릿 x 5.5~13.5 m) 한가운데에 멈춘 채로 둔다. 틈 뒤 내리막 시작 높이에서 떨어지기 시작한다.
+    const s = run(airborne(c, TPL_X + mm(9500), 0, 0, 0), 600, () => false, c)
     expect(s.dead).toBe('fall')
     expect(Math.floor((s.rear.y + s.front.y) / 2)).toBeLessThan(c.section(0).minY - FALL_DEPTH)
   })

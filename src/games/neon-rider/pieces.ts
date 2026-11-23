@@ -1,5 +1,5 @@
 // 장애물 템플릿 → 선분. 순수 정수 TS (설계 §6). 좌표 x 앞, y 위, 단위 u.
-import { MM, SEG_LEN } from './constants.ts'
+import { LEAD_FLAT_MAX, MM, SEG_LEN, TAIL_FLAT_MAX } from './constants.ts'
 import { TRIG_ONE, TURN, cosT, sinT } from './trig.ts'
 
 export type Seg = { x0: number; y0: number; x1: number; y1: number; boost: boolean }
@@ -9,7 +9,8 @@ export type Prim =
   | { t: 'gap'; dx: number; dy: number } // 길 없이 펜만 이동
   | { t: 'boost'; len: number } // 수평 부스터 직선
   | { t: 'gem'; dx: number; dy: number } // 현재 점 기준 위치에 보석 하나(펜은 그대로)
-export type Template = { id: string; tier: 1 | 2 | 3 | 4; prims: readonly Prim[] }
+// trimFlats: 앞뒤 맨 평지를 LEAD_FLAT_MAX·TAIL_FLAT_MAX로 자른다. TEMPLATES의 템플릿은 모두 켠다(테스트용 지형은 끈 채로 쓴다).
+export type Template = { id: string; tier: 1 | 2 | 3 | 4; prims: readonly Prim[]; trimFlats?: boolean }
 export type Built = {
   segs: Seg[]
   gems: { x: number; y: number }[]
@@ -62,7 +63,52 @@ export function buildTemplate(t: Template): Built {
     }
   }
   if (segs.length === 0) throw new Error(`선분이 없는 템플릿: ${t.id}`)
-  return { segs, gems, endX: px, endY: py, minY }
+  const built = { segs, gems, endX: px, endY: py, minY }
+  return t.trimFlats ? trimFlats(built) : built
+}
+
+// 템플릿 앞뒤의 맨 평지(부스터가 아닌 수평 선분이 끊김 없이 이어진 부분)를 LEAD_FLAT_MAX·TAIL_FLAT_MAX로 자른다.
+// 녹화처럼 장애물이 짧은 평지를 사이에 두고 이어지게 하려는 것(constants.ts REST_LEN 주석). 앞을 자르면 나머지를 그만큼 왼쪽으로 옮긴다.
+function trimFlats(b: Built): Built {
+  const flat = (s: Seg): boolean => !s.boost && s.y0 === s.y1
+  let segs = b.segs
+  let gems = b.gems
+  let lead = 0
+  let k = 0 // 앞쪽 맨 평지 선분 수
+  for (; k < segs.length && flat(segs[k]) && segs[k].y0 === segs[0].y0 && (k === 0 || segs[k].x0 === segs[k - 1].x1); k++)
+    lead += segs[k].x1 - segs[k].x0
+  let endX = b.endX
+  const d = lead - LEAD_FLAT_MAX
+  if (d > 0) {
+    // 앞쪽 평지 선분만 잘라 낸다(고리처럼 뒤로 도는 선분이 x < 0으로 가도 그대로 둔다).
+    const moved = segs.map((s) => ({ ...s, x0: s.x0 - d, x1: s.x1 - d }))
+    const head = moved.slice(0, k).filter((s) => s.x1 > 0).map((s) => (s.x0 < 0 ? { ...s, x0: 0 } : s))
+    segs = [...head, ...moved.slice(k)]
+    gems = gems.map((g) => ({ x: g.x - d, y: g.y }))
+    endX -= d
+  }
+  let tail = 0
+  const n = segs.length
+  for (let i = n - 1; i >= 0 && flat(segs[i]) && segs[i].y1 === segs[n - 1].y1 && (i === n - 1 || segs[i].x1 === segs[i + 1].x0); i--)
+    tail += segs[i].x1 - segs[i].x0
+  let cut = tail - TAIL_FLAT_MAX
+  if (cut > 0) {
+    const out = segs.slice()
+    while (cut > 0) {
+      const last = out[out.length - 1]
+      const len = last.x1 - last.x0
+      if (len <= cut) {
+        out.pop()
+        cut -= len
+      } else {
+        out[out.length - 1] = { ...last, x1: last.x1 - cut }
+        cut = 0
+      }
+    }
+    segs = out
+    endX = segs[segs.length - 1].x1
+  }
+  return { ...b, segs, gems, endX }
 }
 
 // 호 시작점을 기준으로 한 원 위의 점 (보석 배치용).
@@ -569,4 +615,4 @@ export const TEMPLATES: readonly Template[] = [
   loop, humps, sinuous, vplat, curl, hook,
   // tier 4
   arcs, loop2, spiral,
-]
+].map((t) => ({ ...t, trimFlats: true }))
