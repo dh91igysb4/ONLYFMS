@@ -29,7 +29,7 @@ import {
   WHEEL_R,
 } from './constants.ts'
 import { collideWheel, toFrame, windowCands } from './collide.ts'
-import { courseFromTemplates, courseOf, makeSeededCourse } from './course.ts'
+import { courseFromTemplates, courseOf, getCourse, makeSeededCourse } from './course.ts'
 import type { Course } from './course.ts'
 import { TEMPLATES } from './pieces.ts'
 import type { Template } from './pieces.ts'
@@ -1362,6 +1362,51 @@ describe('넘어지는 블록', () => {
     const bh = courseOf(['blocks', 'hill'])
     run(bh, 0, initSim(bh), 'blocks → hill')
   }, 120000)
+
+  it('I1: 블록을 깨운 뒤 되굴러간 상태(JSON)를 새 코스에서 이어 돌려도 던지지 않고 같은 결과다', () => {
+    // 최종 리뷰의 재현: hill에서 되굴러가 blocks 구간이 아직 만들어지지 않은 새 코스에서도 깨어 있는 블록 id를 찾는다.
+    const ids = ['hill', 'blocks', 'boostflat']
+    const c = courseOf(ids)
+    let s = initSimAt(c, c.section(0).startX + mm(1500), 2000)
+    let checked = 0
+    let maxBack = 0
+    let maxX = -Infinity
+    for (let t = 0; t < 520 && !s.dead; t++) {
+      const hold = t < 20
+      const fresh = step(JSON.parse(JSON.stringify(s)) as SimState, hold, courseOf(ids))
+      s = step(s, hold, c)
+      expect(fresh, `t${t}`).toEqual(s)
+      const cx = Math.floor((s.rear.x + s.front.x) / 2)
+      maxX = Math.max(maxX, cx)
+      if (s.blocks.length > 0) {
+        checked++
+        maxBack = Math.max(maxBack, maxX - cx)
+      }
+    }
+    expect(checked).toBeGreaterThan(50)
+    expect(maxBack).toBeGreaterThan(BLOCK_WAKE + mm(20000)) // 블록을 깨운 뒤 BLOCK_WAKE보다 멀리 되굴러갔다
+  }, 30000)
+
+  it('I1: getCourse 캐시에서 밀려나 새로 만든 코스로 깨어 있는 블록 상태를 이어 돌려도 같은 결과다', () => {
+    const seed = 'review-seed-14'
+    const warm = getCourse(seed)
+    let k = 0
+    while (warm.section(k).templateId !== 'blocks') k++
+    let s = initSimAt(warm, warm.section(k).startX, V_MAX)
+    for (let t = 0; t < 240; t++) s = step(s, true, warm)
+    expect(s.blocks.length).toBeGreaterThan(0)
+    const snap = JSON.stringify(s)
+    for (const other of ['evict-a', 'evict-b', 'evict-c', 'evict-d']) getCourse(other)
+    const fresh = getCourse(seed)
+    expect(fresh).not.toBe(warm)
+    let a = s
+    let b = JSON.parse(snap) as SimState
+    for (let t = 0; t < 120; t++) {
+      a = step(a, t % 50 < 40, warm)
+      b = step(b, t % 50 < 40, fresh)
+    }
+    expect(b).toEqual(a)
+  }, 30000)
 
   it('Review Focus 4: 블록 8개가 한꺼번에 깨어 있는 템플릿 600틱 동안 상태 JSON ≤ 6000자', () => {
     // 블록 8개(1.5 m 간격)가 10 m 안에 있고, 그 뒤 평지가 길어 다음 반복의 블록은 BLOCK_WAKE 밖이다.

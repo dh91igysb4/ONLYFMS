@@ -19,13 +19,17 @@ export type Course = {
   hazardsNear(box: Box): readonly Hazard[]
   moversNear(box: Box): readonly Mover[]
   blocksNear(box: Box): readonly Block[]
-  moverById(id: number): Mover // 이미 만든 구간의 길만(상태에 남은 id로 다시 찾기)
-  blockById(id: number): Block // 이미 만든 구간의 블록만(깨어 있는 블록의 처음 치수와 자기 구간 끝 endX를 다시 찾기)
+  // 상태에 남은 id로 다시 찾기. 아직 만들지 않은 구간의 id면 seg(i)처럼 그 id가 생길 때까지 구간을 만든다
+  // (저장한 상태를 새 코스에서 이어 돌려도 같은 결과). 구간을 LOOKUP_MAX개 더 만들어도 안 나오면 RangeError.
+  moverById(id: number): Mover
+  blockById(id: number): Block // 처음 치수와 자기 구간 끝(endX)
 }
 
 // 최근 몇 개 구간의 템플릿을 피하는지, 캐시에 몇 개 seed를 두는지 (조정 수치가 아니라 구조 값).
 const RECENT = 3
 const CACHE_MAX = 4
+// id로 찾을 때 더 만들어 보는 구간 수 상한(움직이는 길·블록이 없는 템플릿 목록이나 망가진 id로 끝없이 돌지 않게).
+const LOOKUP_MAX = 10000
 
 function fnv(h: number, v: number): number {
   return Math.imul(h ^ v, 0x01000193) >>> 0
@@ -200,6 +204,15 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
     penY += built.endY
   }
 
+  // 조건이 맞을 때까지 구간을 만든다(LOOKUP_MAX개 넘게 더 만들어야 하면 RangeError).
+  const buildUntil = (done: () => boolean, what: string): void => {
+    const limit = sections.length + LOOKUP_MAX
+    while (!done()) {
+      if (sections.length >= limit) throw new RangeError(`구간을 ${LOOKUP_MAX}개 더 만들어도 없는 ${what}`)
+      addSection()
+    }
+  }
+
   // 상자와 겹칠 수 있는 구간: startX − back ≤ box.x1 이고 endX + fwd ≥ box.x0. 앞쪽 조건을 만족하는 구간을 모두 만든 뒤
   // endX로 이진 탐색해 시작 구간을 찾고 오른쪽으로 훑는다.
   const near = <T>(box: Box, list: (s: SectionItems) => Boxed<T>[]): T[] => {
@@ -252,12 +265,12 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
     blocksNear: (box) => near(box, (s) => s.blocks),
     moverById(id) {
       checkIndex(id, 'mover')
-      if (id >= movers.length) throw new RangeError(`아직 만들지 않은 움직이는 길: ${id}`)
+      buildUntil(() => movers.length > id, `움직이는 길 ${id}`)
       return movers[id]
     },
     blockById(id) {
       checkIndex(id, 'block')
-      if (id >= blocks.length) throw new RangeError(`아직 만들지 않은 블록: ${id}`)
+      buildUntil(() => blocks.length > id, `블록 ${id}`)
       return blocks[id]
     },
   }

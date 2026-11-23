@@ -296,7 +296,7 @@ describe('neon-rider 코스: 위험물·움직이는 길·블록', () => {
     for (const m of a.m) expect(ahead.moverById(m.id)).toEqual(m)
   })
 
-  it('moverById: 만든 구간의 길은 같은 내용, 없는 id는 던진다', () => {
+  it('moverById: 만든 구간의 길은 같은 내용, 잘못된 id와 끝내 나오지 않는 id는 던진다', () => {
     const c = courseFromTemplates([flat('one', 1, [mv(0, 0, yellow(1000, NONE))])])
     const near = c.moversNear(at(origin(c, 2) + 20500, 0))
     expect(near.map((m) => m.id)).toEqual([2])
@@ -305,7 +305,23 @@ describe('neon-rider 코스: 위험물·움직이는 길·블록', () => {
     expect(c.moverById(0).pivotX).toBe(origin(c, 0) + 20000)
     expect(() => c.moverById(-1)).toThrow()
     expect(() => c.moverById(1.5)).toThrow()
-    expect(() => c.moverById(1000000)).toThrow()
+    expect(() => c.moverById(1000000)).toThrow(RangeError) // 구간을 LOOKUP_MAX개 더 만들어도 없다
+    expect(() => courseFromTemplates([flat('none', 1, [])]).blockById(0)).toThrow(RangeError) // 블록 없는 템플릿
+  })
+
+  it('I1: moverById·blockById는 아직 만들지 않은 구간의 id면 그 구간까지 만든다(먼저 만든 구간 수와 상관없이 같은 내용)', () => {
+    const T = flat('mb', 1, [mv(0, 0, yellow(1000, NONE)), { t: 'block', dx: 9000, dy: 0, b: { x: 0, y: 0, w: 800, h: 1600, a: 0 } }])
+    const warm = courseFromTemplates([T])
+    warm.section(12)
+    const fresh = courseFromTemplates([T])
+    expect(fresh.blockById(7)).toEqual(warm.blockById(7))
+    expect(fresh.blockById(7).endX).toBe(warm.section(7).endX)
+    expect(fresh.moverById(9)).toEqual(warm.moverById(9))
+    const seeded = makeSeededCourse('b10c', TEMPLATES)
+    const ahead = makeSeededCourse('b10c', TEMPLATES)
+    ahead.section(200)
+    expect(seeded.blockById(5)).toEqual(ahead.blockById(5))
+    expect(seeded.moverById(30)).toEqual(ahead.moverById(30))
   })
 
   it('구간 바닥(minY)에 움직이는 길의 움직임 범위 최저점이 들어간다(fall은 처음 자세 최저점)', () => {
