@@ -94,7 +94,8 @@ export function price(speciesId: string, sizeCm: number, perfect: boolean): numb
 }
 
 // ---------------------------------------------------------------- WorldLogic
-export type Fish = { species: string; sizeCm: number; perfect: boolean }
+/** locked: 가방에서 잠근 물고기. "전부 팔기"에서 빠진다. 잠기지 않았으면 필드가 없다. */
+export type Fish = { species: string; sizeCm: number; perfect: boolean; locked?: true }
 export type Pending = {
   species: string
   sizeCm: number
@@ -136,6 +137,7 @@ export type Action =
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
+  | { type: 'lock'; index: number; locked: boolean }
   | { type: 'buyRod'; tier: number }
   | { type: 'buyBag'; tier: number }
   | { type: 'buyTackle'; id: string }
@@ -216,23 +218,36 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (!a.success) return { state: { ...state, pending: null }, result: { caught: null } }
   if (p.hookedAt == null) return { error: 'not_hooked' }
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
-  const fish: Fish = { species: p.species, sizeCm: p.sizeCm, perfect: a.perfect }
+  const isLegend = !!speciesById(p.species).legend
+  // 전설은 다시 잡을 수 없으니 실수로 팔리지 않게 잠근 채 넣는다 (가방에서 풀 수 있다)
+  const fish: Fish = { species: p.species, sizeCm: p.sizeCm, perfect: a.perfect, ...(isLegend ? { locked: true as const } : {}) }
   const prev = state.dex[p.species]
   const dex = {
     ...state.dex,
     [p.species]: { count: (prev?.count ?? 0) + 1, maxCm: Math.max(prev?.maxCm ?? 0, p.sizeCm) },
   }
-  const legends = speciesById(p.species).legend && !state.legends.includes(p.species) ? [...state.legends, p.species] : state.legends
+  const legends = isLegend && !state.legends.includes(p.species) ? [...state.legends, p.species] : state.legends
   return { state: { ...state, bag: [...state.bag, fish], dex, legends, pending: null }, result: { caught: fish } }
 }
 
 function sell(state: State): Out {
-  if (state.bag.length === 0) return { error: 'bag_empty' }
-  const earned = state.bag.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
+  // 잠긴 물고기는 팔지 않고 순서 그대로 남긴다
+  const selling = state.bag.filter((f) => !f.locked)
+  if (selling.length === 0) return { error: 'bag_empty' }
+  const earned = selling.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
   return {
-    state: { ...state, gold: state.gold + earned, totalEarned: state.totalEarned + earned, bag: [] },
+    state: { ...state, gold: state.gold + earned, totalEarned: state.totalEarned + earned, bag: state.bag.filter((f) => f.locked) },
     result: { earned },
   }
+}
+
+function lock(state: State, a: Record<string, unknown>): Out {
+  const i = a.index
+  if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= state.bag.length) return { error: 'bad_action' }
+  if (typeof a.locked !== 'boolean') return { error: 'bad_action' }
+  const { locked: _was, ...rest } = state.bag[i]
+  const fish: Fish = a.locked ? { ...rest, locked: true } : rest
+  return { state: { ...state, bag: state.bag.map((f, j) => (j === i ? fish : f)) } }
 }
 
 function buyRod(state: State, a: Record<string, unknown>): Out {
@@ -268,7 +283,7 @@ function equip(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, equipped: [...ids] } }
 }
 
-function migrate(raw: unknown, _fromVersion: number): State {
+function migrate(raw: unknown, fromVersion: number): State {
   const base = init()
   if (!isObj(raw)) return base
   const nonNeg = (v: unknown, d: number) => (isNum(v) && v >= 0 ? v : d)
@@ -284,7 +299,9 @@ function migrate(raw: unknown, _fromVersion: number): State {
   if (Array.isArray(raw.bag)) {
     for (const f of raw.bag) {
       if (isObj(f) && knownSpecies(f.species) && isNum(f.sizeCm) && typeof f.perfect === 'boolean') {
-        bag.push({ species: f.species, sizeCm: f.sizeCm, perfect: f.perfect })
+        // v4까지는 잠금이 없었다: 가방에 있던 전설은 잠가 둔다. v5부터는 저장된 잠금 그대로.
+        const locked = fromVersion < 5 ? !!speciesById(f.species).legend : f.locked === true
+        bag.push({ species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
       }
     }
   }
@@ -332,7 +349,7 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 5,
+  version: 6,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
@@ -347,6 +364,8 @@ export const logic: WorldLogic<State, Action, View> = {
         return resolve(state, action, ctx.now)
       case 'sell':
         return sell(state)
+      case 'lock':
+        return lock(state, action)
       case 'buyRod':
         return buyRod(state, action)
       case 'buyBag':

@@ -330,6 +330,39 @@ describe('fishing Game', () => {
     expect(screen.getByText('0/20')).toBeInTheDocument()
   })
 
+  test('가방: 물고기 칸을 누르면 lock을 보내고, 응답 뒤 잠금 표시가 바뀐다', async () => {
+    const fish = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const view = makeView({ bag: [fish] })
+    await mount(view)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    route({
+      lock: (b) => ok({ ...view, bag: [b.action === 'act' && b.payload.locked ? { ...fish, locked: true as const } : fish] }),
+    })
+    const cell = () => within(screen.getByRole('region', { name: '가방' })).getByRole('button', { name: /멸치 10cm/ })
+    expect(cell()).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(cell())
+    await flush()
+    expect(calls('lock')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: true } }])
+    expect(cell()).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(cell())
+    await flush()
+    expect(calls('lock')[1]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: false } })
+    expect(cell()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('상점: 잠긴 물고기는 마릿수·예상 금액에서 빠지고, 전부 잠겨 있으면 팔기 버튼이 꺼진다', async () => {
+    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const grouper = { species: 'grouper', sizeCm: 120, perfect: false, locked: true as const }
+    const { unmount } = await mountAtShop(makeView({ bag: [anchovy, grouper] }))
+    const value = price('anchovy', 10, false).toLocaleString('ko-KR')
+    expect(screen.getByText(`팔 물고기 1마리 · 잠금 1마리 · 예상 ${value} G`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeEnabled()
+    unmount()
+    await mountAtShop(makeView({ bag: [grouper] }))
+    expect(screen.getByText('팔 물고기 0마리 · 잠금 1마리 · 예상 0 G')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeDisabled()
+  })
+
   test('shop: buy button disabled when gold is short; enabled and calls buyRod when enough', async () => {
     const { unmount } = await mountAtShop(makeView({ gold: 1000 }))
     const rods = screen.getByRole('list', { name: '낚싯대 목록' })
@@ -1809,23 +1842,23 @@ describe('찌 상점·장비', () => {
     await mountAtShop(old as View)
     expect(within(screen.getByRole('list', { name: '찌 목록' })).getAllByRole('listitem')).toHaveLength(5)
     cleanup()
-    render(<BagPanel view={old as View} atShop={false} busy={false} onEquip={() => {}} />)
+    render(<BagPanel view={old as View} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     expect(within(screen.getByRole('group', { name: '장비' })).getAllByTestId('fish-slot')).toHaveLength(1)
   })
 
   test('가방: 장비 구역이 가방 칸보다 위, 찌를 사기 전에도 칸과 안내가 보인다', () => {
     const view = makeView({ rodTier: 2, tackles: ['cork'] })
-    const { container } = render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} />)
+    const { container } = render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     const gear = screen.getByRole('group', { name: '장비' })
     const grid = container.querySelector('.fish-bag') as Element
     expect(gear.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByText('카본 낚싯대부터 낄 수 있어요')).toBeInTheDocument()
     cleanup()
-    render(<BagPanel view={makeView({ rodTier: 3 })} atShop={false} busy={false} onEquip={() => {}} />)
+    render(<BagPanel view={makeView({ rodTier: 3 })} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     expect(screen.getByRole('group', { name: '장비' })).toBeInTheDocument()
     expect(screen.getAllByTestId('fish-slot')).toHaveLength(1)
     cleanup()
-    render(<BagPanel view={makeView({ rodTier: 2 })} atShop={false} busy={false} onEquip={() => {}} />)
+    render(<BagPanel view={makeView({ rodTier: 2 })} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     expect(screen.queryByRole('group', { name: '장비' })).not.toBeInTheDocument()
   })
 
@@ -1856,7 +1889,7 @@ describe('찌 상점·장비', () => {
 
   test('낚시 중이면 장비 구역이 비활성이고 문구가 보인다', () => {
     const view = makeView({ rodTier: 3, tackles: ['cork'], pending: pending() })
-    render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} />)
+    render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     expect(screen.getByText('낚시 중에는 바꿀 수 없어요')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '코르크 찌' })).toBeDisabled()
   })

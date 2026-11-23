@@ -18,7 +18,7 @@
 - 찌 5종과 값(설계 §7 그대로): `cork` 코르크 찌 1,000G 바 길이 ×1.2 / `trap` 함정 찌 1,500G 물고기가 바 밖일 때 진행도 감소 ×0.75 / `barbed` 가시 바늘 2,000G 바 안의 물고기 쪽으로 바가 끌림 / `spinner` 회전 찌 1,500G 입질 지연 ×0.7 / `curious` 호기심 찌 5,000G rare 가중치 ×1.5·전설 확률 ×1.5.
 - 칸: 낚싯대 1·2단계 0칸, 3단계 1칸, 4단계 2칸. 같은 찌 중복 장착 불가. 한 번 사면 영구.
 - `rollCatch`의 rng 호출 수(항상 5번)와 순서는 그대로. 찌가 없으면 추첨 결과는 지금과 같다.
-- `logic.version` 5. 기존 33종·낚싯대·가방 값 불변.
+- `logic.version` 5 (가방 잠금 PR #72가 먼저 5를 써서, 병합 때 6으로 올림). 기존 33종·낚싯대·가방 값 불변.
 - 커밋 `type: 내용`, 마지막 두 줄 트레일러(Co-Authored-By: <작성 모델 이름> <noreply@anthropic.com> / Claude-Session: https://claude.ai/code/session_01T7oyVpQAuQkbAiCkNHahWh). 경로 지정 스테이징, 푸시 금지.
 
 ## Review Focus

@@ -277,7 +277,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(5)
+    expect(logic.version).toBe(6)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null,
     })
@@ -805,5 +805,69 @@ describe('fishing WorldLogic', () => {
       expect(m({ rodTier: 2, tackles: ['cork'], equipped: ['cork'] })).toMatchObject({ tackles: ['cork'], equipped: [] })
       expect(m({ tackles: 'cork', equipped: 7 })).toMatchObject({ tackles: [], equipped: [] })
     })
+  })
+})
+
+describe('가방 잠금', () => {
+  const anchovy: Fish = { species: 'anchovy', sizeCm: 8, perfect: false }
+  const grouper: Fish = { species: 'grouper', sizeCm: 140, perfect: true }
+  const mackerel: Fish = { species: 'mackerel', sizeCm: 30, perfect: false }
+
+  it('lock: 고른 칸만 잠그고, 풀면 locked 필드가 사라진다; 낚시 중에도 된다', () => {
+    const s = deepFreeze(withPending({ gold: 7, bag: [anchovy, mackerel] }))
+    const r = ok(logic.apply(s, { type: 'lock', index: 1, locked: true }, ctx()))
+    expect(r.state.bag).toEqual([anchovy, { ...mackerel, locked: true }])
+    expect(r.state.gold).toBe(7)
+    expect(r.state.pending).toEqual(s.pending)
+    const back = ok(logic.apply(deepFreeze(r.state), { type: 'lock', index: 1, locked: false }, ctx()))
+    expect(back.state.bag).toEqual([anchovy, mackerel])
+    expect('locked' in back.state.bag[1]).toBe(false)
+  })
+
+  it('lock: 잘못된 index·locked → bad_action', () => {
+    const s = deepFreeze(fresh({ bag: [anchovy, mackerel] }))
+    const bad = [
+      { index: -1, locked: true }, { index: 2, locked: true }, { index: 0.5, locked: true },
+      { index: '0', locked: true }, { index: 0, locked: 'yes' }, { index: 0 }, { locked: true },
+    ]
+    for (const a of bad) expect(err(logic.apply(s, { type: 'lock', ...a } as unknown as Action, ctx()))).toBe('bad_action')
+  })
+
+  it('sell: 잠긴 물고기는 남기고 값에 넣지 않는다; 전부 잠겨 있으면 bag_empty', () => {
+    const locked: Fish = { ...grouper, locked: true }
+    const s = deepFreeze(fresh({ gold: 10, totalEarned: 5, bag: [anchovy, locked, mackerel] }))
+    const sum = price('anchovy', 8, false) + price('mackerel', 30, false)
+    const r = ok(logic.apply(s, { type: 'sell' }, ctx()))
+    expect(r.result).toEqual({ earned: sum })
+    expect(r.state.gold).toBe(10 + sum)
+    expect(r.state.totalEarned).toBe(5 + sum)
+    expect(r.state.bag).toEqual([locked])
+    expect(err(logic.apply(deepFreeze(r.state), { type: 'sell' }, ctx()))).toBe('bag_empty')
+  })
+
+  it('resolve: 전설은 잠긴 채 가방에 들어가고, 일반 어종은 잠기지 않는다', () => {
+    const p = withHooked().pending!
+    const legend = withHooked({ pending: { ...p, species: 'grouper', sizeCm: 120 } })
+    const r = ok(logic.apply(legend, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    const fish = { species: 'grouper', sizeCm: 120, perfect: false, locked: true }
+    expect(r.state.bag).toEqual([fish])
+    expect(r.result).toEqual({ caught: fish })
+    const n = ok(logic.apply(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    expect(n.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: false }])
+  })
+
+  it('migrate: v4 이하 가방의 전설은 잠그고, v5 세이브의 잠금은 저장된 그대로(true만 인정)', () => {
+    expect(logic.migrate({ bag: [anchovy, grouper] }, 4).bag).toEqual([anchovy, { ...grouper, locked: true }])
+    expect(logic.migrate({ bag: [anchovy, grouper] }, 2).bag).toEqual([anchovy, { ...grouper, locked: true }])
+    const v5 = [{ ...anchovy, locked: true }, grouper, { ...mackerel, locked: 'x' }, { ...mackerel, locked: false }]
+    expect(logic.migrate({ bag: v5 }, 5).bag).toEqual([{ ...anchovy, locked: true }, grouper, mackerel, mackerel])
+  })
+
+  it('migrate: 잠금만 있던 v5 세이브(찌 필드 없음) → v6에서 잠금은 그대로, 찌는 빈 목록', () => {
+    const m = logic.migrate({ gold: 900, rodTier: 3, bag: [{ ...grouper, locked: true }, anchovy] }, 5)
+    expect(m.bag).toEqual([{ ...grouper, locked: true }, anchovy])
+    expect(m.tackles).toEqual([])
+    expect(m.equipped).toEqual([])
+    expect(m.gold).toBe(900)
   })
 })

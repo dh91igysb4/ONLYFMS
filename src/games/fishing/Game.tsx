@@ -788,6 +788,15 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
+  async function lockFish(index: number, locked: boolean) {
+    setNotice(null)
+    try {
+      await act({ type: 'lock', index, locked })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
   async function buyRod(tier: number) {
     setNotice(null)
     try {
@@ -983,7 +992,9 @@ export function Game({ gameId }: WorldGameProps) {
                   닫기
                 </button>
               </div>
-              {menu === 'bag' && <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} />}
+              {menu === 'bag' && (
+                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} />
+              )}
               {menu === 'shop' && (
                 <ShopPanel
                   view={view}

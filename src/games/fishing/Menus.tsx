@@ -9,8 +9,16 @@ const ICON_SCALE = 2
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 
-/** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. */
-export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: boolean; busy: boolean; onEquip(ids: TackleId[]): void }) {
+type BagProps = {
+  view: View
+  atShop: boolean
+  busy: boolean
+  onEquip(ids: TackleId[]): void
+  onLock(index: number, locked: boolean): void
+}
+
+/** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 잠금을 뒤집는다. */
+export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
   const slots = tackleSlots(view.rodTier)
   const fishing = view.pending !== null
@@ -67,13 +75,24 @@ export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: 
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
       {!atShop && <p className="fish-shop-note">상점에서 팔 수 있어요</p>}
+      {view.bag.length > 0 && <p className="muted">물고기를 누르면 잠가서 팔리지 않게 해요</p>}
       <ul className="fish-bag">
         {cells.map((f, i) =>
           f ? (
-            <li key={i} className="fish-cell">
-              <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt={speciesName(f.species)} />
-              <span className="fish-cell-size">{f.sizeCm}cm</span>
-              <span className="fish-cell-price">{gold(price(f.species, f.sizeCm, f.perfect))}</span>
+            <li key={i} className="fish-cell-slot">
+              <button
+                type="button"
+                className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}`}
+                aria-pressed={!!f.locked}
+                aria-label={`${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
+                disabled={busy}
+                onClick={() => onLock(i, !f.locked)}
+              >
+                {f.locked && <span className="fish-cell-lock" aria-hidden="true" />}
+                <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt="" />
+                <span className="fish-cell-size">{f.sizeCm}cm</span>
+                <span className="fish-cell-price">{gold(price(f.species, f.sizeCm, f.perfect))}</span>
+              </button>
             </li>
           ) : (
             <li key={i} className="fish-cell fish-cell-empty" aria-hidden="true" />
@@ -87,7 +106,10 @@ export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: 
 type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
 
 export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
-  const bagValue = view.bag.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
+  // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
+  const selling = view.bag.filter((f) => !f.locked)
+  const lockedCount = view.bag.length - selling.length
+  const bagValue = selling.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
   const slots = tackleSlots(view.rodTier)
@@ -97,9 +119,9 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
     <section className="fish-panel-body" aria-label="상점">
       <div className="fish-shop-sell">
         <p className="muted">
-          가방 {view.bag.length}마리 · 예상 {gold(bagValue)}
+          {`팔 물고기 ${selling.length}마리${lockedCount > 0 ? ` · 잠금 ${lockedCount}마리` : ''} · 예상 ${gold(bagValue)}`}
         </p>
-        <button type="button" className="btn btn-primary" disabled={busy || view.bag.length === 0} onClick={onSell}>
+        <button type="button" className="btn btn-primary" disabled={busy || selling.length === 0} onClick={onSell}>
           전부 팔기
         </button>
       </div>
