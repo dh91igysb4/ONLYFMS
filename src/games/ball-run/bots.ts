@@ -32,11 +32,16 @@ function hold(s: SimState, target: number, n: number, course: Course): { end: Si
 const byAbs = (a: number, b: number): number => Math.abs(a) - Math.abs(b) || a - b
 
 // 후보는 "지금 자리"와 열 가운데를 겨누는 목표다. 기운 판이 쌓은 drift만큼 실효 목표가 옮겨 가므로(sim 설계 §2.1) 목표에서
-// drift를 빼서 겨눈다(사람도 화면의 공 자리를 보고 손가락을 옮긴다).
-function decide(s: SimState, prev: number, course: Course): number {
+// drift를 빼서 겨눈다(사람도 화면의 공 자리를 보고 손가락을 옮긴다). v8: 기운 판이 등가속으로 밀어 첫 목표를 붙드는 동안에도
+// drift가 크게 바뀌므로 둘째 목표 후보는 첫 목표를 붙든 뒤 상태의 drift로 다시 만든다.
+function candidates(s: SimState): number[] {
   const set = new Set<number>([clampX(s.x - s.drift)])
   for (let col = COL_MIN; col <= COL_MAX; col++) set.add(clampX(col * 1000 - s.drift))
-  const cands = [...set].sort(byAbs)
+  return [...set].sort(byAbs)
+}
+
+function decide(s: SimState, prev: number, course: Course): number {
+  const cands = candidates(s)
 
   let best = prev
   let bestAlive = -1
@@ -57,7 +62,7 @@ function decide(s: SimState, prev: number, course: Course): number {
         consider(a, first.alive)
         continue
       }
-      for (const b of cands) {
+      for (const b of first.end.drift === s.drift ? cands : candidates(first.end)) {
         consider(a, stageA + hold(first.end, b, HORIZON - stageA, course).alive)
         if (bestAlive === HORIZON && best === a) break
       }

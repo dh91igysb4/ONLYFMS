@@ -108,18 +108,41 @@ test('4자면 올리기 비활성, 5자면 올리고 비우고 다시 읽는다'
   await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(before))
 })
 
-test('특정 대상 필터에서 다른 대상으로 올리면 필터가 그 대상으로 바뀐다', async () => {
+test('특정 대상 칩을 고르면 대상 선택이 없고 그 대상으로 올린다', async () => {
   postMock.mockResolvedValue('new')
   renderPage()
   await screen.findByText('힌트를 늘려줘')
   fireEvent.click(screen.getByRole('button', { name: '사이트' }))
   await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
-  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'players' } })
+  expect(screen.queryByLabelText('대상')).toBeNull()
+  fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
+  const before = listMock.mock.calls.length
+  fireEvent.click(screen.getByRole('button', { name: '올리기' }))
+  await waitFor(() => expect(postMock).toHaveBeenCalledWith('site', 'abcde'))
+  await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(before))
+  expect(listMock).toHaveBeenLastCalledWith('site')
+})
+
+test('전체에서는 대상 선택이 보이고 고른 대상으로 올린다', async () => {
+  postMock.mockResolvedValue('new')
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'yacht' } })
   fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
   fireEvent.click(screen.getByRole('button', { name: '올리기' }))
-  await waitFor(() => expect(postMock).toHaveBeenCalledWith('players', 'abcde'))
-  await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('players'))
-  expect(screen.getByRole('button', { name: '선수 맞추기' }).getAttribute('aria-pressed')).toBe('true')
+  await waitFor(() => expect(postMock).toHaveBeenCalledWith('yacht', 'abcde'))
+})
+
+test('전체에서 대상을 고른 뒤 칩을 누르면 칩의 대상으로 올린다', async () => {
+  postMock.mockResolvedValue('new')
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'yacht' } })
+  fireEvent.click(screen.getByRole('button', { name: '사이트' }))
+  await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
+  fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
+  fireEvent.click(screen.getByRole('button', { name: '올리기' }))
+  await waitFor(() => expect(postMock).toHaveBeenCalledWith('site', 'abcde'))
 })
 
 test('전체 필터에서 올리면 필터는 그대로 전체다', async () => {

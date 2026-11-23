@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANK_DRIFT, BLOCK_H, DROP_TOL, G, GATE_H, JUMP_VY, KEY_STEP, LAT_ACC, LEDGE, MOVER_PERIOD, MOVER_ROW_OFFSET, PILLAR_H, R, ROW, SPEED_TABLE, STEEP_STEP,
+  BANK_ACC, BANK_DRIFT_MAX, BLOCK_H, DROP_TOL, G, GATE_H, JUMP_VY, LAT_ACC, LEDGE, MOVER_PERIOD, MOVER_ROW_OFFSET, PILLAR_H, R, ROW, SPEED_TABLE, STEEP_STEP,
   V0, V_MAX, VX_MAX, X_LIMIT,
 } from './constants.ts'
 import { moverX } from './mover.ts'
 import { courseFromSegments, getCourse } from './course.ts'
 import type { Course } from './course.ts'
-import { JOINT, START_PARSED, parseSegment } from './segments.ts'
+import { BANDS, JOINT, START_PARSED, TEMPLATES, bandOf, parseSegment } from './segments.ts'
+import type { Band } from './segments.ts'
+import { clampX } from './input.ts'
 import { colOf, floorAt, initSim, rowOf, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 
@@ -49,7 +51,7 @@ describe('ball-run sim', () => {
 
   it('initSim', () => {
     expect(initSim()).toEqual({
-      tick: 0, x: 0, vx: 0, drift: 0, y: R, z: 0, vy: 0, vz: V0, grounded: true, lastFloor: 0, speedLevel: 0, dead: null,
+      tick: 0, x: 0, vx: 0, drift: 0, driftV: 0, y: R, z: 0, vy: 0, vz: V0, grounded: true, lastFloor: 0, speedLevel: 0, dead: null,
     })
     expect(initSim({ speedLevel: 3 }).vz).toBe(SPEED_TABLE[3])
     expect(initSim({ speedLevel: 99 }).vz).toBe(SPEED_TABLE[SPEED_TABLE.length - 1])
@@ -98,46 +100,110 @@ describe('ball-run sim', () => {
     expect(Math.abs(last(left).x + 3000)).toBeLessThan(50)
   })
 
-  // 기운 판 밀림은 쌓이는 drift(설계 v2 §2.1): 판 위 한 틱마다 drift += bank × BANK_DRIFT, 줄지 않는다.
-  // 실효 목표 = clampX(target + drift). 3칸 판 가운데에서 손을 떼면 6행 안에 판 밖으로 밀려난다.
+  // 기운 판 밀림(설계 v8): 등가속. 판 위 한 틱마다 driftV += bank × BANK_ACC(1/100 mm/틱), drift += driftV / 100(0 쪽 버림),
+  // 판을 벗어나거나 뜨면 driftV = 0. drift는 줄지 않는다. 실효 목표 = clampX(target + drift).
   const plank = (ch: string, n: number, after = 12): Course =>
     course(J, ...rep('..___..', 4), ...rep(`..${ch.repeat(3)}..`, n), ...rep('..___..', after), J)
   const RUN0 = 5 // 기운 판 첫 행
-
-  // v3: 속도가 1.7배라 같은 밀림(틱당 BANK_DRIFT)이 1.7배 긴 행에 걸친다. 템플릿의 기운 판 묶음도 6 → 10행으로 늘렸다.
-  it('bank drift: a hands-off ball slides off a 3-wide plank within a 10-row run (speed 1)', () => {
-    const c = plank('>', 10)
-    const states = run(c, 200, 0, initSim({ speedLevel: 1 }))
-    const off = states.findIndex((s) => s.dead === 'fall' || colOf(s.x) > 1)
-    expect(off, 'never left the plank').toBeGreaterThan(0)
-    expect(rowOf(states[off].z), `left at row ${rowOf(states[off].z)}`).toBeLessThanOrEqual(RUN0 + 9)
-    expect(last(states).dead).toBe('fall')
-    // 판 위에서 drift는 틱마다 BANK_DRIFT씩 쌓이고, 판 전에는 0이다.
-    for (let i = 1; i < states.length; i++) {
-      const d = states[i].drift - states[i - 1].drift
-      expect([0, BANK_DRIFT]).toContain(d)
+  const trunc100 = (v: number): number => (v < 0 ? 0 - Math.floor(-v / 100) : Math.floor(v / 100))
+  // 템플릿에서 같은 쪽으로 미는 기운 판이 이어지는 가장 짧은 묶음(행). 방향이 바뀌거나 평지가 끼면 끊는다.
+  const shortestBankRun = (b: Band): number => {
+    let best = Infinity
+    for (const t of TEMPLATES.filter((t) => bandOf(t)?.id === b.id)) {
+      let dir = ''
+      let run = 0
+      for (const row of [...t.rows, J]) {
+        const d = row.includes('<') ? '<' : row.includes('>') ? '>' : ''
+        if (d !== dir && run > 0) best = Math.min(best, run)
+        run = d !== '' && d === dir ? run + 1 : d !== '' ? 1 : 0
+        dir = d
+      }
     }
-    for (const s of states.filter((s) => rowOf(s.z) < RUN0)) expect(s.drift).toBe(0)
-    expect(states.some((s) => s.drift > 0)).toBe(true)
+    return best
+  }
+
+  it('BANK_ACC is the rolling-sphere acceleration on a 20° bank under G, in 1/100 mm/tick²', () => {
+    // a = (5/7)·G·sin 20°. sin 20° ≈ 0.3420.
+    expect(Math.abs(BANK_ACC - (5 / 7) * G * 0.342 * 100)).toBeLessThan(1)
+    expect(Number.isInteger(BANK_ACC)).toBe(true)
   })
 
-  it('bank drift: steering uphill as fast as the push holds the ball on the plank', () => {
-    for (const [speedLevel, n] of [[1, 10], [1, 13], [8, 13], [16, 13]]) {
-      const c = plank('>', n)
-      // 판 위에 있는 틱마다 손가락을 위쪽(왼쪽)으로 BANK_DRIFT만큼 옮긴다(키보드 KEY_STEP보다 느리다).
-      let tgt = 0
-      const states = run(c, 400, (s) => {
-        if (rowOf(s.z) >= RUN0 && rowOf(s.z) < RUN0 + n) tgt -= BANK_DRIFT
-        return tgt
-      }, initSim({ speedLevel }))
-      const where = `speed ${speedLevel} rows ${n}`
-      for (const s of states) {
-        expect(s.dead, where).toBeNull()
-        expect(Math.abs(s.x), `${where} x=${s.x} at row ${rowOf(s.z)}`).toBeLessThan(500)
-      }
-      expect(Math.abs(tgt)).toBeLessThanOrEqual(X_LIMIT)
+  it('bank (a): a hands-off ball leaves a 3-wide plank before the end of the shortest bank run of each band (band lowest speed)', () => {
+    for (const b of BANDS) {
+      const n = shortestBankRun(b)
+      expect(n, b.id).toBeLessThan(Infinity)
+      const states = run(plank('>', n), 300, 0, initSim({ speedLevel: b.minLevel }))
+      const on = states.findIndex((s) => s.driftV !== 0)
+      const off = states.findIndex((s) => s.dead !== null || colOf(s.x) > 1)
+      const where = `band ${b.id} speed ${b.minLevel} run ${n}`
+      expect(off, `${where}: never left the plank`).toBeGreaterThan(on)
+      expect(rowOf(states[off].z), `${where}: left at row ${rowOf(states[off].z)} after ${off - on} ticks`).toBeLessThan(RUN0 + n)
+      expect(last(states).dead, where).toBe('fall')
     }
-    expect(BANK_DRIFT).toBeLessThan(KEY_STEP)
+  })
+
+  it('bank (b): steering against the push holds the ball on every bank run of every band speed', () => {
+    for (const b of BANDS) {
+      for (let speedLevel = b.minLevel; speedLevel <= b.maxLevel; speedLevel++) {
+        for (const ch of ['<', '>']) {
+          // 손가락을 drift만큼 반대로 옮겨 실효 목표를 판 가운데에 둔다(사람은 화면의 공 자리를 보고 따라간다).
+          let tgt = 0
+          const states = run(plank(ch, b.bank), 400, (s) => (tgt = clampX(0 - s.drift)), initSim({ speedLevel }))
+          const where = `band ${b.id} speed ${speedLevel} ${ch}`
+          for (const s of states) {
+            expect(s.dead, where).toBeNull()
+            expect(Math.abs(s.x), `${where} x=${s.x} at row ${rowOf(s.z)}`).toBeLessThan(500)
+          }
+          expect(Math.abs(tgt), where).toBeLessThan(X_LIMIT)
+        }
+      }
+    }
+  })
+
+  it('bank (c): constant acceleration — drift grows quadratically on a long bank with a frozen target', () => {
+    const c = course(J, ...rep(F, 4), ...rep('>>>>>>>', 80), ...rep(F, 10), J)
+    const states = run(c, 200, 0)
+    const on = states.findIndex((s) => s.driftV !== 0)
+    expect(on).toBeGreaterThan(0)
+    for (const n of [10, 20, 30]) {
+      const dn = states[on + n - 1].drift
+      const d2n = states[on + 2 * n - 1].drift
+      expect(d2n, `n=${n}`).toBeLessThan(BANK_DRIFT_MAX)
+      // d(t) = Σ trunc(k·a/100) ≈ a·t²/200 + (a/200 − ½)t: 4·d(n) − d(2n) ≈ 0.71n (버림·이산화).
+      expect(Math.abs(d2n - 4 * dn), `n=${n} d(n)=${dn} d(2n)=${d2n}`).toBeLessThanOrEqual(n)
+    }
+    // 판 위 한 틱마다 driftV는 BANK_ACC씩, drift는 그 1/100(버림)씩 는다.
+    for (let i = on; i < on + 60; i++) {
+      expect(states[i].driftV).toBe((i - on + 1) * BANK_ACC)
+      expect(states[i].drift - (i === 0 ? 0 : states[i - 1].drift)).toBe(trunc100(states[i].driftV))
+    }
+  })
+
+  it('bank (d): driftV is 0 the tick after leaving a bank and before reaching it', () => {
+    for (const speedLevel of [1, 8, 16]) {
+      const states = run(plank('<', 10), 200, (s) => clampX(0 - s.drift), initSim({ speedLevel }))
+      const onBank = (i: number): boolean => i > 0 && states[i - 1].grounded && rowOf(states[i].z) >= RUN0 && rowOf(states[i].z) < RUN0 + 10
+      expect(states.some((_, i) => onBank(i))).toBe(true)
+      states.forEach((s, i) => {
+        if (onBank(i)) expect(s.driftV, `tick ${s.tick}`).toBe((i === 0 ? 0 : states[i - 1].driftV) - BANK_ACC)
+        else expect(s.driftV, `tick ${s.tick} row ${rowOf(s.z)}`).toBe(0)
+      })
+      for (const s of states) expect(s.dead).toBeNull()
+    }
+  })
+
+  it('bank: driftV integrates through a direct reversal (decelerates, then pushes back)', () => {
+    const c = course(J, ...rep(F, 4), ...rep('>>>>>>>', 10), ...rep('<<<<<<<', 10), ...rep(F, 10), J)
+    const states = run(c, 120, 0)
+    const at = (r: number) => states.findIndex((s) => rowOf(s.z) === r)
+    const turn = at(RUN0 + 10)
+    // 뒤집히는 행에서 0으로 돌아가지 않고 줄기 시작한다.
+    expect(states[turn - 1].driftV).toBeGreaterThan(0)
+    expect(states[turn].driftV).toBe(states[turn - 1].driftV - BANK_ACC)
+    // 같은 길이의 반대 판 뒤 driftV는 거의 0이고(틱 수 ±1), drift는 그동안 계속 같은 쪽으로 쌓였다.
+    const end = at(RUN0 + 20) - 1
+    expect(Math.abs(states[end].driftV)).toBeLessThanOrEqual(2 * BANK_ACC)
+    expect(states[end].drift).toBeGreaterThan(states[turn - 1].drift)
   })
 
   it('bank drift does not decay after the plank and is zero on flat ground', () => {
@@ -161,8 +227,11 @@ describe('ball-run sim', () => {
     const seg = parseSegment({ id: 'm', kind: 'obstacle', tier: 1, rows })
     const a = run(courseFromSegments([{ seg, mirrored: false }]), 150, 0)
     const b = run(courseFromSegments([{ seg, mirrored: true }]), 150, 0)
-    expect(b.map((s) => [0 - s.x, 0 - s.drift])).toEqual(a.map((s) => [s.x, s.drift]))
-    for (const s of a) expect(Number.isInteger(s.drift)).toBe(true)
+    expect(b.map((s) => [0 - s.x, 0 - s.drift, 0 - s.driftV])).toEqual(a.map((s) => [s.x, s.drift, s.driftV]))
+    for (const s of a) {
+      expect(Number.isInteger(s.drift)).toBe(true)
+      expect(Number.isInteger(s.driftV)).toBe(true)
+    }
     expect(a.some((s) => s.drift < 0)).toBe(true)
     // ±2·X_LIMIT에서 멈춘다.
     const onPlank = { ...initSim(), z: RUN0 * 1000 + 100 }
@@ -179,6 +248,7 @@ describe('ball-run sim', () => {
     for (const s of airOnBank) {
       expect(s.x).toBe(0)
       expect(s.drift).toBe(0)
+      expect(s.driftV).toBe(0)
     }
     for (const s of states) expect(s.dead).toBeNull()
   })

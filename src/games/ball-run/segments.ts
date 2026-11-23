@@ -1,4 +1,4 @@
-import { COL_MAX, COL_MIN, GATE_H, LEDGE, PILLAR_H, RAMP_STEP, SPEED_TABLE, STEEP_STEP, V_MAX } from './constants.ts'
+import { COL_MAX, COL_MIN, GATE_H, LEDGE, PILLAR_H, RAMP_STEP, ROW, SPEED_TABLE, STEEP_STEP, V_MAX } from './constants.ts'
 
 // pad: 점프대('J'). 왕복 블록('M') 칸은 평평한 바닥이고 큐브는 행 단위(ParsedSegment.movers, Course.moverAt)로 따로 둔다.
 export type Cell = { floor: null | { h0: number; h1: number }; block: boolean; blockH?: number; bank?: -1 | 1; pad?: true }
@@ -149,7 +149,7 @@ export type Band = {
   s3: number // 3칸(28행)
   e1: number // 1칸 틈으로 들어가면 더(5행)
   clear: number // 왕복 블록 앞뒤 평평한 3칸 길(26행)
-  bank: number // 같은 쪽으로 미는 기운 판 연속 최대(13행, 내림)
+  bank: number // 기운 판 한 묶음(같은 쪽 연속) 행 수: 묶음 최저 속도에서 BANK_TICKS틱(올림). v8: 모든 기운 판 묶음이 이 길이다.
   ledge: number // 단차 뒤 착지 평지(15행)
   flight: number // 점프대 뒤 날아 넘는 구간(구멍·'BBB' 벽): 묶음 최저 속도에서 착지 행 − 4
   land: number // 점프대 뒤 착지 평지 끝(42행): 묶음 최고 속도 착지 행 + 여유
@@ -158,9 +158,13 @@ export type Band = {
 }
 // v7(사용자: "지금이랑 아까의 중간 정도로"): v6은 결정 사이를 설계 최소 간격으로 붙였다. 그 위에 이만큼 더 둔다.
 export const REST_TOP = 23
+// v8(기운 판 등가속, BANK_ACC 171): 3칸 판 가운데에서 손을 뗀 공은 판에 오른 뒤 46틱에 판 밖으로 나간다(sim.test, 속도와 무관).
+// 판 한 묶음은 묶음 최저 속도에서 그보다 조금 긴 BANK_TICKS틱 — 손을 떼면 판 끝 전에 떨어진다. 묶음 최고 속도에서는 더 짧게
+// 지나가 덜 밀린다(묶음 c 최고 속도 36틱: 약 1.1 m).
+export const BANK_TICKS = 50
 function band(id: Band['id'], minLevel: number, maxLevel: number, flight: number, rampLand: number): Band {
   const r = (n: number) => bandRows(n, maxLevel)
-  const bank = Math.floor((13 * SPEED_TABLE[maxLevel]) / V_MAX)
+  const bank = Math.ceil((BANK_TICKS * SPEED_TABLE[minLevel]) / ROW)
   return { id, minLevel, maxLevel, s1: r(12), s2: r(21), s3: r(28), e1: r(5), clear: r(26), bank, ledge: r(15), flight, land: r(42), rampLand, rest: r(REST_TOP) }
 }
 // 점프대 착지 행(시뮬로 잰 값, sim.test): 단계 1 → +15, 3 → +17, 4 → +19, 8 → +24, 9 → +25, 16 → +35.
@@ -172,6 +176,8 @@ export const BANDS: readonly Band[] = [band('a', 1, 3, 11, 15), band('b', 4, 8, 
 //   1칸 옮김 s1, 2칸 s2, 3칸 s3, 1칸 틈으로 들어가면 +e1. 이음 행(가운데 3칸)도 그런 행으로 친다.
 //   옮겨 가는 길 사이가 구멍·블록으로 끊긴 동안은 세지 않는다(레일 끝에서부터 센다). 경사 행·점프 구멍 행도 옮길 시간으로 센다.
 // - 같은 쪽으로 미는 기운 판은 연속 bank행 이하. 길게 이으려면 평지를 끼우거나 방향을 바꾼다. 양쪽으로 미는 행 수는 같다.
+//   v8(등가속): 미는 쪽이 바뀌는 곳에는 평지 한 행을 끼운다(판을 벗어나면 driftV = 0). 바로 이어 뒤집으면 driftV가 이어져
+//   앞 판에서 얻은 속도를 되돌리느라 같은 쪽으로 aT²만큼 더 밀려(평지를 끼우면 묶음마다 ½aT²) 손가락이 트랙 끝에 닿는다.
 // - 구멍 열은 높이가 그대로라 3칸 길은 모든 열이 같은 높이인 평지에서만 옆으로 옮겨 가거나 좁아진다. 경사·급경사·단차는 가운데
 //   3칸 길 전체에서만 쓰고, 그 뒤에는 바깥 열을 다시 쓰지 않는다(좁힌 길은 다시 넓힌 뒤에 내려간다).
 // - 장애물 조각은 평지(내리막은 v5처럼 몇 행만). 강제로 옮겨야 하는 행 사이는 손을 놓으면 1초 안에 길을 벗어나는 구간으로 잇는다:
@@ -264,8 +270,8 @@ function chain(b: Band, ...items: Item[]): string[] {
   while (gapNeed(b, last, J) > since) push(fill)
   return out
 }
-// 기운 판 bank행 + 같은 칸 평지(bank < s1 + 1이면 다음에 길이 옮겨 가기 전 빈 행 s1을 채운다).
-const bankRun = (b: Band, row: string, flat: string): string[] => [...rep(row, b.bank), ...rep(flat, b.s1 + 1 - b.bank)]
+// 기운 판 bank행 + 같은 칸 평지 한 행 이상(bank < s1이면 다음에 길이 옮겨 가기 전 빈 행 s1을 채운다).
+const bankRun = (b: Band, row: string, flat: string): string[] => [...rep(row, b.bank), ...rep(flat, Math.max(1, b.s1 + 1 - b.bank))]
 const L1 = '.._....' // 1칸(열 -1)
 const R1 = '...._..' // 1칸(열 1)
 const g1 = (b: Band): number => b.s1 + b.e1 // 1칸 옮겨 1칸 틈으로
@@ -335,11 +341,12 @@ const OBSTACLE_RECIPES: readonly Recipe[] = [
       return [...F(b.s2), ...rep('.__....', k), ...rep(N2, k), ...rep(R2, k), ...rep('....__.', k), R2, N3]
     },
   },
-  // 같은 쪽으로 두 번 미는 기운 판(사이 평지 한 행), 반대쪽도 두 번, 자리를 잡을 평지 뒤 블록(녹화 4.5 s, 7.0 s).
+  // 한쪽으로 미는 기운 판, 반대쪽으로 두 번, 다시 처음 쪽(사이마다 평지 한 행), 자리를 잡을 평지 뒤 블록(녹화 4.5 s, 7.0 s).
+  // v8: 같은 쪽 두 번(> > < <)은 등가속에서 drift가 2 × ½aT²(약 4.3 m)까지 쌓여 손가락이 트랙 끝(±3.5 m)에 닿는다. > < < >는 ½aT²까지.
   {
     base: 'o1-bank-intro', kind: 'obstacle', tier: 1, bands: ALL,
     rows: (b) =>
-      chain(b, { raw: [...rep('..>>>..', b.bank), N3, ...rep('..>>>..', b.bank), ...rep('..<<<..', b.bank), N3, ...rep('..<<<..', b.bank), ...F(b.s1)] }, '..B_B..', '.._B_..'),
+      chain(b, { raw: [...rep('..>>>..', b.bank), N3, ...rep('..<<<..', b.bank), N3, ...rep('..<<<..', b.bank), N3, ...rep('..>>>..', b.bank), ...F(b.s1)] }, '..B_B..', '.._B_..'),
   },
   // 완만한 내리막 끝 번갈아 막는 블록.
   { base: 'o1-down-blocks', kind: 'obstacle', tier: 1, bands: ALL, rows: (b) => chain(b, { raw: D(4) }, '..B__..', '..B_B..', '..__B..') },
@@ -455,8 +462,8 @@ const OBSTACLE_RECIPES: readonly Recipe[] = [
         b,
         {
           raw: [
-            ...F(b.s1 - b.bank), ...rep('..>>>..', b.bank), R3, ...rep('...>>>.', b.bank), ...rep('...<<<.', b.bank), N3,
-            ...bankRun(b, '..<<<..', N3), L3, ...rep('.<<<...', b.bank), ...rep('.>>>...', b.bank), N3,
+            ...F(b.s1 - b.bank), ...rep('..>>>..', b.bank), R3, ...rep('...>>>.', b.bank), R3, ...rep('...<<<.', b.bank), N3,
+            ...bankRun(b, '..<<<..', N3), L3, ...rep('.<<<...', b.bank), L3, ...rep('.>>>...', b.bank), N3,
           ],
         },
         '..B_B..', '..BB_..',

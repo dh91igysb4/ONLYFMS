@@ -5,7 +5,8 @@ import {
   TUNNELS, bandOf, bandRows, parseSegment,
 } from './segments.ts'
 import type { Band, SegmentTemplate } from './segments.ts'
-import { inBand } from './course.ts'
+import { courseFromSegments, inBand } from './course.ts'
+import { runBot } from './bots.ts'
 
 // v6: 조각마다 속도 묶음. 묶음이 없는(모든 단계) 조각은 최고 속도 기준(v3 값)으로 본다.
 const TOP_BAND: Band = {
@@ -252,9 +253,10 @@ describe('templates', () => {
     expect(jumps).toBeGreaterThan(0)
   })
 
-  it('banked boards push one way for at most 13 rows (band: same ticks) in a row', () => {
+  it('banked boards push one way for at most Band.bank rows in a row', () => {
     // 같은 쪽으로 미는 기운 판이 길게 이어지면 손을 거의 못 뗀다(설계 기준). 방향이 바뀌거나 평지가 끼면 끊는다.
     // v3: 속도가 1.7배라 v2의 8행이 13행(같은 시간). v6: 묶음 최고 속도에서 같은 틱(Band.bank).
+    // v8(등가속): 묶음 최저 속도에서 BANK_TICKS틱(손 뗀 공이 판 끝 전에 떨어지는 길이, sim.test).
     let banked = 0
     for (const t of TEMPLATES) {
       let dir = ''
@@ -471,15 +473,58 @@ describe('templates', () => {
     expect(n).toBeGreaterThanOrEqual(4)
   })
 
-  it('banked boards push both ways equally in every template (drift never decays)', () => {
-    // 기운 판이 쌓은 drift는 줄지 않고, 손가락 목표는 ±X_LIMIT 안이라 drift가 크게 남으면 반대쪽 끝에 못 간다.
-    // 조각 안에서는 속도가 같으니 '<' 행 수와 '>' 행 수가 같으면 조각을 지난 뒤 drift가 거의 0으로 돌아온다.
+  it('banked boards push both ways the same number of rows in every template (structural)', () => {
     for (const t of TEMPLATES) {
       const left = t.rows.filter((row) => row.includes('<')).length
       const right = t.rows.filter((row) => row.includes('>')).length
       expect(left, t.id).toBe(right)
     }
   })
+
+  it('v8: every bank run is exactly the band bank length and a flat row separates opposite pushes', () => {
+    // 등가속: 바로 뒤집으면 driftV가 이어져 같은 쪽으로 aT² 더 밀린다(평지를 끼우면 묶음마다 ±½aT²로 상쇄).
+    for (const t of TEMPLATES) {
+      let dir = ''
+      let run = 0
+      t.rows.forEach((row, r) => {
+        const d = row.includes('<') ? '<' : row.includes('>') ? '>' : ''
+        if (d !== '' && dir !== '' && d !== dir) throw new Error(`${t.id} row ${r}: '${dir}' turns into '${d}' without a flat row`)
+        if (d !== dir && run > 0) expect(run, `${t.id} run ending at row ${r}`).toBe(bandFor(t).bank)
+        run = d !== '' && d === dir ? run + 1 : d !== '' ? 1 : 0
+        dir = d
+      })
+    }
+  })
+})
+
+// v8: 기운 판이 등가속이라 조각을 지난 뒤 남는 drift는 행 수에 비례하지 않는다. 봇(실제 시뮬로 계획)을 모든 속도·반전으로
+// 굴려 조각을 지난 뒤 drift가 들어올 때와 400 mm 안으로 돌아오는지 본다(drift는 줄지 않고 손가락은 ±X_LIMIT 안이다).
+describe('bank drift balance (sim, v8)', () => {
+  const banked = PARSED.filter((p) => p.cells.some((row) => row.some((c) => c.bank !== undefined)))
+  const cases = banked.flatMap((seg) => [false, true].map((mirrored) => ({ id: seg.id, seg, mirrored })))
+  it('covers every banked template', () => {
+    expect(banked.length).toBeGreaterThanOrEqual(8)
+  })
+  it.each(cases)('$id mirrored=$mirrored ends within 400 mm of its entry drift at every speed of its band', ({ seg, mirrored }) => {
+    const course = courseFromSegments([{ seg: START_PARSED, mirrored: false }, { seg, mirrored }])
+    const z0 = START_PARSED.length * ROW
+    const z1 = (START_PARSED.length + seg.length) * ROW
+    const bad: string[] = []
+    for (let speedLevel = seg.minLevel; speedLevel <= seg.maxLevel; speedLevel++) {
+      let entry: number | null = null
+      let peak = 0
+      const end = runBot(course, {
+        speedLevel, maxTicks: 6000, untilZ: z1,
+        onStep: (s) => {
+          if (entry === null && s.z >= z0) entry = s.drift
+          if (entry !== null) peak = Math.max(peak, Math.abs(s.drift - entry))
+        },
+      })
+      const net = end.drift - (entry ?? 0)
+      if (end.dead !== null || Math.abs(net) > 400) bad.push(`speed ${speedLevel}: dead=${end.dead} net=${net} peak=${peak}`)
+    }
+    expect(bad).toEqual([])
+  }, 30_000)
 })
 
 describe('pools', () => {

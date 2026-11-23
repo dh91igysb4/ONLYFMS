@@ -49,7 +49,8 @@ export function SuggestPage() {
     return () => { seq.current++ }
   }, [load])
 
-  const target = draftTarget ?? filter ?? targets[0].id
+  // 칩으로 대상을 골랐으면 그 대상으로 올린다. 대상 선택은 '전체'일 때만 보인다
+  const target = filter ?? draftTarget ?? targets[0].id
   const canPost = body.trim().length >= MIN_LEN && !posting
 
   const shown = useMemo(() => {
@@ -64,8 +65,7 @@ export function SuggestPage() {
     try {
       await postSuggestion(target, body.trim())
       setBody('')
-      if (filter !== null && filter !== target) setFilter(target)
-      else await load()
+      await load()
     } catch (e) {
       setPostError(msg(e))
     } finally {
@@ -121,12 +121,14 @@ export function SuggestPage() {
       </div>
 
       <form className="card suggest-form" onSubmit={(e) => { e.preventDefault(); if (canPost) void submit() }}>
-        <label className="suggest-field">
-          대상
-          <select className="input" value={target} onChange={(e) => setDraftTarget(e.target.value)}>
-            {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </label>
+        {filter === null && (
+          <label className="suggest-field">
+            대상
+            <select className="input" value={target} onChange={(e) => setDraftTarget(e.target.value)}>
+              {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+        )}
         <label className="suggest-field">
           제안 내용
           <textarea
