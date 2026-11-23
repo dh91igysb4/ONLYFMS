@@ -101,3 +101,28 @@ export function freeGold(
 export function hourlyGold(avgScore: number, playSec: number, perPoint: number): number {
   return (3600 / (playSec + FREE_GAP_SEC)) * scoreGold(avgScore, perPoint)
 }
+
+// ---------------------------------------------------------------- 데일리 상금·판돈·참가비 (설계 §8.1, §9, §10, 지갑 3단계)
+
+/** 데일리 상금 비율(설계 §8.1, 2026-11-24 개정). 6등 이하는 마지막 값 */
+export const DAILY_PRIZE_RATES = [0.3, 0.25, 0.2, 0.15, 0.12, 0.1] as const
+
+/** REF × 비율을 10 단위 내림: [6150, 5120, 4100, 3070, 2460, 2050]. SQL 사본 _economy()->'daily_prizes' */
+export const DAILY_PRIZES: readonly number[] = DAILY_PRIZE_RATES.map((r) => Math.floor(Math.round(REF * r * 100) / 1000) * 10)
+
+/** k등(1부터, 행동을 한 사람끼리 다시 센 등수) 상금. 정수가 아니거나 1 미만이면 0 */
+export function dailyPrize(rank: number): number {
+  if (!Number.isInteger(rank) || rank < 1) return 0
+  return DAILY_PRIZES[Math.min(rank, DAILY_PRIZES.length) - 1]
+}
+
+/** 데일리 게임이 n개일 때 모든 데일리 1등 합계가 REF 이하인가(설계 §8.1: 넘으면 상금 표를 줄인다) */
+export function dailyBudgetOk(n: number): boolean {
+  return n * DAILY_PRIZES[0] <= REF
+}
+
+/** 대전 판돈 상한(설계 §9). 사람 사이에서 옮기는 돈이라 인플레이션과 무관 */
+export const STAKE_MAX = REF * 2 // 41,000
+
+/** 대회 참가비 상한(설계 §10) */
+export const FEE_MAX = REF * 2 // 41,000

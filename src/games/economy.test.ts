@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest'
 import {
+  DAILY_PRIZE_RATES,
+  DAILY_PRIZES,
+  dailyBudgetOk,
+  dailyPrize,
   DAILY_SOFT_CAP,
+  FEE_MAX,
+  STAKE_MAX,
   DAILY_SOFT_CAP_2,
   FISHING_SINK_TARGET,
   FREE_DAILY_CAP,
@@ -13,6 +19,7 @@ import {
   SOFT_CAP_TIERS,
   softCap,
 } from './economy.ts'
+import { games } from './index.ts'
 
 test('경제 상수 (설계 §4)', () => {
   expect(REF).toBe(20500)
@@ -100,6 +107,9 @@ test('SQL 사본 _economy()가 economy.ts와 같다 (설계 §12)', () => {
     soft_cap_rate: SOFT_CAP_RATE,
     daily_soft_cap_2: DAILY_SOFT_CAP_2,
     soft_cap_rate_2: SOFT_CAP_RATE_2,
+    daily_prizes: DAILY_PRIZES,
+    stake_max: STAKE_MAX,
+    fee_max: FEE_MAX,
   })
 })
 
@@ -143,4 +153,40 @@ test('freeGold: 판당 상한 → 게임별 남은 몫 → 사이트 상한 (설
 test('hourlyGold: 3600 / (playSec + 5) × floor(avgScore × perPoint)', () => {
   expect(Math.abs(hourlyGold(5.81, 60, 64) - 20548)).toBeLessThanOrEqual(1)
   expect(hourlyGold(0, 60, 64)).toBe(0)
+})
+
+// ---------------------------------------------------------------- 데일리 상금·판돈·참가비 (설계 §8.1, §9, §10, 지갑 3단계)
+
+test('데일리 상금 표: REF × [0.3 … 0.1]을 10 단위 내림 (설계 §4, §8.1)', () => {
+  expect(DAILY_PRIZE_RATES).toEqual([0.3, 0.25, 0.2, 0.15, 0.12, 0.1])
+  expect(DAILY_PRIZES).toEqual([6150, 5120, 4100, 3070, 2460, 2050])
+})
+
+test('dailyPrize: 등수별 상금, 6등 이하는 마지막 값', () => {
+  expect(dailyPrize(1)).toBe(6150)
+  expect(dailyPrize(2)).toBe(5120)
+  expect(dailyPrize(6)).toBe(2050)
+  expect(dailyPrize(7)).toBe(2050)
+  expect(dailyPrize(100)).toBe(2050)
+  expect(dailyPrize(0)).toBe(0)
+  expect(dailyPrize(-1)).toBe(0)
+  expect(dailyPrize(1.5)).toBe(0)
+  expect(dailyPrize(Number.NaN)).toBe(0)
+})
+
+test('판돈·참가비 상한 REF × 2 (설계 §9, §10)', () => {
+  expect(STAKE_MAX).toBe(41000)
+  expect(FEE_MAX).toBe(41000)
+})
+
+test('dailyBudgetOk: 모든 데일리 1등 합계 ≤ REF (설계 §8.1)', () => {
+  expect(dailyBudgetOk(1)).toBe(true)
+  expect(dailyBudgetOk(3)).toBe(true) // 18,450
+  expect(dailyBudgetOk(4)).toBe(false) // 24,600
+})
+
+test('데일리 게임 수 × 1등 상금 ≤ REF (등록부 기준, 숨김 포함)', () => {
+  const n = games.filter((g) => g.manifest.modes.daily).length
+  expect(n).toBeGreaterThan(0)
+  expect(dailyBudgetOk(n), `데일리 게임 ${n}개: 데일리 게임이 늘었다 — 설계 §8.1대로 상금 표를 줄인다`).toBe(true)
 })
