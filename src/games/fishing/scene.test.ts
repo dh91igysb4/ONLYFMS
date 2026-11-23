@@ -52,7 +52,7 @@ class RecordingCtx {
 const asCtx = (c: RecordingCtx) => c as unknown as CanvasRenderingContext2D
 
 const bar = { barPos: 0.55, barVel: 0, fishPos: 0.62, fishTarget: 0.6, progress: 0.58, perfect: true, t: 0 }
-const barParams: BarParams = { barSize: 0.3, difficulty: 0.5, behavior: 'mixed' }
+const barParams: BarParams = { barSize: 0.3, difficulty: 0.5, behavior: 'mixed', drain: 1, pull: 0 }
 const NOON_SUN: Conditions = { gameMinute: 12 * 60, gameDay: 1, season: 'spring', weather: 'sun' }
 const PHASES: Phase[] = ['idle', 'charging', 'waiting', 'bite', 'fighting', 'caught', 'lost']
 const SIZES: [number, number][] = [[160, 240], [195, 280], [320, 480]]

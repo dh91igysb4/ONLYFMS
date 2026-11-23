@@ -2105,6 +2105,117 @@ const TILE_CLIFF = sprite(CLIFF, [
   'dddddddddddddddd',
 ])
 
+// ── 찌 5종(상점·가방 아이콘, 16×16): 코르크 / 함정 / 가시 바늘 / 회전 / 호기심 ──
+const TACKLE_CORK = sprite(
+  { k: '#2b2118', R: '#e0483c', r: '#a82e2a', w: '#ff9a8a', C: '#c8935a', c: '#e6b87c', d: '#8f6238' },
+  [
+    '.......kk.......',
+    '.......kk.......',
+    '......kRRk......',
+    '.....kRwRRk.....',
+    '.....kRRRRk.....',
+    '.....krRRrk.....',
+    '....kkkkkkkk....',
+    '...kcCCCCCCdk...',
+    '..kcccCCCCCCdk..',
+    '..kcCCCCCCdCdk..',
+    '..kCCCCdCCCCdk..',
+    '..kCCdCCCCCddk..',
+    '...kCCCCCCdddk..',
+    '....kddddddk....',
+    '.....kkkkkk.....',
+    '.......kk.......',
+  ],
+)
+
+const TACKLE_TRAP = sprite(
+  { k: '#2b2118', t: '#d8b878', T: '#a07a4a', n: '#5a4630', b: '#7a5a3a', B: '#523a24' },
+  [
+    '................',
+    '....kkkkkkkk....',
+    '...kbtttttTBk...',
+    '..kbbbbbbbbBBk..',
+    '..kkkkkkkkkkkk..',
+    '..ktnttnttnttk..',
+    '..kTtnttnttntk..',
+    '..kttntttnttnk..',
+    '..kntnnnnnntnk..',
+    '..kTnttnttnttk..',
+    '...kttntnttntk..',
+    '...kTtnnnnnTTk..',
+    '....kttntnttk...',
+    '....kTTnTnTTk...',
+    '.....kkkkkkk....',
+    '................',
+  ],
+)
+
+const TACKLE_BARBED = sprite(
+  { k: '#1d2026', g: '#c4ccd6', G: '#7d8895', w: '#f4f8fc', r: '#d0443a' },
+  [
+    '......kkkk......',
+    '.....kgwwGk.....',
+    '.....kg..Gk.....',
+    '.....kGkkGk.....',
+    '......kgGk......',
+    '.....kkgGk......',
+    '....kwkgGk......',
+    '.....kkgGkk.....',
+    '......kgGkwk....',
+    '......kgGkk.....',
+    '......kgGk......',
+    '.k....kgGk......',
+    'kwk...kgGk......',
+    'kgGk.kgGk.......',
+    '.kgGGGgk........',
+    '..kkkkk.........',
+  ],
+)
+
+const TACKLE_SPINNER = sprite(
+  { k: '#1d2026', s: '#dfe6ee', S: '#8e9db0', w: '#ffffff', y: '#f2c94c', Y: '#b88a1c', g: '#7d8895' },
+  [
+    '...kkk..........',
+    '..k...k.........',
+    '...kkk..........',
+    '...kgk..kkkk....',
+    '...kgggkswwsk...',
+    '...kgk.kswSSk...',
+    '...kyk.kssSSk...',
+    '...kYk.kssSSk...',
+    '...kgk.kssSSk...',
+    '...kgggkssSSk...',
+    '...kgk..kSSk....',
+    '...kgk..kkkk....',
+    '...kgk..........',
+    '...kkk..........',
+    '..k...k.........',
+    '...kkk..........',
+  ],
+)
+
+const TACKLE_CURIOUS = sprite(
+  { k: '#2a1a40', P: '#8a4fd0', p: '#5e2f9e', l: '#b98cf0', w: '#f1e6ff', q: '#fff4a8', c: '#d8b878', C: '#8f7438' },
+  [
+    '.......kk.......',
+    '......kCCk......',
+    '.....kkccCkk....',
+    '....kPPPPPPpk...',
+    '...kPPlqqqPPpk..',
+    '..kPllqPPqPPpk..',
+    '..kPlPPPPqPPpk..',
+    '..kPlPPPqPPPpk..',
+    '..kPPPPqqPPPpk..',
+    '..kPPPPqPPPppk..',
+    '..kPPPPPPPPppk..',
+    '..kPPPPqPPPppk..',
+    '...kPPPPPPppk...',
+    '....kppppppk....',
+    '.....kkkkkk.....',
+    '................',
+  ],
+)
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
@@ -2190,6 +2301,11 @@ export const SPRITES: Record<string, Sprite> = {
   'rod-2': ROD_2,
   'rod-3': ROD_3,
   'rod-4': ROD_4,
+  'tackle-cork': TACKLE_CORK,
+  'tackle-trap': TACKLE_TRAP,
+  'tackle-barbed': TACKLE_BARBED,
+  'tackle-spinner': TACKLE_SPINNER,
+  'tackle-curious': TACKLE_CURIOUS,
   'tile-grass': TILE_GRASS,
   'tile-grass-alt': TILE_GRASS_ALT,
   'tile-path': TILE_PATH,

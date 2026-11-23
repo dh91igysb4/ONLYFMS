@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES, type Behavior } from './data.ts'
+import { RODS, SPECIES, TACKLE_FX, type Behavior } from './data.ts'
 import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar } from './minigame.ts'
 
 function seeded(n: number): () => number {
@@ -30,6 +30,75 @@ describe('barParams', () => {
   it('difficulty comes from species', () => {
     expect(barParams('anchovy', 1).difficulty).toBe(SPECIES.find((s) => s.id === 'anchovy')!.difficulty)
     expect(barParams('grouper', 1).difficulty).toBe(0.95)
+  })
+})
+
+describe('barParams 찌', () => {
+  it('equipped 없음 → drain 1·pull 0·barSize 지금 값', () => {
+    const base = barParams('anchovy', 2)
+    expect(base.drain).toBe(1)
+    expect(base.pull).toBe(0)
+    expect(barParams('anchovy', 2, []).barSize).toBe(base.barSize)
+    expect(base.barSize).toBeCloseTo(0.22 * (1 + RODS[1].barBonus))
+  })
+  it('cork → barSize ×1.2, trap → drain TACKLE_FX.trapDrain, barbed → pull > 0', () => {
+    const base = barParams('anchovy', 2)
+    const cork = barParams('anchovy', 2, ['cork'])
+    expect(cork.barSize).toBeCloseTo(base.barSize * TACKLE_FX.corkBar)
+    expect(cork.drain).toBe(1)
+    expect(cork.pull).toBe(0)
+    const trap = barParams('anchovy', 2, ['trap'])
+    expect(trap.drain).toBe(TACKLE_FX.trapDrain)
+    expect(trap.barSize).toBe(base.barSize)
+    const barbed = barParams('anchovy', 2, ['barbed'])
+    expect(barbed.pull).toBeGreaterThan(0)
+    expect(barbed.drain).toBe(1)
+  })
+  it('세 개 조합은 각각 반영', () => {
+    const p = barParams('anchovy', 2, ['cork', 'trap', 'barbed'])
+    expect(p.barSize).toBeCloseTo(barParams('anchovy', 2).barSize * 1.2)
+    expect(p.drain).toBe(TACKLE_FX.trapDrain)
+    expect(p.pull).toBeGreaterThan(0)
+  })
+})
+
+describe('찌 효과 stepBar', () => {
+  const calm = () => 0.99 // 목표 변경 없음
+  it('trap: 바 밖 1초 진행도 감소량이 trapDrain 배', () => {
+    const base = { ...barParams('anchovy', 1), behavior: 'mixed' as const }
+    const trap = { ...base, drain: TACKLE_FX.trapDrain }
+    const start = { ...initBar(), barPos: 0.8, fishPos: 0.1, fishTarget: 0.1, progress: 0.8 }
+    const run = (params: typeof base) => {
+      let bar = start
+      for (let i = 0; i < 50; i++) bar = stepBar(bar, true, 20, params, calm)
+      return 0.8 - bar.progress
+    }
+    expect(run(trap)).toBeCloseTo(run(base) * TACKLE_FX.trapDrain, 9)
+    expect(run(base)).toBeGreaterThan(0)
+  })
+  it('barbed: 바 안 위쪽 끝 근처 물고기가 있으면 안 눌러도 바가 그쪽으로 끌린다, 바 밖이면 효과 없음', () => {
+    const base = { ...barParams('anchovy', 1), behavior: 'mixed' as const }
+    const barbed = barParams('anchovy', 1, ['barbed'])
+    const top = base.barSize / 2 - 0.01
+    const inside = { ...initBar(), barPos: 0.5, fishPos: 0.5 + top, fishTarget: 0.5 + top }
+    const a = stepBar(inside, false, 20, base, calm)
+    const b = stepBar(inside, false, 20, { ...base, pull: barbed.pull }, calm)
+    expect(b.barPos).toBeGreaterThan(a.barPos)
+    const outside = { ...inside, fishPos: 0.5 + base.barSize, fishTarget: 0.5 + base.barSize }
+    const c = stepBar(outside, false, 20, base, calm)
+    const d = stepBar(outside, false, 20, { ...base, pull: barbed.pull }, calm)
+    expect(d.barPos).toBe(c.barPos)
+  })
+  it('barbed만으로는 혼자 다 잡지 못한다: 안 눌러도 빠른 dart 물고기(난이도 .7)는 빠져나간다', () => {
+    const params = { ...barParams('anchovy', 1, ['barbed']), difficulty: 0.7, behavior: 'dart' as const }
+    const rng = seeded(5)
+    let bar = initBar()
+    let escaped = false
+    for (let i = 0; i < 1250; i++) {
+      bar = stepBar({ ...bar, progress: 0.5 }, false, 16, params, rng)
+      if (Math.abs(bar.fishPos - bar.barPos) > params.barSize / 2) escaped = true
+    }
+    expect(escaped).toBe(true)
   })
 })
 
@@ -178,7 +247,7 @@ describe('simulation', () => {
 
 describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', () => {
   function sim(behavior: Behavior, seedN = 11) {
-    const params = { barSize: 0.22, difficulty: 0.5, behavior }
+    const params = { barSize: 0.22, difficulty: 0.5, behavior, drain: 1, pull: 0 }
     const rng = seeded(seedN)
     let bar = initBar()
     let sum = 0
@@ -222,7 +291,7 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
 
   it('모든 유형에서 위치가 [0, 1] 안에 머문다', () => {
     for (const behavior of ['mixed', 'smooth', 'dart', 'floater', 'sinker'] as const) {
-      const params = { barSize: 0.22, difficulty: 1, behavior }
+      const params = { barSize: 0.22, difficulty: 1, behavior, drain: 1, pull: 0 }
       const rng = seeded(21)
       let bar = initBar()
       for (let i = 0; i < 2000; i++) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable } from './data.ts'
+import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
 const WEATHERS: Weather[] = ['sun', 'rain']
@@ -140,5 +140,22 @@ describe('areaHasSpecies', () => {
     expect(areaHasSpecies('river')).toBe(true)
     expect(areaHasSpecies('forest')).toBe(true)
     expect(areaHasSpecies('lake')).toBe(false)
+  })
+})
+
+describe('찌', () => {
+  it('TACKLES 5종 id·가격, 이름·설명 있음', () => {
+    expect(TACKLES.map((t) => [t.id, t.price])).toEqual([['cork', 1000], ['trap', 1500], ['barbed', 2000], ['spinner', 1500], ['curious', 5000]])
+    for (const t of TACKLES) {
+      expect(t.name.length).toBeGreaterThan(0)
+      expect(t.desc.length).toBeGreaterThan(0)
+    }
+  })
+  it('tackleSlots(1..4) = 0,0,1,2, 모르는 단계는 0', () => {
+    expect([1, 2, 3, 4].map(tackleSlots)).toEqual([0, 0, 1, 2])
+    expect(tackleSlots(99)).toBe(0)
+  })
+  it('TACKLE_FX 값', () => {
+    expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 })
   })
 })

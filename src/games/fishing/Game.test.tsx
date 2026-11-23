@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { availableHeight, canvasScale, fitScene, Game, hudTopFor, TOUCH_HINT_BAND } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
@@ -6,7 +6,7 @@ import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
-import { conditionLabel } from './Menus.tsx'
+import { BagPanel, conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
 import { TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -62,7 +62,7 @@ const worldMock = vi.mocked(world)
 const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null, ...over }
 }
 
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
@@ -1803,5 +1803,114 @@ describe('fishing Game: 지역 전환', () => {
     await advance(16)
     raf.mockRestore()
     expect(lastScene().fade).toBeGreaterThan(0)
+  })
+})
+
+describe('찌 상점·장비', () => {
+  test('상점: 찌 5종 표시, 사기는 buyTackle, 보유 중 표시, 골드 부족 비활성', async () => {
+    const view = makeView({ gold: 1200, rodTier: 3, tackles: ['trap'] })
+    await mountAtShop(view)
+    route({ buyTackle: () => ok({ ...view, gold: 200, tackles: ['trap', 'cork'] }) })
+    const list = screen.getByRole('list', { name: '찌 목록' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(list).getByText('희귀·전설 물고기가 더 잘 나와요')).toBeInTheDocument()
+    expect(within(list).getByText('보유 중 · 가방에서 낄 수 있어요')).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: '가시 바늘 사기' })).toBeDisabled()
+    expect(screen.queryByText('카본 낚싯대부터 낄 수 있어요')).not.toBeInTheDocument()
+    fireEvent.click(within(list).getByRole('button', { name: '코르크 찌 사기' }))
+    await flush()
+    expect(calls('buyTackle')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyTackle', id: 'cork' } }])
+    expect(screen.getByText('200 G')).toBeInTheDocument()
+  })
+
+  test('상점: 낚싯대 단계 2면 카본 낚싯대부터 낄 수 있다는 안내', async () => {
+    await mountAtShop(makeView({ rodTier: 2 }))
+    expect(screen.getByText('사 둘 수 있고, 카본 낚싯대부터 낄 수 있어요')).toBeInTheDocument()
+  })
+
+  test('상점: 낀 찌는 "장착 중", 안 낀 보유 찌는 가방 안내', async () => {
+    await mountAtShop(makeView({ rodTier: 3, tackles: ['trap', 'cork'], equipped: ['trap'] }))
+    const list = screen.getByRole('list', { name: '찌 목록' })
+    expect(within(list).getByText('장착 중')).toBeInTheDocument()
+    expect(within(list).getAllByText('보유 중 · 가방에서 낄 수 있어요')).toHaveLength(1)
+  })
+
+  test('찌 필드 없는 옛 응답에도 상점과 가방이 그려진다', async () => {
+    const old = makeView({ rodTier: 3 }) as Partial<View>
+    delete old.tackles
+    delete old.equipped
+    await mountAtShop(old as View)
+    expect(within(screen.getByRole('list', { name: '찌 목록' })).getAllByRole('listitem')).toHaveLength(5)
+    cleanup()
+    render(<BagPanel view={old as View} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    expect(within(screen.getByRole('group', { name: '장비' })).getAllByTestId('fish-slot')).toHaveLength(1)
+  })
+
+  test('가방: 장비 구역이 가방 칸보다 위, 찌를 사기 전에도 칸과 안내가 보인다', () => {
+    const view = makeView({ rodTier: 2, tackles: ['cork'] })
+    const { container } = render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    const gear = screen.getByRole('group', { name: '장비' })
+    const grid = container.querySelector('.fish-bag') as Element
+    expect(gear.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('카본 낚싯대부터 낄 수 있어요')).toBeInTheDocument()
+    cleanup()
+    render(<BagPanel view={makeView({ rodTier: 3 })} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    expect(screen.getByRole('group', { name: '장비' })).toBeInTheDocument()
+    expect(screen.getAllByTestId('fish-slot')).toHaveLength(1)
+    cleanup()
+    render(<BagPanel view={makeView({ rodTier: 2 })} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    expect(screen.queryByRole('group', { name: '장비' })).not.toBeInTheDocument()
+  })
+
+  test('상점: 찌 구매 실패는 상점 오류 표시로', async () => {
+    const view = makeView({ gold: 5000, rodTier: 3 })
+    await mountAtShop(view)
+    route({ buyTackle: () => Promise.reject(new ApiError('already_owned', 400)), load: () => ok(view) })
+    fireEvent.click(screen.getByRole('button', { name: '코르크 찌 사기' }))
+    await flush()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  test('가방 장비: 칸 1개, 눌러 끼우고 빼며 칸이 차면 나머지는 비활성', async () => {
+    const view = makeView({ rodTier: 3, tackles: ['cork', 'trap'], equipped: [] })
+    await mount(view)
+    route({ equip: (b) => ok({ ...view, equipped: (b as Extract<Body, { action: 'act' }>).payload.ids as never[] }) })
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    const gear = screen.getByRole('group', { name: '장비' })
+    expect(within(gear).getAllByTestId('fish-slot')).toHaveLength(1)
+    fireEvent.click(within(gear).getByRole('button', { name: '코르크 찌' }))
+    await flush()
+    expect(calls('equip')[0]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'equip', ids: ['cork'] } })
+    expect(within(gear).getByRole('button', { name: '함정 찌' })).toBeDisabled()
+    fireEvent.click(within(gear).getByRole('button', { name: '코르크 찌' }))
+    await flush()
+    expect(calls('equip')[1]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'equip', ids: [] } })
+  })
+
+  test('낚시 중이면 장비 구역이 비활성이고 문구가 보인다', () => {
+    const view = makeView({ rodTier: 3, tackles: ['cork'], pending: pending() })
+    render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    expect(screen.getByText('낚시 중에는 바꿀 수 없어요')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '코르크 찌' })).toBeDisabled()
+  })
+
+  test('미니게임: 코르크를 끼면 낚시 바가 1.2배', async () => {
+    const barSize = async (equipped: ('cork')[]) => {
+      const view = makeView({ equipped, tackles: equipped, rodTier: 3 })
+      await castAndWait(view, 3000)
+      route({ hook: () => ok(view, { species: 'mackerel', sizeCm: 40 }), resolve: () => new Promise(() => {}) })
+      await advance(3100)
+      press()
+      release()
+      await flush()
+      await advance(100)
+      const size = vi.mocked(drawWorld).mock.calls.at(-1)?.[1].barParams?.barSize as number
+      cleanup()
+      worldMock.mockReset()
+      return size
+    }
+    const plain = await barSize([])
+    const corked = await barSize(['cork'])
+    expect(corked).toBeCloseTo(plain * 1.2)
   })
 })

@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, type AreaId, type Species } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, TACKLES, tackleSlots, type AreaId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { price, type View } from './logic.ts'
 import { spriteDataUrl } from './sprites.ts'
@@ -9,13 +9,68 @@ const ICON_SCALE = 2
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 
-type BagProps = { view: View; atShop: boolean; busy: boolean; onLock(index: number, locked: boolean): void }
+type BagProps = {
+  view: View
+  atShop: boolean
+  busy: boolean
+  onEquip(ids: TackleId[]): void
+  onLock(index: number, locked: boolean): void
+}
 
 /** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 잠금을 뒤집는다. */
-export function BagPanel({ view, atShop, busy, onLock }: BagProps) {
+export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
+  const slots = tackleSlots(view.rodTier)
+  const fishing = view.pending !== null
+  const locked = busy || fishing
+  // 옛 서버 응답(찌 필드 없음)에도 죽지 않게 빈 목록으로 읽는다
+  const owned = view.tackles ?? []
+  const equipped = view.equipped ?? []
+  const full = equipped.length >= slots
+  const toggle = (id: TackleId) => onEquip(equipped.includes(id) ? equipped.filter((x) => x !== id) : [...equipped, id])
   return (
     <section className="fish-panel-body" aria-label="가방">
+      {(owned.length > 0 || slots > 0) && (
+        <div className="fish-gear" role="group" aria-label="장비">
+          <h3 className="fish-panel-sub">장비</h3>
+          {fishing && <p className="fish-shop-note">낚시 중에는 바꿀 수 없어요</p>}
+          {slots === 0 && <p className="muted">카본 낚싯대부터 낄 수 있어요</p>}
+          <ul className="fish-slots" aria-label="낀 찌">
+            {Array.from({ length: slots }, (_, i) => {
+              const id = equipped[i]
+              return (
+                <li key={i} data-testid="fish-slot" className={`fish-slot${id ? '' : ' fish-slot-empty'}`}>
+                  {id && <img src={spriteDataUrl(`tackle-${id}`, ICON_SCALE)} alt="" />}
+                </li>
+              )
+            })}
+          </ul>
+          <ul className="fish-rods" aria-label="보유 찌">
+            {TACKLES.filter((t) => owned.includes(t.id)).map((t) => {
+              const on = equipped.includes(t.id)
+              return (
+                <li key={t.id} className={`fish-rod${on ? ' fish-rod-owned' : ''}`}>
+                  <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
+                  <div className="fish-rod-info">
+                    <strong>{t.name}</strong>
+                    <span className="muted">{t.desc}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    aria-label={t.name}
+                    aria-pressed={on}
+                    disabled={locked || slots === 0 || (!on && full)}
+                    onClick={() => toggle(t.id)}
+                  >
+                    {on ? '빼기' : '끼우기'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
       <p className="muted">
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
@@ -48,15 +103,18 @@ export function BagPanel({ view, atShop, busy, onLock }: BagProps) {
   )
 }
 
-type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void }
+type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
 
-export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
+export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
   const bagValue = selling.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
+  const slots = tackleSlots(view.rodTier)
+  const ownedTackles = view.tackles ?? []
+  const equippedTackles = view.equipped ?? []
   return (
     <section className="fish-panel-body" aria-label="상점">
       <div className="fish-shop-sell">
@@ -124,6 +182,37 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
                   onClick={() => onBuyBag(bag.tier)}
                 >
                   구매
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <h3 className="fish-panel-sub">찌</h3>
+      {slots === 0 && <p className="fish-shop-note">사 둘 수 있고, 카본 낚싯대부터 낄 수 있어요</p>}
+      <ul className="fish-rods" aria-label="찌 목록">
+        {TACKLES.map((t) => {
+          const owned = ownedTackles.includes(t.id)
+          const on = equippedTackles.includes(t.id)
+          return (
+            <li key={t.id} className={`fish-rod${owned ? ' fish-rod-owned' : ''}`}>
+              <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
+              <div className="fish-rod-info">
+                <strong>{t.name}</strong>
+                <span className="muted">{t.desc}</span>
+                <span className="muted">{gold(t.price)}</span>
+              </div>
+              {owned ? (
+                <span className="fish-rod-state">{on ? '장착 중' : '보유 중 · 가방에서 낄 수 있어요'}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  aria-label={`${t.name} 사기`}
+                  disabled={busy || view.gold < t.price}
+                  onClick={() => onBuyTackle(t.id)}
+                >
+                  사기
                 </button>
               )}
             </li>

@@ -1,6 +1,6 @@
 // 낚시 미니게임 물리. 순수 함수만: DOM·시계·Math.random 없이 난수는 rng 인자, 시간은 dtMs로만 받는다.
 // 위치는 모두 0~1(트랙 아래 = 0).
-import { RODS, SPECIES, type Behavior } from './data.ts'
+import { RODS, SPECIES, TACKLE_FX, type Behavior, type TackleId } from './data.ts'
 
 export const MAX_DT_MS = 50
 
@@ -13,7 +13,13 @@ export type Bar = {
   perfect: boolean
   t: number // 누적 경과 ms(MAX_DT_MS로 자른 값)
 }
-export type BarParams = { barSize: number; difficulty: number; behavior: Behavior }
+export type BarParams = {
+  barSize: number
+  difficulty: number
+  behavior: Behavior
+  drain: number // 물고기가 바 밖일 때 진행도 감소 배율(기본 1, trap 0.75)
+  pull: number // 물고기가 바 안일 때 바를 물고기 쪽으로 끄는 세기(기본 0, barbed는 BARBED_PULL)
+}
 
 const BASE_BAR_SIZE = 0.22
 const BAR_ACCEL_UP = 8 // 누르는 동안 위로 가속 (1/s²)
@@ -32,18 +38,28 @@ const DART_SPEED_SCALE = 1.5
 const DART_MIN_JUMP = 0.4 // dart: 새 목표는 현재 위치에서 이만큼 이상 떨어진 곳
 const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
 const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
+// 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
+// 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
+// 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
+export const BARBED_PULL = 70
 const PROGRESS_UP = 0.35 // 초당 진행 증가
 const PROGRESS_DOWN = 0.3 // 초당 진행 감소
 const GAUGE_PERIOD_MS = 1600
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
-export function barParams(speciesId: string, rodTier: 1 | 2 | 3 | 4): BarParams {
+export function barParams(speciesId: string, rodTier: 1 | 2 | 3 | 4, equipped: readonly TackleId[] = []): BarParams {
   const species = SPECIES.find((s) => s.id === speciesId)
   const rod = RODS.find((r) => r.tier === rodTier)
   if (!species) throw new Error(`unknown species: ${speciesId}`)
   if (!rod) throw new Error(`unknown rod tier: ${rodTier}`)
-  return { barSize: BASE_BAR_SIZE * (1 + rod.barBonus), difficulty: species.difficulty, behavior: species.behavior }
+  return {
+    barSize: BASE_BAR_SIZE * (1 + rod.barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
+    difficulty: species.difficulty,
+    behavior: species.behavior,
+    drain: equipped.includes('trap') ? TACKLE_FX.trapDrain : 1,
+    pull: equipped.includes('barbed') ? BARBED_PULL : 0,
+  }
 }
 
 // 유형별 새 목표. rng는 한 번만 부른다(mixed는 예전과 같은 난수열).
@@ -79,7 +95,9 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   // 바: 가속도 + 감쇠, 양 끝에서 속도 0
   const lo = params.barSize / 2
   const hi = 1 - params.barSize / 2
-  let barVel = (bar.barVel + (held ? BAR_ACCEL_UP : -BAR_ACCEL_DOWN) * dt) * Math.exp(-BAR_DRAG * dt)
+  const wasInside = Math.abs(bar.fishPos - bar.barPos) <= params.barSize / 2
+  const pullAccel = params.pull > 0 && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
+  let barVel = (bar.barVel + ((held ? BAR_ACCEL_UP : -BAR_ACCEL_DOWN) + pullAccel) * dt) * Math.exp(-BAR_DRAG * dt)
   let barPos = bar.barPos + barVel * dt
   if (barPos <= lo) {
     barPos = lo
@@ -109,7 +127,7 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
 
   // 진행도
   const inside = Math.abs(fishPos - barPos) <= params.barSize / 2
-  const progress = clamp01(bar.progress + (inside ? PROGRESS_UP : -PROGRESS_DOWN) * dt)
+  const progress = clamp01(bar.progress + (inside ? PROGRESS_UP : -PROGRESS_DOWN * params.drain) * dt)
 
   return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs }
 }
