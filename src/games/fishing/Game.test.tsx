@@ -362,12 +362,52 @@ describe('fishing Game', () => {
     await mount(makeView({ dex: { anchovy: { count: 3, maxCm: 14 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
+    const village = SPECIES.filter((s) => s.area === 'village').length
     expect(within(dex).getByText('멸치')).toBeInTheDocument()
     expect(within(dex).queryByText('망둥어')).not.toBeInTheDocument()
-    expect(within(dex).getAllByText('???')).toHaveLength(SPECIES.length - 1)
+    expect(within(dex).getAllByText('???')).toHaveLength(village - 1)
     const imgs = within(dex).getAllByRole('img') as HTMLImageElement[]
-    expect(imgs.filter((i) => i.src.endsWith(':silhouette'))).toHaveLength(SPECIES.length - 1)
+    expect(imgs.filter((i) => i.src.endsWith(':silhouette'))).toHaveLength(village - 1)
     expect(imgs.some((i) => i.src === 'data:fish-anchovy')).toBe(true)
+  })
+
+  test('dex has a tab per area with species, opens on the current area, and filters by tab', async () => {
+    const entry = VILLAGE.exits[0].entry
+    await mount(makeView(), { area: 'river', pos: tileCenter(entry.tx, entry.ty), facing: 'up' })
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    const tabs = within(dex).getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8'])
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dex).getAllByText('???')).toHaveLength(9)
+    fireEvent.click(within(dex).getByRole('tab', { name: /숲/ }))
+    expect(within(dex).getByRole('tab', { name: /숲/ })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'false')
+    expect(within(dex).getAllByText('???')).toHaveLength(8)
+  })
+
+  test('dex shows per-area counts and the overall n/33 on top; caught names only on their tab', async () => {
+    await mount(makeView({ dex: { anchovy: { count: 1, maxCm: 10 }, 'pale-chub': { count: 2, maxCm: 12 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
+    expect(within(dex).getByRole('tab', { name: /바닷가 마을/ })).toHaveTextContent('1/16')
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveTextContent('1/9')
+    expect(within(dex).getByText('멸치')).toBeInTheDocument()
+    expect(within(dex).queryByText('피라미')).not.toBeInTheDocument()
+    fireEvent.click(within(dex).getByRole('tab', { name: /마을 강/ }))
+    expect(within(dex).getByText('피라미')).toBeInTheDocument()
+    expect(within(dex).queryByText('멸치')).not.toBeInTheDocument()
+  })
+
+  test('dex marks an uncaught legend slot with a border but keeps its name hidden', async () => {
+    await mount(makeView())
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).queryByText('다금바리')).not.toBeInTheDocument()
+    expect(within(dex).queryByText('전설')).not.toBeInTheDocument()
+    expect(dex.querySelectorAll('.fish-dex-item-legend')).toHaveLength(1)
+    expect(dex.querySelectorAll('.fish-dex-item-legend')[0]).toHaveTextContent('???')
   })
 
   test('bag_full on cast tells the player to go and sell at the shop, with no open-shop button', async () => {
@@ -766,7 +806,7 @@ describe('fishing Game', () => {
     expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
     expect(within(dex).getByText('전설')).toBeInTheDocument()
     expect(within(dex).queryByText('봄 · 가을')).not.toBeInTheDocument() // 못 잡은 멸치
-    expect(within(dex).getAllByText('???')).toHaveLength(31)
+    expect(within(dex).getAllByText('???')).toHaveLength(14)
   })
 
   test('server_now가 기기 시각과 같으면 cond는 conditionsAt(Date.now())', async () => {

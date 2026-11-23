@@ -956,7 +956,7 @@ export function Game({ gameId }: WorldGameProps) {
                   onBuyBag={(t) => void buyBag(t)}
                 />
               )}
-              {menu === 'dex' && <DexPanel view={view} />}
+              {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
             </div>
           )}
           {fullscreen && notices && <div className={touch ? 'fish-notices fish-notices-top' : 'fish-notices'}>{notices}</div>}
