@@ -171,3 +171,31 @@ describe('갯벌·늪지 수입 (40칸, 회전+호기심, 얻을 수 있는 신�
   })
 })
 
+
+// ---------------------------------------------------------------- 낚시 5부 M3: 산정 호수·난파선 (최종 고정)
+describe('산정 호수·난파선 수입과 최종 진행 (40칸, 회전+호기심, 얻을 수 있는 신화 버프 포함)', () => {
+  const ALL: AreaId[] = ['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck']
+  const gear = (rodTier: 4 | 5 | 6) => ({ rodTier, bagTier: 3 as const, equipped: ['spinner', 'curious'] as TackleId[], buffs: buffsAt(ALL, rodTier) })
+  it('낚싯대 5: 산정 얼음 구멍 ≈ 동굴 용암 × 1.0~1.4, 난파선 심해 ≈ × 1.3~1.9', () => {
+    const lava = hourlyIncome('cave', 'cave3', gear(5))
+    const ice = hourlyIncome('summit', 'ice', gear(5)) / lava
+    const abyss = hourlyIncome('wreck', 'abyss', gear(5)) / lava
+    expect(ice).toBeGreaterThanOrEqual(1.0)
+    expect(ice).toBeLessThanOrEqual(1.4)
+    expect(abyss).toBeGreaterThanOrEqual(1.3)
+    expect(abyss).toBeLessThanOrEqual(1.9)
+  })
+  it('난파선은 낚싯대 4로는 수입 0(들어갈 수 없다), 신화 버프 셋 중 시뮬레이션에 넣는 것은 비늘·여의주뿐', () => {
+    expect(hourlyIncome('wreck', 'abyss', gear(4))).toBe(0)
+    expect(buffsAt(ALL, 4)).toEqual([])
+    expect(buffsAt(ALL, 5)).toEqual(['imugi-scale'])
+    expect(buffsAt(ALL, 6)).toEqual(['imugi-scale', 'dragon-pearl'])
+  })
+  it('구매 순서: 기존 13개 → 갯벌 → 늪지 → 백골 → 산정 → 50칸 → 난파선 → 용왕 → 60칸', () => {
+    expect(plain.slice(13).map((m) => m.label)).toEqual(['갯벌 해금', '늪지 해금', '백골 낚싯대', '산정 호수 해금', '가방 50칸', '난파선 앞바다 해금', '용왕의 낚싯대', '가방 60칸'])
+  })
+  it('하루 1시간 + 상한 전부 다 사기 지금 값(34.3일)과 시험 계산(약 34일)이 ±5% 안', () => {
+    const d = capped[capped.length - 1].atDay
+    expect(Math.abs(d - 34) / 34).toBeLessThan(0.05)
+  })
+})
