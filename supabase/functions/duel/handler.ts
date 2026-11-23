@@ -3,7 +3,8 @@
 // 모든 변경은 대국 행을 `for update`로 잠근 트랜잭션 안에서 하고, 커밋 뒤에 "바뀜" 신호만 보낸다.
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
-import { getDuel } from '../../../src/games/index.ts'
+import { getDuel, walletEnabled } from '../../../src/games/index.ts'
+import { STAKE_MAX } from '../../../src/games/economy.ts'
 import type { DuelLogic, DuelModule, Manifest, Seat } from '../../../src/games/types.ts'
 import { hmacSeed, rngFromSeed } from '../../../src/shared/rng.ts'
 
@@ -13,7 +14,7 @@ export type DuelDeps = {
   getUserId(req: Request): Promise<string | null>
   secret: string
   broadcast(matchId: string, payload: { action_no: number; status: string }): Promise<void>
-  registry?: { getDuel(id: string): DuelModule | undefined }
+  registry?: Registry
 }
 
 export type DuelView = {
@@ -24,6 +25,8 @@ export type DuelView = {
   visibility: 'public' | 'invite'
   status: Status
   turn_seconds: number
+  /** 판돈(한 사람이 맡기는 금액, 지갑 설계 §9). 0이면 없음 */
+  stake: number
   players: { id: string; handle: string | null; rating: number }[]
   my_seat: Seat | null
   to_move: Seat | null
@@ -64,7 +67,8 @@ function json({ status, body }: Out): Response {
 }
 
 type Me = { id: string; admin: boolean }
-type Registry = { getDuel(id: string): DuelModule | undefined }
+/** walletEnabled가 false면(지갑 게임이 없음) 새 판돈은 0만 받는다. 생략하면 등록부 판단 */
+type Registry = { getDuel(id: string): DuelModule | undefined; walletEnabled?(): boolean }
 // deno-lint-ignore no-explicit-any
 type Logic = DuelLogic<any, any, any>
 
@@ -76,6 +80,7 @@ type MatchRow = {
   rated: boolean
   visibility: 'public' | 'invite'
   status: Status
+  stake: number
   created_by: string | null
   players: string[] | null
   state: unknown
@@ -124,7 +129,7 @@ async function route(req: Request, deps: DuelDeps): Promise<Out> {
     select status, is_admin from public.profiles where id = ${uid}`
   if (!p || p.status !== 'approved') return err(403, 'not_approved')
   const me: Me = { id: uid, admin: p.is_admin }
-  const reg = deps.registry ?? { getDuel }
+  const reg = deps.registry ?? { getDuel, walletEnabled }
 
   const matchId = (): string | null =>
     typeof b.match_id === 'string' && UUID_RE.test(b.match_id) ? b.match_id : null
@@ -137,7 +142,9 @@ async function route(req: Request, deps: DuelDeps): Promise<Out> {
       const rawCode = typeof b.code === 'string' ? b.code.trim().toLowerCase() : null
       const code = rawCode !== null && CODE_RE.test(rawCode) ? rawCode : null
       if (!id && !code) return bad('match_id 또는 code가 필요해요')
-      return await run(deps, (tx) => join(tx, deps, reg, me, id ? { id } : { code: code! }))
+      // 화면이 본 판돈. 없으면 0(옛 화면). 숫자가 아니면 어떤 판돈과도 맞지 않는다
+      const seen = b.stake === undefined ? 0 : typeof b.stake === 'number' ? b.stake : NaN
+      return await run(deps, (tx) => join(tx, deps, reg, me, id ? { id } : { code: code! }, seen))
     }
     case 'cancel':
     case 'view':
@@ -166,7 +173,14 @@ async function route(req: Request, deps: DuelDeps): Promise<Out> {
 
 /** 트랜잭션을 돌리고, 커밋된 뒤에 신호를 보낸다. 신호 실패는 로그만 남긴다 */
 async function run(deps: DuelDeps, fn: (tx: Tx) => Promise<TxResult>): Promise<Out> {
-  const r = await txOn(deps.sql)(fn)
+  let r: TxResult
+  try {
+    r = await txOn(deps.sql)(fn)
+  } catch (e) {
+    // _gold_move의 잔액 부족: 트랜잭션은 이미 롤백됐다(대국은 그대로)
+    if (isNotEnoughGold(e)) return err(409, 'not_enough_gold')
+    throw e
+  }
   if (r.signal) {
     const { matchId, ...payload } = r.signal
     try {
@@ -176,6 +190,10 @@ async function run(deps: DuelDeps, fn: (tx: Tx) => Promise<TxResult>): Promise<O
     }
   }
   return r.out
+}
+
+function isNotEnoughGold(e: unknown): boolean {
+  return e instanceof Error && e.message === 'not_enough_gold'
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -193,7 +211,7 @@ async function isHidden(tx: Tx | Sql, gameId: string): Promise<boolean> {
   return h.hidden
 }
 
-const MATCH_COLS = `id, game_id, options, logic_version, rated, visibility, status, created_by, players, state,
+const MATCH_COLS = `id, game_id, options, logic_version, rated, visibility, status, stake, created_by, players, state,
   action_no, turn_no, turn_seconds, turn_deadline, timeouts, moved, winner, end_reason, final_scores,
   created_at, started_at, ended_at`
 
@@ -306,6 +324,7 @@ async function buildView(tx: Tx, m: MatchRow, me: Me, logic: Logic | undefined, 
     visibility: m.visibility,
     status: m.status,
     turn_seconds: m.turn_seconds,
+    stake: Number(m.stake),
     players: players.map((p) => ({ id: p.id, handle: p.handle, rating: Number(p.rating) })),
     my_seat: mySeat,
     to_move: live && usable ? safe('toMove', () => usable.toMove(m.state), null) : null,
@@ -446,12 +465,39 @@ async function create(deps: DuelDeps, reg: Registry, me: Me, b: Record<string, u
   const turn = game.manifest.duel?.turnSeconds ?? DEFAULT_TURN
   const ts = b.turn_seconds === undefined ? turn.default : b.turn_seconds
   if (typeof ts !== 'number' || !turn.choices.includes(ts)) return bad('턴 시간이 잘못됐어요')
+  const stake = b.stake === undefined ? 0 : b.stake
+  if (typeof stake !== 'number' || !Number.isInteger(stake) || stake < 0 || stake > STAKE_MAX) {
+    return err(400, 'invalid_stake')
+  }
+  // 지갑 게임이 없으면(골드를 볼 곳이 없으면) 새 판돈은 0만 (Ruling)
+  if (stake > 0 && !(reg.walletEnabled?.() ?? walletEnabled())) return err(400, 'invalid_stake')
   const rated = b.rated
   const visibility = b.visibility
   const now = deps.now()
 
+  try {
+    return await createTx(deps, game, me, { options, rated, visibility, ts, stake, now })
+  } catch (e) {
+    if (isNotEnoughGold(e)) return err(409, 'not_enough_gold')
+    throw e
+  }
+}
+
+type CreateArgs = {
+  options: Record<string, string>
+  rated: boolean
+  visibility: 'public' | 'invite'
+  ts: number
+  stake: number
+  now: number
+}
+
+async function createTx(deps: DuelDeps, game: DuelModule, me: Me, a: CreateArgs): Promise<Out> {
+  const { options, rated, visibility, ts, stake, now } = a
   return await txOn(deps.sql)(async (tx) => {
-    if ((await isHidden(tx, game.manifest.id)) && !me.admin) return err(404, 'unknown_game')
+    const hidden = await isHidden(tx, game.manifest.id)
+    if (hidden && !me.admin) return err(404, 'unknown_game')
+    if (hidden && stake > 0) return err(400, 'invalid_stake')
     // 대기 대국 수 검사를 직렬화한다(같은 사람의 동시 생성)
     await tx`select 1 from public.profiles where id = ${me.id} for update`
     await tx`
@@ -464,11 +510,14 @@ async function create(deps: DuelDeps, reg: Registry, me: Me, b: Record<string, u
     // Ruling T4-a: 공개 대국에도 초대 코드를 만든다(링크 공유용)
     const [m] = await tx<{ id: string; invite_code: string }[]>`
       insert into public.duel_matches
-        (game_id, options, logic_version, rated, visibility, invite_code, created_by, turn_seconds, created_at)
+        (game_id, options, logic_version, rated, visibility, invite_code, created_by, turn_seconds, created_at, stake)
       values (${game.manifest.id}, ${tx.json(options)}, ${game.logic.version}, ${rated},
-              ${visibility}::public.duel_visibility, public._new_invite_code(), ${me.id}, ${ts}, ${new Date(now)})
+              ${visibility}::public.duel_visibility, public._new_invite_code(), ${me.id}, ${ts}, ${new Date(now)},
+              ${stake})
       returning id, invite_code`
-    return out(200, { match_id: m.id, invite_code: m.invite_code })
+    // 판돈 맡기기: 대국 행 다음에 지갑(잠금 순서). 모자라면 not_enough_gold로 대국 insert까지 되돌린다
+    if (stake > 0) await tx`select public._gold_move(${me.id}, ${-stake}, 'duel_stake', ${m.id}, ${game.manifest.id})`
+    return out(200, { match_id: m.id, invite_code: m.invite_code, stake })
   })
 }
 
@@ -479,6 +528,7 @@ async function join(
   reg: Registry,
   me: Me,
   key: { id: string } | { code: string },
+  seenStake: number,
 ): Promise<TxResult> {
   const now = deps.now()
   const m = 'id' in key ? await lockById(tx, key.id) : await lockByCode(tx, key.code)
@@ -501,6 +551,11 @@ async function join(
     return { out: err(409, 'not_waiting') }
   }
   m.options = options
+  // 판돈은 만든 뒤 바뀌지 않지만, 옛 화면·잘못된 요청이 다른 금액으로 들어오지 못하게 화면이 본 값과 맞춘다
+  const stake = Number(m.stake)
+  if (seenStake !== stake) return { out: err(409, 'stake_mismatch', { stake }) }
+  // 대국 행을 잡은 뒤 참가자 지갑(잠금 순서). 모자라면 not_enough_gold → run()이 409, 대국은 waiting 그대로
+  if (stake > 0) await tx`select public._gold_move(${me.id}, ${-stake}, 'duel_stake', ${m.id}, ${m.game_id})`
 
   // 선공: action_no = -1 시드의 첫 값 < 0.5면 참가자. 같은 난수열의 나머지로 init
   const rng = await rngFor(deps.secret, m.id, -1)
