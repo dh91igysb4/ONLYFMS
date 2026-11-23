@@ -18,6 +18,9 @@
 - `supabase/functions/suggest/` 제안 워커용 Edge Function. 브라우저는 부르지 않고 헤더 `x-worker-token`으로만 인증한다. 워커 절차는 `docs/suggest-worker.md`
 - `supabase/functions/world/` 지속형 게임 Edge Function. 요청은 `{ game, action: 'load' }` 또는 `{ game, action: 'act', payload }`이고, 트랜잭션에서 `world_saves` 행을 잠근 채 게임의 `WorldLogic`을 돌리고 `game_records`를 upsert한다. 테이블은 `world_saves`·`game_records`. `world_saves`는 클라이언트에서 읽을 수 없다. 화면에 필요한 값은 `WorldLogic.view`로만 내보낸다.
 - 등록부 `src/games/index.ts`의 `worlds`/`getWorld`(지속형 게임), 화면은 `src/games/ui.ts`의 `getWorldComponent`
+- 지갑(설계 `docs/superpowers/specs/2026-11-23-wallet-design.md`): 테이블 `wallets`(잔액)·`gold_ledger`(장부, `unique (user_id, reason, ref)`, 상한으로 줄기 전 금액 `raw_delta`). 골드를 바꾸는 길은 SQL `_gold_move` 하나이고, 사이트 하루 상한(KST 하루 `REF × 1.5`, 넘은 몫 20%)도 그 안에서만 적용한다. 잠금 순서는 세이브·대국·대회 행 먼저, 지갑 나중
+- `src/games/economy.ts` 경제 상수 원본(`REF`, `DAILY_SOFT_CAP`, `SOFT_CAP_RATE`, `softCap`). SQL 사본은 `_economy()`이고 `economy.test.ts`가 마이그레이션의 마지막 정의와 비교한다. 수치를 바꾸면 새 마이그레이션에서 `_economy()`를 `create or replace`한다
+- `src/lib/walletStore.ts` 내 잔액 저장소(React 밖, 구독 모듈). `world` 응답 최상위 `gold`와 `my_wallet()`이 채운다. `src/platform/wallet/` 지갑 데이터 계층·헤더 배지·관리자 골드 섹션
 - `supabase/migrations/` 스키마·RLS·함수, `supabase/tests/` DB 테스트, `supabase/functions/play/` 출제·판정 Edge Function, `supabase/functions/duel/` 1대1 대전 Edge Function, `supabase/functions/_shared/` 두 함수가 함께 쓰는 코드(`db.ts`)
 
 ## 게임 추가 절차
@@ -41,6 +44,7 @@
 - manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
+- 골드는 세이브에 두지 않는다. 지갑을 쓰는 게임은 logic에 `wallet: true`를 두고 `ctx.gold`(잔액)를 읽어 지출을 검사한 뒤 `apply`의 `gold`(정수 증감)로 돌려준다. 옛 세이브의 골드는 `legacyGold`가 한 번 지갑으로 옮긴다(reason `migrate`). 사이트 하루 상한은 게임이 몰라도 된다(핸들러가 `gold_capped`를 응답에 넣고 `WorldPage`가 알린다).
 
 ## 낚시 데이터 갱신 (`fishing`)
 `src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
@@ -83,6 +87,7 @@
 ## 금지 사항
 - 비밀값 커밋 금지 (`.env`, `.env.local`, 키, `PLAY_SECRET`). 예시는 `.env.example`만.
 - 플랫폼 코드에 게임별 분기 금지. 게임마다 다른 점은 manifest·등록부로 푼다.
+- 골드는 `_gold_move`로만 바꾼다. `wallets`·`gold_ledger`를 직접 update/insert하지 않는다(테스트 픽스처 제외).
 - 모든 화면 문구는 한국어, 모바일 우선. 색은 theme.css·src/app/palettes.ts 토큰만 쓴다 (후알야 카드 내부·킷 색, 양치 캔버스 내부 색, 볼 런·몰래 수능 3D 장면 내부 색, 네온 라이더 캔버스 내부 색, 낚시 캔버스 내부 색 예외). 문구 예외는 네온 라이더 착지 감탄 문구(영어 소문자) 하나뿐이다.
 
 ## 비밀값 위치
