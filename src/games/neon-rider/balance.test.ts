@@ -116,4 +116,19 @@ describe.skip('한 바퀴 착지가 가능한 점프', () => {
       expect(flipped, `${id} vx=${vx} 한 바퀴 착지`).toBe(true)
     }
   })
+
+  // 한 바퀴 착지가 '한 틱만 맞으면 되는 묘기'가 아니어야 한다. 손을 떼는 시점의 여유가 0.4초(24틱) 이상.
+  // 공중제비를 '돈 각도 360° 이상'으로 세던 때 ramp는 이 창이 3틱(67~69)이었다: 턱에서 앞이 37° 들린 채 떠서
+  // −32° 내리막에 내리므로, 바퀴로 내리는 대부분의 착지가 360°에 못 미쳤다.
+  const MIN_WINDOW = 24
+  it.each(JUMPS)('%s: 한 바퀴 돌고 살아 내리는 누름 길이가 정지·V_MAX 진입 모두 24틱 이상 있다', (id) => {
+    for (const vx of [0, V_MAX]) {
+      let good = 0
+      for (let n = 1; n <= N_MAX; n++) {
+        const r = attempt(id, vx, n)
+        if (!r.dead && r.flips >= 1) good++
+      }
+      expect(good, `${id} vx=${vx} 한 바퀴 착지 창(틱)`).toBeGreaterThanOrEqual(MIN_WINDOW)
+    }
+  })
 })

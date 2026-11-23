@@ -25,7 +25,7 @@ import { collideWheel, windowCands } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { Course } from './course.ts'
 import type { Template } from './pieces.ts'
-import { bodyAngle, initSim, initSimAt, scoreOf, step } from './sim.ts'
+import { bodyAngle, flipsOf, initSim, initSimAt, scoreOf, step } from './sim.ts'
 import type { SimState, Wheel } from './sim.ts'
 import { TRIG_ONE, TURN, angDiff, cosT, isqrt, sinT } from './trig.ts'
 
@@ -604,4 +604,45 @@ describe('neon-rider 시뮬', () => {
     expect(maxTaken).toBeLessThanOrEqual(64)
     expect(JSON.stringify(s).length).toBeLessThan(2000)
   }, 20000)
+})
+
+describe('공중제비 수: 거꾸로 선 자세를 지난 횟수 (flipsOf)', () => {
+  const D = (deg: number) => Math.floor((deg * TURN) / 360)
+  it('평지에서 떠서 360° 돌면 1, 179°까지는 0, 181°부터 1, 540°를 넘기면 2', () => {
+    expect(flipsOf(0)).toBe(0)
+    expect(flipsOf(D(179))).toBe(0)
+    expect(flipsOf(D(181))).toBe(1)
+    expect(flipsOf(D(360))).toBe(1)
+    expect(flipsOf(D(539))).toBe(1)
+    expect(flipsOf(D(541))).toBe(2)
+    expect(flipsOf(D(720))).toBe(2)
+  })
+  it('앞이 45° 들린 채 떠서 283°만 돌아 내리막에 내려도 1 (45° + 283° = 328°)', () => {
+    expect(flipsOf(D(45) + D(283))).toBe(1)
+  })
+  it('앞이 들린 채 떠서 조금만 돌면 0 (45° + 100° = 145°)', () => {
+    expect(flipsOf(D(45) + D(100))).toBe(0)
+  })
+  it('앞으로 도는 회전도 같다: −181° → 1, −179° → 0, 앞이 30° 숙여진 채 −160° 더 돌면 1', () => {
+    expect(flipsOf(-D(179))).toBe(0)
+    expect(flipsOf(-D(181))).toBe(1)
+    expect(flipsOf(-D(30) - D(160))).toBe(1)
+  })
+  it('공중 구간의 시작값은 뜨기 직전 차체의 기울기다', () => {
+    // 가파른 오르막 끝에서 뜨면 airAngle이 0이 아니라 그 기울기에서 시작한다.
+    const course = courseOf(['ramp'])
+    const sec = course.section(0)
+    let s = initSimAt(course, sec.startX + WHEEL_R, V_MAX)
+    let first: { angle: number; air: number } | null = null
+    for (let t = 0; t < 600 && !s.dead && first === null; t++) {
+      const before = bodyAngle(s)
+      const wasNull = s.airAngle === null
+      s = step(s, true, course)
+      const pitch = before > TURN / 2 ? before - TURN : before
+      if (wasNull && s.airAngle !== null && Math.abs(pitch) > D(20)) first = { angle: pitch, air: s.airAngle }
+    }
+    expect(first).not.toBeNull()
+    expect(Math.abs(first!.air - first!.angle)).toBeLessThan(D(8)) // 시작 기울기 + 한 틱 회전
+    expect(first!.angle).toBeGreaterThan(D(20))
+  })
 })
