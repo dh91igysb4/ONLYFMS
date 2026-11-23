@@ -385,3 +385,4 @@
 .fish-wear-picked { box-shadow: inset 0 0 0 2px var(--accent-strong); }
 .fish-wear-lock { white-space: nowrap; }
 .fish-wear-open { align-self: flex-start; }
+.fish-wear-confirm { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }

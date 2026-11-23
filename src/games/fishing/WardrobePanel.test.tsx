@@ -54,8 +54,8 @@ describe('WardrobePanel', () => {
     expect(screen.queryByRole('button', { name: '전설의 왕관 입기' })).toBeNull()
   })
 
-  test('업적을 채우면 입을 수 있다', () => {
-    const { onWear } = setup({ legends: ['grouper'] })
+  test('얻은(저장된) 업적 옷은 입을 수 있다', () => {
+    const { onWear } = setup({ legends: ['grouper'], wardrobe: ['hat:crown'] })
     fireEvent.click(screen.getByRole('button', { name: '전설의 왕관 입기' }))
     expect(onWear).toHaveBeenCalledWith('hat', 'crown')
   })
@@ -91,5 +91,25 @@ describe('WardrobePanel', () => {
     delete v.outfit
     render(<WardrobePanel view={v as View} atShop busy={false} onWear={() => {}} onBuy={() => {}} />)
     expect(within(row('청록 비니')).getByText('입는 중')).toBeTruthy()
+  })
+})
+
+describe('비싼 옷 사기 확인', () => {
+  test('20,000 G 이상은 한 번 더 묻고, 확인해야 산다. 취소하면 그대로', () => {
+    const { onBuy } = setup({ gold: 1_000_000 })
+    fireEvent.click(screen.getByRole('button', { name: '밀짚모자 사기' }))
+    expect(onBuy).not.toHaveBeenCalled()
+    expect(screen.getByText('20,000 G에 살까요?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    expect(screen.queryByText('20,000 G에 살까요?')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '개구리 모자 사기' }))
+    fireEvent.click(screen.getByRole('button', { name: '개구리 모자 140,000 G에 사기' }))
+    expect(onBuy).toHaveBeenCalledWith('hat', 'frog')
+  })
+
+  test('20,000 G 미만은 바로 산다', () => {
+    const { onBuy } = setup({ gold: 1_000_000 })
+    fireEvent.click(screen.getByRole('button', { name: '카키 버킷햇 사기' }))
+    expect(onBuy).toHaveBeenCalledWith('hat', 'bucket')
   })
 })

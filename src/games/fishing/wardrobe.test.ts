@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { AREAS, CHALLENGES, SPECIES } from './data.ts'
 import {
-  DEFAULT_OUTFIT, isShopItem, ownsWear, unlockMet, unlockText, WEAR, WEAR_SLOTS, wearItem,
+  DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, unlockText, WEAR, WEAR_SLOTS, wearItem,
   type OwnFacts, type WearSlot,
 } from './wardrobe.ts'
 
@@ -89,22 +89,34 @@ describe('ownership', () => {
     expect(ownsWear(empty, 'hat', '__proto__')).toBe(false)
   })
 
-  test('achievements: legends, challenges, all challenges, area dex', () => {
-    expect(ownsWear(empty, 'hat', 'crown')).toBe(false)
-    expect(ownsWear({ ...empty, legends: ['grouper'] }, 'hat', 'crown')).toBe(true)
-    expect(ownsWear({ ...empty, legends: ['grouper', 'eel'] }, 'hairColor', 'gold')).toBe(false)
-    expect(ownsWear({ ...empty, legends: ['a', 'b', 'c'] }, 'hairColor', 'gold')).toBe(true)
-    expect(ownsWear({ ...empty, challenges: { 'cave-deep': { done: true } } }, 'top', 'lava-suit')).toBe(true)
-    expect(ownsWear({ ...empty, challenges: { 'cave-deep': { done: false } } }, 'top', 'lava-suit')).toBe(false)
+  test('achievement conditions (unlockMet / newlyEarned): legends, challenges, all challenges, area dex', () => {
+    const met = (f: Partial<OwnFacts>, slot: WearSlot, id: string) => newlyEarned({ ...empty, ...f }).includes(`${slot}:${id}`)
+    expect(met({}, 'hat', 'crown')).toBe(false)
+    expect(met({ legends: ['grouper'] }, 'hat', 'crown')).toBe(true)
+    expect(met({ legends: ['grouper', 'eel'] }, 'hairColor', 'gold')).toBe(false)
+    expect(met({ legends: ['a', 'b', 'c'] }, 'hairColor', 'gold')).toBe(true)
+    expect(met({ challenges: { 'cave-deep': { done: true } } }, 'top', 'lava-suit')).toBe(true)
+    expect(met({ challenges: { 'cave-deep': { done: false } } }, 'top', 'lava-suit')).toBe(false)
     const all = Object.fromEntries(CHALLENGES.map((c) => [c.id, { done: true }]))
-    expect(ownsWear({ ...empty, challenges: all }, 'rodSkin', 'rainbow')).toBe(true)
+    expect(met({ challenges: all }, 'rodSkin', 'rainbow')).toBe(true)
     const five = Object.fromEntries(CHALLENGES.slice(1).map((c) => [c.id, { done: true }]))
-    expect(ownsWear({ ...empty, challenges: five }, 'rodSkin', 'rainbow')).toBe(false)
+    expect(met({ challenges: five }, 'rodSkin', 'rainbow')).toBe(false)
     const forest = Object.fromEntries(SPECIES.filter((s) => s.area === 'forest').map((s) => [s.id, { count: 1 }]))
-    expect(ownsWear({ ...empty, dex: forest }, 'hat', 'fish-hat')).toBe(true)
+    expect(met({ dex: forest }, 'hat', 'fish-hat')).toBe(true)
     const almost = Object.fromEntries(SPECIES.filter((s) => s.area === 'forest').slice(1).map((s) => [s.id, { count: 1 }]))
-    expect(ownsWear({ ...empty, dex: almost }, 'hat', 'fish-hat')).toBe(false)
+    expect(met({ dex: almost }, 'hat', 'fish-hat')).toBe(false)
     expect(unlockMet(empty, { kind: 'areaDex' })).toBe(false)
+    // 이미 저장된 옷은 다시 주지 않는다
+    expect(newlyEarned({ ...empty, legends: ['g'], wardrobe: ['hat:crown'] })).toEqual([])
     expect(AREAS.length).toBeGreaterThan(0)
+  })
+
+  test('achievement items are owned only once saved in the wardrobe (data growth cannot take them away)', () => {
+    expect(ownsWear({ ...empty, legends: ['grouper'] }, 'hat', 'crown')).toBe(false)
+    expect(ownsWear({ ...empty, wardrobe: ['hat:crown'] }, 'hat', 'crown')).toBe(true)
+    const grown = { challenges: [...CHALLENGES, { id: 'new-7' }], species: SPECIES }
+    const all = Object.fromEntries(CHALLENGES.map((c) => [c.id, { done: true }]))
+    expect(unlockMet({ ...empty, challenges: all }, { kind: 'allChallenges' }, grown)).toBe(false)
+    expect(ownsWear({ ...empty, challenges: all, wardrobe: ['rodSkin:rainbow'] }, 'rodSkin', 'rainbow')).toBe(true)
   })
 })

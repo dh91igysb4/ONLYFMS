@@ -122,8 +122,18 @@ export function composePose(name: string, outfit: Outfit): Sprite {
       if (top.pattern && top.alt) {
         for (const x of xs) if (orig[y][x] !== 'z' && patternOn(top.pattern, x - dx, y - dy)) g[y][x] = orig[y][x] === 'J' ? top.alt[1] : top.alt[0]
       }
-      if (top.sleeve) {
-        for (const x of [xs[0], xs[xs.length - 1]]) g[y][x] = orig[y][x] === 'J' ? top.sleeve[1] : top.sleeve[0]
+    }
+    if (top.sleeve) {
+      const sleeve = top.sleeve
+      // 앞·뒤: 줄마다 맨 왼쪽·오른쪽(어깨·팔). 옆: 줄마다 첫 J~마지막 J(팔). 밑단 줄은 뺀다
+      for (const y of rows.slice(0, -1)) {
+        const xs = [...orig[y]].flatMap((ch, x) => (TOP_LETTERS.has(ch) ? [x] : []))
+        let cells = [xs[0], xs[xs.length - 1]]
+        if (dir === 'side') {
+          const js = xs.filter((x) => orig[y][x] === 'J')
+          cells = js.length === 0 ? [] : xs.filter((x) => x >= js[0] && x <= js[js.length - 1])
+        }
+        for (const x of cells) g[y][x] = orig[y][x] === 'J' ? sleeve[1] : sleeve[0]
       }
     }
     if (top.collar && rows.length > 0) {
@@ -131,7 +141,7 @@ export function composePose(name: string, outfit: Outfit): Sprite {
       const xs = [...orig[y]].flatMap((ch, x) => (TOP_LETTERS.has(ch) ? [x] : []))
       const l = xs[0]
       const r = xs[xs.length - 1]
-      for (const x of xs) if (x >= l + 2 && x <= r - 2) g[y][x] = top.collar
+      for (const x of xs) if (top.collarFull || (x >= l + 2 && x <= r - 2)) g[y][x] = top.collar
     }
     if (top.hem && rows.length > 0) {
       const y = rows[rows.length - 1]
@@ -181,8 +191,8 @@ export function composePose(name: string, outfit: Outfit): Sprite {
   // 4. 머리 모양
   const hair = HAIR_ART[outfit.hair] ?? null
   if (hair) {
-    const layer = hair[dir] ?? hair.down
-    stamp(g, layer, dx, dy, (ch) => ch, hat.kind === 'none' ? -1 : hair.under ?? HAT_LINE)
+    if (hat.kind !== 'none' && hair.hatted) stamp(g, hair.hatted[dir] ?? hair.hatted.down, dx, dy, (ch) => ch)
+    else stamp(g, hair[dir] ?? hair.down, dx, dy, (ch) => ch, hat.kind === 'none' ? -1 : hair.under ?? HAT_LINE)
   }
   // 비니는 머리 위에 다시 얹는다(비니 칸과 그 둘레 외곽선). 옆으로 부푸는 머리가 비니를 덮지 않게
   if (hat.kind === 'beanie' && hair) {

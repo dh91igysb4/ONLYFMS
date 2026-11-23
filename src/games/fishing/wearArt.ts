@@ -8,17 +8,21 @@
 
 export type Layer = { y: number; rows: readonly string[] }
 export type Dir = 'down' | 'up' | 'side'
-/** under: 모자를 써도 그리는 첫 줄(기본 7 = 머리띠 아래). 옆으로 부푸는 머리(뽀글·양갈래)는 모자 옆까지 보인다 */
-export type Layers = { down: Layer; up?: Layer; side?: Layer; under?: number }
+/**
+ * under: 모자를 써도 그리는 첫 줄(기본 7 = 머리띠 아래).
+ * hatted: 모자를 썼을 때 대신 쓰는 덧그림(통째로 그린다). 옆으로 부푸는 머리(뽀글·양갈래)가 모자 챙처럼 보이지 않게 얼굴 옆에 붙인다
+ */
+export type Layers = { down: Layer; up?: Layer; side?: Layer; under?: number; hatted?: { down: Layer; up?: Layer; side?: Layer } }
 
 /** 상의 무늬. 좌표는 머리 위치 기준이라 걸음에 몸이 1px 내려가도 무늬가 흔들리지 않는다 */
 export type Pattern = 'stripeH' | 'stripeV' | 'check'
 /**
  * 상의: j(몸판)→body, J(그늘)→shade, z(지퍼 칸)→zip(없으면 몸판색).
  * alt: 무늬 칸의 [밝은, 그늘]. sleeve: 줄마다 상의 칸 맨 왼쪽·오른쪽(소매·어깨) [밝은, 그늘].
- * collar: 상의 맨 윗줄 가운데 칸. hem: 상의 맨 아랫줄.
+ * 옆모습에서는 줄마다 첫 J~마지막 J(팔) 칸이 소매다(가장자리가 아니라 팔). 맨 아랫줄(밑단)은 소매에서 뺀다.
+ * collar: 상의 맨 윗줄 가운데 칸(collarFull이면 맨 윗줄 전체). hem: 상의 맨 아랫줄.
  */
-export type TopArt = { body: string; shade: string; zip?: string; pattern?: Pattern; alt?: readonly [string, string]; sleeve?: readonly [string, string]; collar?: string; hem?: string }
+export type TopArt = { body: string; shade: string; zip?: string; pattern?: Pattern; alt?: readonly [string, string]; sleeve?: readonly [string, string]; collar?: string; collarFull?: true; hem?: string }
 /** 하의: l→main, L→shade, b(신발)→shoes. shorts면 열마다 맨 아래 바지 칸이 맨다리 */
 export type BottomArt = { main: string; shade: string; shoes?: string; shorts?: true; pattern?: Pattern; alt?: readonly [string, string] }
 /** 낚싯대: r(대)·R(손잡이)·g(릴). rainbow면 대 칸을 줄마다 무지개 색으로 */
@@ -45,7 +49,8 @@ export const TOP_ART: Readonly<Record<string, TopArt | null>> = {
   // 유니폼(색·무늬만)
   'kit-claret': { body: '#7c1f3f', shade: '#5a1530', sleeve: ['#93c9ea', '#6aa6cc'], collar: '#93c9ea' },
   'kit-red': { body: '#d3262c', shade: '#a11b20' },
-  'kit-redwhite': { body: '#da2a2a', shade: '#a81e1e', collar: WHITE, hem: WHITE },
+  // 빨강 몸판 + 굵은 흰 깃(맨 윗줄 전체)·흰 가운데 선·흰 밑단. 온통 빨간 kit-red와 한눈에 갈리게
+  'kit-redwhite': { body: '#da2a2a', shade: '#a81e1e', zip: WHITE, collar: WHITE, collarFull: true, hem: WHITE },
   'kit-white': { body: '#f6f6f3', shade: '#d2d5da', collar: '#1f2a52', hem: '#1f2a52' },
   'kit-royal': { body: '#1f4fbf', shade: '#163a8f', collar: WHITE },
   'kit-stripes': { body: '#f6f6f3', shade: '#c9ccd0', pattern: 'stripeV', alt: ['#1e1e24', '#121216'], collar: '#1e1e24' },
@@ -422,7 +427,29 @@ export const HAIR_ART: Readonly<Record<string, Layers | null>> = {
       'kak.............',
       '.k..............',
     ),
-    under: 5,
+    hatted: {
+      down: L(7,
+        '.kak........kak.',
+        '.kak........kak.',
+        '.kAk........kAk.',
+        '.kak........kak.',
+        '..k..........k..',
+      ),
+      up: L(7,
+        '.kak........kak.',
+        '.kak........kak.',
+        '.kAk........kAk.',
+        '.kak........kak.',
+        '..k..........k..',
+      ),
+      side: L(7,
+        '.kak............',
+        '.kak............',
+        '.kAk............',
+        '.kak............',
+        '..k.............',
+      ),
+    },
   },
   mohawk: {
     down: MOHAWK,
@@ -455,6 +482,26 @@ export const HAIR_ART: Readonly<Record<string, Layers | null>> = {
       '.kAaaaak........',
       '..kkkkk.........',
     ),
-    under: 4,
+    hatted: {
+      down: L(7,
+        '.kak........kak.',
+        'kaak........kaak',
+        'kaAk........kAak',
+        '.kk..........kk.',
+      ),
+      up: L(7,
+        '..kaaaaaaaaaak..',
+        '..kaaaaaaaaaak..',
+        '..kaAaaaaaaAak..',
+        '...kaaaaaaaak...',
+        '....kkkkkkkk....',
+      ),
+      side: L(7,
+        '.kak............',
+        'kaaak...........',
+        'kaAak...........',
+        '.kkk............',
+      ),
+    },
   },
 }

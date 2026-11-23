@@ -6,7 +6,7 @@ export const WEAR_SLOTS = ['hat', 'top', 'bottom', 'hair', 'hairColor', 'rodSkin
 export type WearSlot = (typeof WEAR_SLOTS)[number]
 export type Outfit = Record<WearSlot, string>
 
-/** 업적 조건. 모두 되돌아가지 않는 값이라 소유를 저장하지 않고 매번 계산한다 */
+/** 업적 조건. 채우는 순간 세이브 wardrobe에 저장한다(newlyEarned → logic의 grantEarned). 데이터가 늘어도 잃지 않는다 */
 export type Unlock =
   | { kind: 'challenge'; id: string }
   | { kind: 'allChallenges' }
@@ -137,27 +137,42 @@ export type OwnFacts = {
   challenges: Readonly<Record<string, { done: boolean }>>
   dex: Readonly<Record<string, unknown>>
 }
+/** 업적 판정에 쓰는 낚시 데이터. 기본은 지금 data.ts. 테스트는 데이터가 늘어난 경우를 흉내 낼 수 있다 */
+export type UnlockData = {
+  challenges: readonly { id: string }[]
+  species: readonly { id: string; area: string }[]
+}
+const CURRENT: UnlockData = { challenges: CHALLENGES, species: SPECIES }
 
-export function unlockMet(f: OwnFacts, u: Unlock): boolean {
+/**
+ * 업적 조건을 지금 채웠는가. **주는 데에만** 쓴다(grantEarned). 가졌는지는 세이브 wardrobe가 정한다:
+ * 과제·어종이 늘면(다음 확장) "과제 모두"·"한 지역 도감"이 다시 거짓이 될 수 있어, 한 번 얻은 옷을 잃지 않게 저장한다.
+ */
+export function unlockMet(f: OwnFacts, u: Unlock, data: UnlockData = CURRENT): boolean {
   switch (u.kind) {
     case 'challenge':
       return f.challenges[u.id]?.done === true
     case 'allChallenges':
-      return CHALLENGES.every((c) => f.challenges[c.id]?.done === true)
+      return data.challenges.every((c) => f.challenges[c.id]?.done === true)
     case 'legends':
       return f.legends.length >= u.count
     case 'areaDex': {
-      const areas = new Set(SPECIES.map((s) => s.area))
-      return [...areas].some((a) => SPECIES.filter((s) => s.area === a).every((s) => Object.prototype.hasOwnProperty.call(f.dex, s.id)))
+      const areas = new Set(data.species.map((s) => s.area))
+      return [...areas].some((a) => data.species.filter((s) => s.area === a).every((s) => Object.prototype.hasOwnProperty.call(f.dex, s.id)))
     }
   }
 }
 
+/** 조건을 채웠지만 아직 wardrobe에 없는 업적 옷 키(WEAR 순서). 없으면 [] */
+export function newlyEarned(f: OwnFacts, data: UnlockData = CURRENT): string[] {
+  return WEAR.filter((w) => w.unlock && !f.wardrobe.includes(wearKey(w.slot, w.id)) && unlockMet(f, w.unlock, data)).map((w) => wearKey(w.slot, w.id))
+}
+
+/** 가졌는가: 무료 기본이거나, 세이브 wardrobe에 있다(산 옷과 얻은 업적 옷 모두) */
 export function ownsWear(f: OwnFacts, slot: WearSlot, id: string): boolean {
   const w = wearItem(slot, id)
   if (!w) return false
-  if (w.unlock) return unlockMet(f, w.unlock)
-  if (w.price === 0) return true
+  if (w.price === 0 && !w.unlock) return true
   return f.wardrobe.includes(wearKey(slot, id))
 }
 

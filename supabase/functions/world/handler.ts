@@ -94,10 +94,11 @@ async function run(
 ): Promise<Out> {
   const now = deps.now()
   // 없으면 만들고(동시 요청은 여기서 한 줄로 서게 된다), 잠근다
-  await tx`
+  const created = await tx`
     insert into public.world_saves (user_id, game_id, state, logic_version)
     values (${uid}, ${gameId}, ${tx.json(logic.init())}, ${logic.version})
-    on conflict (user_id, game_id) do nothing`
+    on conflict (user_id, game_id) do nothing
+    returning user_id`
   const [row] = await tx<{ state: unknown; logic_version: number }[]>`
     select state, logic_version from public.world_saves
      where user_id = ${uid} and game_id = ${gameId} for update`
@@ -108,6 +109,8 @@ async function run(
     state = logic.migrate(state, row.logic_version)
     dirty = true
   }
+  // 프로필 캐릭터를 다시 쓸지 비교할 기준(행동 전, migrate 뒤)
+  const avatarBefore = logic.avatar && !dirty && created.length === 0 ? logic.avatar(state) : null
 
   let result: unknown = null
   if (isAct) {
@@ -132,11 +135,15 @@ async function run(
         on conflict (user_id, game_id, key)
         do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
     }
-    // 프로필 캐릭터(manifest avatar가 있는 게임): 기록과 같은 표에 키 AVATAR_RECORD_KEY, 값 0, detail에 문자열
-    if (logic.avatar) {
+  }
+  // 프로필 캐릭터(manifest avatar가 있는 게임): 기록과 같은 표에 키 AVATAR_RECORD_KEY, 값 0, detail에 문자열.
+  // 세이브를 새로 만들었거나 migrate했으면(배포 뒤 첫 load) 쓰고, 그 밖에는 행동으로 문자열이 바뀐 때만 쓴다.
+  if (logic.avatar) {
+    const avatar = logic.avatar(state)
+    if (avatarBefore === null || (isAct && avatar !== avatarBefore)) {
       await tx`
         insert into public.game_records (user_id, game_id, key, value, detail)
-        values (${uid}, ${gameId}, ${AVATAR_RECORD_KEY}, 0, ${logic.avatar(state)})
+        values (${uid}, ${gameId}, ${AVATAR_RECORD_KEY}, 0, ${avatar})
         on conflict (user_id, game_id, key)
         do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
     }

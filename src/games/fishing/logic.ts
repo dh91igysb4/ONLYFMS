@@ -7,7 +7,7 @@ import {
   type AreaId, type BagTier, type Challenge, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
-import { DEFAULT_OUTFIT, isShopItem, isWearSlot, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
+import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -186,7 +186,7 @@ export type State = {
   equipped: TackleId[]
   /** 도전과제 진행(과제 id → 진행). 배포 뒤부터 센다 */
   challenges: Record<string, ChallengeProgress>
-  /** 산 옷 `부위:id`(영구, 중복 없음). 무료·업적 품목은 넣지 않는다 (logic.version 10) */
+  /** 가진 옷 `부위:id`(영구, 중복 없음): 산 옷 + 조건을 채워 얻은 업적 옷. 무료 기본은 넣지 않는다 (logic.version 10) */
   wardrobe: string[]
   /** 입은 옷. 부위마다 가진 품목 */
   outfit: Outfit
@@ -420,6 +420,12 @@ function wear(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, outfit: { ...state.outfit, [w.slot]: w.id } } }
 }
 
+/** 조건을 채운 업적 옷을 wardrobe에 넣는다(한 번 얻으면 데이터가 늘어도 잃지 않게). 새로 얻은 게 없으면 같은 객체 */
+function grantEarned(state: State): State {
+  const earned = newlyEarned(state)
+  return earned.length === 0 ? state : { ...state, wardrobe: [...state.wardrobe, ...earned] }
+}
+
 function migrate(raw: unknown, fromVersion: number): State {
   const base = init()
   if (!isObj(raw)) return base
@@ -473,8 +479,10 @@ function migrate(raw: unknown, fromVersion: number): State {
     }
   }
   // v9 이하에는 옷장이 없다. 알려진 상점 품목 키만 중복 없이. 입은 옷은 부위마다 가진 품목만, 아니면 기본값
-  const shopKeys = new Set(WEAR.filter(isShopItem).map((w) => wearKey(w.slot, w.id)))
-  const wardrobe = Array.isArray(raw.wardrobe) ? [...new Set(raw.wardrobe.filter((k): k is string => typeof k === 'string' && shopKeys.has(k)))] : []
+  // wardrobe는 알려진 상점·업적 품목 키만(업적 옷은 저장된 것이 곧 소유). 그다음 지금 조건을 채운 업적 옷을 더한다(v9 세이브 포함)
+  const ownable = new Set(WEAR.filter((w) => isShopItem(w) || w.unlock).map((w) => wearKey(w.slot, w.id)))
+  const kept = Array.isArray(raw.wardrobe) ? [...new Set(raw.wardrobe.filter((k): k is string => typeof k === 'string' && ownable.has(k)))] : []
+  const wardrobe = [...kept, ...newlyEarned({ wardrobe: kept, legends, challenges, dex })]
   const facts = { wardrobe, legends, challenges, dex }
   const rawOutfit = isObj(raw.outfit) ? raw.outfit : {}
   const outfit = { ...DEFAULT_OUTFIT }
@@ -524,40 +532,46 @@ export const logic: WorldLogic<State, Action, View> = {
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
   apply(state, action: unknown, ctx) {
-    if (!isObj(action)) return { error: 'bad_action' }
-    switch (action.type) {
-      case 'cast':
-        return cast(state, action, ctx)
-      case 'hook':
-        return hook(state, ctx.now)
-      case 'resolve':
-        return resolve(state, action, ctx.now)
-      case 'sell':
-        return sell(state)
-      case 'lock':
-        return lock(state, action)
-      case 'buyRod':
-        return buyRod(state, action)
-      case 'buyBag':
-        return buyBag(state, action)
-      case 'buyTackle':
-        return buyTackle(state, action)
-      case 'equip':
-        return equip(state, action)
-      case 'unlockArea':
-        return unlockArea(state, action)
-      case 'teleport':
-        return teleport(state, action)
-      case 'buyWear':
-        return buyWear(state, action)
-      case 'wear':
-        return wear(state, action)
-      default:
-        return { error: 'bad_action' }
-    }
+    const r = applyAction(state, action, ctx)
+    // 행동으로 업적 조건을 채웠으면(잡기·과제 깨기 등) 그 자리에서 옷을 저장한다
+    return 'error' in r ? r : { ...r, state: grantEarned(r.state) }
   },
   view: (state): View => ({ ...state, pending: state.pending && pendingView(state.pending) }),
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),
+}
+
+function applyAction(state: State, action: unknown, ctx: { now: number; rng: () => number }): Out {
+  if (!isObj(action)) return { error: 'bad_action' }
+  switch (action.type) {
+    case 'cast':
+      return cast(state, action, ctx)
+    case 'hook':
+      return hook(state, ctx.now)
+    case 'resolve':
+      return resolve(state, action, ctx.now)
+    case 'sell':
+      return sell(state)
+    case 'lock':
+      return lock(state, action)
+    case 'buyRod':
+      return buyRod(state, action)
+    case 'buyBag':
+      return buyBag(state, action)
+    case 'buyTackle':
+      return buyTackle(state, action)
+    case 'equip':
+      return equip(state, action)
+    case 'unlockArea':
+      return unlockArea(state, action)
+    case 'teleport':
+      return teleport(state, action)
+    case 'buyWear':
+      return buyWear(state, action)
+    case 'wear':
+      return wear(state, action)
+    default:
+      return { error: 'bad_action' }
+  }
 }

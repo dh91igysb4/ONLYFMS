@@ -116,3 +116,29 @@ describe('outfit compose', () => {
     expect(decodeOutfit(JSON.stringify({ ...DEFAULT_OUTFIT, rodSkin: 'gold' }))).toEqual({ ...DEFAULT_OUTFIT, rodSkin: 'gold' })
   })
 })
+
+describe('리뷰 반영 그림', () => {
+  test('빨강·흰 깃 유니폼은 새빨간 유니폼과 맨 윗줄·가운데 선이 다르다', () => {
+    const a = composePose('player-idle-down', { ...DEFAULT_OUTFIT, top: 'kit-red' })
+    const b = composePose('player-idle-down', { ...DEFAULT_OUTFIT, top: 'kit-redwhite' })
+    const diff = a.rows.flatMap((r, y) => [...r].flatMap((_, x) => (color(a, x, y) !== color(b, x, y) ? [1] : []))).length
+    expect(diff).toBeGreaterThanOrEqual(12)
+  })
+
+  test('옆모습 소매는 앞뒤 가장자리가 아니라 팔 칸', () => {
+    const sp = composePose('player-idle-side', { ...DEFAULT_OUTFIT, top: 'kit-claret' })
+    const sky = TOP_ART['kit-claret']!.sleeve!
+    // idle-side 팔: 13~17행 x5~8, 앞 가장자리(x11 지퍼 칸)는 소매색이 아니다
+    expect(sky).toContain(color(sp, 5, 14))
+    expect(sky).not.toContain(color(sp, 11, 14))
+  })
+
+  test('모자를 쓰면 뽀글·양갈래는 얼굴 옆 덧그림(hatted)을 쓰고 모자 높이(4~6행)로 부풀지 않는다', () => {
+    for (const hair of ['afro', 'twin']) {
+      const sp = composePose('player-idle-down', { ...DEFAULT_OUTFIT, hair, hairColor: 'pink' })
+      // x14는 낚싯대라 뺀다
+      for (let y = 4; y <= 6; y++) for (const x of [0, 1, 15]) expect(color(sp, x, y), `${hair} ${x},${y}`).toBeNull()
+      expect(color(sp, 2, 8)).toBe(HAIR_COLORS.pink[0])
+    }
+  })
+})

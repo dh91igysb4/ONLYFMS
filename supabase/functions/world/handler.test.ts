@@ -51,6 +51,7 @@ const worlds = new Map<string, WorldModule>([
   ['test-world-v2', { manifest: manifest('test-world-v2', false), logic: v2 }],
   ['test-world-hidden', { manifest: manifest('test-world-hidden', true), logic: base }],
   ['test-world-avatar', { manifest: { ...manifest('test-world-avatar', false), avatar: { label: '캐릭터' } }, logic: { ...base, avatar: (state: S) => `look-${state.n}` } }],
+  ['test-world-avatar-fixed', { manifest: { ...manifest('test-world-avatar-fixed', false), avatar: { label: '캐릭터' } }, logic: { ...base, version: 2, avatar: () => 'same' } }],
 ])
 const registry = { getWorld: (id: string) => worlds.get(id) }
 
@@ -142,15 +143,41 @@ t('act upserts records', async () => {
   assert.equal(Number(rows[0].value), 2)
 })
 
-t('act writes the avatar record when the logic has avatar(); load does not', async () => {
+t('avatar row: written when the save is created (first load) and when an act changes it', async () => {
   const u = await user()
+  const detail = async (game: string) =>
+    (await sql`select detail from public.game_records where user_id = ${u} and game_id = ${game} and key = 'avatar'`)[0]?.detail ?? null
   await load(u, 'test-world-avatar')
-  let rows = await sql`select key from public.game_records where user_id = ${u} and game_id = 'test-world-avatar'`
-  assert.equal(rows.length, 0)
+  assert.equal(await detail('test-world-avatar'), 'look-0')
+  // 기록(records)은 여전히 행동 뒤에만
+  const recs = await sql`select key from public.game_records where user_id = ${u} and game_id = 'test-world-avatar' and key <> 'avatar'`
+  assert.equal(recs.length, 0)
   await act(u, { type: 'inc' }, 'test-world-avatar')
   await act(u, { type: 'inc' }, 'test-world-avatar')
-  rows = await sql`select key, value, detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar' order by key`
+  const rows = await sql`select key, value, detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar' order by key`
   assert.deepEqual(rows.map((r) => [r.key, Number(r.value), r.detail]), [['avatar', 0, 'look-2'], ['n', 2, null]])
+})
+
+t('avatar row: not rewritten when an act leaves the avatar string unchanged', async () => {
+  const u = await user()
+  await load(u, 'test-world-avatar-fixed')
+  await sql`update public.game_records set detail = 'tampered' where user_id = ${u} and game_id = 'test-world-avatar-fixed' and key = 'avatar'`
+  await act(u, { type: 'inc' }, 'test-world-avatar-fixed')
+  const [r] = await sql`select detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar-fixed' and key = 'avatar'`
+  assert.equal(r.detail, 'tampered')
+})
+
+t('avatar row: written on the first load after a migrate (profiles fill right after deploy)', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${u}, 'test-world-avatar-fixed', ${sql.json({ n: 5 })}, 1)`
+  await load(u, 'test-world-avatar-fixed')
+  const [r] = await sql`select detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar-fixed' and key = 'avatar'`
+  assert.equal(r.detail, 'same')
+  // 그다음 load(migrate 없음)는 다시 쓰지 않는다
+  await sql`update public.game_records set detail = 'kept' where user_id = ${u} and game_id = 'test-world-avatar-fixed' and key = 'avatar'`
+  await load(u, 'test-world-avatar-fixed')
+  const [r2] = await sql`select detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar-fixed' and key = 'avatar'`
+  assert.equal(r2.detail, 'kept')
 })
 
 t('no avatar record for a world without avatar()', async () => {

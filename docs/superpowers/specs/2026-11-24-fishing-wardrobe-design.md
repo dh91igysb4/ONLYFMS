@@ -194,7 +194,7 @@ State += {
   outfit: Outfit
 }
 ```
-- 가졌는가 `ownsWear(state, id)`: 무료 품목, 또는 `wardrobe`에 있음, 또는 업적 조건을 채움. 업적은 저장하지 않고 매번 `challenges`·`legends`·`dex`로 계산한다(모두 되돌아가지 않는 값이라 한 번 얻으면 계속 가진다).
+- 가졌는가 `ownsWear(state, slot, id)`: 무료 기본이거나 `wardrobe`에 있음. 업적 옷은 조건을 채운 **행동 직후**(`apply` 끝의 `grantEarned`)와 `migrate`에서 `wardrobe`에 저장한다. 저장된 것이 곧 소유이고 `unlockMet`은 주는 데에만 쓴다 — 다음 확장에서 과제·어종이 늘어 "과제 모두"·"한 지역 도감"이 다시 거짓이 돼도 한 번 얻은 옷을 잃지 않는다(리뷰 I1).
 - 업적 조건 종류: `{ kind: 'challenge', id }`, `{ kind: 'allChallenges' }`, `{ kind: 'legends', count }`, `{ kind: 'areaDex' }`(어느 한 지역이라도 그 지역 어종을 모두 도감에).
 
 ### 5.2 행동
@@ -219,11 +219,11 @@ State += {
 ## 7. 프로필 표시 (플랫폼, 게임 분기 없음)
 - `Manifest.avatar?: { label: string }`: 이 지속형 게임은 프로필에 캐릭터를 보여 준다.
 - `WorldLogic.avatar?(state): string`: 캐릭터를 그릴 짧은 문자열(낚시는 옷차림 JSON).
-- `world` 함수: 행동(`act`) 뒤 `records`를 쓸 때, `logic.avatar`가 있으면 `game_records`에 키 `avatar`(값 0, `detail` = 문자열)를 함께 upsert한다. **DB 변경 없음**(`game_records`는 키 제한이 없고 `user_records`가 모든 행을 돌려준다).
+- `world` 함수: `logic.avatar`가 있으면 세이브를 새로 만들었거나 migrate했거나 행동으로 캐릭터 문자열이 바뀌었을 때 `game_records`에 키 `avatar`(값 0, `detail` = 문자열)를 upsert한다(배포 뒤 첫 불러오기에서 바로 채워진다, 리뷰 M1). **DB 변경 없음**(`game_records`는 키 제한이 없고 `user_records`가 모든 행을 돌려준다).
 - 화면 등록: `src/games/ui.ts`의 `getAvatarComponent(id)` → `ComponentType<AvatarProps>`(`{ data: string; scale: number }`). 낚시는 `Avatar.tsx`가 앞모습 대기 그림을 캔버스에 그린다(모르는 값은 기본 옷차림).
 - 프로필 요약 탭 맨 위 `AvatarSection`: `user_records`에서 `key = 'avatar'`인 행 중 manifest에 `avatar`가 있고 화면이 등록된 게임만 그린다. 없으면 아무것도 그리지 않는다. 기록 탭(`RecordsSection`)은 manifest `records`에 선언된 키만 그리므로 `avatar` 행은 거기 나오지 않는다.
 - 등록부 테스트: `avatar` manifest ⇔ `logic.avatar` ⇔ `getAvatarComponent` 셋이 같이 있고, `records` 키에 `avatar`가 없다.
-- 배포 직후에는 행이 없다. 낚시에서 행동을 한 번이라도 하면(던지기 등) 생긴다.
+- 배포 뒤 낚시를 한 번 열면(첫 load의 migrate) 행이 생긴다.
 
 ## 8. 지갑 이후
 - 구매는 지금 다른 낚시 구매처럼 `state.gold`에서 뺀다(`buyWear`의 한 줄). 지갑 2단계에서 낚시 구매가 지갑으로 옮겨갈 때 같은 자리만 바뀐다(지갑 설계의 "낚시 구매" 이전 절차를 그대로 따른다). 옷 소유·입은 옷은 낚시 세이브에 남는다.
@@ -237,7 +237,7 @@ State += {
 ## 10. 판단 (밤샘 작업 규칙의 Ruling)
 - 품목 목록·가격은 §3 — 상점 총액 `REF × 65`로 집과 절반씩 나눈다 — 틀리면 `wardrobe.ts` 숫자만 고친다(세이브 형식 영향 없음).
 - 무료 기본은 부위마다 2개(낚싯대 겉모습 1개) — 처음부터 바꿔 볼 수 있게 — 틀리면 가격만 바꾼다.
-- 업적 소유는 저장하지 않고 계산한다 — 조건 값이 모두 되돌아가지 않고 migrate가 단순해진다 — 나중에 되돌아갈 수 있는 조건을 넣으면 그때 저장으로 바꾼다.
+- 업적 옷은 얻는 순간 세이브에 저장한다(리뷰 I1로 바꿈) — 데이터가 늘어도 잃지 않는다 — 세이브 키가 몇 개 늘 뿐이다.
 - 사면 바로 입는다 — 누르는 수를 줄인다 — 원치 않으면 다시 입기 한 번.
 - 옷장은 아래 줄이 아니라 가방·상점 창에서 연다 — 320px 아래 줄 다섯 버튼 한계 — 찾기 어렵다는 말이 나오면 가방 버튼 길게 누르기 등으로 바꾼다.
 - 프로필 캐릭터는 `game_records`의 `avatar` 키로 — 마이그레이션 없이 기존 RLS·RPC 그대로 — 기록 행 하나가 늘 뿐이다.

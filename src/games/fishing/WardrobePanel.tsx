@@ -9,6 +9,10 @@ import { isShopItem, ownsWear, SLOT_NAMES, unlockText, WEAR, WEAR_SLOTS, type Ou
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const PREVIEW_SCALE = 5
 const THUMB_SCALE = 2
+/** 이 값 이상인 옷은 사기 전에 한 번 더 묻는다(되팔기가 없어서) */
+export const CONFIRM_PRICE = 20_000
+/** 작은 그림 캐시 상한(최근 것부터 남긴다) */
+const THUMB_CACHE_MAX = 128
 /** 미리보기 배경(풀밭). 캔버스 내부 색 */
 const PREVIEW_BG = '#6fa85a'
 /** 돌려 보기 순서: 앞 → 오른쪽 → 뒤 → 왼쪽 */
@@ -24,7 +28,11 @@ const thumbCache = new Map<string, string>()
 function thumbUrl(outfit: Outfit): string {
   const key = `${outfitKey(outfit)}|${THUMB_SCALE}`
   const hit = thumbCache.get(key)
-  if (hit !== undefined) return hit
+  if (hit !== undefined) {
+    thumbCache.delete(key)
+    thumbCache.set(key, hit)
+    return hit
+  }
   const sp = composePose('player-idle-down', outfit)
   const canvas = document.createElement('canvas')
   canvas.width = sp.w * THUMB_SCALE
@@ -32,6 +40,7 @@ function thumbUrl(outfit: Outfit): string {
   const ctx = canvas.getContext('2d')
   const url = ctx ? (drawSpriteData(ctx, sp, 0, 0, THUMB_SCALE), canvas.toDataURL('image/png')) : ''
   thumbCache.set(key, url)
+  while (thumbCache.size > THUMB_CACHE_MAX) thumbCache.delete(thumbCache.keys().next().value!)
   return url
 }
 
@@ -73,6 +82,8 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
   const [slot, setSlot] = useState<WearSlot>('hat')
   const [picked, setPicked] = useState<string | null>(null)
   const [turn, setTurn] = useState(0)
+  /** 비싼 옷 사기 확인 중인 품목 키(부위:id) */
+  const [confirming, setConfirming] = useState<string | null>(null)
   // 옛 서버 응답(옷장 필드 없음)에도 죽지 않게 기본값으로 읽는다
   const facts = { wardrobe: view.wardrobe ?? [], legends: view.legends ?? [], challenges: view.challenges ?? {}, dex: view.dex ?? {} }
   const worn = normalizeOutfit(view.outfit)
@@ -90,13 +101,36 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
       )
     }
     if (w.unlock) return <span className="muted fish-wear-lock">업적</span>
+    const key = `${w.slot}:${w.id}`
+    if (confirming === key) {
+      return (
+        <span className="fish-wear-confirm" role="group" aria-label={`${w.name} 사기 확인`}>
+          <span className="fish-shop-note">{gold(w.price)}에 살까요?</span>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            aria-label={`${w.name} ${gold(w.price)}에 사기`}
+            disabled={busy || !atShop || view.gold < w.price}
+            onClick={() => {
+              setConfirming(null)
+              onBuy(w.slot, w.id)
+            }}
+          >
+            사기
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirming(null)}>
+            취소
+          </button>
+        </span>
+      )
+    }
     return (
       <button
         type="button"
         className="btn btn-primary btn-sm"
         aria-label={`${w.name} 사기`}
         disabled={busy || !atShop || view.gold < w.price}
-        onClick={() => onBuy(w.slot, w.id)}
+        onClick={() => (w.price >= CONFIRM_PRICE ? setConfirming(key) : onBuy(w.slot, w.id))}
       >
         사기
       </button>
@@ -128,6 +162,7 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
             onClick={() => {
               setSlot(s)
               setPicked(null)
+              setConfirming(null)
             }}
           >
             {SLOT_NAMES[s]}
