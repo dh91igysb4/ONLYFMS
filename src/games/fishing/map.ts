@@ -45,6 +45,12 @@ const STEP: Readonly<Record<Facing, { dx: number; dy: number }>> = {
   right: { dx: 1, dy: 0 },
 }
 
+/**
+ * 가장자리 출구. from..to는 그 가장자리를 따라 센 칸 범위(포함, n/s는 tx, e/w는 ty).
+ * 출구 칸 = 그 가장자리 줄(행/열)의 범위 안 걸을 수 있는 칸. entry는 도착 맵(target)에서 설 칸과 방향.
+ */
+export type Exit = { edge: 'n' | 's' | 'e' | 'w'; from: number; to: number; target: AreaId; entry: { tx: number; ty: number; facing: Facing } }
+
 /** 한 지역의 타일맵과 거기서 계산한 값. defineMap으로 만든다. */
 export type MapDef = {
   id: AreaId
@@ -56,6 +62,7 @@ export type MapDef = {
   spawn: { pos: Vec; facing: Facing }
   /** 물 종류 → 낚시 자리 id. 여기 없는 물은 낚시할 수 없다 */
   spots: Partial<Record<WaterKind, string>>
+  exits: readonly Exit[]
 }
 
 export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
@@ -97,13 +104,13 @@ function computeShop(map: MapDef): MapDef['shop'] {
 }
 
 /** 행 문자열로 맵을 만든다. 행 길이가 다르거나 문이 둘 이상이면 throw. */
-export function defineMap(id: AreaId, rows: readonly string[], opts: { spots?: MapDef['spots'] } = {}): MapDef {
+export function defineMap(id: AreaId, rows: readonly string[], opts: { spots?: MapDef['spots']; exits?: Exit[] } = {}): MapDef {
   if (rows.length === 0) throw new Error('map needs at least one row')
   const w = rows[0].length
   rows.forEach((row, i) => {
     if (row.length !== w) throw new Error(`map row ${i} has length ${row.length}, expected ${w}`)
   })
-  const map: MapDef = { id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' }, spots: opts.spots ?? {} }
+  const map: MapDef = { id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' }, spots: opts.spots ?? {}, exits: opts.exits ?? [] }
   map.shop = computeShop(map)
   // 시작 위치: 문 앞(문 바로 아래 타일), 문이 없으면 첫 걸을 수 있는 칸
   const at = shopSpot(map) ?? firstWalkable(map)
@@ -129,6 +136,18 @@ export function pierEnd(map: MapDef): { tx: number; ty: number } | null {
   const ends = pier.filter((p) => p.ty === maxTy)
   if (ends.length !== 1) throw new Error('pier must end in a single tile')
   return ends[0]
+}
+
+/** 발 중앙이 있는 칸이 출구 칸이면 그 출구, 아니면 null. */
+export function exitAt(map: MapDef, pos: Vec): Exit | null {
+  const { tx, ty } = tileOf(pos)
+  if (!isWalkable(map, tx, ty)) return null
+  for (const exit of map.exits) {
+    const onEdge = exit.edge === 'n' ? ty === 0 : exit.edge === 's' ? ty === map.h - 1 : exit.edge === 'w' ? tx === 0 : tx === map.w - 1
+    const along = exit.edge === 'n' || exit.edge === 's' ? tx : ty
+    if (onEdge && along >= exit.from && along <= exit.to) return exit
+  }
+  return null
 }
 
 export type Interaction = { kind: 'shop' } | { kind: 'fish'; spot: string } | null

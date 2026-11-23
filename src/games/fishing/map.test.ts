@@ -5,6 +5,7 @@ import {
   WATER_KINDS,
   castTarget,
   defineMap,
+  exitAt,
   interactionAt,
   isWalkable,
   pierEnd,
@@ -91,9 +92,10 @@ describe('map grid', () => {
     }
   })
 
-  it('border tiles are not walkable', () => {
+  it('border tiles are not walkable except the north exit', () => {
     for (let tx = 0; tx < MAP_W; tx++) {
-      expect(isWalkable(VILLAGE, tx, 0), `(${tx},0)`).toBe(false)
+      const isExit = exitAt(VILLAGE, center(tx, 0)) !== null
+      expect(isWalkable(VILLAGE, tx, 0), `(${tx},0)`).toBe(isExit)
       expect(isWalkable(VILLAGE, tx, MAP_H - 1), `(${tx},${MAP_H - 1})`).toBe(false)
     }
     for (let ty = 0; ty < MAP_H; ty++) {
