@@ -1,6 +1,7 @@
 // 낚시 픽셀 스프라이트. 전부 자체 디자인이며 글자 하나가 픽셀 하나다('.' = 투명).
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)라 여기서 직접 정한다.
-// 물고기는 머리가 왼쪽, 16×16 칸 가운데. 캐릭터는 정면(물 쪽)을 보는 16×24.
+// 물고기는 머리가 왼쪽, 16×16 칸 가운데. 캐릭터는 16×24, 아래·위·옆(오른쪽) 세 방향이고 왼쪽은 flipX로 그린다.
+// 마을 타일은 16×16(나무 16×32, 상점 80×64). 땅 타일은 칸을 꽉 채우고, 돌·울타리·나무·상점은 배경이 투명해 땅 위에 얹는다.
 
 export type Sprite = { w: number; h: number; rows: string[]; palette: Record<string, string> }
 
@@ -17,6 +18,7 @@ const PLAYER: Record<string, string> = {
   p: '#f27d5e', // 방울
   c: '#efe6cc', // 비니 단
   a: '#6b4430', // 머리카락
+  A: '#4e2f20', // 뒷머리 그늘
   s: '#f7cda8', // 피부
   S: '#dda17c', // 피부 그늘
   o: '#f39a8a', // 볼
@@ -111,6 +113,334 @@ const PLAYER_REEL = sprite(PLAYER, [
   '...kLllkkLllkr..',
   '..kbbbbkkbbbbkr.',
   '..kkkkk..kkkkk.r',
+])
+
+// ── 4방향 걷기·낚시 자세 ──
+// 아래: 기존 정지 그림에 다리 교대 + 방울 흔들림. 위: 뒷모습(뒷머리, 등판 후드), 낚싯대는 왼손 쪽.
+// 옆(오른쪽을 봄): 낚싯대를 등 뒤로 비스듬히 멘다. 걷기 0은 보폭(몸 1px 아래, 팔 앞), 1은 뒷발을 드는 순간.
+// 낚싯대 끝(스프라이트 안 좌표): cast-up [3, 0], reel-up [14, 0], cast-side [0, 0], reel-side [15, 16].
+const PLAYER_WALK_DOWN_0 = sprite(PLAYER, [
+  '......kk........',
+  '.....kppk.......',
+  '.....kppkkk...r.',
+  '....khhhhhhk..r.',
+  '...khHhHhHhhk.r.',
+  '...khhhhhhhhk.r.',
+  '...kcccccccck.r.',
+  '...kassssssak.r.',
+  '...kssessessk.r.',
+  '...ksossssosk.r.',
+  '...ksssmmsssk.r.',
+  '....kSssssSk..r.',
+  '...kjjjzzjjjk.r.',
+  '..kjjjjzzjjjjkr.',
+  '..kJjjjzzjjjJkr.',
+  '..kJjjjzzjjjJksk',
+  '..ksJjjzzjjjJkR.',
+  '...kjjjzzjjjk.R.',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '...kLllkkbbbbk..',
+  '..kbbbbkkkkkk...',
+  '..kkkkk.........',
+])
+
+const PLAYER_WALK_DOWN_1 = sprite(PLAYER, [
+  '........kk......',
+  '.......kppk.....',
+  '.....kkkppk...r.',
+  '....khhhhhhk..r.',
+  '...khHhHhHhhk.r.',
+  '...khhhhhhhhk.r.',
+  '...kcccccccck.r.',
+  '...kassssssak.r.',
+  '...kssessessk.r.',
+  '...ksossssosk.r.',
+  '...ksssmmsssk.r.',
+  '....kSssssSk..r.',
+  '...kjjjzzjjjk.r.',
+  '..kjjjjzzjjjjkr.',
+  '..kJjjjzzjjjJkr.',
+  '..kJjjjzzjjjJksk',
+  '..ksJjjzzjjjJkR.',
+  '...kjjjzzjjjk.R.',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '..kbbbbkkLllk...',
+  '...kkkkkkbbbbk..',
+  '.........kkkkk..',
+])
+
+const PLAYER_IDLE_UP = sprite(PLAYER, [
+  '.......kk.......',
+  '......kppk......',
+  '.r...kkppkk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '.r.khhhhhhhhk...',
+  '.r.kcccccccck...',
+  '.r.kaaaaaaaak...',
+  '.r.kaaaaaaaak...',
+  '.r.kAaaaaaaAk...',
+  '.r.ksAaaaaAsk...',
+  '.r..kSAAAASk....',
+  '.r.kjJJJJJJjk...',
+  '.rkjjJjjjjJjjk..',
+  '.rkJjjJJJJjjJk..',
+  'kskJjjjjjjjjJk..',
+  '.RkJjjjjjjjJsk..',
+  '.R.kjjjjjjjjk...',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '...kLllkkLllk...',
+  '..kbbbbkkbbbbk..',
+  '..kkkkk..kkkkk..',
+])
+
+const PLAYER_WALK_UP_0 = sprite(PLAYER, [
+  '........kk......',
+  '.......kppk.....',
+  '.r...kkkppk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '.r.khhhhhhhhk...',
+  '.r.kcccccccck...',
+  '.r.kaaaaaaaak...',
+  '.r.kaaaaaaaak...',
+  '.r.kAaaaaaaAk...',
+  '.r.ksAaaaaAsk...',
+  '.r..kSAAAASk....',
+  '.r.kjJJJJJJjk...',
+  '.rkjjJjjjjJjjk..',
+  '.rkJjjJJJJjjJk..',
+  'kskJjjjjjjjjJk..',
+  '.RkJjjjjjjjJsk..',
+  '.R.kjjjjjjjjk...',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '...kLllkkbbbbk..',
+  '..kbbbbkkkkkk...',
+  '..kkkkk.........',
+])
+
+const PLAYER_WALK_UP_1 = sprite(PLAYER, [
+  '......kk........',
+  '.....kppk.......',
+  '.r...kppkkk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '.r.khhhhhhhhk...',
+  '.r.kcccccccck...',
+  '.r.kaaaaaaaak...',
+  '.r.kaaaaaaaak...',
+  '.r.kAaaaaaaAk...',
+  '.r.ksAaaaaAsk...',
+  '.r..kSAAAASk....',
+  '.r.kjJJJJJJjk...',
+  '.rkjjJjjjjJjjk..',
+  '.rkJjjJJJJjjJk..',
+  'kskJjjjjjjjjJk..',
+  '.RkJjjjjjjjJsk..',
+  '.R.kjjjjjjjjk...',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '..kbbbbkkLllk...',
+  '...kkkkkkbbbbk..',
+  '.........kkkkk..',
+])
+
+const PLAYER_IDLE_SIDE = sprite(PLAYER, [
+  '.......kk.......',
+  'r.....kppk......',
+  '.r...kkppkk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '..rkhhhhhhhhk...',
+  '..rkcccccccck...',
+  '..rkaaaassssk...',
+  '..rkaaSsssesk...',
+  '..rkaaSssosssk..',
+  '..rkaassssmsk...',
+  '...rkaSsssSk....',
+  '...rkjjjjjjk....',
+  '...kjJjjJjjzk...',
+  '...kjJjjJjjzk...',
+  '...kjJjjJjjzk...',
+  '...kjJjjJjjzk...',
+  '...kjJssJjjzk...',
+  '...RkJkkJJJk....',
+  '...Rkllllllk....',
+  '....kllllllk....',
+  '....kLllllLk....',
+  '....kbbbbbbbk...',
+  '....kkkkkkkkk...',
+])
+
+const PLAYER_WALK_SIDE_0 = sprite(PLAYER, [
+  '................',
+  '.......kk.......',
+  'r.....kppk......',
+  '.r...kkppkk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '..rkhhhhhhhhk...',
+  '..rkcccccccck...',
+  '..rkaaaassssk...',
+  '..rkaaSsssesk...',
+  '..rkaaSssosssk..',
+  '..rkaassssmsk...',
+  '...rkaSsssSk....',
+  '...rkjjjjjjk....',
+  '...kjjjjjjjzk...',
+  '...kjjjJjjjzk...',
+  '...kjjjjJjjzk...',
+  '...kjjjjjJszk...',
+  '...RkJJJJJskk...',
+  '...Rklllllllk...',
+  '...klllkkkllk...',
+  '..kLllk..kLllk..',
+  '.kbbbbk..kbbbbk.',
+  '.kkkkk...kkkkkk.',
+])
+
+const PLAYER_WALK_SIDE_1 = sprite(PLAYER, [
+  '.......kk.......',
+  'r.....kppk......',
+  '.r...kkppkk.....',
+  '.r..khhhhhhk....',
+  '.r.khhHhHhHhk...',
+  '..rkhhhhhhhhk...',
+  '..rkcccccccck...',
+  '..rkaaaassssk...',
+  '..rkaaSsssesk...',
+  '..rkaaSssosssk..',
+  '..rkaassssmsk...',
+  '...rkaSsssSk....',
+  '...rkjjjjjjk....',
+  '...kjjjjjjjzk...',
+  '...kjJjjjjjzk...',
+  '...kJjjjjjjzk...',
+  '..ksJjjjjjjzk...',
+  '...kkjjjjjjzk...',
+  '....kJJJJJJk....',
+  '...kkllllllk....',
+  '..kbblllllk.....',
+  '..kkbkLllLk.....',
+  '....kkbbbbbk....',
+  '.....kkkkkkk....',
+])
+
+const PLAYER_CAST_UP = sprite(PLAYER, [
+  '...r............',
+  '....r..kk.......',
+  '.....rkppk......',
+  '.....kkrpkk.....',
+  '....khhhrhhk....',
+  '...khhHhHrHhk...',
+  '...khhhhhhrhk...',
+  '...kcccccccRk...',
+  '...kaaaaaaaRsk..',
+  '...kaaaaaaaksk..',
+  '...kAaaaaaaAkJk.',
+  '...ksAaaaaAskJk.',
+  '....kSAAAASkjJk.',
+  '...kjJJJJJJjJk..',
+  '..kjjJjjjjJjjk..',
+  '..kJjjJJJJjjJk..',
+  '..kJjjjjjjjjJk..',
+  '..ksjjjjjjjJk...',
+  '...kjjjjjjjjk...',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...kLllkkLllk...',
+  '..kbbbbkkbbbbk..',
+  '..kkkkk..kkkkk..',
+])
+
+const PLAYER_REEL_UP = sprite(PLAYER, [
+  '.......kk.....r.',
+  '......kppk...r..',
+  '.....kkppkk.r...',
+  '....khhhhhhkr...',
+  '...khhHhHhHrk...',
+  '...khhhhhhhrk...',
+  '...kcccccccck...',
+  '...kaaaaaaaak...',
+  '...kaaaaaaaak...',
+  '...kAaaaaaaAk...',
+  '...ksAaaaaAsk...',
+  '....kSAAAASk....',
+  '...kjJJJJJJjk...',
+  '..kjjJjjjjJjjk..',
+  '..kJjjJJJJjjJkk.',
+  '..kJjjjjjjjjkgsk',
+  '..kJjjjjjjjjJkk.',
+  '...kjjjjjjjjk...',
+  '...kJJJJJJJJk...',
+  '...kllllllllk...',
+  '...klllkklllk...',
+  '...kLllkkLllk...',
+  '..kbbbbkkbbbbk..',
+  '..kkkkk..kkkkk..',
+])
+
+const PLAYER_CAST_SIDE = sprite(PLAYER, [
+  'r.....k.........',
+  '.r...kpk........',
+  '..r.kkppkkk.....',
+  '...rkhhhhhhk....',
+  '...rRhHhHhHhk...',
+  '...kRsshhhhhk...',
+  '...kssscccccck..',
+  '...kJsaassssk...',
+  '...kJkaSsesk....',
+  '...kJkaSsosssk..',
+  '...kjkassssmk...',
+  '...kjkaSsssSk...',
+  '...kjjkjjjjk....',
+  '...kjjjjjjjzk...',
+  '...kjjjjjjjzk...',
+  '...kjjjjjjjzk...',
+  '...kjjjjjjjzk...',
+  '...kjjjjjjjzk...',
+  '....kJJJJJJk....',
+  '....kllllllk....',
+  '...klllkklllk...',
+  '...kLllk.kLllk..',
+  '..kbbbbk.kbbbbk.',
+  '..kkkkk..kkkkkk.',
+])
+
+const PLAYER_REEL_SIDE = sprite(PLAYER, [
+  '.......kk.......',
+  '......kppk......',
+  '.....kkppkk.....',
+  '....khhhhhhk....',
+  '...khhHhHhHhk...',
+  '...khhhhhhhhk...',
+  '...kcccccccck...',
+  '...kaaaassssk...',
+  '...kaaSsssesk...',
+  '...kaaSssosssk..',
+  '...kaassssmsk...',
+  '....kaSsssSk....',
+  '....kjjjjjjk....',
+  '...kjjjjjjjzk...',
+  '...kjjJJJJkkk...',
+  '...kjjjjksgsRrr.',
+  '...kjjjjjkkkk..r',
+  '...kjjjjjjjzk...',
+  '....kJJJJJJk....',
+  '....kllllllk....',
+  '...klllkklllk...',
+  '...kLllk.kLllk..',
+  '..kbbbbk.kbbbbk.',
+  '..kkkkk..kkkkkk.',
 ])
 
 // ── 물: 2프레임, 가장자리끼리 이어진다 ──
@@ -633,10 +963,376 @@ const ROD_4 = sprite(
   ],
 )
 
+// ── 마을 땅 타일: 칸을 꽉 채우고 가장자리끼리 이어진다 ──
+const GRASS: Record<string, string> = {
+  g: '#78b85c', // 바탕
+  d: '#5f9e4a', // 풀잎 그늘
+  l: '#9ad172', // 풀잎 밝은 쪽
+  y: '#b7dd84', // 마른 풀 점
+}
+
+const PATH: Record<string, string> = {
+  p: '#d6b27a', // 흙
+  d: '#bb955e', // 흙 그늘
+  l: '#e7cb98', // 조약돌 윗면
+  n: '#9e7b4d', // 조약돌 아래
+}
+
+const SAND: Record<string, string> = {
+  s: '#f0dca8', // 모래
+  d: '#dfc58b', // 젖은 알갱이
+  l: '#fbefcc', // 반짝이는 알갱이
+}
+
+const FLOWER: Record<string, string> = {
+  ...GRASS,
+  w: '#fbf7ee', // 흰 꽃잎
+  W: '#e4dccb', // 흰 꽃잎 그늘
+  c: '#f4c542', // 꽃술
+  p: '#f28fae', // 분홍 꽃잎
+  P: '#d96a8e', // 분홍 꽃잎 그늘
+  t: '#4e8a3e', // 줄기
+}
+
+// ── 마을 위에 얹는 타일: 배경 투명, 그림자는 반투명이라 풀·모래 어디에 얹어도 된다 ──
+const GROUND_SHADOW = '#1f2a1c55'
+
+const ROCK_TILE: Record<string, string> = {
+  k: '#39424c', // 외곽선
+  G: '#c8d1d6', // 윗면
+  g: '#9eabb3', // 몸
+  d: '#727f89', // 그늘
+  m: '#7fae5e', // 이끼
+  x: GROUND_SHADOW,
+}
+
+// 울타리: tile-fence는 가로로 이어지는 난간, tile-fence-v는 세로로 이어지는 난간(위·아래에 울타리가 있는 칸용)
+const FENCE: Record<string, string> = {
+  k: '#3b2a22', // 외곽선
+  w: '#e9c58e', // 나무 밝은 면
+  u: '#c8925a', // 나무
+  U: '#a2703f', // 나무 그늘
+  x: GROUND_SHADOW,
+}
+
+// 나무: 아래 16px가 자기 칸(밑동), 위 16px는 윗칸에 겹친다. 줄지어 서면 수관이 이어진다
+const TREE: Record<string, string> = {
+  k: '#1f3a2c', // 외곽선
+  t: '#2f6b45', // 수관 그늘
+  T: '#3f8a4f', // 수관
+  L: '#5aa85a', // 수관 밝은 쪽
+  h: '#8cc86c', // 수관 하이라이트
+  b: '#7a4e30', // 줄기
+  B: '#5a3822', // 줄기 그늘
+  q: '#9a6a40', // 줄기 밝은 결
+  x: GROUND_SHADOW,
+}
+
+// 상점: 5×4칸(80×64). 맨 아래 줄 세 번째 칸(x 32~47)이 문. 산호색 기와 지붕, 하늘색 판자 벽, 물고기 간판
+const SHOP_PALETTE: Record<string, string> = {
+  k: '#2a2135', // 외곽선
+  R: '#d9654b', // 기와
+  r: '#b04a3a', // 기와 그늘
+  Q: '#ef8f6c', // 기와 밝은 쪽
+  C: '#8f3a33', // 용마루
+  n: '#4a3a4a', // 처마 그늘
+  B: '#9fcbd8', // 벽 판자
+  b: '#7db0c2', // 판자 이음
+  w: '#f6f1e4', // 흰 테두리
+  W: '#d9d0bc', // 흰 테두리 그늘
+  G: '#bfe6f2', // 유리
+  g: '#8cc8de', // 유리 아래
+  i: '#e9f8fc', // 유리 반짝임
+  d: '#a0673d', // 문
+  D: '#7c4b2a', // 문 홈
+  e: '#c28452', // 문 밝은 쪽
+  y: '#f4c542', // 문손잡이
+  s: '#a9b3b9', // 기단 돌
+  S: '#7f8b93', // 돌 이음
+  a: '#f27d5e', // 차양 산호색 줄, 간판 물고기 꼬리
+  A: '#fbf1d6', // 차양 흰 줄, 간판 물고기
+  o: '#c8925a', // 화분 윗면
+  O: '#8a5a34', // 화분, 간판 줄, 선반
+  f: '#3f7fa8', // 간판 아래 테
+  F: '#2f6b7c', // 간판
+  p: '#f28fae', // 분홍 꽃
+  P: '#ffd76a', // 노란 꽃
+  t: '#4e8a3e', // 잎
+  c: '#9aa3a8', // 굴뚝
+  x: '#6e7880', // 굴뚝 이음
+}
+
+const TILE_GRASS = sprite(GRASS, [
+  'gggggggggggggggg',
+  'gggggggggggggggg',
+  'ggggdggggggggggg',
+  'ggglddgggggggggg',
+  'gggggggggggggggg',
+  'ggggggggggglgggg',
+  'gggggggggggdgdgg',
+  'gggggggggggggggg',
+  'gggggggggggggggg',
+  'gggggdgggggggggg',
+  'ggggldgdgggggggg',
+  'gggggggggggggggg',
+  'gggggggggggggdgg',
+  'ggggggggggggldlg',
+  'gggggggggggggggg',
+  'gggggggggggggggg',
+])
+
+const TILE_GRASS_ALT = sprite(GRASS, [
+  'gggggggggggggggg',
+  'ggggggggggdggggg',
+  'gggggggggldlgggg',
+  'gggggggggggggggg',
+  'ggdggggggggggggg',
+  'gldlgggggggggggg',
+  'gggggggggggggggg',
+  'gggggggyggggggdg',
+  'gggggggggggggldl',
+  'gggggggggggggggg',
+  'gggggggggggggggg',
+  'gggggggggdgggggg',
+  'ggggyggggldggggg',
+  'gggggggggggggggg',
+  'ggggggggggggyggg',
+  'gggggggggggggggg',
+])
+
+const TILE_PATH = sprite(PATH, [
+  'pppppppppppppppp',
+  'pppppppppppplppp',
+  'ppdppppppppppppp',
+  'pppppppppppppppp',
+  'pppppplppppppppp',
+  'ppppplnppppppdpp',
+  'pppppppppppppppp',
+  'pdpppppppppppppp',
+  'pppppppppplppppp',
+  'pppppppppldnpppp',
+  'pppppppppppppppp',
+  'pppplppppppppppp',
+  'pppppppppppppdpp',
+  'ppdppppppppppppp',
+  'pppppppplppppppp',
+  'pppppppppppppppp',
+])
+
+const TILE_SAND = sprite(SAND, [
+  'ssssssssssssssss',
+  'ssssssssssdsssss',
+  'sslsssssssssssss',
+  'ssssssssssssssss',
+  'sssssdssssssslss',
+  'ssssssssssssssss',
+  'ssssssssssssssss',
+  'sdssssssslssssss',
+  'sssssssssssssdss',
+  'ssssssssssssssss',
+  'sssslsssssssssss',
+  'ssssssssssssssss',
+  'ssssssssdsssssss',
+  'sssssssssssssssl',
+  'ssdsssssssssssss',
+  'ssssssssssssssss',
+])
+
+const TILE_FLOWER = sprite(FLOWER, [
+  'gggggggggggggggg',
+  'gggggggggggggggg',
+  'ggggwgggggggggdg',
+  'gggwcwgggggggggg',
+  'ggggWggggggggggg',
+  'ggggtgggggpggggg',
+  'ggggtggggpcpgggg',
+  'gggggggggtPggggg',
+  'gggggggggtgggggg',
+  'gggdgggggggggggg',
+  'gggggggggggggggg',
+  'gggggggwggggggpg',
+  'ggggggwcwggggpcp',
+  'gggggggWgggggtPg',
+  'ggggggdtgggggtgg',
+  'gggggggggggggggg',
+])
+
+const TILE_ROCK = sprite(ROCK_TILE, [
+  '................',
+  '................',
+  '................',
+  '................',
+  '.....kkkkk......',
+  '...kkGGGggkk....',
+  '..kGGGgGggggk...',
+  '..kGGggggggdkk..',
+  '.kGgmmgggggddk..',
+  '.kgmmggggdddddk.',
+  '.kggggggdddddkk.',
+  '.kdgggdddddddk..',
+  '..kdddddddddkkx.',
+  '..xkkkkkkkkkxxx.',
+  '...xxxxxxxxxxx..',
+  '................',
+])
+
+const TILE_FENCE = sprite(FENCE, [
+  '................',
+  '................',
+  '................',
+  '......kkkk......',
+  '.....kwwwuk.....',
+  'kkkkkkwuuUkkkkkk',
+  'wwwwwkwuuUkwwwww',
+  'uuuuukwuuUkuuuuu',
+  'UUUUUkwuuUkUUUUU',
+  'kkkkkkwuuUkkkkkk',
+  'wwwwwkwuuUkwwwww',
+  'uuuuukwuuUkuuuuu',
+  'UUUUUkuuuUkUUUUU',
+  'kkkkkkUUUUkkkkkk',
+  'xxxxxxkkkkxxxxxx',
+  '................',
+])
+
+const TILE_FENCE_V = sprite(FENCE, [
+  '......kwUkx.....',
+  '......kwUkx.....',
+  '......kwUkx.....',
+  '.....kkkkkkx....',
+  '.....kwwwukx....',
+  '.....kwuuUkx....',
+  '.....kwuuUkx....',
+  '.....kwuuUkx....',
+  '.....kwuuUkx....',
+  '.....kwuuUkx....',
+  '.....kwuuUkx....',
+  '.....kuuuUkx....',
+  '.....kUUUUkx....',
+  '.....kkkkkkx....',
+  '......kwUkxx....',
+  '......kwUkx.....',
+])
+
+const TILE_TREE = sprite(TREE, [
+  '......kkkk......',
+  '...kkkLLLTkkk...',
+  '..kTLLhhLTTTTk..',
+  '.kTLhhLLTTTTttk.',
+  '.kTLhLLTTTkTttk.',
+  'kTLLLTTTTTTktttk',
+  'kTTLTTTTLLLTtttk',
+  'ktTTTTTLhhLTTttk',
+  'kttTTkTTLLTTTttk',
+  '.ktTTTTTTTTTTtk.',
+  'kTkttTTTTTTTtktk',
+  'kLLTkttTTTTttTTk',
+  'kLhLTTtttttTLLtk',
+  'ktLLTTTtttTTLhtk',
+  'kttTTTTttTTTTLtk',
+  'kttttTTTTTTTtttk',
+  '.ktttttTTTtttttk',
+  '..kktttttttttkk.',
+  '....kktkktttk...',
+  '......kbqBk.....',
+  '......kbqBk.....',
+  '......kbqBk.....',
+  '......kbqBk.....',
+  '.....kbbqBBk....',
+  '....kbbkqkBBk...',
+  '...xkkkxkxkkkx..',
+  '...xxxxxxxxxxxx.',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+
+const SHOP = sprite(SHOP_PALETTE, [
+  '........................................................kkkkkkkkk...............',
+  '........................................................kxxxxxxxk...............',
+  '........................................................kxxxxxxxk...............',
+  '........................................................kcccxccck...............',
+  '........kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk........',
+  '........CQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQC........',
+  '........CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCkccccccckCCCCCCC........',
+  '.......kCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCkcxcccxckCCCCCCCk.......',
+  '.......kQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRkcxcccxckRRRQQRRk.......',
+  '.......kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRkxxxxxxxkRrRRRRRk.......',
+  '......kRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRkccccccckRrRRRRRRk......',
+  '......kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrkccccccckrrrrrrrRk......',
+  '......kRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQkkkkkkkkkkkQRRRRQQk......',
+  '.....kRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRrrrrrrrrrrrRRRrRRRRk.....',
+  '.....kRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRk.....',
+  '.....kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk.....',
+  '....kRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQk....',
+  '....kRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRk....',
+  '....kRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRk....',
+  '...kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk...',
+  '...kRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRk...',
+  '...kRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrk...',
+  '..kRRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRk..',
+  '..kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk..',
+  '..kQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRk..',
+  '.kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRk.',
+  '.kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRk.',
+  '.kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk.',
+  'kRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQk',
+  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  'knnnnnnnnnnnnnnnnnnnnnnnnnnnnnOnnnnnnnnnnnnnnnnnnOnnnnnnnnnnnnnnnnnnnnnnnnnnnnnk',
+  'knnnnnnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkkkkkkkkkkkkkknnnnnnnnnnnnnnnnnnnnnnnnnnnk',
+  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBkFFFFFFFFAAAFFFFFFFFFFFkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWbkkkkkkkkkkkkkkkkkkkkkkbkFFFFFFAAAAAAAFaaFFFFFFkbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
+  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkFFFFFAkAAAAAAaaFFFFFFFkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkFFFFFFAAAAAAAFaaFFFFFFkBBOOOOOOOOOOOOOOOOOOOOBBwwWk',
+  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkffffffffWWWfffffffffffkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWbbaakAAkaakAAkaakAAkaakbkkkkkkkkkkkkkkkkkkkkkkkkbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
+  'kwwWBBBkkkkkkkkkkkkkkkkkkBBBBBBBkwwwwwwwwwwwwwwkBBBBBBBkkkkkkkkkkkkkkkkkkBBBwwWk',
+  'kwwWBBBkwwwwwwwwwwwwwwwwkBBBBBBBkwwwwwwwwwwwwwwkBBBBBBBkwwwwwwwwwwwwwwwwkBBBwwWk',
+  'kwwWBBBkwGGGGGGwwGGGGGGwkBBBBBBBkwwDDDDDDDDDDwwkBBBBBBBkwGGGGGGwwGGGGGGwkBBBwwWk',
+  'kwwWbbbkwGiiGGGwwGiiGGGwkbbbbbbbkwwdeDddddDddwwkbbbbbbbkwGiiGGGwwGiiGGGwkbbbwwWk',
+  'kwwWBBBkwGiGGGGwwGiGGGGwkBBBBBBBkwwdeDddddDddwwkBBBBBBBkwGiGGGGwwGiGGGGwkBBBwwWk',
+  'kwwWBBBkwGGGGGGwwGGGGGGwkBBBBBBBkwwdeDkkkkDddwwkBBBBBBBkwGGGGGGwwGGGGGGwkBBBwwWk',
+  'kwwWBBBkwwwwwwwwwwwwwwwwkBBBBBBBkwwdekiiGGkddwwkBBBBBBBkwwwwwwwwwwwwwwwwkBBBwwWk',
+  'kwwWbbbkwggggggwwggggggwkbbbbbbbkwwdekGGGGkddwwkbbbbbbbkwggggggwwggggggwkbbbwwWk',
+  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdekGGGGkddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
+  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdeDkkkkDddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
+  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdeDddddDddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
+  'kwwWbbbkAggPggpwwAggpggPkbbbbbbbkwwdeDddddDddwwkbbbbbbbkwggggggwwggggggwkbbbwwWk',
+  'kwwWBBBkppWPPWppWPPWppWPPBBBBBBBkwwdeDddddDddwwkBBBBBBBkWWWWWWWWWWWWWWWWkBBBwwWk',
+  'kwwWBBBkttkttkttkttkttkttBBBBBBBkwwdeDddddDddwwkBBBBBBBkkkkkkkkkkkkkkkkkkBBBwwWk',
+  'kwwWBBkkktkktkktkktkktkktkBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWbbkooooooooooooooooookbbbbbbkwwdeDddddDydwwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
+  'kwwWBBkOOOOOOOOOOOOOOOOOOkBBBBBBkwwdeDddddDDdwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWBBkkkkkkkkkkkkkkkkkkkkBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwwdeDddddDddwwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
+  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
+  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwwdeDddddDddwwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  'ksssSssssssSssssssSssssssSssssskSSSSSSSSSSSSSSSSkssssSssssssSssssssSssssssSssssk',
+  'ksssSssssssSssssssSssssssSsssssksssssssssssssssskssssSssssssSssssssSssssssSssssk',
+  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+])
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
   'player-reel': PLAYER_REEL,
+  'player-idle-down': PLAYER_IDLE,
+  'player-walk-down-0': PLAYER_WALK_DOWN_0,
+  'player-walk-down-1': PLAYER_WALK_DOWN_1,
+  'player-idle-up': PLAYER_IDLE_UP,
+  'player-walk-up-0': PLAYER_WALK_UP_0,
+  'player-walk-up-1': PLAYER_WALK_UP_1,
+  'player-idle-side': PLAYER_IDLE_SIDE,
+  'player-walk-side-0': PLAYER_WALK_SIDE_0,
+  'player-walk-side-1': PLAYER_WALK_SIDE_1,
+  'player-cast-up': PLAYER_CAST_UP,
+  'player-reel-up': PLAYER_REEL_UP,
+  'player-cast-side': PLAYER_CAST_SIDE,
+  'player-reel-side': PLAYER_REEL_SIDE,
   'water-0': WATER_0,
   'water-1': WATER_1,
   'pier-plank': PIER_PLANK,
@@ -665,6 +1361,16 @@ export const SPRITES: Record<string, Sprite> = {
   'rod-2': ROD_2,
   'rod-3': ROD_3,
   'rod-4': ROD_4,
+  'tile-grass': TILE_GRASS,
+  'tile-grass-alt': TILE_GRASS_ALT,
+  'tile-path': TILE_PATH,
+  'tile-sand': TILE_SAND,
+  'tile-flower': TILE_FLOWER,
+  'tile-rock': TILE_ROCK,
+  'tile-fence': TILE_FENCE,
+  'tile-fence-v': TILE_FENCE_V,
+  'tile-tree': TILE_TREE,
+  shop: SHOP,
 }
 
 const SILHOUETTE = '#1b1f2a'
@@ -675,12 +1381,13 @@ export function drawSprite(
   x: number,
   y: number,
   scale: number,
-  opts?: { silhouette?: boolean },
+  opts?: { silhouette?: boolean; flipX?: boolean },
 ): void {
   const sp = SPRITES[name]
   if (!sp) throw new Error(`unknown sprite: ${name}`)
   const silhouette = opts?.silhouette === true
-  // 같은 색이 가로로 이어지면 한 번에 칠한다
+  const flipX = opts?.flipX === true
+  // 같은 색이 가로로 이어지면 한 번에 칠한다. flipX면 같은 상자 안에서 좌우를 뒤집는다
   for (let row = 0; row < sp.h; row++) {
     const line = sp.rows[row]
     let col = 0
@@ -693,8 +1400,9 @@ export function drawSprite(
       const color = silhouette ? SILHOUETTE : sp.palette[ch]
       let end = col + 1
       while (end < sp.w && line[end] !== '.' && (silhouette || line[end] === ch)) end++
+      const left = flipX ? sp.w - end : col
       ctx.fillStyle = color
-      ctx.fillRect(x + col * scale, y + row * scale, (end - col) * scale, scale)
+      ctx.fillRect(x + left * scale, y + row * scale, (end - col) * scale, scale)
       col = end
     }
   }
