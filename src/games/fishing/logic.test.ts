@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, SPECIES, speciesAvailable, type Species } from './data.ts'
+import { BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, type Species, type TackleId } from './data.ts'
 import { logic, pickPool, price, rollCatch, sizePercentile, type Action, type CastCtx, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -26,7 +26,7 @@ const WEEK = 7 * 86_400_000
 // weeks주째 계절(0 봄, 1 여름, 2 가을, 3 겨울)의 KST 자정 뒤 hour*60초 = 게임 hour시
 const nowAt = (weeks: number, hour: number): number => SEASON_ANCHOR_MS + weeks * WEEK + hour * 60 * 1000
 const ctxOf = (over: Partial<CastCtx> = {}): CastCtx => ({
-  rodTier: 1, power: 0.5, sizeBonus: 0, area: 'village', spot: 'shore', cond: cond('spring', 12), legends: [], ...over,
+  rodTier: 1, power: 0.5, sizeBonus: 0, area: 'village', spot: 'shore', cond: cond('spring', 12), legends: [], equipped: [], ...over,
 })
 const sequence = (...vals: number[]) => {
   let i = 0
@@ -159,6 +159,72 @@ describe('rollCatch', () => {
       expect(c.sizeCm).toBe(g.minCm)
     })
   })
+
+  it('찌 없음(equipped []): 고정 rng 열의 결과가 v4 코드와 같다', () => {
+    const c = (rodTier: CastCtx['rodTier'], power: number, sizeBonus: number, area: CastCtx['area'], spot: string, k: Conditions) =>
+      ctxOf({ rodTier, power, sizeBonus, area, spot, cond: k })
+    const ctxs = [
+      c(1, 0.5, 0, 'village', 'shore', cond('spring', 12)),
+      c(3, 0.95, 0.25, 'village', 'pier', cond('winter', 12)),
+      c(4, 0.3, 0, 'river', 'river', cond('summer', 22)),
+      c(3, 0.1, 0, 'forest', 'pond', cond('spring', 22)),
+    ]
+    const rows = [[0.01, 0.5, 0.5, 0.5, 0.5], [0.5, 0.1, 0.2, 0.3, 0.4], [0.5, 0.45, 0.9, 0.7, 0.0], [0.5, 0.99, 0.5, 0.25, 0.99], [0.09, 0.84, 0.1, 0.8, 0.6]]
+    const got = ctxs.flatMap((x) => rows.map((r) => { const o = rollCatch(sequence(...r), x); return [o.species, o.sizeCm, o.biteDelayMs] }))
+    // 이 값은 찌 도입 전(logic.version 4) 코드로 계산한 것이다. 바꾸지 말 것.
+    expect(got).toEqual([["goby",14,3750],["anchovy",10,3300],["horse-mackerel",29,1500],["rockfish",28,5955],["mullet",62,4200],["grouper",129,3750],["goby",16,3300],["mackerel",43,1500],["yellowtail",93,5955],["yellowtail",107,4200],["aucha-perch",18,3000],["pale-chub",10,2640],["dark-chub",15,1200],["eel",49,4764],["mandarin-fish",48,3360],["century-snakehead",113,3750],["crucian",14,3300],["carp",60,1500],["carp",37,5955],["crucian",25,4200]])
+  })
+  it('equipped에 서버 효과가 없는 찌(cork·trap·barbed)만 있어도 결과는 같다', () => {
+    const rng = (): (() => number) => rngFromSeed(seedBytes(61))
+    const a = rng(), b = rng()
+    for (let i = 0; i < 200; i++) {
+      expect(rollCatch(a, ctxOf({ rodTier: 4, equipped: ['cork', 'trap'] }))).toEqual(rollCatch(b, ctxOf({ rodTier: 4 })))
+    }
+  })
+  it('spinner: 같은 rng에서 입질 지연이 ×0.7(반올림 ±1), 어종·크기는 그대로', () => {
+    for (const rodTier of [1, 3, 4] as const) {
+      for (const r4 of [0, 0.3, 0.77, 0.999]) {
+        const base = rollCatch(sequence(0.5, 0.5, 0.5, 0.5, r4), ctxOf({ rodTier }))
+        const fast = rollCatch(sequence(0.5, 0.5, 0.5, 0.5, r4), ctxOf({ rodTier, equipped: ['spinner'] }))
+        const exact = (1500 + r4 * 4500) * RODS.find((r) => r.tier === rodTier)!.biteScale * TACKLE_FX.spinnerBite
+        expect(Math.abs(fast.biteDelayMs - exact)).toBeLessThanOrEqual(0.5)
+        expect(fast.biteDelayMs).toBeLessThanOrEqual(Math.round(base.biteDelayMs * 0.7) + 1)
+        expect(fast.biteDelayMs).toBeGreaterThanOrEqual(Math.round(base.biteDelayMs * 0.7) - 1)
+        expect({ ...fast, biteDelayMs: 0 }).toEqual({ ...base, biteDelayMs: 0 })
+      }
+    }
+  })
+  it('curious: rod 3에서 r1이 rare 경계 바로 위일 때 장착하면 rare, 아니면 uncommon', () => {
+    // rod 3 가중치 50/34/16: rare 경계 r1=0.84, curious는 50/34/24(합 108)라 r1=0.7778부터 rare
+    const rarity = (r1: number, equipped: TackleId[]) =>
+      byId(rollCatch(sequence(0.5, r1, 0.5, 0.5, 0.5), ctxOf({ rodTier: 3, equipped })).species).rarity
+    expect(rarity(0.8, [])).toBe('uncommon')
+    expect(rarity(0.8, ['curious'])).toBe('rare')
+    expect(rarity(0.7, ['curious'])).toBe('uncommon')
+    expect(rarity(0.4, ['curious'])).toBe('common')
+    expect(rarity(0.8, ['spinner'])).toBe('uncommon')
+  })
+  it('curious: 전설 조건에서 r0 = LEGEND_CHANCE×1.2이면 장착 없으면 전설 아님, 장착하면 전설', () => {
+    const base = { area: 'village' as const, spot: 'pier', cond: cond('winter', 12), rodTier: 3 as const, power: 0.95 }
+    const species = (r0: number, equipped: TackleId[]) => rollCatch(sequence(r0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...base, equipped })).species
+    const r0 = LEGEND_CHANCE * 1.2
+    expect(species(r0, [])).not.toBe('grouper')
+    expect(species(r0, ['curious'])).toBe('grouper')
+    expect(species(LEGEND_CHANCE * TACKLE_FX.curiousLegend, ['curious'])).not.toBe('grouper')
+  })
+  it('rng 호출은 찌 조합과 상관없이 항상 5번', () => {
+    const combos: TackleId[][] = [[], ['spinner'], ['curious'], ['spinner', 'curious']]
+    const legendCtx = { area: 'village' as const, spot: 'pier', cond: cond('winter', 12), rodTier: 3 as const, power: 0.95 }
+    for (const equipped of combos) {
+      for (const over of [{}, legendCtx, { rodTier: 4 as const }]) {
+        for (const r0 of [0.01, 0.5]) {
+          const rng = counting(sequence(r0, 0.5, 0.5, 0.5, 0.5))
+          rollCatch(rng, ctxOf({ ...over, equipped }))
+          expect(rng.n).toBe(5)
+        }
+      }
+    }
+  })
 })
 
 describe('pickPool', () => {
@@ -211,9 +277,9 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(4)
+    expect(logic.version).toBe(5)
     expect(logic.init()).toEqual({
-      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], pending: null,
+      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null,
     })
   })
 
@@ -594,7 +660,7 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
     const dex = { grouper: { count: 1, maxCm: 100 }, goby: { count: 2, maxCm: 12 } }
     const m = logic.migrate({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }, 2)
-    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], pending: null })
+    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], pending: null })
     expect(logic.migrate({ dex: { goby: { count: 1, maxCm: 10 } }, areas: ['pier'] }, 2).legends).toEqual([])
   })
 
@@ -602,9 +668,9 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
     const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
     const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
-    expect(logic.migrate(v3, 3)).toEqual(v3)
+    expect(logic.migrate(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [] })
     const v2 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }
-    expect(logic.migrate(v2, 2)).toEqual({ ...v3, areas: [...DEFAULT_AREAS] })
+    expect(logic.migrate(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], areas: [...DEFAULT_AREAS] })
   })
 
   it('migrate legends: 모르는 id·비전설 id는 버리고, 기본 지역은 항상 포함, 알려진 추가 지역은 유지', () => {
@@ -653,5 +719,91 @@ describe('fishing WorldLogic', () => {
     expect(v.gold).toBe(7)
     expect(v.pending).toEqual({ biteDelayMs: 3000, startedAt: T0, hooked: true, species: 'anchovy', sizeCm: 12 })
     expect(logic.view(fresh(), { now: T0 }).pending).toBeNull()
+  })
+
+  describe('찌', () => {
+    it('buyTackle cork: 골드 1200 → 200, tackles [cork]; 다시 → already_owned', () => {
+      const r = ok(logic.apply(fresh({ gold: 1200, totalEarned: 5 }), { type: 'buyTackle', id: 'cork' }, ctx()))
+      expect(r.state).toMatchObject({ gold: 200, tackles: ['cork'], totalEarned: 5 })
+      expect(err(logic.apply(deepFreeze(r.state), { type: 'buyTackle', id: 'cork' }, ctx()))).toBe('already_owned')
+    })
+    it('buyTackle: 골드 부족 → not_enough_gold(불변), 모르는 id → bad_tackle', () => {
+      const s = deepFreeze(fresh({ gold: 999 }))
+      expect(err(logic.apply(s, { type: 'buyTackle', id: 'cork' }, ctx()))).toBe('not_enough_gold')
+      for (const id of ['zzz', 1, null, undefined]) {
+        expect(err(logic.apply(s, { type: 'buyTackle', id } as unknown as Action, ctx()))).toBe('bad_tackle')
+      }
+      expect(s.gold).toBe(999)
+      expect(s.tackles).toEqual([])
+    })
+    it('buyTackle: 5종 가격 그대로 빠지고 낚시 중에도 살 수 있다', () => {
+      for (const t of TACKLES) {
+        const r = ok(logic.apply(withPending({ gold: t.price }), { type: 'buyTackle', id: t.id }, ctx()))
+        expect(r.state.gold).toBe(0)
+        expect(r.state.tackles).toEqual([t.id])
+      }
+    })
+    const owned = (rodTier: State['rodTier'], over: Partial<State> = {}) =>
+      deepFreeze(fresh({ rodTier, tackles: ['cork', 'trap', 'spinner'], ...over }))
+    it('equip: rod 3에 [cork] 성공, [] 성공(전부 해제)', () => {
+      const r = ok(logic.apply(owned(3), { type: 'equip', ids: ['cork'] }, ctx()))
+      expect(r.state.equipped).toEqual(['cork'])
+      expect(ok(logic.apply(deepFreeze(r.state), { type: 'equip', ids: [] }, ctx())).state.equipped).toEqual([])
+    })
+    it('equip: rod 3에 [cork, trap] → too_many, rod 1·2는 한 개도 too_many', () => {
+      expect(err(logic.apply(owned(3), { type: 'equip', ids: ['cork', 'trap'] }, ctx()))).toBe('too_many')
+      expect(err(logic.apply(owned(1), { type: 'equip', ids: ['cork'] }, ctx()))).toBe('too_many')
+      expect(err(logic.apply(owned(2), { type: 'equip', ids: ['cork'] }, ctx()))).toBe('too_many')
+      ok(logic.apply(owned(1), { type: 'equip', ids: [] }, ctx()))
+    })
+    it('equip: 안 산 찌 → not_owned, [cork, cork]·모르는 id·배열 아님 → bad_tackle', () => {
+      expect(err(logic.apply(owned(4), { type: 'equip', ids: ['curious'] }, ctx()))).toBe('not_owned')
+      expect(err(logic.apply(owned(4), { type: 'equip', ids: ['cork', 'cork'] }, ctx()))).toBe('bad_tackle')
+      expect(err(logic.apply(owned(4), { type: 'equip', ids: ['zzz'] }, ctx()))).toBe('bad_tackle')
+      expect(err(logic.apply(owned(4), { type: 'equip', ids: 'cork' } as unknown as Action, ctx()))).toBe('bad_tackle')
+      expect(err(logic.apply(owned(4), { type: 'equip', ids: [1] } as unknown as Action, ctx()))).toBe('bad_tackle')
+    })
+    it('equip: pending이 있으면 busy(상태 불변)', () => {
+      const s = deepFreeze(withPending({ rodTier: 4, tackles: ['cork'] }))
+      expect(err(logic.apply(s, { type: 'equip', ids: ['cork'] }, ctx()))).toBe('busy')
+      expect(s.equipped).toEqual([])
+    })
+    it('equip: rod 4에 2개 성공, 순서 유지, 오류 시 equipped 불변', () => {
+      const s = owned(4, { equipped: ['spinner'] })
+      expect(ok(logic.apply(s, { type: 'equip', ids: ['trap', 'cork'] }, ctx())).state.equipped).toEqual(['trap', 'cork'])
+      expect(err(logic.apply(s, { type: 'equip', ids: ['cork', 'trap', 'spinner'] }, ctx()))).toBe('too_many')
+      expect(s.equipped).toEqual(['spinner'])
+    })
+    it('cast는 state.equipped를 CastCtx로 넘긴다: spinner 장착 세이브의 입질 지연이 짧다', () => {
+      const act = { type: 'cast', area: 'village', power: 0.5 } as const
+      const rng = () => sequence(0.5, 0.5, 0.5, 0.5, 0.5)
+      const plain = ok(logic.apply(fresh({ rodTier: 3 }), act, { now: T0, rng: rng() })).state.pending!
+      const fast = ok(logic.apply(fresh({ rodTier: 3, tackles: ['spinner'], equipped: ['spinner'] }), act, { now: T0, rng: rng() })).state.pending!
+      expect(plain.biteDelayMs).toBe(3750)
+      expect(fast.biteDelayMs).toBe(Math.round(3750 * 0.7))
+      // 산 것만으로는 효과가 없다
+      const bought = ok(logic.apply(fresh({ rodTier: 3, tackles: ['spinner'] }), act, { now: T0, rng: rng() })).state.pending!
+      expect(bought.biteDelayMs).toBe(3750)
+    })
+    it('view는 tackles·equipped를 내보낸다', () => {
+      const v = logic.view(fresh({ rodTier: 3, tackles: ['cork', 'trap'], equipped: ['cork'] }), { now: T0 })
+      expect(v.tackles).toEqual(['cork', 'trap'])
+      expect(v.equipped).toEqual(['cork'])
+    })
+    it('migrate v4 세이브 → tackles [], equipped [], 나머지 그대로', () => {
+      const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
+      const dex = { grouper: { count: 1, maxCm: 100 } }
+      const v4 = { gold: 300, totalEarned: 900, rodTier: 4, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper'], pending: null }
+      expect(logic.migrate(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [] })
+    })
+    it('migrate v5: 모르는 id·중복 제거, 미보유 장착 제거, 칸 초과분은 뒤에서 자른다', () => {
+      const m = (raw: Record<string, unknown>) => logic.migrate(raw, 5)
+      expect(m({ rodTier: 4, tackles: ['cork', 'zzz', 'cork', 3, 'trap'], equipped: ['trap'] })).toMatchObject({ tackles: ['cork', 'trap'], equipped: ['trap'] })
+      expect(m({ rodTier: 4, tackles: ['cork'], equipped: ['trap', 'cork', 'cork', 'zzz'] }).equipped).toEqual(['cork'])
+      expect(m({ rodTier: 4, tackles: ['cork', 'trap', 'spinner'], equipped: ['spinner', 'cork', 'trap'] }).equipped).toEqual(['spinner', 'cork'])
+      expect(m({ rodTier: 3, tackles: ['cork', 'trap'], equipped: ['trap', 'cork'] }).equipped).toEqual(['trap'])
+      expect(m({ rodTier: 2, tackles: ['cork'], equipped: ['cork'] })).toMatchObject({ tackles: ['cork'], equipped: [] })
+      expect(m({ tackles: 'cork', equipped: 7 })).toMatchObject({ tackles: [], equipped: [] })
+    })
   })
 })

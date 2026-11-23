@@ -3,7 +3,8 @@ import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, type Conditions } from './clock.ts'
 import {
   AREAS, areaHasSpecies, BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
-  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, type AreaId, type Rod, type Species,
+  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES,
+  type AreaId, type Rod, type Species, type TackleId,
 } from './data.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
@@ -16,6 +17,8 @@ export type CastCtx = {
   cond: Conditions
   /** 이미 잡은 전설 어종 id. 다시 나오지 않는다 */
   legends: readonly string[]
+  /** 장착한 찌. 서버 추첨에 쓰이는 건 spinner·curious */
+  equipped: readonly TackleId[]
 }
 
 type NormalRarity = keyof Rod['weights']
@@ -42,24 +45,27 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
   if (!rod) throw new Error(`unknown rod tier: ${c.rodTier}`)
   const available = SPECIES.filter((s) => speciesAvailable(s, c.area, c.spot, c.cond, c.rodTier))
 
+  const spinner = c.equipped.includes('spinner')
+  const curious = c.equipped.includes('curious')
   const r0 = rng()
   const r1 = rng()
   const r2 = rng()
   const legend = available.find((s) => s.legend && c.power >= s.legend.power && !c.legends.includes(s.id))
 
   let species: Species
-  if (legend && r0 < LEGEND_CHANCE) {
+  if (legend && r0 < LEGEND_CHANCE * (curious ? TACKLE_FX.curiousLegend : 1)) {
     species = legend
   } else {
-    const total = RARITIES.reduce((sum, r) => sum + rod.weights[r], 0)
+    const weight = (r: NormalRarity) => rod.weights[r] * (curious && r === 'rare' ? TACKLE_FX.curiousRare : 1)
+    const total = RARITIES.reduce((sum, r) => sum + weight(r), 0)
     let pick = r1 * total
     let rarity: NormalRarity = RARITIES[RARITIES.length - 1]
     for (const r of RARITIES) {
-      if (pick < rod.weights[r]) {
+      if (pick < weight(r)) {
         rarity = r
         break
       }
-      pick -= rod.weights[r]
+      pick -= weight(r)
     }
     const byRarity: Record<NormalRarity, Species[]> = { common: [], uncommon: [], rare: [] }
     for (const s of available) if (s.rarity !== 'legend') byRarity[s.rarity].push(s)
@@ -70,7 +76,7 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
 
   const p = rng() ** (1.5 - Math.min(1.25, c.power + c.sizeBonus))
   const sizeCm = Math.round(species.minCm + p * (species.maxCm - species.minCm))
-  const biteDelayMs = Math.round((1500 + rng() * 4500) * rod.biteScale)
+  const biteDelayMs = Math.round((1500 + rng() * 4500) * rod.biteScale * (spinner ? TACKLE_FX.spinnerBite : 1))
   return { species: species.id, sizeCm, biteDelayMs }
 }
 
@@ -119,6 +125,10 @@ export type State = {
   dex: Record<string, { count: number; maxCm: number }>
   /** 이미 잡은 전설 어종 id */
   legends: string[]
+  /** 산 찌(영구). 장착은 equipped */
+  tackles: TackleId[]
+  /** 장착한 찌. 칸 수(tackleSlots) 이하, 산 것만, 중복 없음 */
+  equipped: TackleId[]
   pending: Pending | null
 }
 export type Action =
@@ -128,6 +138,8 @@ export type Action =
   | { type: 'sell' }
   | { type: 'buyRod'; tier: number }
   | { type: 'buyBag'; tier: number }
+  | { type: 'buyTackle'; id: string }
+  | { type: 'equip'; ids: string[] }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
@@ -153,11 +165,14 @@ const init = (): State => ({
   bag: [],
   dex: {},
   legends: [],
+  tackles: [],
+  equipped: [],
   pending: null,
 })
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const knownTackle = (id: unknown): id is TackleId => typeof id === 'string' && TACKLES.some((t) => t.id === id)
 const knownSpecies = (id: unknown): id is string => typeof id === 'string' && SPECIES.some((s) => s.id === id)
 
 function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng: () => number }): Out {
@@ -178,6 +193,7 @@ function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng:
     spot,
     cond,
     legends: state.legends,
+    equipped: state.equipped,
   })
   const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power }
   return { state: { ...state, pending }, result: pendingView(pending) }
@@ -235,6 +251,23 @@ function buyBag(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, bagTier: bag.tier, gold: state.gold - bag.price } }
 }
 
+function buyTackle(state: State, a: Record<string, unknown>): Out {
+  const t = TACKLES.find((x) => x.id === a.id)
+  if (!t) return { error: 'bad_tackle' }
+  if (state.tackles.includes(t.id)) return { error: 'already_owned' }
+  if (state.gold < t.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, gold: state.gold - t.price, tackles: [...state.tackles, t.id] } }
+}
+
+function equip(state: State, a: Record<string, unknown>): Out {
+  if (state.pending) return { error: 'busy' }
+  const ids = a.ids
+  if (!Array.isArray(ids) || !ids.every(knownTackle) || new Set(ids).size !== ids.length) return { error: 'bad_tackle' }
+  if (!ids.every((id) => state.tackles.includes(id))) return { error: 'not_owned' }
+  if (ids.length > tackleSlots(state.rodTier)) return { error: 'too_many' }
+  return { state: { ...state, equipped: [...ids] } }
+}
+
 function migrate(raw: unknown, _fromVersion: number): State {
   const base = init()
   if (!isObj(raw)) return base
@@ -265,6 +298,10 @@ function migrate(raw: unknown, _fromVersion: number): State {
   const legendIds = new Set(SPECIES.filter((s) => s.legend).map((s) => s.id))
   const savedLegends = Array.isArray(raw.legends) ? raw.legends : []
   const legends = [...legendIds].filter((id) => savedLegends.includes(id) || id in dex)
+  // v4 이하에는 찌가 없다. 알려진 id만, 중복 없이. 장착은 산 것만, 칸 수까지(앞에서부터 남긴다)
+  const uniqueTackles = (v: unknown): TackleId[] => (Array.isArray(v) ? [...new Set(v.filter(knownTackle))] : [])
+  const tackles = uniqueTackles(raw.tackles)
+  const equipped = uniqueTackles(raw.equipped).filter((id) => tackles.includes(id)).slice(0, tackleSlots(rodTier))
   return {
     gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
@@ -274,6 +311,8 @@ function migrate(raw: unknown, _fromVersion: number): State {
     bag: bag.slice(0, bagSize(bagTier)),
     dex,
     legends,
+    tackles,
+    equipped,
     pending: null,
   }
 }
@@ -293,7 +332,7 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 4,
+  version: 5,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
@@ -312,6 +351,10 @@ export const logic: WorldLogic<State, Action, View> = {
         return buyRod(state, action)
       case 'buyBag':
         return buyBag(state, action)
+      case 'buyTackle':
+        return buyTackle(state, action)
+      case 'equip':
+        return equip(state, action)
       default:
         return { error: 'bad_action' }
     }
