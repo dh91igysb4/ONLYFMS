@@ -270,8 +270,12 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   const bag = await real({ game, action: 'act', payload: { type: 'buyBag', tier: 2 } })
   assert.equal(bag.status, 400)
   assert.equal(bag.body.error, 'not_enough_gold')
+  // 순간이동: 과제를 깨지 않았으니 꺼져 있다(맵·요금 모듈이 함께 번들되는지도 확인)
+  const tp = await real({ game, action: 'act', payload: { type: 'teleport', from: 'village', to: 'river' } })
+  assert.equal(tp.status, 400)
+  assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
-  assert.deepEqual(rows.map((r) => r.key), ['biggest', 'dex', 'total_earned'])
+  assert.deepEqual(rows.map((r) => r.key), ['biggest', 'challenges', 'dex', 'total_earned'])
 })
 
 t('teardown', async () => {

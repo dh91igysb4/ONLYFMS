@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
+import { teleportFee } from './teleport.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, type Species, type TackleId } from './data.ts'
 import { challengeMatches, logic, pickPool, price, progressChallenges, rollCatch, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State } from './logic.ts'
@@ -1150,5 +1151,57 @@ describe('도전과제', () => {
     expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/6' })
     const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
     expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/6' })
+  })
+})
+
+describe('순간이동', () => {
+  const ALL_OPEN = [...DEFAULT_AREAS, 'lake', 'cave', 'island'] as State['areas']
+  const DONE = { progress: 9, done: true }
+  const allDone = Object.fromEntries(CHALLENGES.map((c) => [c.id, DONE]))
+  const tp = (from: unknown, to: unknown) => ({ type: 'teleport', from, to }) as unknown as Action
+  const rich = (over: Partial<State> = {}) => deepFreeze(fresh({ gold: 10_000, totalEarned: 777, areas: ALL_OPEN, challenges: allDone, ...over }))
+
+  it('village → river: 요금만큼 골드가 줄고 totalEarned 그대로, result {from, to, fee}', () => {
+    const fee = teleportFee('village', 'river')
+    const r = ok(logic.apply(rich(), tp('village', 'river'), ctx()))
+    expect(r.state.gold).toBe(10_000 - fee)
+    expect(r.state.totalEarned).toBe(777)
+    expect(r.result).toEqual({ from: 'village', to: 'river', fee })
+    // 요금이 딱 맞으면 0이 된다
+    expect(ok(logic.apply(rich({ gold: fee }), tp('village', 'river'), ctx())).state.gold).toBe(0)
+  })
+
+  it('모르는 id·프로토타입 키·문자열 아님 → bad_teleporter', () => {
+    const s = rich()
+    for (const [from, to] of [['zzz', 'river'], ['village', 'zzz'], ['__proto__', 'river'], ['village', 'constructor'], [3, 'river'], ['village', null], [undefined, undefined]]) {
+      expect(err(logic.apply(s, tp(from, to), ctx())), `${String(from)}→${String(to)}`).toBe('bad_teleporter')
+    }
+  })
+
+  it('같은 곳 → same, 낚시 중 → busy', () => {
+    expect(err(logic.apply(rich(), tp('river', 'river'), ctx()))).toBe('same')
+    const p = withPending().pending
+    expect(err(logic.apply(rich({ pending: p }), tp('village', 'river'), ctx()))).toBe('busy')
+  })
+
+  it('꺼진 이동기(과제 미완, 또는 과제는 깼지만 지역이 안 열림) → not_open', () => {
+    const partial = { ...allDone, 'river-rain': { progress: 4, done: false } }
+    expect(err(logic.apply(rich({ challenges: partial }), tp('village', 'river'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ challenges: partial }), tp('river', 'village'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ areas: [...DEFAULT_AREAS, 'lake'] }), tp('village', 'island'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ challenges: {} }), tp('village', 'river'), ctx()))).toBe('not_open')
+  })
+
+  it('골드가 요금보다 1 모자라면 not_enough_gold, 상태 불변', () => {
+    const fee = teleportFee('cave', 'island')
+    const s = rich({ gold: fee - 1 })
+    expect(err(logic.apply(s, tp('cave', 'island'), ctx()))).toBe('not_enough_gold')
+    expect(s.gold).toBe(fee - 1)
+  })
+
+  it('섬으로 가는 요금은 마을→강의 세 배보다 비싸다', () => {
+    const toIsland = ok(logic.apply(rich(), tp('village', 'island'), ctx())).result as { fee: number }
+    const toRiver = ok(logic.apply(rich(), tp('village', 'river'), ctx())).result as { fee: number }
+    expect(toIsland.fee).toBeGreaterThan(3 * toRiver.fee)
   })
 })

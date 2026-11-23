@@ -6,6 +6,7 @@ import {
   PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
   type AreaId, type Challenge, type Rod, type Species, type TackleId,
 } from './data.ts'
+import { teleportFee, teleporterWorld } from './teleport.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -197,6 +198,7 @@ export type Action =
   | { type: 'buyTackle'; id: string }
   | { type: 'equip'; ids: string[] }
   | { type: 'unlockArea'; area: string }
+  | { type: 'teleport'; from: string; to: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
@@ -356,6 +358,23 @@ function unlockArea(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, gold: state.gold - u.price, areas: [...state.areas, area] } }
 }
 
+/** 이동기가 있는 알려진 지역 id인가(자기 키만 본다: '__proto__' 같은 키가 걸리지 않게) */
+function teleporterArea(id: unknown): id is AreaId {
+  return typeof id === 'string' && AREAS.some((a) => a.id === id) && teleporterWorld(id as AreaId) !== null
+}
+
+// 화면이 알려 준 from을 믿는다(설계 §8.4). 둘 다 켜진 이동기이고 골드가 요금 이상이면 요금을 뺀다.
+function teleport(state: State, a: Record<string, unknown>): Out {
+  const { from, to } = a
+  if (!teleporterArea(from) || !teleporterArea(to)) return { error: 'bad_teleporter' }
+  if (from === to) return { error: 'same' }
+  if (state.pending) return { error: 'busy' }
+  if (!teleporterOpen(state, from) || !teleporterOpen(state, to)) return { error: 'not_open' }
+  const fee = teleportFee(from, to)
+  if (state.gold < fee) return { error: 'not_enough_gold' }
+  return { state: { ...state, gold: state.gold - fee }, result: { from, to, fee } }
+}
+
 function equip(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   const ids = a.ids
@@ -477,6 +496,8 @@ export const logic: WorldLogic<State, Action, View> = {
         return equip(state, action)
       case 'unlockArea':
         return unlockArea(state, action)
+      case 'teleport':
+        return teleport(state, action)
       default:
         return { error: 'bad_action' }
     }
