@@ -227,7 +227,7 @@
 - Test: `src/games/fishing/data.test.ts`, `src/games/fishing/logic.test.ts`, `src/games/fishing/Game.test.tsx`
 
 **Interfaces:**
-- Produces: `SPECIES` 56종. `SPOT_NAMES`: lake 호수, cave1 얕은 웅덩이, cave2 수정 웅덩이, cave3 용암, sea 바다, lagoon 석호. (`logic.version`은 Task 4의 5 그대로)
+- Produces: `SPECIES` 56종. `SPOT_NAMES`: lake 호수, cave1 얕은 웅덩이, cave2 수정 웅덩이, cave3 용암, sea 바다, lagoon 석호. (`logic.version`은 Task 4의 7 그대로)
 
 **산 호수 (`area:'lake'`, 자리 하나라 spots 없음)**
 
