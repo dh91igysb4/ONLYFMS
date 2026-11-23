@@ -48,7 +48,7 @@ describe('initBar', () => {
 })
 
 describe('stepBar', () => {
-  const params = barParams('anchovy', 1)
+  const params = { ...barParams('anchovy', 1), behavior: 'mixed' as const } // 기존 동작(mixed)을 고정
 
   it('holding moves bar up, releasing moves it down', () => {
     const up = stepBar(initBar(), true, 16, params, seeded(1))
@@ -101,7 +101,7 @@ describe('stepBar', () => {
 })
 
 function run(speciesId: string, tier: 1 | 2 | 3 | 4, strategy: (b: Bar) => boolean, seedN: number, ms: number) {
-  const params = barParams(speciesId, tier)
+  const params = { ...barParams(speciesId, tier), behavior: 'mixed' as const } // 기존 동작(mixed)을 고정
   const rng = seeded(seedN)
   let bar = initBar()
   let elapsed = 0
@@ -147,7 +147,7 @@ describe('simulation', () => {
 
   it('hard fish (grouper, rod 3) moves faster than anchovy', () => {
     const dist = (id: string) => {
-      const params = barParams(id, 3)
+      const params = { ...barParams(id, 3), behavior: 'mixed' as const }
       const rng = seeded(7)
       let bar = initBar()
       let total = 0
@@ -162,7 +162,7 @@ describe('simulation', () => {
   })
 
   it('positions stay within [0, 1] over 60s of random input', () => {
-    const params = barParams('grouper', 1)
+    const params = { ...barParams('grouper', 1), behavior: 'mixed' as const }
     const rng = seeded(9)
     const input = seeded(10)
     let bar = initBar()
@@ -204,12 +204,20 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
     expect(mean).toBeLessThan(0.65)
   })
 
-  it('이동량은 dart > mixed > smooth', () => {
-    const dart = sim('dart').move
-    const mixed = sim('mixed').move
-    const smooth = sim('smooth').move
+  it('이동량은 dart > mixed > smooth (여러 시드 평균)', () => {
+    const avg = (b: Behavior) => [11, 12, 13, 14, 15].reduce((a, n) => a + sim(b, n).move, 0) / 5
+    const dart = avg('dart')
+    const mixed = avg('mixed')
+    const smooth = avg('smooth')
     expect(dart).toBeGreaterThan(mixed)
     expect(mixed).toBeGreaterThan(smooth)
+  })
+
+  it('mixed는 변경 전 구현과 같은 궤적이다 (골든: seed 11, 60초)', () => {
+    // 행동 유형 도입 전 minigame.ts(589b409)로 구한 값
+    const { mean, move } = sim('mixed', 11)
+    expect(mean).toBeCloseTo(1897.822500257715 / 3750, 9)
+    expect(move).toBeCloseTo(35.29450431521198, 9)
   })
 
   it('모든 유형에서 위치가 [0, 1] 안에 머문다', () => {
