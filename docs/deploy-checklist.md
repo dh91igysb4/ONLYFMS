@@ -167,8 +167,8 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
-## 낚시(숨김, 지속형 world 게임) 배포
-낚시 마을 변경(`feat/fishing-walk`, `logic.version` 2) 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `hidden: true` 그대로다.
+## 낚시(지속형 world 게임) 배포
+낚시 마을 변경(`feat/fishing-walk`, `logic.version` 2) 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `20261123065500_fishing_public.sql`부터 공개다 (`hidden: false`, `npx supabase@2 db push` 필요).
 
 순서: DB push → `world` 함수 배포 → Vercel.
 
@@ -185,7 +185,7 @@ npx supabase@2 functions deploy world --no-verify-jwt
 ### 낚시 미리보기 확인
 브라우저 폭 390px와 1280px 모두, 관리자 계정으로.
 
-- [ ] 게임 목록에 "펨타듀 낚시" 카드와 "들어가기"가 관리자에게만 보인다
+- [ ] 게임 목록에 "펨타듀 낚시" 카드와 "들어가기"가 관리자가 아닌 계정에도 보인다
 - [ ] 캐스팅 → 입질 → 챔 → 미니게임 → 가방 → 판매 → 골드 증가 한 바퀴
 - [ ] 1,500 G 모아 유리섬유 낚싯대 구매 후 바가 길어지고 희귀 어종이 나온다
 - [ ] 새로고침·다른 브라우저에서 세이브가 이어진다
