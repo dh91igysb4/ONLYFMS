@@ -82,3 +82,13 @@ test('world(): 응답 gold를 저장소에 넣는다, 없으면 그대로', asyn
   await world({ game: 'g', action: 'load' })
   expect(getWallet().balance).toBe(77)
 })
+
+test('fetchMyWallet: 요청 중 world 잔액이 들어오면 늦은 my_wallet이 잔액을 덮지 않는다', async () => {
+  let resolve!: (v: unknown) => void
+  rpcMock.mockReturnValue(new Promise((r) => { resolve = r }))
+  const p = fetchMyWallet()
+  setBalance(500) // world 응답(지연 이전 뒤 잔액)이 먼저 도착
+  resolve({ data: { balance: 0, today: { a: 1 }, earned_today: 7 }, error: null })
+  expect(await p).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
+  expect(getWallet()).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
+})

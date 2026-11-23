@@ -12,6 +12,8 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: auth.status, is_admin: auth.isAdmin } }),
 }))
 const fetchMyWallet = vi.hoisted(() => vi.fn())
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../wallet/api.ts', () => ({ fetchMyWallet }))
 const pendingCount = vi.hoisted(() => vi.fn())
 vi.mock('../suggest/adminApi.ts', () => ({ suggestionPendingCount: pendingCount }))
@@ -32,6 +34,7 @@ beforeEach(() => {
   pendingCount.mockResolvedValue(0)
   auth.isAdmin = false
   auth.status = 'approved'
+  wallet.enabled = true
   resetWallet()
   fetchMyWallet.mockReset()
   fetchMyWallet.mockImplementation(async () => {
@@ -230,6 +233,14 @@ test('로드 때 my_wallet을 한 번 읽고 헤더에 잔액을 보여 준다',
 
 test('승인되지 않은 사용자에게는 배지가 없고 my_wallet도 부르지 않는다', async () => {
   auth.status = 'pending'
+  mount()
+  await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
+  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(fetchMyWallet).not.toHaveBeenCalled()
+})
+
+test('지갑을 쓰는 게임이 없으면(낚시 이전 전) 배지가 없고 my_wallet도 부르지 않는다', async () => {
+  wallet.enabled = false
   mount()
   await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
   expect(screen.queryByLabelText(/내 골드/)).toBeNull()

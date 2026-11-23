@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
 const rpcMock = vi.fn()
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {}, supabaseUrl: 'x', supabaseKey: 'k' }))
 vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
@@ -32,7 +34,7 @@ const renderAt = (h: string, search = '') => render(
 )
 const where = () => screen.getByTestId('where').textContent
 
-beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane' })
+beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane'; wallet.enabled = true })
 
 function setup(over: Record<string, unknown>) {
   rpcMock.mockImplementation(async (name: string) => (name in over ? over[name] : name === 'duel_stats' ? [] : null))
@@ -373,5 +375,14 @@ test('profile_gold: null이면 줄 없음', async () => {
   renderAt('messi')
   await screen.findByRole('heading', { name: 'messi' })
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' }))
+  expect(screen.queryByLabelText(/^골드/)).toBeNull()
+})
+
+test('profile_gold: 지갑을 쓰는 게임이 없으면 user_wallet을 부르지 않고 줄도 없다', async () => {
+  wallet.enabled = false
+  setup({ user_stats: emptyStats, user_wallet: 5000 })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  expect(rpcMock).not.toHaveBeenCalledWith('user_wallet', expect.anything())
   expect(screen.queryByLabelText(/^골드/)).toBeNull()
 })

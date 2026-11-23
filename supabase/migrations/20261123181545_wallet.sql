@@ -132,12 +132,7 @@ begin
     v_eco  := public._economy();
     v_cap  := (v_eco ->> 'daily_soft_cap')::bigint;
     v_rate := (v_eco ->> 'soft_cap_rate')::numeric;
-    select coalesce(sum(l.delta), 0)::bigint into v_s
-      from public.gold_ledger l
-     where l.user_id = p_user
-       and l.reason in ('world', 'free', 'daily_prize')
-       and l.delta > 0
-       and l.created_at >= public._kst_today_start();
+    v_s    := public._earned_today(p_user);   -- 지갑을 잠근 뒤에 읽는다
     v_room := greatest(v_cap - v_s, 0);
     v_got  := least(p_delta, v_room) + floor((p_delta - least(p_delta, v_room)) * v_rate)::bigint;
     if v_got <= 0 then

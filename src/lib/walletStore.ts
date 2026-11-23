@@ -13,9 +13,12 @@ export type WalletSnapshot = {
 
 const EMPTY: WalletSnapshot = { balance: null, today: {}, earnedToday: 0 }
 let snap: WalletSnapshot = EMPTY
+/** 잔액을 바꿀 때마다 1씩. 늦게 도착한 my_wallet()이 더 새 world 잔액을 덮지 않게 비교한다 */
+let version = 0
 const listeners = new Set<() => void>()
 
 function emit(next: WalletSnapshot) {
+  version += 1
   snap = next
   for (const fn of listeners) {
     try { fn() } catch { /* 구독자 오류가 다른 구독자를 막지 않게 */ }
@@ -24,6 +27,11 @@ function emit(next: WalletSnapshot) {
 
 export function getWallet(): WalletSnapshot {
   return snap
+}
+
+/** 지금 저장소 판 번호. 요청을 보내기 전에 읽어 두고, 응답이 왔을 때 바뀌었는지 본다 */
+export function walletVersion(): number {
+  return version
 }
 
 /** 잔액만 바꾼다(world 응답). today·earnedToday는 그대로 */

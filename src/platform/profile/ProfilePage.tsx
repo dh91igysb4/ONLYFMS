@@ -12,6 +12,7 @@ import { Avatar } from './Avatar.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
 import { fetchUserWallet } from '../wallet/api.ts'
 import { formatGold } from '../wallet/format.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
 import '../leaderboard/leaderboard.css'
 import './profile.css'
 
@@ -87,6 +88,7 @@ export function ProfilePage() {
   useEffect(() => {
     let alive = true
     setGold(null)
+    if (!walletEnabled()) return
     fetchUserWallet(handle)
       .then((g) => { if (alive) setGold(g) })
       .catch(() => {})

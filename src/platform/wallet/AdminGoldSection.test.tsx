@@ -83,10 +83,10 @@ test.each([
   expect(await screen.findByText(text)).toBeTruthy()
 })
 
-test('금액이 0이 아닌 정수가 아니면 보내지 않는다', async () => {
+test.each(['1.5', '1e3', '0x10', '0', '+5', '9'.repeat(20)])('금액 %s는 보내지 않는다(0이 아닌 일반 정수만)', async (value) => {
   render(<AdminGoldSection />)
   fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'kane' } })
-  fireEvent.change(screen.getByLabelText('금액'), { target: { value: '1.5' } })
+  fireEvent.change(screen.getByLabelText('금액'), { target: { value } })
   fireEvent.change(screen.getByLabelText('메모'), { target: { value: 'x' } })
   fireEvent.click(screen.getByRole('button', { name: '반영' }))
   expect(await screen.findByText('금액은 0이 아닌 정수로 적어 주세요')).toBeTruthy()

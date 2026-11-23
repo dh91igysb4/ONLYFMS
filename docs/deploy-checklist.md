@@ -298,9 +298,9 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부되고, `supabase.from('world_saves').select('state')`는 행 없이 오류(권한 거부)를 돌려준다
 
 ## 지갑 배포 (1단계, `feat/wallet-core`)
-설계 `docs/superpowers/specs/2026-11-23-wallet-design.md`, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 1단계. 이 브랜치는 지갑 핵심(Task 1·1b·2·3·5·6·7)만 담고, **낚시 골드 이전(Task 4)은 낚시 다듬기 PR 뒤 따로 들어온다**. 그래서 이 PR만 배포하면 어떤 게임도 아직 지갑을 쓰지 않는다(`WorldLogic.wallet`이 있는 게임 없음): 낚시는 지금처럼 세이브 안 골드를 쓰고, 헤더는 모두 `0 G`(관리자 조정분만)로 보인다.
+설계 `docs/superpowers/specs/2026-11-23-wallet-design.md`, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 1단계. 이 브랜치는 지갑 핵심(Task 1·1b·2·3·5·6·7)만 담고, **낚시 골드 이전(Task 4)은 낚시 다듬기 PR 뒤 따로 들어온다**. 그래서 이 PR만 배포하면 어떤 게임도 아직 지갑을 쓰지 않는다(`WorldLogic.wallet`이 있는 게임 없음): 낚시는 지금처럼 세이브 안 골드를 쓰고, 헤더 배지·프로필 골드 줄은 **보이지 않는다**(등록부에 `wallet: true` 게임이 생기면 저절로 켜진다, `src/platform/wallet/enabled.ts`). `/admin` 골드 섹션은 처음부터 보인다.
 
-- **권장**: Task 4(낚시 → 지갑, 낚시 `logic.version` = 다듬기 버전 + 1) PR과 이어서 배포한다. 이 PR만 먼저 배포해도 낚시·다른 게임은 그대로 동작하지만, 헤더 `0 G`와 낚시 화면 골드가 달라 보인다. 먼저 배포하면 테스터에게 "헤더 골드는 낚시 이전 뒤부터 맞아요"라고 알린다.
+- **권장**: Task 4(낚시 → 지갑, 낚시 `logic.version` = 다듬기 버전 + 1) PR과 같은 새벽(KST)에 이어서 배포한다. 이 PR만 먼저 배포해도 낚시·다른 게임은 그대로 동작하고 사용자 화면에는 바뀌는 것이 없다.
 
 순서: DB push → `world` 함수 → Vercel. (테이블·함수만 더하므로 옛 `world`·옛 화면과 호환. 새 `world`는 `wallet`이 없는 게임에 지금과 똑같이 동작하고 응답에 `gold`를 넣지 않는다)
 
@@ -308,16 +308,15 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (지갑 잠금·이전·증감 경로. 낚시 로직은 바뀌지 않았으므로 버전 변화 없음)
 - [ ] PR 머지 → Vercel 배포
 - [ ] 수동 확인(미리보기 → 운영, 폰 390px·PC):
-  - [ ] 헤더 오른쪽(아이디 메뉴 왼쪽)에 `0 G`가 줄바꿈 없이 보인다(360px 폭 포함). 대기 계정에는 없다
-  - [ ] 다른 계정 프로필 요약에 "골드 0 G"
-  - [ ] `/admin` 골드 섹션: 내 아이디로 +100 → "반영했어요. … 잔액 100 G", 헤더는 새로고침 뒤 `100 G`, 장부 맨 위에 "관리자 조정 +100"과 메모. −1000 → "잔액보다 많이 뺄 수 없어요", 메모 비움 → 브라우저가 막거나 "메모를 1~100자로 적어 주세요", 없는 아이디 → "없는 아이디예요". 끝나면 −100으로 되돌린다
+  - [ ] 헤더·프로필에 골드가 **보이지 않는다**(지갑 게임 없음). Task 4 뒤에는 헤더 오른쪽(아이디 메뉴 왼쪽)에 `N G`가 줄바꿈 없이(360px 폭 포함), 다른 계정 프로필 요약에 "골드 N G", 대기 계정에는 없음
+  - [ ] `/admin` 골드 섹션: 내 아이디로 +100 → "반영했어요. … 잔액 100 G", 장부 맨 위에 "관리자 조정 +100"과 메모. −1000 → "잔액보다 많이 뺄 수 없어요", 메모 비움 → 브라우저가 막거나 "메모를 1~100자로 적어 주세요", 없는 아이디 → "없는 아이디예요". 끝나면 −100으로 되돌린다
   - [ ] 비관리자 계정 브라우저 콘솔: `supabase.from('gold_ledger').select('*')`는 본인 줄만, `supabase.from('wallets').update({balance: 1})`·`supabase.rpc('_gold_move', …)`는 거부
   - [ ] 낚시가 지금과 똑같이 동작한다(팔기·사기·새로고침 뒤 골드 유지). 네트워크 탭의 `world` 응답에 최상위 `gold`가 없다
 - 확인 쿼리(SQL 편집기): `select count(*), sum(balance) from wallets;` `select reason, count(*), sum(delta) from gold_ledger group by 1;`
 
 ### Task 4(낚시 → 지갑) 배포 때 더할 것
 Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
-- 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다(옛 로직은 세이브에 gold가 없어 0으로 시작한다).
+- 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다. 옛 로직은 세이브에 gold가 없어 0으로 시작하고, 그 사이 번 골드는 다시 배포해도 **사라진다**: 이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시되기 때문이다.
 - 수동 확인: 낚시를 열기 전 헤더 `0 G`(지연 이전), 낚시를 열면 헤더와 낚시 화면 골드가 옛 골드와 같음, 새로고침해도 같음; 물고기 팔기 → 헤더가 바로 오름; 낚싯대·가방·찌·해금·순간이동·고급 장비 구매 → 헤더가 바로 내림, 모자라면 "골드가 부족해요".
 - 확인 쿼리: 아직 이전되지 않은 세이브 `select count(*) from world_saves where game_id = 'fishing' and logic_version <= <LAST_GOLD_IN_SAVE>;`, 이전 합계 `select count(*), sum(delta) from gold_ledger where reason = 'migrate';`, 이중 이전 없음 `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행).
 - 사이트 하루 상한 확인: 관리자 계정으로 낚시를 해 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림이 3초 뜨고 헤더 증가가 넘은 몫의 20%; 관리자 장부에 "(상한, 원래 …)".

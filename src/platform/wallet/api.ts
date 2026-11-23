@@ -1,6 +1,6 @@
 // 지갑 RPC 데이터 계층 (설계 §5.3·§5.4). 잔액 쓰기는 서버 함수만 한다.
 import { rpc } from '../../lib/api.ts'
-import { setWallet } from '../../lib/walletStore.ts'
+import { getWallet, setWallet, walletVersion } from '../../lib/walletStore.ts'
 
 export type MyWallet = { balance: number; today: Record<string, number>; earnedToday: number }
 
@@ -24,12 +24,18 @@ export type LedgerRow = {
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : Number(v ?? 0))
 
-/** my_wallet() → 저장소를 채우고 돌려준다 */
+/**
+ * my_wallet() → 저장소를 채우고 돌려준다.
+ * 요청 중에 잔액이 바뀌었으면(world 응답이 먼저 옴) 그 잔액이 더 새것이므로 balance는 두고 today·earnedToday만 바꾼다.
+ */
 export async function fetchMyWallet(): Promise<MyWallet> {
+  const started = walletVersion()
   const d = await rpc<{ balance: number | string; today?: Record<string, number | string>; earned_today?: number | string }>('my_wallet')
   const today: Record<string, number> = {}
   for (const [k, v] of Object.entries(d?.today ?? {})) today[k] = num(v)
-  const w = { balance: num(d?.balance), today, earnedToday: num(d?.earned_today) }
+  const fresh = { balance: num(d?.balance), today, earnedToday: num(d?.earned_today) }
+  const kept = getWallet().balance
+  const w = walletVersion() !== started && kept !== null ? { ...fresh, balance: kept } : fresh
   setWallet(w)
   return w
 }

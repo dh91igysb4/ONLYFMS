@@ -73,8 +73,9 @@ export function AdminGoldSection() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const delta = Number(amount.trim())
-    if (!amount.trim() || !Number.isSafeInteger(delta) || delta === 0) {
+    const raw = amount.trim()
+    const delta = /^-?\d+$/.test(raw) ? Number(raw) : Number.NaN
+    if (!Number.isSafeInteger(delta) || delta === 0) {
       setResult({ ok: false, text: '금액은 0이 아닌 정수로 적어 주세요' })
       return
     }

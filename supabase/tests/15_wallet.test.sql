@@ -2,7 +2,7 @@
 -- 장부·지갑 변경은 슈퍼유저(= Edge Function의 소유자 연결)로 _gold_move를 부른다.
 -- 사이트 상한 경우마다 새 사용자(c1~c9)로 시작한다. cap 30,750 · rate 0.2 기준.
 begin;
-select plan(98);
+select plan(104);
 
 \set PU  '{"sub":"00000000-0000-0000-0000-0000000000f0","role":"authenticated"}'
 \set UA  '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}'
@@ -137,10 +137,11 @@ select is(public._gold_move(:'c8', 1000, 'free', 'a', 'g1'), 1000::bigint, 'dup:
 select is(public._gold_move(:'c8', 5000, 'free', 'a', 'g1'), 1000::bigint, 'dup: 같은 ref 금액 바꿔도 무시');
 select is((select count(*)::int from public.gold_ledger where user_id = :'c8'), 1, 'dup: 장부 1줄');
 
--- 잠금 순서: 지갑을 잠근 뒤 합계를 읽는다
-select ok(position('_wallet_lock' in pg_get_functiondef('public._gold_move(uuid,bigint,text,text,text,text)'::regprocedure))
-        < position('sum(' in pg_get_functiondef('public._gold_move(uuid,bigint,text,text,text,text)'::regprocedure)),
-  'cap: _wallet_lock이 합계(sum)보다 먼저');
+-- 잠금 순서: 지갑을 잠근 뒤 합계를 읽는다 (동시성 자체는 world 함수 테스트의 두 게임 동시 요청이 확인)
+select ok(position('public._wallet_lock(' in pg_get_functiondef('public._gold_move(uuid,bigint,text,text,text,text)'::regprocedure))
+        < position('public._earned_today(' in pg_get_functiondef('public._gold_move(uuid,bigint,text,text,text,text)'::regprocedure))
+      and position('public._wallet_lock(' in pg_get_functiondef('public._gold_move(uuid,bigint,text,text,text,text)'::regprocedure)) > 0,
+  'cap: _wallet_lock이 합계(_earned_today)보다 먼저');
 
 -- c9: my_wallet earned_today·today (어제 줄과 world 줄 today에서 빠짐)
 insert into public.gold_ledger (user_id, delta, balance_after, reason, ref, game_id, created_at) values
@@ -167,6 +168,8 @@ select throws_ok($$delete from public.gold_ledger$$, '42501', null, 'gold_ledger
 select throws_ok($$select public._gold_move(auth.uid(), 100, 'admin', 'hack')$$, '42501', null, '_gold_move: authenticated 실행 불가');
 select throws_ok($$select public._wallet_lock(auth.uid())$$, '42501', null, '_wallet_lock: authenticated 실행 불가');
 select throws_ok($$select public._economy()$$, '42501', null, '_economy: authenticated 실행 불가');
+select throws_ok($$select public._kst_today_start()$$, '42501', null, '_kst_today_start: authenticated 실행 불가');
+select throws_ok($$select public._earned_today(auth.uid())$$, '42501', null, '_earned_today: authenticated 실행 불가');
 
 select is(public.my_wallet(), '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
 select is(public.user_wallet('goldb'), 0::bigint, 'user_wallet: 지갑 0');
@@ -214,6 +217,10 @@ select is(public.user_wallet('goldb'), 1000::bigint, 'user_wallet: 조정 뒤 1,
 -- ---------------------------------------------------------------- anon
 set local role anon;
 select throws_ok($$select public.my_wallet()$$, '42501', null, 'anon: my_wallet 실행 불가');
+select throws_ok($$select public.user_wallet('golda')$$, '42501', null, 'anon: user_wallet 실행 불가');
+select throws_ok($$select public.admin_gold_adjust('golda', 1, 'x')$$, '42501', null, 'anon: admin_gold_adjust 실행 불가');
+select throws_ok($$select * from public.admin_gold_ledger(1)$$, '42501', null, 'anon: admin_gold_ledger 실행 불가');
+select throws_ok($$select public._gold_move('00000000-0000-0000-0000-0000000000f1', 1, 'admin', 'anon')$$, '42501', null, 'anon: _gold_move 실행 불가');
 reset role;
 
 select * from finish();

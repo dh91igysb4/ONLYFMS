@@ -508,6 +508,24 @@ t('wallet concurrent earn 20,000 × 2 → 32,600', async () => {
   assert.equal(rs.filter((r) => 'gold_capped' in r.body).length, 1)
 })
 
+// 서로 다른 지갑 게임은 세이브 행이 달라 세이브 잠금으로 줄 서지 않는다 → 지갑 잠금이 상한·음수를 지킨다
+t('wallet concurrent earn across two wallet games → 32,600', async () => {
+  const v = await user()
+  await load(v, W2)
+  const rs = await Promise.all([act(v, { type: 'earn', n: 20000 }, W), act(v, { type: 'earn', n: 20000 }, W2)])
+  assert.ok(rs.every((r) => r.status === 200))
+  assert.equal(await balance(v), 32600)
+})
+
+t('wallet concurrent force-spend across two wallet games: one 400, balance 20', async () => {
+  const v = await user()
+  await load(v, W2)
+  await act(v, { type: 'earn', n: 100 }, W)
+  const rs = await Promise.all([act(v, { type: 'force', n: -80 }, W), act(v, { type: 'force', n: -80 }, W2)])
+  assert.deepEqual(rs.map((r) => r.status).sort(), [200, 400])
+  assert.equal(await balance(v), 20)
+})
+
 t('teardown', async () => {
   await sql`delete from public.hidden_games where game_id = 'test-world-hidden'`
   await sql.end()

@@ -27,7 +27,7 @@ test('softCap: 효과 표 고정 (설계 §4.1)', () => {
 /** 마이그레이션을 이름순으로 읽어 가장 마지막 _economy() 정의의 JSON 리터럴을 꺼낸다 */
 function lastEconomy(files: Record<string, string>): unknown {
   let body: string | null = null
-  const re = /create\s+or\s+replace\s+function\s+(?:public\.)?_economy\s*\(\s*\)[\s\S]*?\$\$([\s\S]*?)\$\$/gi
+  const re = /create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?_economy\s*\(\s*\)[\s\S]*?\$\$([\s\S]*?)\$\$/gi
   for (const name of Object.keys(files).sort()) {
     for (const m of files[name].matchAll(re)) body = m[1]
   }
@@ -54,4 +54,5 @@ test('lastEconomy: 이름순 마지막 정의를 쓴다', () => {
   }
   expect(lastEconomy(files)).toEqual({ a: 2 })
   expect(lastEconomy({ 'a.sql': 'select 1;' })).toBeNull()
+  expect(lastEconomy({ ...files, 'c.sql': `create function public._economy() returns jsonb language sql as $$ select '{"a": 3}'::jsonb $$;` })).toEqual({ a: 3 })
 })
