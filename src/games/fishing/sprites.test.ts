@@ -473,3 +473,27 @@ describe('낚시 5부 M1 그림: 신화의 힘·신화 표시', () => {
     expect(filled('drill-1')).toBeLessThan(filled('drill-2'))
   })
 })
+
+describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
+  const WATERS = ['creek', 'marsh', 'bog']
+  const key = (n: string) => SPRITES[n].rows.join('|') + JSON.stringify(SPRITES[n].palette)
+  it('물 세 종은 0/1 두 장이 16×16, 칸을 꽉 채우고 두 장이 다르며 바탕색이 기존 물과 다르다', () => {
+    for (const k of WATERS) {
+      for (const f of [0, 1]) {
+        const sp = SPRITES[`${k}-${f}`]
+        expect([sp?.w, sp?.h], `${k}-${f}`).toEqual([16, 16])
+        expect(sp.rows.join('').includes('.'), `${k}-${f}`).toBe(false)
+      }
+      expect(SPRITES[`${k}-0`].rows.join('|'), k).not.toBe(SPRITES[`${k}-1`].rows.join('|'))
+    }
+    const bases = [...WATERS, 'water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon'].map((k) => SPRITES[`${k}-0`].palette.a)
+    expect(new Set(bases).size).toBe(bases.length)
+  })
+  it('갈대·고사목은 나무처럼 16×32, 데크 판자 16×16, 문 그림 두 장 16×16, 모두 서로 다르다', () => {
+    for (const n of ['tile-reed', 'tile-deadtree']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 32])
+    for (const n of ['boardwalk-plank', 'gate-driftwood', 'gate-vines']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    const all = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), 'tile-reed', 'tile-deadtree', 'boardwalk-plank', 'gate-driftwood', 'gate-vines']
+    expect(new Set(all.map(key)).size).toBe(all.length)
+    for (const old of ['tile-tree', 'tile-palm', 'dock-plank', 'pier-plank', 'gate-rubble', 'gate-broken-bridge']) for (const n of all) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
+  })
+})

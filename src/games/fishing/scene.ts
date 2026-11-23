@@ -58,7 +58,7 @@ const WALK_FRAME_MS = 200
 /** 나무·야자수 밑동(줄기 아래 끝)의 칸 안 y. 캐릭터 발이 이보다 위면 윗부분이 캐릭터를 가린다. */
 const TREE_BASE = 10
 /** 16×32 스프라이트로 윗칸까지 솟는 타일: 아래 16px는 정적 레이어, 위 16px는 캐릭터와 발 y 순으로 */
-const TALL_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { tree: 'tile-tree', palm: 'tile-palm' }
+const TALL_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { tree: 'tile-tree', palm: 'tile-palm', reed: 'tile-reed', deadtree: 'tile-deadtree' }
 
 // 스프라이트 크기
 const PLAYER_W = 16
@@ -225,6 +225,7 @@ type Ground = 'water' | 'sand' | 'grass' | 'cave'
 // 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
 const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
   'water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'dock',
+  'creek', 'marsh', 'bog', 'boardwalk',
 ])
 
 function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
@@ -383,6 +384,7 @@ function drawFence(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: num
 const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = {
   river: 'river', pond: 'pond', basin: 'basin', bridge: 'river',
   lake: 'lake', 'cave-pool': 'cave-pool', crystal: 'crystal', lava: 'lava', lagoon: 'lagoon',
+  creek: 'creek', marsh: 'marsh', bog: 'bog', boardwalk: 'marsh',
 }
 
 /** 물 칸 그림 이름 앞부분. 바위는 이웃(상하좌우) 물 칸 그림 중 가장 많은 것(같으면 위·아래·왼쪽·오른쪽 순서로 먼저 센 것) */
@@ -455,6 +457,7 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
+  else if (kind === 'boardwalk') drawSprite(ctx, 'boardwalk-plank', x, y, 1)
 }
 
 /** 부두 칸 바깥으로 삐져나오는 것: 그늘, 기둥, 끝 옆면, 외곽선 */

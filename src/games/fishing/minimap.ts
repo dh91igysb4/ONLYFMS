@@ -44,6 +44,13 @@ export const MINIMAP_LOOK: Readonly<Record<TileKind, Look>> = {
   // 낚시 5부: 진흙은 물때와 무관한 갯벌 무늬(축소 그림은 한 번만 만든다), 얼음은 흰 바탕 금무늬
   mud: look('#8a7356', '#5f4d39', ['bmb', 'bbb', 'mbb']),
   ice: look('#e6f2f8', '#9fc3d6', ['mbb', 'bmb', 'bbm']),
+  // 낚시 5부 M2: 갯골·늪·수렁은 물(무늬 없음, 바탕색만 다르다), 데크는 판자, 갈대·고사목은 나무처럼
+  creek: look('#5e8e8c', '#5e8e8c'),
+  marsh: look('#5d7b48', '#5d7b48'),
+  bog: look('#2f2b22', '#2f2b22'),
+  boardwalk: look('#a8936c', '#6e5a40', PLANK_GLYPH),
+  reed: look('#8fa452', '#7a4a2a', ['mbm', 'bmb', 'bmb']),
+  deadtree: look('#6f8a4a', '#4e4439', TREE_GLYPH),
 }
 
 /** 고른 낚시 자리 칸에 겹칠 밝은 색(반투명) */

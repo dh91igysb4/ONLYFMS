@@ -323,7 +323,7 @@ describe('new tile kinds', () => {
   })
 
   it('WATER_KINDS holds the fishable water kinds only (falls excluded)', () => {
-    expect([...WATER_KINDS].sort()).toEqual(['basin', 'cave-pool', 'crystal', 'lagoon', 'lake', 'lava', 'pond', 'river', 'water'])
+    expect([...WATER_KINDS].sort()).toEqual(['basin', 'bog', 'cave-pool', 'creek', 'crystal', 'lagoon', 'lake', 'lava', 'marsh', 'pond', 'river', 'water'])
   })
 })
 
@@ -776,5 +776,39 @@ describe('움직이는 맵 상태: 얼음 구멍', () => {
     const three = ['1,1', '2,1', '3,1']
     expect(addHole(three, 4, 1)).toEqual(['2,1', '3,1', '4,1'])
     expect(three).toEqual(['1,1', '2,1', '3,1'])
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M2: 갯벌·늪지 타일
+
+describe('갯벌·늪지 타일', () => {
+  const ROW = defineMap('forest', ['dgRzQX'])
+  const KINDS: [string, TileKind, boolean, boolean][] = [
+    ['d', 'boardwalk', true, false],
+    ['g', 'creek', false, true],
+    ['R', 'reed', false, false],
+    ['z', 'marsh', false, true],
+    ['Q', 'bog', false, true],
+    ['X', 'deadtree', false, false],
+  ]
+  it('글자 → kind, 걷기(데크만), 물 종류(갯골·늪·수렁)', () => {
+    KINDS.forEach(([ch, kind, walk, water], tx) => {
+      expect(TILE_CHARS[ch], ch).toBe(kind)
+      expect(tileAt(ROW, tx, 0), ch).toBe(kind)
+      expect(isWalkable(ROW, tx, 0, ALL_AREAS_OPEN), kind).toBe(walk)
+      expect(WATER_KINDS.has(kind), kind).toBe(water)
+    })
+  })
+  it('spotFor·interactionAt: 데크에서 늪은 marsh, 수렁은 bog, 갯골은 creek', () => {
+    const m = defineMap('forest', ['zdQ', '.g.'], { spots: { marsh: 'marsh', bog: 'bog', creek: 'creek' } })
+    expect(interactionAt(m, center(1, 0), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'marsh' })
+    expect(interactionAt(m, center(1, 0), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'bog' })
+    expect(interactionAt(m, center(1, 0), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'creek' })
+    expect(spotFor(m, 'boardwalk', 'reed')).toBeNull()
+    expect(spotFor(m, 'boardwalk', 'deadtree')).toBeNull()
+  })
+  it('castTarget: 늪·수렁이 섞여도 물로 계속 날아간다, 갈대 앞에서 멈춘다', () => {
+    const m = defineMap('forest', ['dzzQQR'], { spots: { marsh: 'marsh', bog: 'bog' } })
+    expect(castTarget(m, center(0, 0), 'right', 1)).toEqual(center(4, 0))
   })
 })

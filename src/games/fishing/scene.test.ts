@@ -154,6 +154,9 @@ describe('물 속 바위', () => {
     ['L', 'lava', 'lava'],
     ['u', 'cave-pool', 'cave-pool'],
     ['~', 'water', 'water'],
+    ['g', 'creek', 'creek'],
+    ['z', 'marsh', 'marsh'],
+    ['Q', 'bog', 'bog'],
   ]
   test.each(cases)('%s 물 속 바위는 그 물(%s) 위에 그린다', (ch, sprite) => {
     const m = defineMap('river', pool(ch))
@@ -1181,5 +1184,72 @@ describe('움직이는 맵 장면', () => {
       expect(ring(null)).toBe(0)
       expect(ring(1600)).toBe(0)
     })
+  })
+})
+
+describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
+  const size = { w: 195, h: 280 }
+  const inTile = (r: { x: number; y: number }, cam: Vec, tx: number, ty: number) =>
+    r.x >= tx * 16 - cam.x && r.x < (tx + 1) * 16 - cam.x && r.y >= ty * 16 - cam.y && r.y < (ty + 1) * 16 - cam.y
+  // 0 zzzzz
+  // 1 zdddQ   늪·데크·수렁
+  // 2 ggR.X   갯골·갈대·모래·고사목
+  // 3 .....
+  const SWAMPY = defineMap('forest', ['zzzzz', 'zdddQ', 'ggR.X', '.....', '.....'], { spots: { marsh: 'marsh', bog: 'bog', creek: 'creek' } })
+
+  test('물은 제 그림(늪·수렁·갯골 두 장), 데크는 늪물 위 판자', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const p = player(tileCentre(3, 3))
+    const cam = cameraFor(SWAMPY, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: SWAMPY, camera: cam }, size)
+    const at = (tx: number, ty: number) => ctx.sprites.filter((c) => c.x === tx * 16 - cam.x && c.y === ty * 16 - cam.y).map((c) => c.name)
+    expect(at(0, 0)).toContainEqual(expect.stringMatching(/^marsh-[01]$/))
+    expect(at(4, 1)).toContainEqual(expect.stringMatching(/^bog-[01]$/))
+    expect(at(0, 2)).toContainEqual(expect.stringMatching(/^creek-[01]$/))
+    expect(at(2, 1)).toContainEqual(expect.stringMatching(/^marsh-[01]$/))
+    expect(at(2, 1)).toContain('boardwalk-plank')
+  })
+
+  test.each([['R', 'tile-reed'], ['X', 'tile-deadtree']])('%s 윗부분: 캐릭터가 밑동보다 위 줄이면 앞에, 아래 줄이면 뒤에', (ch, name) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const m = defineMap('forest', ['.....', '.....', '.....', `..${ch}..`, '.....', '.....'])
+    // 윗부분에만 있는 색(밑동과 겹치지 않는 색)
+    const sp = realSprites.SPRITES[name]
+    const topColors = new Set(sp.rows.slice(0, 16).flatMap((r) => [...r].filter((c) => c !== '.').map((c) => sp.palette[c])))
+    const bottomColors = new Set(sp.rows.slice(16).flatMap((r) => [...r].filter((c) => c !== '.').map((c) => sp.palette[c])))
+    const only = [...topColors].filter((c) => !bottomColors.has(c) && c !== '#78b85c')
+    expect(only.length).toBeGreaterThan(0)
+    const tops = (c: RecordingCtx, cam: Vec) => c.rects.map((r, i) => ({ r, i })).filter(({ r }) => only.includes(r.color) && inTile(r, cam, 2, 2))
+    const above = { ...scene('idle', player(tileCentre(2, 2), 'down'), size), map: m }
+    above.camera = cameraFor(m, above.player.pos, size)
+    const a = new RecordingCtx()
+    drawWorld(asCtx(a), above, size)
+    const ta = tops(a, above.camera)
+    expect(ta.length).toBeGreaterThan(0)
+    expect(ta.every(({ i }) => i >= players(a)[0].at)).toBe(true)
+    const below = { ...scene('idle', player(tileCentre(2, 4), 'up'), size), map: m }
+    below.camera = cameraFor(m, below.player.pos, size)
+    const b = new RecordingCtx()
+    drawWorld(asCtx(b), below, size)
+    const tb = tops(b, below.camera)
+    expect(tb.length).toBeGreaterThan(0)
+    expect(tb.every(({ i }) => i < players(b)[0].at)).toBe(true)
+  })
+
+  test('잠긴 통나무 더미·덩굴 문은 gate-driftwood·gate-vines를 그린다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const m = defineMap('village', ['.....', '.....', '.....'], {
+      gates: [
+        { area: 'lake', tiles: { tx: 0, ty: 0, w: 1, h: 3 }, look: 'driftwood', front: { tx: 1, ty: 1, facing: 'left' } },
+        { area: 'cave', tiles: { tx: 4, ty: 0, w: 1, h: 2 }, look: 'vines', front: { tx: 3, ty: 0, facing: 'right' } },
+      ],
+    })
+    const p = player(tileCentre(2, 1))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    expect(ctx.sprites.filter((c) => c.name === 'gate-driftwood')).toHaveLength(3)
+    expect(ctx.sprites.filter((c) => c.name === 'gate-vines')).toHaveLength(2)
   })
 })
