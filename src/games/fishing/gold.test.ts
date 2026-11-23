@@ -3,8 +3,9 @@
 // 달력 기준이다: 지갑의 사이트 하루 상한(§5.6)을 넣고 하루 1시간씩 플레이해 약 30일(±20%).
 // 기존 장비 가격은 그대로 두고 고급 장비(5·6단계 낚싯대, 50·60칸 가방)로 늘린다(사용자 결정 2026-11-24).
 import { describe, expect, it } from 'vitest'
-import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS } from './data.ts'
-import { BUY_ORDER, hourlyIncome, simulate, totalSinks } from './econSim.ts'
+import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS, type AreaId } from './data.ts'
+import { BUY_ORDER, buffsAt, hourlyIncome, openFraction, simulate, totalSinks } from './econSim.ts'
+import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
 /** 지갑 설계 §4의 기준 시간당 수입(2단계 낚싯대·마을 물가·20칸). 지갑 1단계에서 src/games/economy.ts로 옮긴다 */
 const REF = 20_500
@@ -96,4 +97,42 @@ describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', (
   it('하루 3시간: 약 16.4일', () => near(daysFor(3), 16.38))
   it('하루 5시간: 약 11.4일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 11.41))
   it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 15.9일', () => near(plain[plain.length - 1].atHours, 15.86))
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M1: 물때 자리·지역 최소 낚싯대·신화 버프
+
+describe('시뮬레이션 확장 (합성 지역)', () => {
+  withTempData(M1_FIXTURE)
+  const gear = { rodTier: 4 as const, bagTier: 3 as const, equipped: [] }
+
+  it('물때 자리는 열린 비율(8/24)만 그 자리, 나머지는 같은 지역 첫 늘 열린 자리로 섞는다', () => {
+    expect(openFraction(TMP_FLAT, 'gully')).toBeCloseTo(8 / 24, 6)
+    expect(openFraction(TMP_FLAT, 'bank')).toBe(1)
+    const mixed = hourlyIncome(TMP_FLAT, 'gully', gear)
+    const bank = hourlyIncome(TMP_FLAT, 'bank', gear)
+    expect(mixed).toBeGreaterThan(bank) // 갯골에는 더 비싼 짱뚱이가 있다
+    // 갯골만 열린 시간에 섞이므로, 늘 갯골에 있는 것보다는 적게 번다: mixed = bank + 1/3 × (갯골 - bank)
+    const gullyGain = (mixed - bank) / (8 / 24)
+    expect(gullyGain).toBeGreaterThan(0)
+    expect(mixed).toBeLessThan(bank + gullyGain * 0.5)
+  })
+  it('지역 최소 낚싯대보다 낮으면 수입 0', () => {
+    expect(hourlyIncome(TMP_DEEP, 'abyss', gear)).toBe(0)
+    expect(hourlyIncome(TMP_DEEP, 'abyss', { ...gear, rodTier: 5 })).toBeGreaterThan(0)
+  })
+  it('이무기의 비늘은 입질만큼, 용왕의 여의주는 판매가(×1.08)만큼 수입을 올린다; 백룡의 숨결은 그대로', () => {
+    const base = hourlyIncome('village', 'shore', gear)
+    expect(hourlyIncome('village', 'shore', { ...gear, buffs: ['dragon-pearl'] }) / base).toBeCloseTo(1.08, 6)
+    expect(hourlyIncome('village', 'shore', { ...gear, buffs: ['imugi-scale'] })).toBeGreaterThan(base)
+    expect(hourlyIncome('village', 'shore', { ...gear, buffs: ['dragon-breath'] })).toBe(base)
+  })
+  it('buffsAt: 신화 지역이 열리고 낚싯대가 신화 minRod 이상이면 얻었다고 본다(백룡의 숨결 제외)', () => {
+    const base: AreaId[] = ['village', 'river', 'forest']
+    expect(buffsAt(base, 6)).toEqual([])
+    expect(buffsAt([...base, TMP_MYTH], 4)).toEqual([])
+    expect(buffsAt([...base, TMP_MYTH], 5)).toEqual(['imugi-scale', 'dragon-pearl'])
+  })
+  it('지금 데이터에는 신화가 없어 버프 없이 그대로(buffsAt 빈 목록)', () => {
+    expect(buffsAt(['village', 'river', 'forest', 'lake', 'cave', 'island'], 6)).toEqual([])
+  })
 })

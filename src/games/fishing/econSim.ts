@@ -12,10 +12,13 @@
 // - 시간: 던질 때마다 평균 입질 지연 (1500 + 4500/2) × biteScale(× 회전 찌 0.7) + 미니게임 8초 + 다음 던지기 3초.
 //   성공률 80%(난이도·바 크기·화면 찌와 무관한 고정값. 진행 속도 고정 검사는 이 가정에 기댄다:
 //   동굴 수입의 대부분인 용암장어(난이도 0.9)는 실제로는 낚싯대가 낮을수록 덜 잡힌다). 가방이 찰 때마다 상점 왕복 TRIP_SEC[지역]초.
+// - 낚시 5부: 물때 자리(tideSpots)는 열린 시각만 그 자리, 닫힌 시각은 같은 지역 첫 늘 열린 자리에서 낚는다고 본다.
+//   지역 최소 낚싯대(areaMinRod)보다 낮으면 그 지역 수입 0. 신화 버프는 얻을 수 있게 되는 즉시 얻었다고 본다(buffsAt):
+//   이무기의 비늘은 입질, 용왕의 여의주는 판매가에 넣고, 백룡의 숨결(바)은 성공률 고정 가정이라 넣지 않는다.
 import { RAIN_CHANCE, type Conditions, type Season } from './clock.ts'
 import {
-  AREAS, BAGS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
-  type AreaId, type BagTier, type Rod, type RodTier, type Species, type TackleId,
+  AREAS, areaMinRod, BAGS, BUFF_FX, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
+  type AreaId, type BagTier, type BuffId, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { pickPool, price } from './logic.ts'
 
@@ -53,10 +56,15 @@ function expectedPrice(s: Species, spot: string): number {
   return v
 }
 
-export type Gear = { rodTier: RodTier; bagTier: BagTier; equipped: readonly TackleId[] }
+export type Gear = { rodTier: RodTier; bagTier: BagTier; equipped: readonly TackleId[]; buffs?: readonly BuffId[] }
 
-/** 한 자리에서 성공한 한 마리의 기대 판매가(조건 평균, 전설 제외) */
-export function fishValue(area: AreaId, spot: string, rodTier: Gear['rodTier'], equipped: readonly TackleId[]): number {
+/**
+ * 한 자리에서 성공한 한 마리의 기대 판매가(조건 평균, 전설·신화 제외).
+ * minutes가 있으면 그 게임 시각(분)만 평균한다(물때 자리의 열린·닫힌 시각).
+ */
+export function fishValue(
+  area: AreaId, spot: string, rodTier: Gear['rodTier'], equipped: readonly TackleId[], minutes?: (gameMinute: number) => boolean,
+): number {
   const rod = RODS.find((r) => r.tier === rodTier)!
   const curious = equipped.includes('curious')
   const weight = (r: NormalRarity) => rod.weights[r] * (curious && r === 'rare' ? TACKLE_FX.curiousRare : 1)
@@ -65,6 +73,7 @@ export function fishValue(area: AreaId, spot: string, rodTier: Gear['rodTier'], 
   let wsum = 0
   for (const season of SEASONS) {
     for (let gameMinute = 0; gameMinute < 1440; gameMinute += 10) {
+      if (minutes && !minutes(gameMinute)) continue
       for (const weather of ['sun', 'rain'] as const) {
         const w = weather === 'rain' ? RAIN_CHANCE : 1 - RAIN_CHANCE
         const cond: Conditions = { gameMinute, gameDay: 0, season, weather }
@@ -83,18 +92,56 @@ export function fishValue(area: AreaId, spot: string, rodTier: Gear['rodTier'], 
       }
     }
   }
-  return sum / wsum
+  return wsum > 0 ? sum / wsum : 0
 }
 
-/** 한 자리의 기대 시간당 판매 수입(G/h) */
+/** 그 자리가 열려 있는 하루 중 비율(10분 간격). 물때 없는 자리는 1 */
+export function openFraction(area: AreaId, spot: string): number {
+  let open = 0
+  for (let m = 0; m < 1440; m += 10) if (spotOpen(area, spot, m)) open++
+  return open / 144
+}
+
+/** 그 시각들에 성공한 한 마리의 기대 판매가 × 판매가 버프 */
+function valueAt(area: AreaId, spot: string, gear: Gear, minutes?: (gameMinute: number) => boolean): number {
+  const pearl = gear.buffs?.includes('dragon-pearl') ? BUFF_FX.pearlSell / 100 : 1
+  return fishValue(area, spot, gear.rodTier, gear.equipped, minutes) * pearl
+}
+
+/** 한 자리의 기대 시간당 판매 수입(G/h). 물때 자리는 닫힌 시각에 같은 지역 첫 늘 열린 자리로 옮겨 낚는다 */
 export function hourlyIncome(area: AreaId, spot: string, gear: Gear): number {
+  if (gear.rodTier < areaMinRod(area)) return 0
   const rod = RODS.find((r) => r.tier === gear.rodTier)!
   const spinner = gear.equipped.includes('spinner')
-  const biteSec = ((1500 + 4500 / 2) / 1000) * rod.biteScale * (spinner ? TACKLE_FX.spinnerBite : 1)
+  const imugi = gear.buffs?.includes('imugi-scale') ? BUFF_FX.imugiBite : 1
+  const biteSec = ((1500 + 4500 / 2) / 1000) * rod.biteScale * (spinner ? TACKLE_FX.spinnerBite : 1) * imugi
   const castSec = biteSec + SIM.fightSec + SIM.recastSec
   const bag = BAGS.find((b) => b.tier === gear.bagTier)!.size
-  const secPerFish = castSec / SIM.successRate + TRIP_SEC[area] / bag
-  return (3600 / secPerFish) * fishValue(area, spot, gear.rodTier, gear.equipped)
+  // 합성 지역(테스트)처럼 표에 없는 지역은 가장 먼 왕복으로 본다
+  const trip = (TRIP_SEC as Partial<Record<AreaId, number>>)[area] ?? Math.max(...Object.values(TRIP_SEC))
+  const secPerFish = castSec / SIM.successRate + trip / bag
+  const open = openFraction(area, spot)
+  let value: number
+  if (open >= 1) value = valueAt(area, spot, gear)
+  else {
+    const alt = AREAS.find((a) => a.id === area)?.spots.find((s) => openFraction(area, s) >= 1)
+    const isOpen = (m: number) => spotOpen(area, spot, m)
+    value = open * valueAt(area, spot, gear, isOpen) + (1 - open) * (alt ? valueAt(area, alt, gear, (m) => !isOpen(m)) : 0)
+  }
+  return (3600 / secPerFish) * value
+}
+
+/**
+ * 이 지역들·낚싯대로 얻었다고 보는 신화 버프(BUFFS 순서는 SPECIES 순서를 따른다):
+ * 신화의 지역이 열렸고 낚싯대가 그 신화의 minRod 이상. 백룡의 숨결(바 크기)은 성공률 고정 가정이라 넣지 않는다.
+ */
+export function buffsAt(areas: readonly AreaId[], rodTier: RodTier): BuffId[] {
+  const out: BuffId[] = []
+  for (const s of SPECIES) {
+    const b = s.rarity === 'mythic' ? s.legend?.buff : undefined
+    if (b && b !== 'dragon-breath' && areas.includes(s.area) && rodTier >= s.minRod && !out.includes(b)) out.push(b)
+  }
+  return out
 }
 
 /**
@@ -109,12 +156,13 @@ export function bestSpot(areas: readonly AreaId[], rodTier: RodTier, bagTier: Ba
     for (const b of owned) if (a < b) combos.push([a, b])
   }
   let best = { area: 'village' as AreaId, spot: 'shore', equipped: [] as TackleId[], income: 0 }
+  const buffs = buffsAt(areas, rodTier)
   for (const area of AREAS) {
     if (!areas.includes(area.id)) continue
     for (const spot of area.spots) {
       for (const equipped of combos) {
         if (equipped.length > slots) continue
-        const income = hourlyIncome(area.id, spot, { rodTier, bagTier, equipped })
+        const income = hourlyIncome(area.id, spot, { rodTier, bagTier, equipped, buffs })
         if (income > best.income) best = { area: area.id, spot, equipped, income }
       }
     }
