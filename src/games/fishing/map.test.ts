@@ -21,6 +21,7 @@ import {
   type Facing,
   type Gate,
   type Opened,
+  type Teleporter,
   type TileKind,
   type Vec,
 } from './map.ts'
@@ -28,6 +29,7 @@ import type { AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
 import { DEFAULT_AREAS } from './data.ts'
+import { feetBlocked, stepWalk, type Player } from './walk.ts'
 
 const MAP_W = VILLAGE.w
 const MAP_H = VILLAGE.h
@@ -590,5 +592,85 @@ describe('산 호수·동굴·섬 타일', () => {
     expect(castTarget(cave, center(0, 0), 'right', 1)).toEqual(center(4, 0))
     const lavaOnly = defineMap('cave', ['_LLLLLLL'], { spots: { lava: 'cave3' } })
     expect(castTarget(lavaOnly, center(0, 0), 'right', 1)).toEqual({ x: center(0, 0).x + 5 * TILE, y: center(0, 0).y })
+  })
+})
+
+describe('순간이동기', () => {
+  // 0 TTTTTTTTTT
+  // 1 T,,,,,,,,T
+  // 2 T,,,,,,,,T   (4,2)~(5,3) 순간이동기 2×2
+  // 3 T,,,,,,,,T
+  // 4 T,,,,,,,,T   (4,4) 도착 자리(아래를 본다)
+  // 5 T~~~~~~~~T
+  // 6 TTTTTTTTTT
+  const ROWS = [
+    'TTTTTTTTTT',
+    'T,,,,,,,,T',
+    'T,,,,,,,,T',
+    'T,,,,,,,,T',
+    'T,,,,,,,,T',
+    'T~~~~~~~~T',
+    'TTTTTTTTTT',
+  ]
+  const TP: Teleporter = { tiles: { tx: 4, ty: 2, w: 2, h: 2 }, front: { tx: 4, ty: 4, facing: 'down' } }
+  const make = (teleporter: Teleporter | null = TP, world = { tx: 7, ty: -3 }) =>
+    defineMap('river', ROWS, { spots: { water: 'sea' }, teleporter: teleporter ?? undefined, world })
+  const MAP = make()
+  const at = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
+
+  it('defineMap 기본값: world {0,0}, teleporter null. 지정하면 그대로', () => {
+    const plain = defineMap('river', ['TTTT', 'T,,T', 'TTTT'])
+    expect(plain.world).toEqual({ tx: 0, ty: 0 })
+    expect(plain.teleporter).toBeNull()
+    expect(MAP.world).toEqual({ tx: 7, ty: -3 })
+    expect(MAP.teleporter).toEqual(TP)
+  })
+
+  it('이동기 칸은 어떤 열림에서도 못 걷고 옆 칸은 걷는다; 발도 걸린다', () => {
+    for (const [tx, ty] of [[4, 2], [5, 2], [4, 3], [5, 3]]) {
+      expect(isWalkable(MAP, tx, ty, ALL_AREAS_OPEN), `${tx},${ty}`).toBe(false)
+      expect(isWalkable(MAP, tx, ty, new Set<AreaId>(DEFAULT_AREAS)), `${tx},${ty}`).toBe(false)
+    }
+    for (const [tx, ty] of [[3, 2], [6, 3], [4, 1], [5, 4]]) expect(isWalkable(MAP, tx, ty, ALL_AREAS_OPEN), `${tx},${ty}`).toBe(true)
+    expect(feetBlocked(MAP, at(4, 2).x, at(4, 2).y, ALL_AREAS_OPEN)).toBe(true)
+    expect(feetBlocked(MAP, at(4, 4).x, at(4, 4).y, ALL_AREAS_OPEN)).toBe(false)
+  })
+
+  it('stepWalk: 이동기로 걸으면 그 앞에서 멈춘다', () => {
+    let p: Player = { pos: at(4, 4), facing: 'up', moving: false, walkMs: 0 }
+    for (let i = 0; i < 60; i++) p = stepWalk(MAP, p, { x: 0, y: -1 }, 16, ALL_AREAS_OPEN)
+    expect(tileOf(p.pos)).toEqual({ tx: 4, ty: 4 })
+  })
+
+  it('interactionAt: 구조물을 아래·옆·위에서 보면 teleporter, 등지거나 옆을 보면 아님', () => {
+    const cases: [number, number, Facing][] = [[4, 4, 'up'], [5, 4, 'up'], [3, 2, 'right'], [6, 3, 'left'], [4, 1, 'down'], [5, 1, 'down']]
+    for (const [tx, ty, f] of cases) expect(interactionAt(MAP, at(tx, ty), f, ALL_AREAS_OPEN), `${tx},${ty} ${f}`).toEqual({ kind: 'teleporter' })
+    for (const [tx, ty, f] of [[4, 4, 'down'], [4, 4, 'left'], [3, 2, 'left'], [6, 4, 'up']] as [number, number, Facing][]) {
+      expect(interactionAt(MAP, at(tx, ty), f, ALL_AREAS_OPEN)?.kind, `${tx},${ty} ${f}`).not.toBe('teleporter')
+    }
+    // 도착 자리에서 도착 방향 그대로는 다시 열리지 않는다
+    expect(interactionAt(MAP, at(TP.front.tx, TP.front.ty), TP.front.facing, ALL_AREAS_OPEN)?.kind).not.toBe('teleporter')
+  })
+
+  it('이동기가 없는 맵은 teleporter 상호작용이 없다', () => {
+    const plain = make(null)
+    expect(plain.teleporter).toBeNull()
+    expect(interactionAt(plain, at(4, 4), 'up', ALL_AREAS_OPEN)).toBeNull()
+  })
+
+  it('defineMap: 칸이 맵 밖·물 위·나무 위, front가 칸 안·떨어짐·못 걷는 칸, front.facing이 구조물을 보면 throw', () => {
+    const bad: Teleporter[] = [
+      { ...TP, tiles: { tx: 8, ty: 2, w: 2, h: 2 } },
+      { ...TP, tiles: { tx: 4, ty: 4, w: 2, h: 2 } },
+      { ...TP, tiles: { tx: 0, ty: 2, w: 2, h: 2 } },
+      { ...TP, front: { tx: 4, ty: 3, facing: 'down' } },
+      { ...TP, front: { tx: 7, ty: 4, facing: 'down' } },
+      { ...TP, front: { tx: 4, ty: 5, facing: 'down' } },
+      { ...TP, front: { tx: 4, ty: 4, facing: 'up' } },
+    ]
+    for (const t of bad) expect(() => make(t), JSON.stringify(t)).toThrow(/teleporter/)
+    // 옆이나 위에 붙은 도착 자리는 된다
+    expect(() => make({ ...TP, front: { tx: 6, ty: 2, facing: 'right' } })).not.toThrow()
+    expect(() => make({ ...TP, front: { tx: 5, ty: 1, facing: 'up' } })).not.toThrow()
   })
 })

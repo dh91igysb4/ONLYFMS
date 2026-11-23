@@ -212,6 +212,7 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'fish') return `fish-${i.spot}`
   if (i.kind === 'gate') return `gate-${i.area}`
   if (i.kind === 'dock') return `dock-${i.target}`
+  if (i.kind === 'teleporter') return 'teleporter'
   return 'shop'
 }
 /** 열린 지역: 기본 지역(마을·강·숲)과 서버 상태의 areas. 아직 못 받았으면 기본 지역만 */
