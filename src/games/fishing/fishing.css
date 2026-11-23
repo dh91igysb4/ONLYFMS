@@ -127,6 +127,7 @@
 .fish-rod-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 14px; }
 .fish-rod-state { color: var(--win-text); }
 .fish-rod-owned { opacity: 0.85; }
+.fish-unlock-price { color: var(--accent-strong); font-weight: 700; font-variant-numeric: tabular-nums; }
 .fish-gear { display: flex; flex-direction: column; gap: 6px; }
 .fish-slots { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
 .fish-slot {

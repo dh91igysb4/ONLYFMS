@@ -1,6 +1,6 @@
-// 낚시 메뉴(가방·상점·도감). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
+// 낚시 메뉴(가방·상점·도감·지역 해금). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, TACKLES, tackleSlots, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { price, type View } from './logic.ts'
 import { spriteDataUrl } from './sprites.ts'
@@ -219,6 +219,32 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
           )
         })}
       </ul>
+    </section>
+  )
+}
+
+type UnlockProps = { view: View; area: AreaId; busy: boolean; onUnlock(): void }
+
+/** 잠긴 문·선착장 앞에서 여는 해금 창: 무엇을 사는지, 가격, 보유 골드, 열기. 골드가 모자라면 열기를 끈다. */
+export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
+  const unlock = UNLOCKS[area]
+  if (!unlock) return null
+  const areaName = AREAS.find((a) => a.id === area)?.name ?? area
+  const short = view.gold < unlock.price
+  return (
+    <section className="fish-panel-body" aria-label="지역 열기">
+      <div className="fish-rod">
+        <div className="fish-rod-info">
+          <strong>{unlock.name}</strong>
+          <span className="muted">{areaName}에 갈 수 있어요</span>
+          <span className="fish-unlock-price">{gold(unlock.price)}</span>
+          <span className="muted">보유 {gold(view.gold)}</span>
+          {short && <span className="fish-shop-note">골드가 모자라요</span>}
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy || short} onClick={onUnlock}>
+          열기
+        </button>
+      </div>
     </section>
   )
 }

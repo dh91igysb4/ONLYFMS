@@ -1,9 +1,11 @@
 // 낚시터의 마지막 지역·위치를 브라우저(localStorage)에 사용자별로 저장·복원한다.
 // 저장소가 막혀 있거나 값이 깨졌거나 지역·맵이 바뀌어 못 쓰는 자리면 null(마을 시작 위치에서 시작).
 // 1단계 형식({pos, facing}, area 없음)은 마을로 읽는다.
+// 열린 지역으로 거르는 일은 첫 서버 상태를 받은 뒤 startPosition이 한다.
 import { AREAS, type AreaId } from './data.ts'
-import { ALL_AREAS_OPEN, type Facing, type MapDef, type Vec } from './map.ts'
+import { ALL_AREAS_OPEN, type Facing, type MapDef, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
+import { VILLAGE } from './maps/village.ts'
 import { feetBlocked } from './walk.ts'
 
 export type SavedPosition = { area: AreaId; pos: Vec; facing: Facing }
@@ -42,4 +44,14 @@ export function savePosition(userId: string, p: SavedPosition): void {
   } catch {
     /* 저장소가 막혀 있으면 다음에 시작 위치에서 시작한다 */
   }
+}
+
+/**
+ * 첫 서버 상태(열린 지역)를 받은 뒤 시작할 자리.
+ * 저장 위치가 없거나, 그 지역이 아직 안 열렸거나, 발이 열린 지역 기준으로 못 걷는 칸(아직 잠긴 문 등)에 걸치면 마을 시작 위치.
+ */
+export function startPosition(saved: SavedPosition | null, opened: Opened): SavedPosition {
+  const map = saved && opened.has(saved.area) ? mapFor(saved.area) : null
+  if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) return saved
+  return { area: VILLAGE.id, pos: { ...VILLAGE.spawn.pos }, facing: VILLAGE.spawn.facing }
 }
