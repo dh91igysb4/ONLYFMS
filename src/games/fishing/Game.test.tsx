@@ -377,7 +377,9 @@ describe('fishing Game', () => {
     const rods = screen.getByRole('list', { name: '낚싯대 목록' })
     expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
     expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
-    expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(2)
+    expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
+    // 5·6단계는 고급 장비: 없어도 모든 물고기를 낚는다
+    expect(within(rods).getAllByText('고급 장비 · 없어도 모든 물고기를 낚아요')).toHaveLength(2)
     unmount()
 
     const rich = makeView({ gold: 2000 })
@@ -401,7 +403,7 @@ describe('fishing Game', () => {
   })
 
   test('shop shows the top-tier message when the best rod is owned', async () => {
-    await mountAtShop(makeView({ rodTier: 4 }))
+    await mountAtShop(makeView({ rodTier: 6 }))
     expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '구매' })).not.toBeInTheDocument()
   })
@@ -1539,11 +1541,11 @@ describe('fishing Game: walking and interaction', () => {
     expect(within(bags).getByText('골드가 부족해요')).toBeInTheDocument()
     unmount()
 
-    await mountAtShop(makeView({ gold: 99999, bagTier: 3, rodTier: 1 }))
+    await mountAtShop(makeView({ gold: 99999, bagTier: 5, rodTier: 1 }))
     const top = screen.getByRole('list', { name: '가방 목록' })
     expect(within(top).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
-    expect(screen.getByText('0/40')).toBeInTheDocument()
+    expect(screen.getByText('0/60')).toBeInTheDocument()
   })
 
   test('unmount releases the scene background cache', async () => {

@@ -1,6 +1,6 @@
 // 낚시 미니게임 물리. 순수 함수만: DOM·시계·Math.random 없이 난수는 rng 인자, 시간은 dtMs로만 받는다.
 // 위치는 모두 0~1(트랙 아래 = 0).
-import { RODS, SPECIES, TACKLE_FX, type Behavior, type TackleId } from './data.ts'
+import { RODS, SPECIES, TACKLE_FX, type Behavior, type RodTier, type TackleId } from './data.ts'
 
 export const MAX_DT_MS = 50
 
@@ -48,7 +48,7 @@ const GAUGE_PERIOD_MS = 1600
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
-export function barParams(speciesId: string, rodTier: 1 | 2 | 3 | 4, equipped: readonly TackleId[] = []): BarParams {
+export function barParams(speciesId: string, rodTier: RodTier, equipped: readonly TackleId[] = []): BarParams {
   const species = SPECIES.find((s) => s.id === speciesId)
   const rod = RODS.find((r) => r.tier === rodTier)
   if (!species) throw new Error(`unknown species: ${speciesId}`)

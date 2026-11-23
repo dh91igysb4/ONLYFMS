@@ -4,13 +4,13 @@ import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
   AREAS, areaHasSpecies, BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
   PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
-  type AreaId, type Challenge, type Rod, type Species, type TackleId,
+  type AreaId, type BagTier, type Challenge, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
-  rodTier: 1 | 2 | 3 | 4
+  rodTier: RodTier
   power: number
   sizeBonus: number
   area: AreaId
@@ -172,8 +172,8 @@ export type PendingView = {
 export type State = {
   gold: number
   totalEarned: number
-  rodTier: 1 | 2 | 3 | 4
-  bagTier: 1 | 2 | 3
+  rodTier: RodTier
+  bagTier: BagTier
   areas: AreaId[]
   bag: Fish[]
   dex: Record<string, { count: number; maxCm: number }>
@@ -469,7 +469,8 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 8,
+  // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
+  version: 9,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.

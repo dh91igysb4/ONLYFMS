@@ -7,6 +7,8 @@ import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
 const ICON_SCALE = 2
+/** 이 단계까지가 기본 낚싯대. 그 위(5·6단계)는 어떤 어종에도 필요 없는 고급 장비 */
+const PREMIUM_ROD = Math.max(...SPECIES.map((s) => s.minRod))
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
@@ -149,6 +151,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
               <div className="fish-rod-info">
                 <strong>{rod.name}</strong>
                 <span className="muted">{rod.price === 0 ? '기본' : gold(rod.price)}</span>
+                {rod.tier > PREMIUM_ROD && !owned && <span className="muted">고급 장비 · 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
                 {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}

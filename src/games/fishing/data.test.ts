@@ -80,7 +80,7 @@ describe('fishing data', () => {
       expect(Object.keys(r.weights).sort()).toEqual(['common', 'rare', 'uncommon'])
       expect(Object.values(r.weights).reduce((a, b) => a + b)).toBe(100)
     }
-    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000])
+    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000, 600_000, 1_300_000])
   })
 })
 
@@ -184,8 +184,8 @@ describe('찌', () => {
       expect(t.desc.length).toBeGreaterThan(0)
     }
   })
-  it('tackleSlots(1..4) = 0,0,1,2, 모르는 단계는 0', () => {
-    expect([1, 2, 3, 4].map(tackleSlots)).toEqual([0, 0, 1, 2])
+  it('tackleSlots(1..6) = 0,0,1,2,2,3, 모르는 단계는 0', () => {
+    expect([1, 2, 3, 4, 5, 6].map(tackleSlots)).toEqual([0, 0, 1, 2, 2, 3])
     expect(tackleSlots(99)).toBe(0)
   })
   it('TACKLE_FX 값', () => {
