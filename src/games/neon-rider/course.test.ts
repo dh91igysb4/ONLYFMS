@@ -255,7 +255,7 @@ describe('neon-rider 코스: 위험물·움직이는 길·블록', () => {
     const c = courseFromTemplates([T])
     const bx = origin(c, 0) + 25000
     const cx = origin(c, 0) + 30000
-    expect(c.blocksNear(at(bx, 3980, 5))).toEqual([{ id: 0, x: bx, y: 0, w: 1000, h: 4000, a: 0 }])
+    expect(c.blocksNear(at(bx, 3980, 5))).toEqual([{ id: 0, x: bx, y: 0, w: 1000, h: 4000, a: 0, endX: c.section(0).endX }])
     expect(c.blocksNear(at(bx, 4100, 5))).toEqual([])
     expect(c.blocksNear(at(bx + 600, 100, 5))).toEqual([])
     expect(c.blocksNear(at(cx - 3500, 0, 5)).map((b) => b.id)).toEqual([1])

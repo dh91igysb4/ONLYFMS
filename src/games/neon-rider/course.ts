@@ -20,7 +20,7 @@ export type Course = {
   moversNear(box: Box): readonly Mover[]
   blocksNear(box: Box): readonly Block[]
   moverById(id: number): Mover // 이미 만든 구간의 길만(상태에 남은 id로 다시 찾기)
-  blockById(id: number): Block // 이미 만든 구간의 블록만(깨어 있는 블록의 처음 치수를 다시 찾기)
+  blockById(id: number): Block // 이미 만든 구간의 블록만(깨어 있는 블록의 처음 치수와 자기 구간 끝 endX를 다시 찾기)
 }
 
 // 최근 몇 개 구간의 템플릿을 피하는지, 캐시에 몇 개 seed를 두는지 (조정 수치가 아니라 구조 값).
@@ -180,7 +180,7 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
       items.movers.push({ item, box: moverIndexBox(item) })
     }
     for (const b of built.blocks) {
-      const item: Block = { ...shiftBlock(b, tx, penY), id: blocks.length }
+      const item: Block = { ...shiftBlock(b, tx, penY), id: blocks.length, endX: built.endX + tx }
       blocks.push(item)
       items.blocks.push({ item, box: blockRestBox(item) })
     }

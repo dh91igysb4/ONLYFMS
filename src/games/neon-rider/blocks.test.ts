@@ -13,7 +13,7 @@ const noHead = (): { x: number; y: number } => ({ x: 1e9, y: 1e9 })
 
 describe('넘어지는 블록: 상태와 도형', () => {
   it('wakeBlock: 꼭짓점 4개(반시계, 0번 = 왼쪽 아래)를 정지 상태(px = x)로 놓는다. 너비는 x − floor(w/2) … x + (w − floor(w/2))', () => {
-    const b: Block = { id: 3, x: 1000, y: 50, w: 401, h: 600, a: 0 }
+    const b: Block = { id: 3, x: 1000, y: 50, w: 401, h: 600, a: 0, endX: 0 }
     const s = wakeBlock(b)
     expect(s.id).toBe(3)
     expect(s.p).toHaveLength(16)
@@ -70,7 +70,7 @@ describe('넘어지는 블록: 상태와 도형', () => {
 })
 
 describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => {
-  const B: Block = { id: 0, x: 0, y: 0, w: mm(1000), h: mm(1000), a: 0 }
+  const B: Block = { id: 0, x: 0, y: 0, w: mm(1000), h: mm(1000), a: 0, endX: 0 }
   const work = () => blockWork(wakeBlock(B), B, [])
 
   it('바퀴가 꼭짓점에 d만큼 파고들면 바퀴는 d·M/(1+M), 꼭짓점은 d/(1+M)만큼 반대로 밀린다', () => {
@@ -113,7 +113,7 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
 
   it('차대 캡슐 안에 들어온 꼭짓점은 캡슐 밖으로, 두 바퀴는 접점 위치 비율(가운데면 반씩)로 반대쪽으로', () => {
     // 45° 돌린 400 mm 정사각형: 맨 위 꼭짓점 하나만 위로 솟는다. 바퀴는 블록에서 멀리(±700 mm) 있다.
-    const D: Block = { id: 0, x: 0, y: 0, w: mm(400), h: mm(400), a: TURN / 8 }
+    const D: Block = { id: 0, x: 0, y: 0, w: mm(400), h: mm(400), a: TURN / 8, endX: 0 }
     const bw = blockWork(wakeBlock(D), D, [])
     const k = [0, 1, 2, 3].reduce((m, i) => (bw.c[i].y > bw.c[m].y ? i : m), 0)
     const { x: vx, y: vy } = { ...bw.c[k] }

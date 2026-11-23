@@ -1312,6 +1312,57 @@ describe('넘어지는 블록', () => {
     expect(step({ ...back, blocksDone: [0] }, false, c).blocks).toEqual([])
   })
 
+  it('끝난 블록: 가운데가 자기 구간 끝 x를 넘으면 blocksDone으로 옮긴다(차가 민 블록을 다음 템플릿으로 가져가지 않는다)', () => {
+    const c = withBlocks([blk(mm(10000), mm(500), mm(2000))], mm(25000))
+    const s0 = step(initSimAt(c, TPL_X, 0), false, c)
+    expect(s0.blocks.map((b) => b.id)).toEqual([0])
+    const endX = c.blockById(0).endX
+    expect(endX).toBe(c.section(0).endX)
+    const shifted = (dx: number) => [{ id: 0, p: s0.blocks[0].p.map((v, i) => (i % 2 === 0 ? v + dx : v)) }]
+    const at = (b: BlockState) => Math.floor((Math.min(b.p[0], b.p[4], b.p[8], b.p[12]) + Math.max(b.p[0], b.p[4], b.p[8], b.p[12])) / 2)
+    const before = shifted(endX - mm(20) - at(s0.blocks[0])) // 가운데가 끝 x 20 mm 앞: 남는다
+    expect(step({ ...s0, blocks: before }, false, c).blocks.map((b) => b.id)).toContain(0)
+    const past = shifted(endX + mm(20) - at(s0.blocks[0])) // 20 mm 넘음: 끝난다
+    const s1 = step({ ...s0, blocks: past }, false, c)
+    expect(s1.blocks.map((b) => b.id)).not.toContain(0)
+    expect(s1.blocksDone).toEqual([0])
+  })
+
+  it('C1: 시드 코스의 blocks 구간을 계속 누름으로 지나면 구덩이를 건너고, 어떤 블록도 자기 구간 끝 x를 넘어 남지 않으며, 다음 템플릿에서 멈추지 않는다', () => {
+    // 최종 리뷰의 재현: 이 시드들은 쓰러진 막대를 다음 템플릿(bowl·spiral·sinuous·stepup·pacman·rampflat·hill·stairs·loop2)까지 밀고 가 멈췄다.
+    const centre = (b: BlockState) => Math.floor((Math.min(b.p[0], b.p[4], b.p[8], b.p[12]) + Math.max(b.p[0], b.p[4], b.p[8], b.p[12])) / 2)
+    const run = (c: Course, k: number, s0: SimState, label: string) => {
+      const sec = c.section(k)
+      const goal = c.section(k + 1).endX
+      let s = s0
+      let best = -Infinity
+      let bestT = 0
+      let cleared = false
+      for (let t = 0; t < 4000 && !s.dead; t++) {
+        s = step(s, true, c)
+        for (const b of s.blocks) expect(centre(b), `${label} t${t} 블록 ${b.id}`).toBeLessThanOrEqual(c.blockById(b.id).endX)
+        const cx = Math.floor((s.rear.x + s.front.x) / 2)
+        if (cx > sec.endX && !s.dead) cleared = true
+        if (cx > goal) break
+        if (cx > best + mm(200)) {
+          best = cx
+          bestT = t
+        }
+        expect(t - bestT, `${label}: 600틱 넘게 200 mm도 못 나아감(x ${Math.floor((cx - sec.endX) / MM)} mm, 구간 끝 기준)`).toBeLessThan(600)
+      }
+      expect(cleared, `${label}: blocks 구간(구덩이)을 살아서 넘지 못함 (${s.dead})`).toBe(true)
+    }
+    for (const n of [2, 4, 5, 7, 8, 11, 14, 20, 36]) {
+      const c = makeSeededCourse(`review-seed-${n}`, TEMPLATES)
+      let k = 0
+      while (c.section(k).templateId !== 'blocks') k++
+      run(c, k, initSimAt(c, c.section(k).startX, V_MAX), `seed ${n} → ${c.section(k + 1).templateId}`)
+    }
+    // 리뷰의 영구 멈춤: blocks 뒤 hill. 정지 출발로 계속 누르면 blocks를 나와 hill을 넘는다.
+    const bh = courseOf(['blocks', 'hill'])
+    run(bh, 0, initSim(bh), 'blocks → hill')
+  }, 120000)
+
   it('Review Focus 4: 블록 8개가 한꺼번에 깨어 있는 템플릿 600틱 동안 상태 JSON ≤ 6000자', () => {
     // 블록 8개(1.5 m 간격)가 10 m 안에 있고, 그 뒤 평지가 길어 다음 반복의 블록은 BLOCK_WAKE 밖이다.
     const c = withBlocks(Array.from({ length: 8 }, (_, k) => blk(mm(8000 + 1500 * k), mm(500), mm(1500))), mm(80000))

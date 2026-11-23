@@ -310,7 +310,8 @@ function nextMovers(
   return { movers, moversDone }
 }
 
-// 블록 정리: 가운데가 차 중심 x보다 BLOCK_WAKE 넘게 뒤이거나, 가장 높은 꼭짓점이 그 자리 코스 바닥 − FALL_DEPTH 아래면 끝난다.
+// 블록 정리: 가운데가 차 중심 x보다 BLOCK_WAKE 넘게 뒤이거나, 자기 구간 끝 x를 넘었거나(차가 민 블록이 다음 템플릿으로 가지 않게),
+// 가장 높은 꼭짓점이 그 자리 코스 바닥 − FALL_DEPTH 아래면 끝난다(설계 §7.3).
 function nextBlocks(s: SimState, course: Course, bws: readonly BlockWork[], cx: number): Pick<SimState, 'blocks' | 'blocksDone'> {
   if (bws.length === 0) return { blocks: s.blocks, blocksDone: s.blocksDone }
   const blocks: BlockState[] = []
@@ -319,7 +320,7 @@ function nextBlocks(s: SimState, course: Course, bws: readonly BlockWork[], cx: 
     const bs = blockState(bw)
     const b = blockBox(bs)
     const mx = Math.floor((b.x0 + b.x1) / 2)
-    if (mx < cx - BLOCK_WAKE || b.y1 < floorY(course, s.nextSection, mx) - FALL_DEPTH) blocksDone.push(bs.id)
+    if (mx < cx - BLOCK_WAKE || mx > course.blockById(bs.id).endX || b.y1 < floorY(course, s.nextSection, mx) - FALL_DEPTH) blocksDone.push(bs.id)
     else blocks.push(bs)
   }
   if (blocksDone.length > BLOCK_MEMORY) blocksDone.splice(0, blocksDone.length - BLOCK_MEMORY)

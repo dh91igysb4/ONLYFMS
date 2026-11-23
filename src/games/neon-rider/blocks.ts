@@ -10,7 +10,7 @@ import { TRIG_ONE, cosT, isqrt, sinT } from './trig.ts'
 
 /** 너비 w·높이 h(u)의 상자. (x, y) = 바닥 변 가운데, a = 처음 각도(TURN, (x, y) 둘레). */
 export type BlockDef = { x: number; y: number; w: number; h: number; a: number }
-export type Block = BlockDef & { id: number } // 월드 좌표
+export type Block = BlockDef & { id: number; endX: number } // 월드 좌표. endX = 자기 구간 끝 x(가운데가 넘으면 끝난다, 설계 §7.3)
 /** 16 정수: 꼭짓점 4개 × (x, y, px, py). 반시계 순서, 0번 = 처음 자세의 왼쪽 아래. (px, py)는 Verlet의 직전 틱 위치. */
 export type BlockState = { id: number; p: number[] }
 
@@ -33,7 +33,7 @@ function restCorners(b: BlockDef): [number, number][] {
   ])
 }
 
-export function wakeBlock(b: Block): BlockState {
+export function wakeBlock(b: BlockDef & { id: number }): BlockState {
   return { id: b.id, p: restCorners(b).flatMap(([x, y]) => [x, y, x, y]) }
 }
 
