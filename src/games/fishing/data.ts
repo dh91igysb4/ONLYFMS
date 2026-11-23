@@ -129,7 +129,7 @@ export const TACKLES: readonly Tackle[] = [
   { id: 'trap', name: '함정 찌', price: 1500, desc: '물고기가 바 밖일 때 진행도가 절반 속도로 줄어요' },
   { id: 'barbed', name: '가시 바늘', price: 2000, desc: '물고기가 바 안에 있으면 바가 물고기 쪽으로 끌려요' },
   { id: 'spinner', name: '회전 찌', price: 1500, desc: '입질이 30% 빨리 와요' },
-  { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀 물고기와 전설 물고기가 1.5배 잘 나와요' },
+  { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설 물고기가 더 잘 나와요' },
 ]
 /** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장 2칸 */
 export function tackleSlots(rodTier: number): number {

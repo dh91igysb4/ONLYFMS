@@ -111,6 +111,19 @@
 .fish-rod-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 14px; }
 .fish-rod-state { color: var(--win-text); }
 .fish-rod-owned { opacity: 0.85; }
+.fish-gear { display: flex; flex-direction: column; gap: 6px; }
+.fish-slots { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+.fish-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+.fish-slot-empty { opacity: 0.5; }
 .fish-dex-item { font-size: 14px; }
 .fish-dex-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .fish-dex-legend { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--on-accent); background: var(--accent-strong); }

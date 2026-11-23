@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, type AreaId, type Species } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, TACKLES, tackleSlots, type AreaId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { price, type View } from './logic.ts'
 import { spriteDataUrl } from './sprites.ts'
@@ -10,8 +10,14 @@ const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 
 /** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. */
-export function BagPanel({ view, atShop }: { view: View; atShop: boolean }) {
+export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: boolean; busy: boolean; onEquip(ids: TackleId[]): void }) {
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
+  const slots = tackleSlots(view.rodTier)
+  const fishing = view.pending !== null
+  const locked = busy || fishing
+  const full = view.equipped.length >= slots
+  const toggle = (id: TackleId) =>
+    onEquip(view.equipped.includes(id) ? view.equipped.filter((x) => x !== id) : [...view.equipped, id])
   return (
     <section className="fish-panel-body" aria-label="가방">
       <p className="muted">
@@ -31,16 +37,58 @@ export function BagPanel({ view, atShop }: { view: View; atShop: boolean }) {
           ),
         )}
       </ul>
+      {view.tackles.length > 0 && (
+        <div className="fish-gear" role="group" aria-label="장비">
+          <h3 className="fish-panel-sub">장비</h3>
+          {fishing && <p className="fish-shop-note">낚시 중에는 바꿀 수 없어요</p>}
+          {slots === 0 && <p className="muted">카본 낚싯대부터 낄 수 있어요</p>}
+          <ul className="fish-slots" aria-label="낀 찌">
+            {Array.from({ length: slots }, (_, i) => {
+              const id = view.equipped[i]
+              return (
+                <li key={i} data-testid="fish-slot" className={`fish-slot${id ? '' : ' fish-slot-empty'}`}>
+                  {id && <img src={spriteDataUrl(`tackle-${id}`, ICON_SCALE)} alt="" />}
+                </li>
+              )
+            })}
+          </ul>
+          <ul className="fish-rods" aria-label="보유 찌">
+            {TACKLES.filter((t) => view.tackles.includes(t.id)).map((t) => {
+              const on = view.equipped.includes(t.id)
+              return (
+                <li key={t.id} className={`fish-rod${on ? ' fish-rod-owned' : ''}`}>
+                  <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
+                  <div className="fish-rod-info">
+                    <strong>{t.name}</strong>
+                    <span className="muted">{t.desc}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    aria-label={t.name}
+                    aria-pressed={on}
+                    disabled={locked || slots === 0 || (!on && full)}
+                    onClick={() => toggle(t.id)}
+                  >
+                    {on ? '빼기' : '끼우기'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
 
-type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void }
+type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
 
-export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
+export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
   const bagValue = view.bag.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
+  const slots = tackleSlots(view.rodTier)
   return (
     <section className="fish-panel-body" aria-label="상점">
       <div className="fish-shop-sell">
@@ -108,6 +156,36 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
                   onClick={() => onBuyBag(bag.tier)}
                 >
                   구매
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <h3 className="fish-panel-sub">찌</h3>
+      {slots === 0 && <p className="fish-shop-note">카본 낚싯대부터 낄 수 있어요</p>}
+      <ul className="fish-rods" aria-label="찌 목록">
+        {TACKLES.map((t) => {
+          const owned = view.tackles.includes(t.id)
+          return (
+            <li key={t.id} className={`fish-rod${owned ? ' fish-rod-owned' : ''}`}>
+              <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
+              <div className="fish-rod-info">
+                <strong>{t.name}</strong>
+                <span className="muted">{t.desc}</span>
+                <span className="muted">{gold(t.price)}</span>
+              </div>
+              {owned ? (
+                <span className="fish-rod-state">보유 중</span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  aria-label={`${t.name} 사기`}
+                  disabled={busy || view.gold < t.price}
+                  onClick={() => onBuyTackle(t.id)}
+                >
+                  사기
                 </button>
               )}
             </li>

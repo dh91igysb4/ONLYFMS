@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type TackleId } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
@@ -150,6 +150,11 @@ const FISHING_MESSAGES: Record<string, string> = {
   bad_action: RETRY,
   bad_area: RETRY,
   bad_power: RETRY,
+  bad_tackle: RETRY,
+  already_owned: '이미 가지고 있어요',
+  not_owned: RETRY,
+  too_many: '칸이 모자라요',
+  busy: '낚시 중에는 바꿀 수 없어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 
@@ -399,7 +404,7 @@ export function Game({ gameId }: WorldGameProps) {
     }
     rt.hookServerNow = res.server_now
     rt.bar = initBar()
-    rt.params = barParams(res.result.species, res.view.rodTier)
+    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped)
     rt.settling = false
     setPhase('fighting')
   }
@@ -801,6 +806,24 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
+  async function buyTackle(id: TackleId) {
+    setNotice(null)
+    try {
+      await act({ type: 'buyTackle', id })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
+  async function equip(ids: TackleId[]) {
+    setNotice(null)
+    try {
+      await act({ type: 'equip', ids })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
   /** 상점 창이 막 열렸으면 누르기·클릭을 버린다(여는 손가락의 유령 클릭 방지) */
   const guardShop = (e: SyntheticEvent) => {
     if (menuRef.current === 'shop' && performance.now() - shopOpenedAt.current < PANEL_GUARD_MS) {
@@ -960,7 +983,7 @@ export function Game({ gameId }: WorldGameProps) {
                   닫기
                 </button>
               </div>
-              {menu === 'bag' && <BagPanel view={view} atShop={atShop} />}
+              {menu === 'bag' && <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} />}
               {menu === 'shop' && (
                 <ShopPanel
                   view={view}
@@ -968,6 +991,7 @@ export function Game({ gameId }: WorldGameProps) {
                   onSell={() => void sell()}
                   onBuy={(t) => void buyRod(t)}
                   onBuyBag={(t) => void buyBag(t)}
+                  onBuyTackle={(id) => void buyTackle(id)}
                 />
               )}
               {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
