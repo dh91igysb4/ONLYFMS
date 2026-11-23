@@ -117,7 +117,8 @@ describe('TEMPLATES', () => {
   // 이어진 두 선분 사이에서 진행 방향이 꺾이는 각. 호 안과 호 이음은 MAX_JOINT보다 작아야 하고,
   // 그보다 큰 꺾임은 직선끼리 일부러 만든 모서리뿐이다(템플릿마다 개수를 적어 둔다). 호 방향을 잘못 쓰면 거의 반 바퀴 꺾여 걸린다.
   const MAX_JOINT = Math.floor(TURN / 24) // 15°
-  const SHARP: Record<string, number> = { spikes: 7, spikes2: 11 }
+  // 직선끼리 만나는 모서리: 삼각 열(△ 4개의 오르막·꼭대기·내리막 + ▽ 꼭짓점 3개 = 12 … 아래 테스트가 센다), 직선 봉우리·경사·계단.
+  const SHARP: Record<string, number> = { spikes: 12, valley: 2, rampflat: 2, roofs: 3, stairs: 7, vplat: 2, curl: 5, spiral: 5 }
   for (const t of TEMPLATES) {
     it(`${t.id}: 이음 꺾임 < 15°, 일부러 만든 모서리 ${SHARP[t.id] ?? 0}개`, () => {
       const s = buildTemplate(t).segs
@@ -130,11 +131,15 @@ describe('TEMPLATES', () => {
       expect(sharp).toBe(SHARP[t.id] ?? 0)
     })
   }
-  it('템플릿 13종, 티어별 개수', () => {
+  it('템플릿 30종(영상 장애물 목록의 정적 지형), 티어별 개수', () => {
     expect(TEMPLATES.map((t) => t.id).sort()).toEqual(
-      ['arcs', 'boostjump', 'bowl', 'hill', 'loop', 'loop2', 'quarter', 'ramp', 'scurve', 'spikes', 'spikes2', 'steps', 'waves'],
+      [
+        'arcs', 'bigdrop', 'boostflat', 'boostjump', 'bowl', 'bowldrop', 'cliff', 'crestgap', 'cup', 'curl',
+        'hill', 'hook', 'humps', 'ledge', 'loop', 'loop2', 'quarter', 'ramp', 'rampflat', 'roofs',
+        'sinuous', 'spikefloor', 'spikepit', 'spikes', 'spiral', 'stairs', 'stepup', 'valley', 'vplat', 'waves',
+      ],
     )
-    expect([1, 2, 3, 4].map((k) => TEMPLATES.filter((t) => t.tier === k).length)).toEqual([4, 4, 3, 2])
+    expect([1, 2, 3, 4].map((k) => TEMPLATES.filter((t) => t.tier === k).length)).toEqual([11, 10, 6, 3])
   })
   it('루프: 몸으로는 가깝지만 길로는 먼 선분 쌍은 진행 번호가 충돌 창(±COLLIDE_WINDOW)보다 멀다', () => {
     // 접지한 차가 루프를 지날 때 입구 쪽에서 출구 쪽 선분(또는 그 반대)에 부딪히지 않으려면 둘이 창 밖이어야 한다.
@@ -157,11 +162,12 @@ describe('TEMPLATES', () => {
       expect(pairs).toBeGreaterThan(0) // 루프는 실제로 겹친다
     }
   })
-  it('bowl은 보석 4개', () => {
-    expect(buildTemplate(TEMPLATES.find((t) => t.id === 'bowl')!).gems).toHaveLength(4)
+  it('보석 수: 녹화에서 보석이 있던 곳(그릇 5, 컵 4, 루프 6, 역삼각 윗변 4, 급경사 궤적 5, 낭떠러지 아래 줄 4)', () => {
+    const want: Record<string, number> = { bowl: 5, bowldrop: 5, cup: 4, loop: 6, vplat: 4, bigdrop: 5, ledge: 4, boostjump: 4, waves: 3, valley: 2, curl: 5, spiral: 5, hook: 5 }
+    for (const t of TEMPLATES) expect(buildTemplate(t).gems.length, t.id).toBe(want[t.id] ?? 0)
   })
-  it('ramp·boostjump·spikes: 점프대 턱(틈 앞 선분 끝)보다 끝 평지가 낮다', () => {
-    for (const id of ['ramp', 'boostjump', 'spikes']) {
+  it('ramp·boostjump·quarter·spikefloor: 점프대 턱(틈 앞 선분 끝)보다 끝 평지가 낮다', () => {
+    for (const id of ['ramp', 'boostjump', 'quarter', 'spikefloor']) {
       const b = buildTemplate(TEMPLATES.find((t) => t.id === id)!)
       const k = b.segs.findIndex((s, i) => i > 0 && s.x0 !== b.segs[i - 1].x1)
       expect(k, id).toBeGreaterThan(0)

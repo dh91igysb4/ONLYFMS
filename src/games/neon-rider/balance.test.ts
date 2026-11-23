@@ -20,7 +20,8 @@ function found(id: string, vx: number): PassResult {
   return r
 }
 
-describe('통과 게이트(빠른 부분)', () => {
+describe.skip('통과 게이트(빠른 부분)', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   it.each(TEMPLATES.map((t) => t.id))('%s: 진입 속도 0·V_MAX·BOOST_V 통과, 넘겨주는 속력 ≤ BOOST_V', (id) => {
     for (const vx of SMOKE) {
       const r = found(id, vx)
@@ -77,7 +78,8 @@ describe('통과 게이트(빠른 부분)', () => {
 const MIN_AIR = 70
 const N_MAX = 100
 const JUMPS = ['ramp', 'boostjump', 'spikes']
-describe('한 바퀴 착지가 가능한 점프', () => {
+describe.skip('한 바퀴 착지가 가능한 점프', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   // longestAir: 턱 근처에서 뜬 뒤의 가장 긴 체공.
   function attempt(id: string, vx: number, n: number): { dead: boolean; flips: number; longestAir: number } {
     const b = buildTemplate(TEMPLATES.find((t) => t.id === id)!)
@@ -112,6 +114,21 @@ describe('한 바퀴 착지가 가능한 점프', () => {
         flipped = !r.dead && r.flips >= 1
       }
       expect(flipped, `${id} vx=${vx} 한 바퀴 착지`).toBe(true)
+    }
+  })
+
+  // 한 바퀴 착지가 '한 틱만 맞으면 되는 묘기'가 아니어야 한다. 손을 떼는 시점의 여유가 0.4초(24틱) 이상.
+  // 공중제비를 '돈 각도 360° 이상'으로 세던 때 ramp는 이 창이 3틱(67~69)이었다: 턱에서 앞이 37° 들린 채 떠서
+  // −32° 내리막에 내리므로, 바퀴로 내리는 대부분의 착지가 360°에 못 미쳤다.
+  const MIN_WINDOW = 24
+  it.each(JUMPS)('%s: 한 바퀴 돌고 살아 내리는 누름 길이가 정지·V_MAX 진입 모두 24틱 이상 있다', (id) => {
+    for (const vx of [0, V_MAX]) {
+      let good = 0
+      for (let n = 1; n <= N_MAX; n++) {
+        const r = attempt(id, vx, n)
+        if (!r.dead && r.flips >= 1) good++
+      }
+      expect(good, `${id} vx=${vx} 한 바퀴 착지 창(틱)`).toBeGreaterThanOrEqual(MIN_WINDOW)
     }
   })
 })

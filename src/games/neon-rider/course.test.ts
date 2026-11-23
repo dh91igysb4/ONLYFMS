@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REST_LEN, START_BACK, START_LEN } from './constants.ts'
+import { REST_LEN, START_BACK, START_LEN, TIER_WEIGHTS } from './constants.ts'
 import { courseCacheSize, courseFromTemplates, courseOf, getCourse, makeSeededCourse } from './course.ts'
 import type { Prim, Template } from './pieces.ts'
 
@@ -61,10 +61,20 @@ describe('neon-rider 코스', () => {
     expect(breaks).toBe(6)
   })
 
-  it('구간 0~3은 tier 1만 나온다', () => {
+  it('첫 가중치 전환(TIER_WEIGHTS[1].from = 3) 전 구간 0~2는 tier 1만 나온다', () => {
+    expect(TIER_WEIGHTS[0].w).toEqual([1, 0, 0, 0])
+    const first = TIER_WEIGHTS[1].from
+    expect(first).toBe(3)
     for (const seed of ['01', '02', '03', '04', '05', '06']) {
       const c = makeSeededCourse(seed, POOL)
-      for (let k = 0; k < 4; k++) expect(c.section(k).templateId.startsWith('t1-')).toBe(true)
+      for (let k = 0; k < first; k++) expect(c.section(k).templateId.startsWith('t1-')).toBe(true)
+    }
+  })
+
+  it('실제 템플릿으로 첫 구간들부터 여러 종류가 나온다: 구간 0~5에 서로 다른 템플릿 4종 이상(seed 20개 모두)', () => {
+    for (let n = 0; n < 20; n++) {
+      const c = getCourse(`5eed${n.toString(16).padStart(4, '0')}`)
+      expect(new Set(ids(c, 6)).size).toBeGreaterThanOrEqual(4)
     }
   })
 

@@ -44,7 +44,9 @@ export type SimState = {
   nextSection: number // 아직 안 지난 첫 구간 번호
   sectionScore: number
   flipScore: number
-  airAngle: number | null // 공중 구간의 부호 있는 누적 회전(TURN 단위). 접지 중이면 null(착지 지급 대기 중에는 계속 쌓으며 유지)
+  // 공중 구간의 차체 각도를 감지 않고 이어 센 값(TURN 단위, 부호 있음). 뜨는 순간의 기울기(−반 바퀴~+반 바퀴)에서 시작해 틱마다 회전을 더한다.
+  // 접지 중이면 null(착지 지급 대기 중에는 계속 쌓으며 유지)
+  airAngle: number | null
   pending: null | { flips: number; perfect: boolean; grace: number }
   lastAward: null | { tick: number; flips: number; perfect: boolean; points: number }
   gems: number
@@ -226,6 +228,15 @@ export function bodyAngle(s: SimState): number {
   return atan2T(s.front.y - s.rear.y, s.front.x - s.rear.x)
 }
 
+/**
+ * 공중제비 수: 차체가 거꾸로 선 자세(각도 ±반 바퀴)를 지난 횟수. 앞으로 돌든 뒤로 돌든 같다(설계 §5.6).
+ * 점프대에서 앞이 들린 채 떠서 내리막에 맞춰 내리면 돈 각도는 360°에 못 미치지만(예: 45° 들린 채 떠서 −32° 경사에 착지하면 283°),
+ * 거꾸로 선 자세를 한 번 지나 바퀴로 내렸으므로 한 바퀴다.
+ */
+export function flipsOf(airAngle: number): number {
+  return Math.abs(Math.floor((airAngle + TURN / 2) / TURN))
+}
+
 export function scoreOf(s: SimState): number {
   return Math.min(SCORE_MAX, s.sectionScore + s.flipScore)
 }
@@ -323,7 +334,8 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   let { airAngle, pending, flipScore, lastAward } = s
   const turned = angDiff(angle, bodyAngle(s))
   if (!rg && !fg) {
-    airAngle = (airAngle ?? 0) + turned
+    // 구간 시작값은 뜨기 직전 차체의 기울기다. 그래야 '거꾸로 선 자세를 지난 횟수'를 셀 수 있다(flipsOf).
+    airAngle = (airAngle ?? angDiff(bodyAngle(s), 0)) + turned
     pending = null // 지급 전에 다시 뜨면 같은 공중 구간으로 이어 센다
   } else if (airAngle !== null) {
     // 처음 닿은 틱과 지급 대기 중(한 바퀴만 닿은 틱)의 회전도 같은 구간에 쌓는다: 다시 뜨면 이어서 세므로 잃지 않는다.
@@ -332,7 +344,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     if (pending === null) {
       const c = (f.hit ?? r.hit) as Cand
       const err = Math.abs(angDiff(angle, atan2T(c.sy, c.sx)))
-      pending = { flips: Math.floor(Math.abs(airAngle) / TURN), perfect: err <= PERFECT_TOL, grace: LAND_GRACE }
+      pending = { flips: flipsOf(airAngle), perfect: err <= PERFECT_TOL, grace: LAND_GRACE }
     } else pending = { ...pending, grace: pending.grace - 1 }
     if ((rg && fg) || pending.grace <= 0) {
       const points = pending.flips * (pending.perfect ? PERFECT_MULT : 1)

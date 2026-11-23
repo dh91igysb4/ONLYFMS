@@ -7,7 +7,8 @@ import { TEMPLATES } from '../pieces.ts'
 
 const SLOW = 120000 // ms
 
-describe('통과 게이트: 두 구간 이어 넘기', () => {
+describe.skip('통과 게이트: 두 구간 이어 넘기', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   it.each(TEMPLATES.map((t) => t.id))('* → %s: 모든 앞 템플릿 뒤에서 넘는다(정지 진입)', (b) => {
     for (const a of TEMPLATES) {
       const r = findPassCourse([a.id, b], 0)

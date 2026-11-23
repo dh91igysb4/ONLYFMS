@@ -10,15 +10,16 @@ export const WHEEL_R = 180 * MM // 바퀴 지름 ≈ 16~18 px → 반지름 8±1
 export const HEAD_OFFSET = 200 * MM // 두 바퀴 중점에서 차 윗방향. 지붕 꼭대기 ≈ 축 위 17 px(380 mm) = OFFSET + R [M13]
 export const HEAD_R = 180 * MM // 지붕 판정원. 축선 위 20~380 mm를 덮는다 [M13]
 export const G = 75 // u/틱². 포물선 0.209 px/프레임² (≈ 16.9 m/s²) ±5% [M2]
-export const DRIVE_ACC = 90 // u/틱². 정지 출발 0.25±0.06 px/프레임² [M3]
+export const DRIVE_ACC = 135 // u/틱². 녹화 측정값(정지 출발 0.25±0.06 px/프레임² ≈ 90)의 1.5배, 사용자 결정 2026-11-23 [M3]
 export const WHEELIE_ACC = 0 // 평지 가속 중 앞 들림이 3° 미만이라 보이지 않음 → 0(코드 경로는 남김) [M11]
 export const V_MAX = 2900 // u/틱. 평지 지속 속도 8.1±0.3 px/프레임 (≈ 10.9 m/s) [M4]
 export const BOOST_V = 5200 // u/틱. 부스터 직후 14.5±1.5 px/프레임 (≈ 19.5 m/s) [M5]
 export const V_TERMINAL = 6400 // u/틱. 종단 속도는 관측 안 됨. 관측 최대 속력(≈15 px/프레임)과 BOOST_V 위의 안전 상한 [M6]
 export const SUBSTEPS = 3 // floor(V_TERMINAL / SUBSTEPS) = 2133 < WHEEL_R. 2로는 3200 ≥ 2880이라 3 [M6]
 // 공중 회전: 두 바퀴에 ±SPIN_ACC를 주면 각가속도 = 2·SPIN_ACC / WHEELBASE (rad/틱²).
-export const SPIN_ACC = 108 // 누르기 시작 후 각가속도 0.55±0.2 °/프레임² → 0.0096 rad × WHEELBASE/2 [M8]
-export const SPIN_MAX = 68 // TURN/틱. 누르고 있을 때 5.8~6.2 °/프레임 (≈ 1바퀴/초) [M7]
+// SPIN_ACC·SPIN_MAX를 같은 비율로 올려 최대 회전까지 걸리는 시간(11~12틱)은 그대로 둔다.
+export const SPIN_ACC = 130 // 녹화 측정값(각가속도 0.55±0.2 °/프레임² → 0.0096 rad × WHEELBASE/2 ≈ 108)의 1.2배, 사용자 결정 2026-11-23 [M8]
+export const SPIN_MAX = 82 // TURN/틱. 녹화 측정값(누르고 있을 때 5.8~6.2 °/프레임 ≈ 1바퀴/초 → 68)의 1.2배, 사용자 결정 2026-11-23 [M7]
 export const AIR_SPIN_DAMP = 3 // 공중에서 뗐을 때 AIR_SPIN_KEEP을 넘는 각속도만 틱마다 1/AIR_SPIN_DAMP씩 줄인다. 빠른 회전이 뗀 뒤 4~6프레임에 1~2 °/프레임로 떨어짐 [M9 ①]
 export const AIR_SPIN_KEEP = 8 // TURN/틱. 이 이하의 느린 잔여 회전은 그대로 남는다(녹화: 1초 넘게 줄지 않음) [M9]
 export const ROLL_DRAG = 1 // u/틱². 손맛 자리표시: V_MAX에서 120틱에 4.1% 감속(5% 미만). 관성 주행 상한 ≈ 3 [M12]
@@ -40,8 +41,10 @@ export const START_LEN = 12000 * MM
 // 시작 평지가 코스 시작점(x = 0) 뒤로 이어지는 길이. 첫 구간(tier 1)에서 되굴러 나오는 속력은 많아야 약 3500 u/틱이고
 // ROLL_DRAG(1 u/틱²)로 멈추기까지 v²/2 ≈ 380 m를 간다(hill 오르막에서 떼면 실측 약 195 m). 그보다 넉넉히 둔다. 측정 대상 아님
 export const START_BACK = 500000 * MM
+// 구간 번호(from)부터 쓰는 티어 1~4 가중치. 티어 1만으로도 11종이라 첫 구간부터 여러 종류가 나온다.
+// 녹화에서는 점수 1~5에서도 컬·구덩이·'9'자 고리가 나와(영상 장애물 목록 "순서와 리듬") 높은 티어를 예전(4·12·30)보다 일찍 섞는다.
 export const TIER_WEIGHTS: readonly { from: number; w: readonly [number, number, number, number] }[] =
-  [{ from: 0, w: [1, 0, 0, 0] }, { from: 4, w: [3, 2, 0, 0] }, { from: 12, w: [2, 3, 2, 0] }, { from: 30, w: [1, 2, 3, 2] }]
+  [{ from: 0, w: [1, 0, 0, 0] }, { from: 3, w: [3, 2, 0, 0] }, { from: 8, w: [3, 3, 1, 0] }, { from: 16, w: [2, 3, 2, 1] }]
 export const SEND_TICKS = 30
 export const PASS_AFTER_TICKS = 30 // 통과 게이트(bots.ts): 구간 끝을 넘은 뒤 이만큼 더 살아 있어야 그 구간을 넘은 것으로 본다
 export const MAX_ACTION_TICKS = 120

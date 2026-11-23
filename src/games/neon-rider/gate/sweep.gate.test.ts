@@ -9,7 +9,8 @@ const SWEEP_STEP = 200
 const SWEEP: readonly number[] = [...new Set([...Array.from({ length: Math.floor(BOOST_V / SWEEP_STEP) + 1 }, (_, i) => i * SWEEP_STEP), V_MAX, BOOST_V])].sort((a, b) => a - b)
 const SLOW = 120000 // ms
 
-describe('통과 게이트: 진입 속도 훑기', () => {
+describe.skip('통과 게이트: 진입 속도 훑기', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   it('진입 속도는 0 ~ BOOST_V의 28가지', () => {
     expect(SWEEP).toHaveLength(28)
     expect([SWEEP[0], SWEEP.at(-1)]).toEqual([0, BOOST_V])
