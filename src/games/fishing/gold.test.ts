@@ -2,8 +2,10 @@
 // 목표(사용자 결정 2026-11-24, 지갑 설계 §4.1): 하루 1시간쯤 하는 사람이 낚시 장비·해금을 다 사는 데 약 한 달.
 // 달력 기준이다: 지갑의 사이트 하루 상한(§5.6)을 넣고 하루 1시간씩 플레이해 약 30일(±20%).
 // 기존 장비 가격은 그대로 두고 고급 장비(5·6단계 낚싯대, 50·60칸 가방)로 늘린다(사용자 결정 2026-11-24).
+// 낚시 5부(설계 2026-11-24-fishing-world-5 §8): 새 지역 해금이 쓸 곳을 늘려 목표가 약 34일(M3 뒤)로 늘어난다.
+// M2(갯벌·늪지)까지는 약 32일(±20%) — 저장소 밖 시험 계산 31.7일과 같다.
 import { describe, expect, it } from 'vitest'
-import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS, type AreaId } from './data.ts'
+import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS, type AreaId, type TackleId } from './data.ts'
 import { BUY_ORDER, buffsAt, hourlyIncome, openFraction, simulate, totalSinks } from './econSim.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
@@ -66,10 +68,16 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
   it('기존 장비·해금은 지금 속도 그대로(4시간 안에 다 산다)', () => {
     expect(at(plain, '가시 바늘').atHours).toBeLessThan(4)
   })
-  it('상한이 없으면 전부 다 사기까지 약 16시간(±20%, 상한 없이 몰아서 하는 경우의 참고값)', () => {
+  it('상한이 없으면 전부 다 사기까지 약 17시간(±20%, 상한 없이 몰아서 하는 경우의 참고값)', () => {
     const h = plain[plain.length - 1].atHours
-    expect(h).toBeGreaterThan(15.86 * 0.8)
-    expect(h).toBeLessThan(15.86 * 1.2)
+    expect(h).toBeGreaterThan(16.86 * 0.8)
+    expect(h).toBeLessThan(16.86 * 1.2)
+  })
+  it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각은 낚시 5부 전과 같다(상한 없음·하루 1시간 상한)', () => {
+    expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.36, 1.46, 1.55, 2.2, 2.86, 2.88, 2.9, 2.92])
+    expect(capped.slice(0, 13).map((m) => +m.atDay.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.36, 1.46, 1.55, 2.43, 3.84, 3.9, 4, 4.03])
+    expect(plain[12].label).toBe('가시 바늘')
+    expect(plain.slice(13, 15).map((m) => m.label)).toEqual(['갯벌 해금', '늪지 해금'])
   })
   it('고급 장비는 살 때마다 시간당 수입이 오른다(새 지역 해금은 오르거나 같다 — 버는 곳이 아니라 갈 곳이 늘어서)', () => {
     const i = plain.findIndex((m) => m.label === '가시 바늘')
@@ -81,10 +89,10 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
 })
 
 describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
-  it('전부 다 사기까지 약 30일(±20%)', () => {
+  it('전부 다 사기까지 약 32일(±20%, M2 — 갯벌·늪지 해금 포함, 시험 계산 31.7일)', () => {
     const d = capped[capped.length - 1].atDay
-    expect(d).toBeGreaterThan(24)
-    expect(d).toBeLessThan(36)
+    expect(d).toBeGreaterThan(32 * 0.8)
+    expect(d).toBeLessThan(32 * 1.2)
   })
   it('3주 안에 다 사지 못한다(지갑 실패 조건), 기존 장비는 일주일 안', () => {
     expect(capped[capped.length - 1].atDay).toBeGreaterThan(21)
@@ -99,9 +107,9 @@ describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
 describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', () => {
   const daysFor = (hoursPerDay: number) => simulate(BUY_ORDER, { hoursPerDay, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE }).at(-1)!.atDay
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.1)
-  it('하루 3시간: 약 16.4일', () => near(daysFor(3), 16.38))
-  it('하루 5시간: 약 11.4일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 11.41))
-  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 15.9일', () => near(plain[plain.length - 1].atHours, 15.86))
+  it('하루 3시간: 약 17.6일', () => near(daysFor(3), 17.59))
+  it('하루 5시간: 약 12.1일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 12.14))
+  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 16.9일', () => near(plain[plain.length - 1].atHours, 16.86))
 })
 
 // ---------------------------------------------------------------- 낚시 5부 M1: 물때 자리·지역 최소 낚싯대·신화 버프
@@ -137,7 +145,28 @@ describe('시뮬레이션 확장 (합성 지역)', () => {
     expect(buffsAt([...base, TMP_MYTH], 4)).toEqual([])
     expect(buffsAt([...base, TMP_MYTH], 5)).toEqual(['imugi-scale', 'dragon-pearl'])
   })
-  it('지금 데이터에는 신화가 없어 버프 없이 그대로(buffsAt 빈 목록)', () => {
+  it('기존 여섯 지역에는 신화가 없어 버프 없이 그대로(buffsAt 빈 목록)', () => {
     expect(buffsAt(['village', 'river', 'forest', 'lake', 'cave', 'island'], 6)).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------- 낚시 5부 M2: 갯벌·늪지
+describe('갯벌·늪지 수입 (40칸, 회전+호기심, 얻을 수 있는 신화 버프 포함)', () => {
+  const gear = (rodTier: 4 | 5 | 6) => ({ rodTier, bagTier: 3 as const, equipped: ['spinner', 'curious'] as TackleId[], buffs: buffsAt(['cave', 'tideflat', 'swamp'], rodTier) })
+  it.each([4, 5, 6] as const)('낚싯대 %i: 갯벌 갯골(물때 섞음) < 동굴 용암, 늪지 수렁 ≤ 동굴 용암', (rod) => {
+    const lava = hourlyIncome('cave', 'cave3', gear(rod))
+    expect(hourlyIncome('tideflat', 'creek', gear(rod))).toBeLessThan(lava)
+    expect(hourlyIncome('swamp', 'bog', gear(rod))).toBeLessThanOrEqual(lava)
+  })
+  it('시험 계산과 같은 크기(±5%): 낚싯대 4에서 갯골 61,400 · 수렁 73,700', () => {
+    const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.05)
+    near(hourlyIncome('tideflat', 'creek', gear(4)), 61_400)
+    near(hourlyIncome('swamp', 'bog', gear(4)), 73_700)
+  })
+  it('이무기의 비늘은 늪지와 백골 낚싯대가 있어야 얻었다고 본다', () => {
+    expect(buffsAt(['swamp'], 4)).toEqual([])
+    expect(buffsAt(['tideflat'], 6)).toEqual([])
+    expect(buffsAt(['swamp'], 5)).toEqual(['imugi-scale'])
+  })
+})
+
