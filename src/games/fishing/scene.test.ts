@@ -331,31 +331,34 @@ describe('drawWorld with an offscreen canvas', () => {
     })
   })
 
-  test('the static map is cached in two canvases once; each frame blits the camera view with one drawImage', () => {
+  test('the static map is cached in two canvases once (built over two frames); each frame blits the camera view with one drawImage', () => {
     const size = { w: 195, h: 280 }
     const main = new RecordingCtx()
     const s = scene('idle', player(SPAWN.pos), size)
     drawWorld(asCtx(main), { ...s, tMs: 0 }, size)
     drawWorld(asCtx(main), { ...s, tMs: 100 }, size)
     drawWorld(asCtx(main), { ...s, tMs: 600 }, size)
+    drawWorld(asCtx(main), { ...s, tMs: 700 }, size)
     expect(made).toHaveLength(2)
     expect(made.every((c) => c.rects.length > 0 && c.sprites.some((t) => t.name === 'shop'))).toBe(true)
-    expect(main.images).toHaveLength(3)
+    expect(main.images).toHaveLength(4)
     const [img, sx, sy, sw, sh, dx, dy, dw, dh] = main.images[0]
     expect([sx, sy, sw, sh, dx, dy, dw, dh]).toEqual([s.camera.x, s.camera.y, 195, 280, 0, 0, 195, 280])
     expect((img as HTMLCanvasElement).width).toBe(48 * 16)
     expect((img as HTMLCanvasElement).height).toBe(36 * 16)
     expect(main.images[1][0]).toBe(img)
     expect(main.images[2][0]).not.toBe(img)
+    expect(main.images[3][0]).toBe(main.images[2][0])
     // 타일은 캐시에만 그리고 화면에는 그리지 않는다
     expect(main.sprites.some((c) => c.name.startsWith('water-') || c.name === 'shop' || c.name === 'tile-grass')).toBe(false)
-    expect(players(main)).toHaveLength(3) // 프레임마다 하나
+    expect(players(main)).toHaveLength(4) // 프레임마다 하나
 
     // 크기가 바뀌어도 맵 캐시는 그대로
     drawWorld(asCtx(main), scene('idle', player(SPAWN.pos), { w: 320, h: 480 }), { w: 320, h: 480 })
     expect(made).toHaveLength(2)
 
     releaseSceneCache()
+    drawWorld(asCtx(main), s, size)
     drawWorld(asCtx(main), s, size)
     expect(made).toHaveLength(4)
     expect(main.images.at(-1)?.[0]).not.toBe(img)
@@ -374,6 +377,7 @@ describe('drawWorld with an offscreen canvas', () => {
     const villageImg = main.images[0][0] as HTMLCanvasElement
 
     drawWorld(asCtx(main), inOther, size)
+    drawWorld(asCtx(main), inOther, size)
     expect(made).toHaveLength(4)
     const otherImg = main.images.at(-1)?.[0] as HTMLCanvasElement
     expect(otherImg).not.toBe(villageImg)
@@ -385,8 +389,58 @@ describe('drawWorld with an offscreen canvas', () => {
 
     // 되돌아오면 마을 캐시는 이미 버려졌으므로 새로 만든다
     drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
     expect(made).toHaveLength(6)
     expect(main.images.at(-1)?.[0]).not.toBe(villageImg)
+  })
+
+  test('switching maps builds one frame on the swap draw and the other on the next; drawing never throws between', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(2)
+
+    // 바꾼 프레임: 한 장만 만들고, 물 모양 1번 때도 그 장으로 그린다
+    expect(() => drawWorld(asCtx(main), { ...inOther, tMs: 600 }, size)).not.toThrow()
+    expect(made).toHaveLength(3)
+    const first = main.images.at(-1)?.[0] as HTMLCanvasElement
+    expect([first.width, first.height]).toEqual([6 * 16, 5 * 16])
+    // 다음 프레임: 나머지 한 장
+    expect(() => drawWorld(asCtx(main), { ...inOther, tMs: 600 }, size)).not.toThrow()
+    expect(made).toHaveLength(4)
+    expect(main.images.at(-1)?.[0]).not.toBe(first)
+    drawWorld(asCtx(main), { ...inOther, tMs: 0 }, size)
+    expect(main.images.at(-1)?.[0]).toBe(first)
+    expect(made).toHaveLength(4)
+  })
+
+  test('replaced or released frames are shrunk to zero size to free canvas memory', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+    const frames = new Set<HTMLCanvasElement>()
+    const spy = vi.spyOn(document, 'createElement')
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), { ...inVillage, tMs: 600 }, size)
+    for (const r of spy.mock.results) if ((r.value as HTMLElement).tagName === 'CANVAS') frames.add(r.value as HTMLCanvasElement)
+    expect(frames.size).toBe(2)
+    expect([...frames].every((c) => c.width > 0 && c.height > 0)).toBe(true)
+
+    drawWorld(asCtx(main), inOther, size) // 맵 교체
+    expect([...frames].every((c) => c.width === 0 && c.height === 0)).toBe(true)
+
+    drawWorld(asCtx(main), inOther, size)
+    const second = [...spy.mock.results].map((r) => r.value as HTMLElement).filter((e) => e.tagName === 'CANVAS' && !frames.has(e as HTMLCanvasElement)) as HTMLCanvasElement[]
+    expect(second).toHaveLength(2)
+    expect(second.every((c) => c.width > 0)).toBe(true)
+    releaseSceneCache()
+    expect(second.every((c) => c.width === 0 && c.height === 0)).toBe(true)
   })
 
   test('tree tops cover the player standing above the trunk, not the player below it', () => {

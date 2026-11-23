@@ -436,37 +436,53 @@ function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: nu
 
 /**
  * 맵 캐시: 한 번에 맵 하나만 가진다(map.id가 바뀌면 이전 것을 버린다).
- * gfx는 계산해 둔 땅, frames는 물 타일 두 장 각각에 맞춘 맵 전체를 오프스크린 캔버스 두 개에 한 번 그려 둔 것이다.
+ * gfx는 계산해 둔 땅, frames는 물 타일 두 장 각각에 맞춘 맵 전체를 오프스크린 캔버스에 한 번 그려 둔 것이다.
+ * 맵을 바꾼 프레임에는 0번 장만 만들고 1번 장은 다음 프레임에 만든다(한 프레임에 큰 맵 둘을 그리면 멈칫한다).
+ * 1번 장이 생길 때까지는 0번 장을 두 물 모양에 모두 쓴다.
  * 오프스크린 2D 컨텍스트를 못 얻으면(jsdom 등) frames 없이 매 프레임 보이는 타일만 직접 그린다.
  */
-type Cache = { gfx: MapGfx; frames: [HTMLCanvasElement, HTMLCanvasElement] | null }
+type Cache = { gfx: MapGfx; frames: HTMLCanvasElement[] | null }
 let cache: Cache | null = null
 
-function renderFrames(g: MapGfx): [HTMLCanvasElement, HTMLCanvasElement] | null {
+function renderFrame(g: MapGfx, k: number): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null
-  const frames: HTMLCanvasElement[] = []
-  for (const k of [0, 1]) {
-    const c = document.createElement('canvas')
-    c.width = g.map.w * TILE
-    c.height = g.map.h * TILE
-    const cx = c.getContext('2d')
-    if (!cx) return null
-    cx.imageSmoothingEnabled = false
-    drawStatic(cx, g, k, 0, 0, g.map.w - 1, g.map.h - 1)
-    frames.push(c)
+  const c = document.createElement('canvas')
+  c.width = g.map.w * TILE
+  c.height = g.map.h * TILE
+  const cx = c.getContext('2d')
+  if (!cx) {
+    c.width = c.height = 0
+    return null
   }
-  return [frames[0], frames[1]]
+  cx.imageSmoothingEnabled = false
+  drawStatic(cx, g, k, 0, 0, g.map.w - 1, g.map.h - 1)
+  return c
+}
+
+/** 버리는 캔버스의 픽셀 메모리를 바로 돌려준다(iOS는 가비지 컬렉션을 기다려 주지 않는다) */
+function disposeCache(c: Cache | null): void {
+  for (const f of c?.frames ?? []) f.width = f.height = 0
 }
 
 /** 맵 캐시를 놓아 준다(게임 화면을 떠날 때). 다음 그리기에서 다시 만든다. */
 export function releaseSceneCache(): void {
+  disposeCache(cache)
   cache = null
 }
 
 function mapCache(map: MapDef): Cache {
   if (!cache || cache.gfx.map.id !== map.id) {
+    disposeCache(cache)
     const gfx: MapGfx = { map, ground: computeGround(map) }
-    cache = { gfx, frames: renderFrames(gfx) }
+    const first = renderFrame(gfx, 0)
+    cache = { gfx, frames: first ? [first] : null }
+  } else if (cache.frames && cache.frames.length < 2) {
+    const second = renderFrame(cache.gfx, 1)
+    if (second) cache.frames.push(second)
+    else {
+      disposeCache(cache)
+      cache.frames = null
+    }
   }
   return cache
 }
@@ -660,7 +676,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   ctx.imageSmoothingEnabled = false
 
   const { gfx, frames } = mapCache(s.map)
-  if (frames) ctx.drawImage(frames[k], cam.x, cam.y, w, h, 0, 0, w, h)
+  if (frames) ctx.drawImage(frames[k] ?? frames[0], cam.x, cam.y, w, h, 0, 0, w, h)
   else {
     ctx.save()
     ctx.translate(-cam.x, -cam.y)

@@ -118,6 +118,8 @@ type Runtime = {
 }
 /** 지역 전환 페이드 한 방향의 길이 */
 const FADE_MS = 150
+/** 전환 한 프레임이 더할 수 있는 최대 시간(약 30fps 한 프레임) */
+const TRANSITION_STEP_MAX_MS = 34
 /** 도착한 지역 이름을 보이는 시간 */
 const AREA_NOTICE_MS = 1500
 
@@ -197,6 +199,7 @@ export function Game({ gameId }: WorldGameProps) {
   const [phase, setPhaseState] = useState<Phase>('idle')
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const badExits = useRef(new Set<string>())
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
@@ -480,7 +483,7 @@ export function Game({ gameId }: WorldGameProps) {
 
   /** 출구에 닿았다: 입력을 잠그고 페이드 아웃을 시작한다 */
   function startTransition(exit: Exit) {
-    clearMove()
+    // 조이스틱·방향키는 놓지 않는다: 누른 채 도착하면 페이드 뒤에 이어서 걷는다(걷기는 전환 중 막혀 있다)
     rt.held.clear()
     rt.shopKey = null
     rt.player = { ...rt.player, moving: false, walkMs: 0 }
@@ -491,7 +494,8 @@ export function Game({ gameId }: WorldGameProps) {
   function stepTransition(dt: number) {
     const tr = rt.trans
     if (!tr) return
-    tr.ms += dt
+    // 맵을 바꾸는 프레임의 멈칫이 다음 dt에 실려 와도 페이드 인이 통째로 건너뛰어지지 않게 한 걸음을 줄인다
+    tr.ms += Math.min(dt, TRANSITION_STEP_MAX_MS)
     if (!tr.swapped && tr.ms >= FADE_MS) {
       const next = mapFor(tr.exit.target)
       if (!next) {
@@ -507,7 +511,8 @@ export function Game({ gameId }: WorldGameProps) {
       savePlayer()
       const name = AREAS.find((a) => a.id === next.id)?.name
       if (name) {
-        setNotice({ kind: 'info', text: name })
+        // 오류 알림이 떠 있으면 덮지 않는다
+        setNotice((n) => (n && n.kind !== 'info' ? n : { kind: 'info', text: name }))
         later(() => setNotice((n) => (n?.kind === 'info' && n.text === name ? null : n)), AREA_NOTICE_MS)
       }
     }
@@ -533,6 +538,7 @@ export function Game({ gameId }: WorldGameProps) {
     rt.lastFrame = now
     // 걷기는 대기 중이고 메뉴가 닫혀 있을 때만. 충전부터 결과 표시까지는 자리·방향이 고정된다.
     const wasMoving = rt.player.moving
+    let started = false
     if (rt.trans) {
       stepTransition(dt)
     } else if (rt.phase === 'idle' && !menuRef.current) {
@@ -540,11 +546,19 @@ export function Game({ gameId }: WorldGameProps) {
       rt.player = stepWalk(rt.map, rt.player, input, dt)
       // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다)
       const exit = exitAt(rt.map, rt.player.pos)
-      if (exit) startTransition(exit)
+      if (exit && mapFor(exit.target)) {
+        startTransition(exit)
+        started = true
+      } else if (exit && !badExits.current.has(exit.target)) {
+        // 맵이 없는 지역으로 가는 출구는 무시한다(전환을 시작하면 페이드만 하고 제자리라 갇힌 것처럼 보인다)
+        badExits.current.add(exit.target)
+        console.error(`fishing: exit to unmapped area "${exit.target}" ignored`)
+      }
     } else if (rt.player.moving) {
       rt.player = { ...rt.player, moving: false, walkMs: 0 }
     }
-    if (wasMoving && !rt.player.moving) savePlayer()
+    // 전환을 시작한 프레임의 출구 칸 위치는 저장하지 않는다(도착 위치만 저장)
+    if (wasMoving && !rt.player.moving && !started) savePlayer()
     syncHere()
 
     if (rt.phase === 'charging' && !rt.busy) rt.gauge = gaugeAt(now - rt.chargeStart)

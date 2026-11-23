@@ -8,7 +8,7 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { TILE, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
+import { TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
@@ -26,6 +26,12 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
 })
 vi.mock('../../platform/auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
 vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+/** 지역 전환 테스트가 강 맵을 없는 것처럼 만들 때 쓴다 */
+const mapGate = vi.hoisted(() => ({ hideRiver: false }))
+vi.mock('./maps/index.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./maps/index.ts')>()
+  return { ...orig, mapFor: (area: AreaId) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area)) }
+})
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -1690,5 +1696,79 @@ describe('fishing Game: 지역 전환', () => {
     const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
     expect(payload.area).toBe('forest')
     expect(payload.spot).toBe('pond')
+  })
+
+  test('조이스틱을 누른 채 출구를 지나면 새 pointermove 없이도 페이드 뒤에 이어서 걷는다', async () => {
+    stubTouch()
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 100, 40) // 위로 끝까지, 이후 움직이지 않는다
+    await advance(200)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    await advance(400)
+    expect(lastScene().map.id).toBe('river')
+    expect(lastScene().fade).toBe(0)
+    const arrived = { ...lastScene().player.pos }
+    await advance(300)
+    expect(lastScene().player.pos.y).toBeLessThan(arrived.y)
+    expect(lastScene().player.moving).toBe(true)
+  })
+
+  test('출구 칸의 위치는 저장하지 않고 도착 위치만 저장한다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    const saved: { area: string; pos: Vec }[] = []
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === POS_KEY) saved.push(JSON.parse(v))
+      return setItem.call(this, k, v)
+    })
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('river')
+    expect(saved.length).toBeGreaterThan(0)
+    expect(saved.at(-1)).toMatchObject({ area: 'river' })
+    for (const s of saved) expect(exitAt(s.area === 'river' ? RIVER : VILLAGE, s.pos)).toBeNull()
+  })
+
+  test('맵이 없는 지역으로 가는 출구는 무시한다: 페이드를 시작하지 않고 한 번만 로그한다', async () => {
+    mapGate.hideRiver = true
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await mount(makeView(), NEAR_EXIT)
+      await advance(50)
+      key('ArrowUp', true)
+      await advance(600)
+      key('ArrowUp', false)
+      expect(lastScene().map.id).toBe('village')
+      expect(lastScene().fade).toBe(0)
+      expect(err).toHaveBeenCalledTimes(1)
+      const stuck = lastScene().player.pos.y
+      key('ArrowDown', true) // 갇히지 않는다
+      await advance(200)
+      key('ArrowDown', false)
+      expect(lastScene().player.pos.y).toBeGreaterThan(stuck)
+    } finally {
+      mapGate.hideRiver = false
+    }
+  })
+
+  test('큰 dt 한 번(맵 캐시를 만드는 프레임의 멈칫)이 와도 페이드 인이 건너뛰어지지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    const tr = lastScene().fade
+    expect(tr).toBeGreaterThan(0)
+    // 한 프레임이 500ms 걸린 것처럼 시간을 뛰어도 한 번에 끝나지 않는다
+    const raf = vi.spyOn(performance, 'now')
+    raf.mockReturnValue(performance.now() + 500)
+    await advance(16)
+    raf.mockRestore()
+    expect(lastScene().fade).toBeGreaterThan(0)
   })
 })
