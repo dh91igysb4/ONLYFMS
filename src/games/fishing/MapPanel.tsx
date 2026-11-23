@@ -20,6 +20,9 @@ export const DEFAULT_LAYERS: MapLayers = { paths: true, spots: true, now: false,
 export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설' }
 
 const MARK_SCALE = 2
+/** 표시 버튼(28px)·현재 위치(18px)의 반폭 */
+const MARK_HALF = 14
+const YOU_HALF = 9
 const ICON_SCALE = 2
 const CHECK_MS = 1000
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
@@ -96,7 +99,11 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapP
     setTab(a)
     setPick(nextPick)
   }
-  const toggle = (k: keyof MapLayers) => onLayers({ ...layers, [k]: !layers[k] })
+  const toggle = (k: keyof MapLayers) => {
+    // 레이어를 끄면 그 레이어의 고른 표시도 놓는다(숨은 표시의 상세가 남지 않게)
+    if (layers[k] && ((k === 'paths' && pick?.kind === 'mark') || (k === 'spots' && pick?.kind === 'spot'))) setPick(null)
+    onLayers({ ...layers, [k]: !layers[k] })
+  }
 
   const rod = RODS.find((r) => r.tier === view.rodTier)?.name ?? ''
   const weather = isSnow(cond) ? '눈' : cond.weather === 'rain' ? '비' : '맑음'
@@ -155,11 +162,14 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapP
           lastOther={lastOther}
         />
       ) : (
-        <LockedArea area={tab} rows={filterFish(areaRows[tab], filter)} view={view} onTab={goTab} />
+        <LockedArea area={tab} rows={filterFish(lockedRows(areaRows[tab]), filter)} view={view} onTab={goTab} />
       )}
     </section>
   )
 }
+
+/** 잠긴 지역 목록은 등급만: 거기서는 던질 수 없으므로 "지금"도, 안 나오는 이유도 없다 */
+const lockedRows = (rows: readonly FishRow[]): FishRow[] => rows.map((r) => ({ ...r, now: false, reason: null }))
 
 function Chip({ on, onClick, children }: { on: boolean; onClick(): void; children: string }) {
   return (
@@ -202,9 +212,20 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
   const hopRoute = atHere && lastOther && lastOther !== here.area ? areaRoute(here.area, lastOther, opened) : null
   const hop = hopRoute ? firstHop(map, hopRoute.path, hopRoute.unlockAt ? lastOther : null, opened) : null
   const hopKey = hop ? markKey(hop) : null
-  const pos = (tx: number, ty: number) => ({ left: `${((tx + 0.5) / map.w) * 100}%`, top: `${((ty + 0.5) / map.h) * 100}%` })
+  // 가장자리 표시(출구 등)가 그림 밖으로 삐져나오지 않게 표시 반폭(half px)만큼 안쪽으로 묶는다
+  const pos = (tx: number, ty: number, half = MARK_HALF) => ({
+    left: `clamp(${half}px, ${((tx + 0.5) / map.w) * 100}%, calc(100% - ${half}px))`,
+    top: `clamp(${half}px, ${((ty + 0.5) / map.h) * 100}%, calc(100% - ${half}px))`,
+  })
   const pickedSpot = pick?.kind === 'spot' ? pick.spot : null
   const highlight = pickedSpot ? spotHighlightUrl(map, pickedSpot) : null
+
+  const pickedMark = pick?.kind === 'mark' ? marks.find((m) => markKey(m) === pick.key) ?? null : null
+  const pickedRows = pickedSpot ? spotRows[pickedSpot] : undefined
+  // 상세 맨 윗줄. 이 줄만 aria-live라 고를 때 목록 전체가 아니라 제목만 읽힌다
+  const detailTitle = pickedRows
+    ? `${spotName(pickedSpot!)} · 지금 ${pickedRows.filter((r) => r.now).length}종 · 미발견 ${pickedRows.filter((r) => !r.found).length}종`
+    : pickedMark ? markTitle(pickedMark, area, view, here.area) : areaName(area)
 
   const onMapClick = (e: MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return
@@ -259,7 +280,7 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
           )
         })}
         {atHere && (
-          <div className={`fish-map-you fish-map-you-${here.facing}`} style={pos(here.tx, here.ty)} role="img" aria-label="현재 위치">
+          <div className={`fish-map-you fish-map-you-${here.facing}`} style={pos(here.tx, here.ty, YOU_HALF)} role="img" aria-label="현재 위치">
             <img src={spriteDataUrl('map-you', MARK_SCALE)} alt="" />
           </div>
         )}
@@ -274,11 +295,12 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
           ))}
         </div>
       )}
-      <div className="fish-map-detail" aria-live="polite">
+      <div className="fish-map-detail">
+        <h4 className="fish-map-detail-title" aria-live="polite">{detailTitle}</h4>
         {pickedSpot && spotRows[pickedSpot] ? (
-          <SpotDetail spot={pickedSpot} rows={spotRows[pickedSpot]} filter={filter} view={view} />
-        ) : pick?.kind === 'mark' && marks.some((m) => markKey(m) === pick.key) ? (
-          <MarkDetail mark={marks.find((m) => markKey(m) === pick.key)!} area={area} view={view} here={here.area} onTab={onTab} />
+          <FishList rows={filterFish(spotRows[pickedSpot], filter)} view={view} />
+        ) : pickedMark ? (
+          <MarkDetail mark={pickedMark} area={area} view={view} here={here.area} onTab={onTab} />
         ) : (
           <AreaSummary rows={areaRows} route={route} tpFee={route ? teleporterInfo(area, view, here.area)?.feeFromHere ?? null : null} />
         )}
@@ -298,6 +320,23 @@ function markLabel(m: PlaceMarker): string {
 }
 
 /** 가는 길 문구: 배로 건너는 구간 앞에 (배) */
+/** 고른 표시의 상세 제목 */
+function markTitle(m: PlaceMarker, area: AreaId, view: View, here: AreaId): string {
+  switch (m.kind) {
+    case 'exit': return `${ro(areaName(m.target))} 가는 길 · ${DIR_NAMES[m.dir]}`
+    case 'gate': return `잠긴 문 · ${UNLOCKS[m.area]?.name ?? areaName(m.area)}`
+    case 'dock': {
+      const u = UNLOCKS[m.target]
+      return view.areas.includes(m.target) || !u ? `${ro(areaName(m.target))} 가는 배 · 무료 왕복` : `선착장 · ${u.name}`
+    }
+    case 'shop': return '상점'
+    case 'teleporter': {
+      const info = teleporterInfo(area, view, here)
+      return info ? `순간이동기 · ${info.open ? '켜짐' : '꺼짐'}` : '순간이동기'
+    }
+  }
+}
+
 function routeText(path: readonly AreaId[]): string {
   return path.map((a, i) => {
     if (i === 0) return areaName(a)
@@ -318,18 +357,6 @@ function AreaSummary({ rows, route, tpFee }: { rows: FishRow[]; route: ReturnTyp
       {tpFee !== null && <p className="muted">{`순간이동기로도 갈 수 있어요 · ${gold(tpFee)}`}</p>}
       <p className="muted">{`물고기 ${rows.length}종 중 ${found}종 찾음 · 지금 잡히는 ${now}종`}</p>
       <p className="muted">낚시 자리를 누르면 그 자리 물고기를 볼 수 있어요</p>
-    </>
-  )
-}
-
-function SpotDetail({ spot, rows, filter, view }: { spot: string; rows: FishRow[]; filter: FishFilter; view: View }) {
-  const shown = filterFish(rows, filter)
-  const now = rows.filter((r) => r.now).length
-  const unknown = rows.filter((r) => !r.found).length
-  return (
-    <>
-      <h4 className="fish-map-detail-title">{`${spotName(spot)} · 지금 ${now}종 · 미발견 ${unknown}종`}</h4>
-      <FishList rows={shown} view={view} />
     </>
   )
 }
@@ -383,7 +410,6 @@ function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area
     case 'exit':
       return (
         <>
-          <p>{`${ro(areaName(mark.target))} 가는 길 · ${DIR_NAMES[mark.dir]}`}</p>
           {goto(mark.target)}
         </>
       )
@@ -391,7 +417,6 @@ function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area
       const u = UNLOCKS[mark.area]
       return (
         <>
-          <p><strong>{u?.name ?? '잠긴 문'}</strong></p>
           {u && <p className="fish-unlock-price">{gold(u.price)}</p>}
           <p className="muted">{`보유 ${gold(view.gold)} · 문 앞에서 열 수 있어요`}</p>
           <p className="muted">{`열면 ${ro(areaName(mark.area))} 갈 수 있어요`}</p>
@@ -404,11 +429,8 @@ function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area
       const u = UNLOCKS[mark.target]
       return (
         <>
-          {open || !u ? (
-            <p>{`${ro(areaName(mark.target))} 가는 배 · 무료 왕복`}</p>
-          ) : (
+          {open || !u ? null : (
             <>
-              <p><strong>{u.name}</strong></p>
               <p className="fish-unlock-price">{gold(u.price)}</p>
               <p className="muted">{`보유 ${gold(view.gold)} · 선착장에서 살 수 있어요`}</p>
             </>
@@ -418,15 +440,14 @@ function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area
       )
     }
     case 'shop':
-      return <p>상점 · 물고기 팔기, 낚싯대·가방·찌</p>
+      return <p>물고기 팔기, 낚싯대·가방·찌</p>
     case 'teleporter': {
       // 켜짐 판정·요금은 서버와 같은 teleporterOpen·teleportFee(atlas의 어댑터). 이동은 이동기 앞에서만 한다
       const info = teleporterInfo(area, view, here)
-      if (!info) return <p>순간이동기</p>
+      if (!info) return null
       if (info.open) {
         return (
           <>
-            <p><strong>순간이동기 · 켜짐</strong></p>
             {info.feeFromHere !== null && <p className="muted">{`${areaName(here)} 이동기에서 오면 ${gold(info.feeFromHere)}`}</p>}
             <p className="muted">켜진 다른 순간이동기와 오갈 수 있어요</p>
           </>
@@ -434,7 +455,6 @@ function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area
       }
       return (
         <>
-          <p><strong>순간이동기 · 꺼짐</strong></p>
           {info.challenge ? (
             <>
               <p>{info.challenge.title}</p>

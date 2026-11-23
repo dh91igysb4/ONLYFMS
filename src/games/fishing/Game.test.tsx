@@ -2474,6 +2474,48 @@ describe('큰 지도', () => {
     expect(worldMock.mock.calls.length).toBe(before)
   })
 
+  test('Esc로 지도를 닫는다. 전체화면에서도 Esc는 지도만 닫고 전체화면은 그대로', async () => {
+    const { container } = await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    expect(container.querySelector('.fish-full')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    expect(container.querySelector('.fish-full')).not.toBeNull()
+    // 지도가 닫힌 뒤의 Esc는 원래대로 전체화면을 나간다
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
+    expect(container.querySelector('.fish-full')).toBeNull()
+  })
+
+  test('첫 서버 상태 전에 누른 M은 무시한다(불러온 뒤 지도가 저절로 열리지 않는다)', async () => {
+    localStorage.setItem(POS_KEY, JSON.stringify(SAND))
+    let resolve: (v: Awaited<ReturnType<typeof ok>>) => void = () => {}
+    route({ load: () => new Promise((r) => { resolve = r }) })
+    render(<Game gameId="fishing" />)
+    pressM()
+    resolve({ view: makeView(), result: null, server_now: Date.now() })
+    await flush()
+    await flush()
+    expect(screen.getByRole('button', { name: '지도' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+  })
+
+  test('지역 전환(페이드) 중에는 M·지도 버튼으로 열리지 않는다', async () => {
+    await mount(makeView(), { area: 'village', pos: tileCenter(24, 1), facing: 'up' })
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    await advance(400)
+    expect(lastScene().fade).toBe(0)
+    pressM()
+    expect(within(mapPanel()).getByRole('tab', { selected: true })).toHaveTextContent('마을 강')
+  })
+
   test('떠나면 축소 그림 캐시를 비운다', async () => {
     vi.mocked(releaseMinimapCache).mockClear()
     const { unmount } = await mount()

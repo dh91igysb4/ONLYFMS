@@ -690,9 +690,16 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
-  const toggleMap = () => toggleMenu('map')
-  const handlers = useRef({ press, release, frame, toggleMap })
-  handlers.current = { press, release, frame, toggleMap }
+  /** 큰 지도 열고 닫기. 첫 서버 상태 전·지역 전환(페이드) 중에는 열지 않는다(닫기는 늘 된다) */
+  const toggleMap = () => {
+    if (menuRef.current !== 'map' && (!viewRef.current || rt.trans)) return
+    toggleMenu('map')
+  }
+  const closeMap = () => {
+    if (menuRef.current === 'map') closeMenu()
+  }
+  const handlers = useRef({ press, release, frame, toggleMap, closeMap })
+  handlers.current = { press, release, frame, toggleMap, closeMap }
 
   // ------------------------------------------------------------ 효과
   useEffect(() => {
@@ -876,6 +883,17 @@ export function Game({ gameId }: WorldGameProps) {
   }, [rt])
 
   // M 키 = 큰 지도 열고 닫기(e.code라 한글 입력 상태에서도). 입력칸·낚시 중·다른 창이 열려 있으면 무시한다.
+  // Esc = 열린 지도 닫기. 캡처 단계에서 받아 멈추므로 전체화면 나가기 등 다른 Esc 처리로 새지 않는다.
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || menuRef.current !== 'map') return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      handlers.current.closeMap()
+    }
+    window.addEventListener('keydown', esc, true)
+    return () => window.removeEventListener('keydown', esc, true)
+  }, [])
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
@@ -1228,7 +1246,7 @@ export function Game({ gameId }: WorldGameProps) {
               className={`btn btn-sm ${menu === m ? 'btn-primary' : 'btn-ghost'}`}
               aria-pressed={menu === m}
               disabled={menuLocked}
-              onClick={() => toggleMenu(m)}
+              onClick={() => (m === 'map' ? toggleMap() : toggleMenu(m))}
             >
               {MENU_LABELS[m]}
             </button>

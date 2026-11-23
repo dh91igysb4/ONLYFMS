@@ -139,7 +139,7 @@ describe('MapPanel', () => {
     const { unmount } = mount(makeView(), { area: 'river', tx: 30, ty: 25, facing: 'up' })
     fireEvent.click(within(screen.getByTestId('fish-map')).getByRole('button', { name: '잠긴 문 · 무너진 다리 수리' }))
     const detail = panel().querySelector('.fish-map-detail') as HTMLElement
-    expect(within(detail).getByText('무너진 다리 수리')).toBeInTheDocument()
+    expect(within(detail).getByRole('heading', { name: '잠긴 문 · 무너진 다리 수리' })).toBeInTheDocument()
     expect(within(detail).getByText('5,000 G')).toBeInTheDocument()
     expect(within(detail).getByText(/보유 1,234 G/)).toBeInTheDocument()
     expect(within(detail).getAllByRole('button').map((b) => b.textContent)).toEqual(['산 호수 지도 보기'])
@@ -162,6 +162,58 @@ describe('MapPanel', () => {
     fireEvent.click(within(panel()).getByRole('button', { name: '마을 강 지도 보기' }))
     expect(within(panel()).getByRole('tab', { selected: true })).toHaveTextContent('마을 강')
     expect(within(screen.getByTestId('fish-map')).getByRole('button', { name: '잠긴 문 · 무너진 다리 수리' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('잠긴 지역 목록은 등급만: "지금" 칩이 없고, 지금 잡히는 필터를 켜면 비며, 이름·그림·조건이 어디에도 없다', () => {
+    mount()
+    fireEvent.click(tab(/산 호수/))
+    const p = panel()
+    expect(within(p).queryByText('지금')).not.toBeInTheDocument()
+    expect(within(p).queryByText(/지금은 안 나와요/)).not.toBeInTheDocument()
+    const lake = SPECIES.filter((s) => s.area === 'lake')
+    const text = p.textContent ?? ''
+    const attrs = [...p.querySelectorAll('*')].flatMap((el) => ['alt', 'aria-label', 'title', 'src'].map((a) => el.getAttribute(a) ?? ''))
+    for (const s of lake) {
+      expect(text, s.id).not.toContain(s.name)
+      expect(text, s.id).not.toContain(conditionLabel(s))
+      for (const a of attrs) {
+        expect(a, s.id).not.toContain(s.name)
+        if (a.startsWith(`data:fish-${s.id}`)) expect(a, s.id).toContain(':silhouette')
+      }
+    }
+    fireEvent.click(within(p).getByRole('button', { name: '지금 잡히는' }))
+    expect(within(p).queryAllByAltText('미발견 물고기')).toHaveLength(0)
+    expect(within(p).getByText('조건에 맞는 물고기가 없어요')).toBeInTheDocument()
+  })
+
+  it('레이어를 끄면 그 레이어에서 고른 표시의 상세가 사라진다', () => {
+    mount(makeView(), { area: 'river', tx: 30, ty: 25, facing: 'up' })
+    const title = () => panel().querySelector('.fish-map-detail-title')
+    fireEvent.click(within(screen.getByTestId('fish-map')).getByRole('button', { name: '잠긴 문 · 무너진 다리 수리' }))
+    expect(title()).toHaveTextContent('잠긴 문 · 무너진 다리 수리')
+    fireEvent.click(within(panel()).getByRole('button', { name: '길' }))
+    expect(title()).toHaveTextContent('마을 강')
+    expect(within(panel()).queryByText('5,000 G')).not.toBeInTheDocument()
+    fireEvent.click(spotMarker('강'))
+    expect(title()).toHaveTextContent(/^강 · 지금/)
+    fireEvent.click(within(panel()).getByRole('button', { name: '낚시 자리' }))
+    expect(title()).toHaveTextContent('마을 강')
+    expect(within(panel()).queryByRole('list', { name: '물고기 목록' })).not.toBeInTheDocument()
+  })
+
+  it('aria-live는 상세 제목 줄 하나뿐(목록 전체를 읽지 않는다)', () => {
+    mount()
+    fireEvent.click(spotMarker('해안'))
+    const live = panel().querySelectorAll('[aria-live]')
+    expect(live).toHaveLength(1)
+    expect(live[0]).toHaveClass('fish-map-detail-title')
+  })
+
+  it('가장자리 표시는 그림 안쪽으로 묶인다(clamp)', () => {
+    mount(makeView(), { area: 'river', tx: 30, ty: 25, facing: 'up' })
+    const west = within(screen.getByTestId('fish-map')).getByRole('button', { name: '숲으로 가는 길' })
+    expect(west.getAttribute('style')).toMatch(/left:\s*clamp\(14px,/)
+    expect(screen.getByLabelText('현재 위치').getAttribute('style')).toMatch(/clamp\(9px,/)
   })
 
   it('숲에서 섬 탭 → 가는 길, 숲 탭으로 돌아오면 강으로 가는 출구가 강조된다', () => {

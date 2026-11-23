@@ -306,8 +306,8 @@
   padding: 0 6px;
   border-radius: 6px;
   font-size: 12px;
-  color: var(--on-accent);
-  background: var(--win-text);
+  color: var(--on-live);
+  background: var(--live-bg);
 }
 
 /* 전체화면: 게임 전체가 사이트 머리·탭 위를 덮는 고정 덮개. 위 줄 - 캔버스 칸(남는 높이 전부) - 아래 버튼 줄. */
