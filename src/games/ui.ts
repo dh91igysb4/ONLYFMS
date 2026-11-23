@@ -6,6 +6,7 @@ import { Game as ToothbrushGame } from './toothbrush/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
 import { Game as BallRunGame } from './ball-run/Game.tsx'
 import { Game as SneakExamGame } from './sneak-exam/Game.tsx'
+import { Game as FishingGame } from './fishing/Game.tsx'
 import { Game as NeonRiderGame } from './neon-rider/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
@@ -59,4 +60,16 @@ const duelComponents: Record<string, ComponentType<DuelGameProps>> = {
 
 export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
   return duelComponents[id]
+}
+
+/** 지속형(world) 게임 화면이 받는 props. 저장·행동 요청은 화면이 플랫폼 데이터 계층으로 직접 한다. */
+export type WorldGameProps = { gameId: string }
+
+/** 지속형 게임 화면 등록부. 새 지속형 게임 화면을 여기에 한 줄씩 등록한다. */
+const worldComponents: Record<string, ComponentType<WorldGameProps>> = {
+  fishing: FishingGame,
+}
+
+export function getWorldComponent(id: string): ComponentType<WorldGameProps> | undefined {
+  return worldComponents[id]
 }

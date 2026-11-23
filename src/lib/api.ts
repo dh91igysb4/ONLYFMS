@@ -190,3 +190,13 @@ export async function play(body: Record<string, unknown>): Promise<PlayView> {
 export async function duel<T = DuelView>(body: Record<string, unknown>): Promise<T> {
   return (await callFunction('duel', body)) as T
 }
+
+/** 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null. */
+export type WorldView<V = unknown, R = unknown> = { view: V; result: R | null; server_now: number }
+
+/** 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act). */
+export async function world<V = unknown, R = unknown>(
+  body: { game: string; action: 'load' } | { game: string; action: 'act'; payload: unknown },
+): Promise<WorldView<V, R>> {
+  return (await callFunction('world', body)) as WorldView<V, R>
+}

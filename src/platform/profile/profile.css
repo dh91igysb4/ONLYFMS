@@ -52,3 +52,5 @@
   .pf-recent { columns: 2; column-gap: 0; column-rule: 1px solid var(--line); }
   .pf-recent-row { break-inside: avoid; }
 }
+
+.rec-value { font-variant-numeric: tabular-nums; }

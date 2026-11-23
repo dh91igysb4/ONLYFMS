@@ -12,9 +12,10 @@ const auth = vi.hoisted(() => ({ handle: 'kane' }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: auth.handle, status: 'approved', is_admin: false }, refresh: async () => {} }),
 }))
-vi.mock('../../games/index.ts', () => ({
+vi.mock('../../games/index.ts', async () => ({
   games: [{ manifest: { id: 'test-guess', name: '숫자 맞추기', hidden: false } }],
   duels: [{ manifest: { id: 'yacht', name: '요트 다이스', hidden: false } }],
+  worlds: [(await import('../../test-fixtures/world.ts')).testWorld],
 }))
 
 import { ProfilePage } from './ProfilePage.tsx'
@@ -201,7 +202,7 @@ test('profile_tabs_default_summary_and_switch_updates_query', async () => {
   setup({ user_stats: emptyStats })
   renderAt('kane')
   const tablist = await screen.findByRole('tablist', { name: '프로필 보기' })
-  expect(within(tablist).getAllByRole('tab').map((t) => t.textContent)).toEqual(['요약', '퍼즐', '대전', '설정'])
+  expect(within(tablist).getAllByRole('tab').map((t) => t.textContent)).toEqual(['요약', '퍼즐', '대전', '기록', '설정'])
   expect(screen.getByRole('tab', { name: '요약' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(screen.getByRole('tab', { name: '요약' }).id)
   fireEvent.click(screen.getByRole('tab', { name: '퍼즐' }))
@@ -343,4 +344,19 @@ test('profile_error_retry', async () => {
   setup({ user_stats: emptyStats })
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
   expect(await screen.findByRole('heading', { name: 'kane' })).toBeTruthy()
+})
+
+test('profile_records_tab_listed_between_duel_and_settings', async () => {
+  setup({ user_stats: emptyStats })
+  renderAt('kane')
+  await screen.findByRole('heading', { name: 'kane' })
+  expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['요약', '퍼즐', '대전', '기록', '설정'])
+})
+
+test('profile_records_tab_direct_entry_shows_record', async () => {
+  setup({ user_stats: emptyStats, user_records: [{ game_id: 'test-world', key: 'n', value: 1234, detail: null }] })
+  renderAt('kane', '?tab=records')
+  expect(await screen.findByText('1,234')).toBeTruthy()
+  expect(screen.getByText('횟수')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_records', { p_handle: 'kane' })
 })
