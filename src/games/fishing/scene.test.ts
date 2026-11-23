@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
-import { MAP_W, PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
+import { TILE, castTarget, defineMap, pierEnd, type Facing, type Vec } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import { cameraFor, type Player } from './walk.ts'
 import type { Conditions } from './clock.ts'
 
@@ -57,6 +58,9 @@ const PHASES: Phase[] = ['idle', 'charging', 'waiting', 'bite', 'fighting', 'cau
 const SIZES: [number, number][] = [[160, 240], [195, 280], [320, 480]]
 
 const tileCentre = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
+const MAP_W = VILLAGE.w
+const SPAWN = VILLAGE.spawn
+const PIER_END = pierEnd(VILLAGE)!
 const PIER_SPOT = tileCentre(PIER_END.tx, PIER_END.ty)
 
 function player(pos: Vec, facing: Facing = 'down', moving = false, walkMs = 0): Player {
@@ -66,12 +70,13 @@ function player(pos: Vec, facing: Facing = 'down', moving = false, walkMs = 0): 
 function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: Partial<WorldScene> = {}): WorldScene {
   const fishing = phase === 'waiting' || phase === 'bite' || phase === 'fighting' || phase === 'lost'
   return {
+    map: VILLAGE,
     phase,
     tMs: 1234,
     gauge: phase === 'charging' ? 0.7 : 0,
     player: p,
-    camera: cameraFor(p.pos, size),
-    bobber: fishing ? castTarget(p.pos, p.facing, 0.6) : null,
+    camera: cameraFor(VILLAGE, p.pos, size),
+    bobber: fishing ? castTarget(VILLAGE, p.pos, p.facing, 0.6) : null,
     bar: phase === 'fighting' ? bar : null,
     barParams: phase === 'fighting' ? barParams : null,
     caughtSpecies: phase === 'caught' ? 'mackerel' : null,
@@ -326,6 +331,34 @@ describe('drawWorld with an offscreen canvas', () => {
     drawWorld(asCtx(main), s, size)
     expect(made).toHaveLength(4)
     expect(main.images.at(-1)?.[0]).not.toBe(img)
+  })
+
+  test('same map reuses the cache; drawing another map.id drops the old cache and builds a new one', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(2)
+    const villageImg = main.images[0][0] as HTMLCanvasElement
+
+    drawWorld(asCtx(main), inOther, size)
+    expect(made).toHaveLength(4)
+    const otherImg = main.images.at(-1)?.[0] as HTMLCanvasElement
+    expect(otherImg).not.toBe(villageImg)
+    expect([otherImg.width, otherImg.height]).toEqual([6 * 16, 5 * 16])
+
+    drawWorld(asCtx(main), inOther, size)
+    expect(made).toHaveLength(4)
+    expect(main.images.at(-1)?.[0]).toBe(otherImg)
+
+    // 되돌아오면 마을 캐시는 이미 버려졌으므로 새로 만든다
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(6)
+    expect(main.images.at(-1)?.[0]).not.toBe(villageImg)
   })
 
   test('tree tops cover the player standing above the trunk, not the player below it', () => {

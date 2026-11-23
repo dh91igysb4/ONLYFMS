@@ -4,7 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
-import { MAP_H, MAP_W, SHOP, TILE, tileAt, type Vec } from './map.ts'
+import { TILE, tileAt, type MapDef, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
 import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
@@ -12,6 +12,7 @@ import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
 /** tMs: 애니메이션 시계(ms). 계속 늘어나기만 하면 된다. gauge는 0~1. camera는 화면 왼쪽 위의 월드 좌표. */
 export type WorldScene = {
+  map: MapDef
   phase: Phase
   tMs: number
   gauge: number
@@ -36,8 +37,6 @@ export const SCENE_W = 160
 export const SCENE_H = 240
 export type SceneSize = { w: number; h: number }
 
-const WORLD_W = MAP_W * TILE
-const WORLD_H = MAP_H * TILE
 const WATER_FRAME_MS = 500
 const WALK_FRAME_MS = 200
 /** 나무 밑동(줄기 아래 끝)의 칸 안 y. 캐릭터 발이 이보다 위면 나무 윗부분이 캐릭터를 가린다. */
@@ -198,8 +197,8 @@ function hash(a: number, b: number): number {
 
 type Ground = 'water' | 'sand' | 'grass'
 
-function baseGround(tx: number, ty: number): Ground | null {
-  const kind = tileAt(tx, ty)
+function baseGround(map: MapDef, tx: number, ty: number): Ground | null {
+  const kind = tileAt(map, tx, ty)
   if (kind === null || kind === 'rock') return null
   if (kind === 'water' || kind === 'pier') return 'water'
   if (kind === 'sand') return 'sand'
@@ -207,10 +206,10 @@ function baseGround(tx: number, ty: number): Ground | null {
 }
 
 /** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물). */
-function rockGround(tx: number, ty: number): Ground {
+function rockGround(map: MapDef, tx: number, ty: number): Ground {
   const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-    const g = baseGround(tx + dx, ty + dy)
+    const g = baseGround(map, tx + dx, ty + dy)
     if (g) count[g]++
   }
   let best: Ground = 'sand'
@@ -218,14 +217,23 @@ function rockGround(tx: number, ty: number): Ground {
   return best
 }
 
-const GROUND: (Ground | null)[] = []
-for (let ty = 0; ty < MAP_H; ty++) {
-  for (let tx = 0; tx < MAP_W; tx++) GROUND.push(tileAt(tx, ty) === 'rock' ? rockGround(tx, ty) : baseGround(tx, ty))
+/** 맵 전체의 바탕 땅(행 우선). 맵 캐시와 함께 만들고 버린다. */
+function computeGround(map: MapDef): (Ground | null)[] {
+  const ground: (Ground | null)[] = []
+  for (let ty = 0; ty < map.h; ty++) {
+    for (let tx = 0; tx < map.w; tx++) {
+      ground.push(tileAt(map, tx, ty) === 'rock' ? rockGround(map, tx, ty) : baseGround(map, tx, ty))
+    }
+  }
+  return ground
 }
 
-function groundAt(tx: number, ty: number): Ground | null {
-  if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return null
-  return GROUND[ty * MAP_W + tx]
+/** 그리기에 쓰는 맵 + 계산해 둔 땅 */
+type MapGfx = { map: MapDef; ground: readonly (Ground | null)[] }
+
+function groundAt(g: MapGfx, tx: number, ty: number): Ground | null {
+  if (tx < 0 || ty < 0 || tx >= g.map.w || ty >= g.map.h) return null
+  return g.ground[ty * g.map.w + tx]
 }
 
 // ── 정적 레이어 ─────────────────────────────────────────────────
@@ -247,10 +255,10 @@ function foamCol(ctx: CanvasRenderingContext2D, x: number, y: number, k: number)
 }
 
 /** 물 칸 가장자리에 모래가 닿으면 젖은 모래 띠와 파도 거품 */
-function drawShoreEdges(ctx: CanvasRenderingContext2D, tx: number, ty: number, k: number): void {
+function drawShoreEdges(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
   const x = tx * TILE
   const y = ty * TILE
-  const sand = (dx: number, dy: number) => groundAt(tx + dx, ty + dy) === 'sand'
+  const sand = (dx: number, dy: number) => groundAt(g, tx + dx, ty + dy) === 'sand'
   const up = sand(0, -1)
   const down = sand(0, 1)
   const left = sand(-1, 0)
@@ -286,10 +294,10 @@ function drawShoreEdges(ctx: CanvasRenderingContext2D, tx: number, ty: number, k
 }
 
 /** 모래 칸 가장자리에 풀이 닿으면 들쭉날쭉한 풀 가장자리(1~3px)를 모래 쪽으로 늘어뜨린다 */
-function drawGrassFringe(ctx: CanvasRenderingContext2D, tx: number, ty: number): void {
+function drawGrassFringe(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
   const x = tx * TILE
   const y = ty * TILE
-  const grass = (dx: number, dy: number) => groundAt(tx + dx, ty + dy) === 'grass'
+  const grass = (dx: number, dy: number) => groundAt(g, tx + dx, ty + dy) === 'grass'
   for (let i = 0; i < TILE; i++) {
     if (grass(0, -1)) {
       const d = 1 + (hash(x + i, y) % 3)
@@ -315,8 +323,8 @@ function drawGrassFringe(ctx: CanvasRenderingContext2D, tx: number, ty: number):
 }
 
 /** 울타리: 위·아래로만 이어지면 세로 난간, 아니면 가로 난간(옆에 울타리가 없는 쪽 난간은 기둥에서 끊는다) */
-function drawFence(ctx: CanvasRenderingContext2D, tx: number, ty: number): void {
-  const fence = (dx: number, dy: number) => tileAt(tx + dx, ty + dy) === 'fence'
+function drawFence(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const fence = (dx: number, dy: number) => tileAt(g.map, tx + dx, ty + dy) === 'fence'
   const x = tx * TILE
   const y = ty * TILE
   const left = fence(-1, 0)
@@ -338,22 +346,22 @@ function drawFence(ctx: CanvasRenderingContext2D, tx: number, ty: number): void 
 }
 
 /** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무 밑동·바위·울타리·부두 판자). 모두 자기 칸 안에 그린다. */
-function drawTile(ctx: CanvasRenderingContext2D, tx: number, ty: number, k: number): void {
-  const kind = tileAt(tx, ty)
+function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
+  const kind = tileAt(g.map, tx, ty)
   if (kind === null) return
   const x = tx * TILE
   const y = ty * TILE
-  const ground = groundAt(tx, ty)
+  const ground = groundAt(g, tx, ty)
 
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
   else if (ground === 'water') {
     // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게
     drawSprite(ctx, (k + tx + ty * 3) % 2 === 0 ? 'water-0' : 'water-1', x, y, 1)
-    drawShoreEdges(ctx, tx, ty, k)
+    drawShoreEdges(ctx, g, tx, ty, k)
   } else if (ground === 'sand') {
     drawSprite(ctx, 'tile-sand', x, y, 1)
-    drawGrassFringe(ctx, tx, ty)
+    drawGrassFringe(ctx, g, tx, ty)
   } else {
     drawSprite(ctx, hash(tx, ty) % 4 === 0 ? 'tile-grass-alt' : 'tile-grass', x, y, 1)
   }
@@ -362,18 +370,18 @@ function drawTile(ctx: CanvasRenderingContext2D, tx: number, ty: number, k: numb
   else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
     else drawSprite(ctx, 'tile-rock', x, y, 1)
-  } else if (kind === 'fence') drawFence(ctx, tx, ty)
+  } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
 }
 
 /** 부두 칸 바깥으로 삐져나오는 것: 그늘, 기둥, 끝 옆면, 외곽선 */
-function drawPierExtras(ctx: CanvasRenderingContext2D, tx: number, ty: number): void {
+function drawPierExtras(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
   const x = tx * TILE
   const y = ty * TILE
-  const above = tileAt(tx, ty - 1) === 'pier'
-  const end = tileAt(tx, ty + 1) !== 'pier'
+  const above = tileAt(g.map, tx, ty - 1) === 'pier'
+  const end = tileAt(g.map, tx, ty + 1) !== 'pier'
   let fromEnd = 0
-  while (tileAt(tx, ty + fromEnd + 1) === 'pier') fromEnd++
+  while (tileAt(g.map, tx, ty + fromEnd + 1) === 'pier') fromEnd++
   const face = end ? 4 : 0
   // 물 위로 드리우는 그늘(오른쪽·아래)
   rect(ctx, x + TILE, y, 3, TILE + face, C.pierShadow)
@@ -392,43 +400,48 @@ function drawPierExtras(ctx: CanvasRenderingContext2D, tx: number, ty: number): 
 }
 
 /** 움직이지 않는 맵(물 k번 장)을 타일 범위 [tx0..tx1]×[ty0..ty1]만큼 월드 좌표로 그린다. */
-function drawStatic(ctx: CanvasRenderingContext2D, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
+function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
+  const { map } = g
   const x0 = Math.max(0, tx0)
   const y0 = Math.max(0, ty0)
-  const x1 = Math.min(MAP_W - 1, tx1)
-  const y1 = Math.min(MAP_H - 1, ty1)
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(ctx, tx, ty, k)
+  const x1 = Math.min(map.w - 1, tx1)
+  const y1 = Math.min(map.h - 1, ty1)
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) drawTile(ctx, g, tx, ty, k)
   // 부두 꾸밈은 옆·아래 칸으로 삐져나오므로 한 칸 넓게 본다
-  for (let ty = Math.max(0, y0 - 1); ty <= Math.min(MAP_H - 1, y1 + 1); ty++) {
-    for (let tx = Math.max(0, x0 - 1); tx <= Math.min(MAP_W - 1, x1 + 1); tx++) {
-      if (tileAt(tx, ty) === 'pier') drawPierExtras(ctx, tx, ty)
+  for (let ty = Math.max(0, y0 - 1); ty <= Math.min(map.h - 1, y1 + 1); ty++) {
+    for (let tx = Math.max(0, x0 - 1); tx <= Math.min(map.w - 1, x1 + 1); tx++) {
+      if (tileAt(map, tx, ty) === 'pier') drawPierExtras(ctx, g, tx, ty)
     }
   }
-  const shopRight = SHOP.tx + SHOP.w - 1
-  const shopBottom = SHOP.ty + SHOP.h - 1
-  if (SHOP.tx <= x1 && shopRight >= x0 && SHOP.ty <= y1 && shopBottom >= y0) {
-    drawSprite(ctx, 'shop', SHOP.tx * TILE, SHOP.ty * TILE, 1)
+  const shop = map.shop
+  if (shop) {
+    const shopRight = shop.tx + shop.w - 1
+    const shopBottom = shop.ty + shop.h - 1
+    if (shop.tx <= x1 && shopRight >= x0 && shop.ty <= y1 && shopBottom >= y0) {
+      drawSprite(ctx, 'shop', shop.tx * TILE, shop.ty * TILE, 1)
+    }
   }
 }
 
 /**
- * 맵 캐시: 물 타일 두 장 각각에 맞춘 맵 전체를 오프스크린 캔버스 두 개에 한 번 그려 둔다.
+ * 맵 캐시: 한 번에 맵 하나만 가진다(map.id가 바뀌면 이전 것을 버린다).
+ * gfx는 계산해 둔 땅, frames는 물 타일 두 장 각각에 맞춘 맵 전체를 오프스크린 캔버스 두 개에 한 번 그려 둔 것이다.
  * 오프스크린 2D 컨텍스트를 못 얻으면(jsdom 등) frames 없이 매 프레임 보이는 타일만 직접 그린다.
  */
-type Cache = { frames: [HTMLCanvasElement, HTMLCanvasElement] | null }
+type Cache = { gfx: MapGfx; frames: [HTMLCanvasElement, HTMLCanvasElement] | null }
 let cache: Cache | null = null
 
-function renderFrames(): [HTMLCanvasElement, HTMLCanvasElement] | null {
+function renderFrames(g: MapGfx): [HTMLCanvasElement, HTMLCanvasElement] | null {
   if (typeof document === 'undefined') return null
   const frames: HTMLCanvasElement[] = []
   for (const k of [0, 1]) {
     const c = document.createElement('canvas')
-    c.width = WORLD_W
-    c.height = WORLD_H
+    c.width = g.map.w * TILE
+    c.height = g.map.h * TILE
     const cx = c.getContext('2d')
     if (!cx) return null
     cx.imageSmoothingEnabled = false
-    drawStatic(cx, k, 0, 0, MAP_W - 1, MAP_H - 1)
+    drawStatic(cx, g, k, 0, 0, g.map.w - 1, g.map.h - 1)
     frames.push(c)
   }
   return [frames[0], frames[1]]
@@ -439,8 +452,11 @@ export function releaseSceneCache(): void {
   cache = null
 }
 
-function mapCache(): Cache {
-  if (!cache) cache = { frames: renderFrames() }
+function mapCache(map: MapDef): Cache {
+  if (!cache || cache.gfx.map.id !== map.id) {
+    const gfx: MapGfx = { map, ground: computeGround(map) }
+    cache = { gfx, frames: renderFrames(gfx) }
+  }
   return cache
 }
 
@@ -632,13 +648,13 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   const k = waterFrame(s.tMs)
   ctx.imageSmoothingEnabled = false
 
-  const frames = mapCache().frames
+  const { gfx, frames } = mapCache(s.map)
   if (frames) ctx.drawImage(frames[k], cam.x, cam.y, w, h, 0, 0, w, h)
   else {
     ctx.save()
     ctx.translate(-cam.x, -cam.y)
     try {
-      drawStatic(ctx, k, Math.floor(cam.x / TILE), Math.floor(cam.y / TILE), Math.floor((cam.x + w - 1) / TILE), Math.floor((cam.y + h - 1) / TILE))
+      drawStatic(ctx, gfx, k, Math.floor(cam.x / TILE), Math.floor(cam.y / TILE), Math.floor((cam.x + w - 1) / TILE), Math.floor((cam.y + h - 1) / TILE))
     } finally {
       ctx.restore()
     }
@@ -707,7 +723,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
-      if (tileAt(tx, ty) === 'tree') trees.push({ x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })
+      if (tileAt(s.map, tx, ty) === 'tree') trees.push({ x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })
     }
   }
   const feet = s.player.pos.y

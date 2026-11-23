@@ -9,7 +9,8 @@ import { price, type Action, type Fish, type PendingView, type View } from './lo
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, interactionAt, SHOP_SPOT, SPAWN, tileOf, type Interaction, type Vec } from './map.ts'
+import { castTarget, interactionAt, shopSpot, tileOf, type Interaction, type MapDef, type Vec } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
 import { loadPosition, savePosition, type SavedPosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
@@ -97,7 +98,7 @@ type Runtime = {
   keys: Keys
   /** 지금 서 있는 자리의 상호작용 (화면 상태와 비교해 바뀔 때만 다시 그린다) */
   hereKey: string
-  castSpot: 'pier' | 'shore'
+  castSpot: string
   /** 던진 찌의 월드 위치 */
   bobber: Vec | null
   /** 서버 시각 - 로컬 시각 (마지막 응답 기준) */
@@ -166,13 +167,17 @@ const coarseQuery = (): MediaQueryList | null =>
  * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
  * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
  */
-function interactionFor(p: SavedPosition): Interaction {
-  const front = interactionAt(p.pos, p.facing)
+function interactionFor(map: MapDef, p: SavedPosition): Interaction {
+  const front = interactionAt(map, p.pos, p.facing)
   if (front) return front
   const t = tileOf(p.pos)
-  return t.tx === SHOP_SPOT.tx && t.ty === SHOP_SPOT.ty ? { kind: 'shop' } : null
+  const door = shopSpot(map)
+  return door && t.tx === door.tx && t.ty === door.ty ? { kind: 'shop' } : null
 }
 const interactionKey = (i: Interaction): string => (i ? (i.kind === 'fish' ? `fish-${i.spot}` : 'shop') : '')
+
+/** 지금은 마을 하나만 걷는다(지역별 맵은 이후 Task) */
+const MAP = VILLAGE
 
 export function Game({ gameId }: WorldGameProps) {
   const { profile } = useAuth()
@@ -203,15 +208,15 @@ export function Game({ gameId }: WorldGameProps) {
   const timers = useRef(new Set<number>())
   const [rt] = useState<Runtime>(() => {
     // 마지막 위치(못 쓰는 값이면 상점 문 앞)에서 시작한다
-    const start = (userId !== null ? loadPosition(userId) : null) ?? SPAWN
+    const start = (userId !== null ? loadPosition(userId, MAP) : null) ?? MAP.spawn
     const player: Player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
     return {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, shopKey: null, chargeStart: 0, gauge: 0, castPower: 0,
-      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(player)), castSpot: 'shore', bobber: null,
+      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(MAP, player)), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0,
     }
   })
-  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.player))
+  const [here, setHere] = useState<Interaction>(() => interactionFor(MAP, rt.player))
   const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
@@ -326,7 +331,7 @@ export function Game({ gameId }: WorldGameProps) {
   // ------------------------------------------------------------ 단계
   async function cast(power: number) {
     rt.castPower = power
-    rt.bobber = castTarget(rt.player.pos, rt.player.facing, power)
+    rt.bobber = castTarget(MAP, rt.player.pos, rt.player.facing, power)
     let res: WorldView<View, PendingView>
     try {
       res = await act<PendingView>({ type: 'cast', area: AREA, power, spot: rt.castSpot })
@@ -416,7 +421,7 @@ export function Game({ gameId }: WorldGameProps) {
     switch (rt.phase) {
       case 'idle': {
         if (source !== 'action') break
-        const at = interactionFor(rt.player)
+        const at = interactionFor(MAP, rt.player)
         if (!at) break
         if (at.kind === 'shop') {
           // 상점은 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 상점 버튼에 떨어진다
@@ -450,7 +455,7 @@ export function Game({ gameId }: WorldGameProps) {
     if (key === rt.shopKey) {
       rt.shopKey = null
       // 아직 대기 중이고 여전히 상점 문 앞일 때만
-      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.player)?.kind === 'shop') {
+      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(MAP, rt.player)?.kind === 'shop') {
         setNotice(null)
         setMenu('shop')
       }
@@ -466,7 +471,7 @@ export function Game({ gameId }: WorldGameProps) {
 
   /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
   function syncHere() {
-    const at = interactionFor(rt.player)
+    const at = interactionFor(MAP, rt.player)
     const k = interactionKey(at)
     if (k === rt.hereKey) return
     rt.hereKey = k
@@ -480,7 +485,7 @@ export function Game({ gameId }: WorldGameProps) {
     const wasMoving = rt.player.moving
     if (rt.phase === 'idle' && !menuRef.current) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
-      rt.player = stepWalk(rt.player, input, dt)
+      rt.player = stepWalk(MAP, rt.player, input, dt)
     } else if (rt.player.moving) {
       rt.player = { ...rt.player, moving: false, walkMs: 0 }
     }
@@ -497,12 +502,13 @@ export function Game({ gameId }: WorldGameProps) {
     const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
     const { pos } = rt.player
     drawWorld(ctx, {
+      map: MAP,
       phase: rt.phase,
       tMs: now,
       gauge: rt.gauge,
       player: rt.player,
       // 캐릭터는 반올림한 자리에 그려지므로 카메라도 반올림한 자리를 따라간다(홀수 폭에서 1px 흔들림 방지)
-      camera: cameraFor({ x: Math.round(pos.x), y: Math.round(pos.y) }, size),
+      camera: cameraFor(MAP, { x: Math.round(pos.x), y: Math.round(pos.y) }, size),
       bobber: fishing ? rt.bobber : null,
       bar: rt.bar,
       barParams: rt.params,

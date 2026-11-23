@@ -8,9 +8,13 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
+import { TILE, pierEnd, type Facing, type Vec } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import fishingCss from './fishing.css?raw'
 import { WALK_SPEED, type Player } from './walk.ts'
+
+const SPAWN = VILLAGE.spawn
+const PIER_END = pierEnd(VILLAGE)!
 
 vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()

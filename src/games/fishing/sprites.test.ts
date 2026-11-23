@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { RODS, SPECIES } from './data.ts'
-import { SHOP, TILE } from './map.ts'
+import { TILE } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
 
 const PLAYER_POSES = [
@@ -113,7 +114,7 @@ describe('SPRITES', () => {
     expect(SPRITES.shop.w % 16).toBe(0)
     expect(SPRITES.shop.h % 16).toBe(0)
     // 맵의 건물 사각형(B·D 칸)과 같은 크기라 좌상단에 한 번에 그리면 맞는다
-    expect([SPRITES.shop.w, SPRITES.shop.h]).toEqual([SHOP.w * TILE, SHOP.h * TILE])
+    expect([SPRITES.shop.w, SPRITES.shop.h]).toEqual([VILLAGE.shop!.w * TILE, VILLAGE.shop!.h * TILE])
   })
 
   it('walk frames 0 and 1 differ in every direction', () => {
