@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots } from './data.ts'
+import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
 const WEATHERS: Weather[] = ['sun', 'rain']
@@ -48,6 +48,13 @@ describe('fishing data', () => {
   it('areas and defaults', () => {
     expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
+  })
+  it('UNLOCKS: lake·cave·island, 가격 5000/15000/50000', () => {
+    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island'])
+    expect(UNLOCKS.lake).toEqual({ price: 5000, name: '무너진 다리 수리' })
+    expect(UNLOCKS.cave).toEqual({ price: 15000, name: '동굴 장비' })
+    expect(UNLOCKS.island).toEqual({ price: 50000, name: '배' })
+    for (const id of Object.keys(UNLOCKS)) expect(DEFAULT_AREAS).not.toContain(id)
   })
   it('spots are a subset of the area spots, hours are integers in 0..24', () => {
     for (const s of SPECIES) {

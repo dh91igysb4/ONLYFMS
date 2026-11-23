@@ -277,7 +277,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(6)
+    expect(logic.version).toBe(7)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null,
     })
@@ -805,6 +805,48 @@ describe('fishing WorldLogic', () => {
       expect(m({ rodTier: 2, tackles: ['cork'], equipped: ['cork'] })).toMatchObject({ tackles: ['cork'], equipped: [] })
       expect(m({ tackles: 'cork', equipped: 7 })).toMatchObject({ tackles: [], equipped: [] })
     })
+  })
+})
+
+describe('지역 해금', () => {
+  const unlock = (area: string) => ({ type: 'unlockArea', area }) as unknown as Action
+  it('unlockArea lake: 골드 6000 → 1000, areas에 lake, totalEarned 그대로; 다시 → already_open', () => {
+    const r = ok(logic.apply(deepFreeze(fresh({ gold: 6000, totalEarned: 9000 })), unlock('lake'), ctx()))
+    expect(r.state.gold).toBe(1000)
+    expect(r.state.totalEarned).toBe(9000)
+    expect(r.state.areas).toEqual([...DEFAULT_AREAS, 'lake'])
+    expect(err(logic.apply(deepFreeze(r.state), unlock('lake'), ctx()))).toBe('already_open')
+  })
+  it('unlockArea: 골드 4999 → not_enough_gold(불변)', () => {
+    const s = deepFreeze(fresh({ gold: 4999 }))
+    expect(err(logic.apply(s, unlock('lake'), ctx()))).toBe('not_enough_gold')
+    expect(s.gold).toBe(4999)
+    expect(s.areas).toEqual([...DEFAULT_AREAS])
+  })
+  it('unlockArea: 기본 지역·모르는 id·프로토타입 키·비문자열 → bad_area', () => {
+    const s = deepFreeze(fresh({ gold: 99999 }))
+    for (const a of ['village', 'river', 'forest', 'zzz', '__proto__', 'constructor', 'toString', '', 3, null, undefined]) {
+      expect(err(logic.apply(s, { type: 'unlockArea', area: a } as unknown as Action, ctx()))).toBe('bad_area')
+    }
+  })
+  it('unlockArea: pending이 있으면 busy', () => {
+    expect(err(logic.apply(deepFreeze(withPending({ gold: 99999 })), unlock('lake'), ctx()))).toBe('busy')
+  })
+  it('unlockArea cave·island 가격', () => {
+    expect(ok(logic.apply(fresh({ gold: 15000 }), unlock('cave'), ctx())).state.gold).toBe(0)
+    expect(ok(logic.apply(fresh({ gold: 50000 }), unlock('island'), ctx())).state.gold).toBe(0)
+  })
+  it('해금한 지역에는 던질 수 있다(어종이 있는 지역)', () => {
+    const s = ok(logic.apply(fresh({ gold: 5000 }), unlock('lake'), ctx())).state
+    expect(s.areas).toContain('lake')
+  })
+  it('migrate v6 세이브(장비·잠금·해금 지역 포함)는 그대로', () => {
+    const v6 = {
+      gold: 10, totalEarned: 70000, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island'],
+      bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
+      legends: [], tackles: ['cork'], equipped: ['cork'], pending: null,
+    }
+    expect(logic.migrate(v6, 6)).toEqual(v6)
   })
 })
 

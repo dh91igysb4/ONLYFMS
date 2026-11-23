@@ -44,6 +44,12 @@ export const AREAS: readonly { id: AreaId; name: string; spots: readonly string[
   { id: 'island', name: '섬', spots: ['sea', 'lagoon'] },
 ]
 export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest']
+// 돈으로 여는 지역. 기본 지역(DEFAULT_AREAS)은 여기 없다.
+export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: string }>>> = {
+  lake: { price: 5000, name: '무너진 다리 수리' },
+  cave: { price: 15000, name: '동굴 장비' },
+  island: { price: 50000, name: '배' },
+}
 export const LEGEND_CHANCE = 0.08
 
 export const SPECIES: Species[] = [

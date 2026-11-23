@@ -3,7 +3,7 @@ import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, type Conditions } from './clock.ts'
 import {
   AREAS, areaHasSpecies, BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
-  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES,
+  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
   type AreaId, type Rod, type Species, type TackleId,
 } from './data.ts'
 
@@ -142,6 +142,7 @@ export type Action =
   | { type: 'buyBag'; tier: number }
   | { type: 'buyTackle'; id: string }
   | { type: 'equip'; ids: string[] }
+  | { type: 'unlockArea'; area: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
@@ -274,6 +275,18 @@ function buyTackle(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, gold: state.gold - t.price, tackles: [...state.tackles, t.id] } }
 }
 
+function unlockArea(state: State, a: Record<string, unknown>): Out {
+  const id = a.area
+  // 프로토타입 키(__proto__ 등)가 걸리지 않게 자기 키만 본다
+  if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(UNLOCKS, id)) return { error: 'bad_area' }
+  const area = id as AreaId
+  const u = UNLOCKS[area]!
+  if (state.pending) return { error: 'busy' }
+  if (state.areas.includes(area)) return { error: 'already_open' }
+  if (state.gold < u.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, gold: state.gold - u.price, areas: [...state.areas, area] } }
+}
+
 function equip(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   const ids = a.ids
@@ -349,7 +362,7 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 6,
+  version: 7,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
@@ -374,6 +387,8 @@ export const logic: WorldLogic<State, Action, View> = {
         return buyTackle(state, action)
       case 'equip':
         return equip(state, action)
+      case 'unlockArea':
+        return unlockArea(state, action)
       default:
         return { error: 'bad_action' }
     }
