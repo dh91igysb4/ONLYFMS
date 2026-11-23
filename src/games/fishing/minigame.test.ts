@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES } from './data.ts'
+import { RODS, SPECIES, type Behavior } from './data.ts'
 import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar } from './minigame.ts'
 
 function seeded(n: number): () => number {
@@ -30,6 +30,14 @@ describe('barParams', () => {
   it('difficulty comes from species', () => {
     expect(barParams('anchovy', 1).difficulty).toBe(SPECIES.find((s) => s.id === 'anchovy')!.difficulty)
     expect(barParams('grouper', 1).difficulty).toBe(0.95)
+  })
+})
+
+describe('barParams behavior', () => {
+  it('barParams는 어종의 behavior를 담는다 (pufferfish → floater, octopus → sinker)', () => {
+    expect(barParams('pufferfish', 1).behavior).toBe('floater')
+    expect(barParams('octopus', 1).behavior).toBe('sinker')
+    expect(barParams('goby', 1).behavior).toBe('mixed')
   })
 })
 
@@ -163,6 +171,58 @@ describe('simulation', () => {
       for (const v of [bar.barPos, bar.fishPos, bar.fishTarget]) {
         expect(v).toBeGreaterThanOrEqual(0)
         expect(v).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+})
+
+describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', () => {
+  function sim(behavior: Behavior, seedN = 11) {
+    const params = { barSize: 0.22, difficulty: 0.5, behavior }
+    const rng = seeded(seedN)
+    let bar = initBar()
+    let sum = 0
+    let move = 0
+    const n = Math.floor(60000 / 16)
+    for (let i = 0; i < n; i++) {
+      const next = stepBar({ ...bar, progress: 0.5 }, false, 16, params, rng)
+      move += Math.abs(next.fishPos - bar.fishPos)
+      sum += next.fishPos
+      bar = next
+    }
+    return { mean: sum / n, move }
+  }
+
+  it('floater는 위쪽, sinker는 아래쪽에 머문다', () => {
+    expect(sim('floater').mean).toBeGreaterThan(0.6)
+    expect(sim('sinker').mean).toBeLessThan(0.4)
+  })
+
+  it('mixed는 가운데 근처다', () => {
+    const { mean } = sim('mixed')
+    expect(mean).toBeGreaterThan(0.35)
+    expect(mean).toBeLessThan(0.65)
+  })
+
+  it('이동량은 dart > mixed > smooth', () => {
+    const dart = sim('dart').move
+    const mixed = sim('mixed').move
+    const smooth = sim('smooth').move
+    expect(dart).toBeGreaterThan(mixed)
+    expect(mixed).toBeGreaterThan(smooth)
+  })
+
+  it('모든 유형에서 위치가 [0, 1] 안에 머문다', () => {
+    for (const behavior of ['mixed', 'smooth', 'dart', 'floater', 'sinker'] as const) {
+      const params = { barSize: 0.22, difficulty: 1, behavior }
+      const rng = seeded(21)
+      let bar = initBar()
+      for (let i = 0; i < 2000; i++) {
+        bar = stepBar({ ...bar, progress: 0.5 }, i % 40 < 20, 16, params, rng)
+        for (const v of [bar.barPos, bar.fishPos, bar.fishTarget]) {
+          expect(v).toBeGreaterThanOrEqual(0)
+          expect(v).toBeLessThanOrEqual(1)
+        }
       }
     }
   })

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudSide, releaseSceneCache, type Phase, type WorldScene } from './scene.ts'
+import type { BarParams } from './minigame.ts'
 import { PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
 import { cameraFor, type Player } from './walk.ts'
 
@@ -45,7 +46,7 @@ class RecordingCtx {
 const asCtx = (c: RecordingCtx) => c as unknown as CanvasRenderingContext2D
 
 const bar = { barPos: 0.55, barVel: 0, fishPos: 0.62, fishTarget: 0.6, progress: 0.58, perfect: true, t: 0 }
-const barParams = { barSize: 0.3, difficulty: 0.5 }
+const barParams: BarParams = { barSize: 0.3, difficulty: 0.5, behavior: 'mixed' }
 const PHASES: Phase[] = ['idle', 'charging', 'waiting', 'bite', 'fighting', 'caught', 'lost']
 const SIZES: [number, number][] = [[160, 240], [195, 280], [320, 480]]
 
