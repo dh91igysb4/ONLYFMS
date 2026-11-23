@@ -5,7 +5,7 @@ import type { Box } from './collide.ts'
 import type { HazardDef } from './hazards.ts'
 import type { Motion } from './motion.ts'
 import type { MoverDef } from './movers.ts'
-import type { Prim, Template } from './pieces.ts'
+import { TEMPLATES, buildTemplate, type Prim, type Template } from './pieces.ts'
 import { TURN } from './trig.ts'
 
 const flat = (id: string, tier: 1 | 2 | 3 | 4, extra: Prim[] = []): Template => ({
@@ -123,7 +123,9 @@ describe('neon-rider 코스', () => {
       prev = s.lastSeg
       let low = Infinity
       for (let i = s.firstSeg; i <= s.lastSeg; i++) low = Math.min(low, c.seg(i).y0, c.seg(i).y1)
-      expect(s.minY).toBe(low)
+      // 움직이는 길이 있는 구간의 minY는 길의 움직임 전체 범위까지 넣는다(course.ts moverFloor): 도는 길은 고정 길보다 낮게 내려갈 수 있다
+      if (buildTemplate(TEMPLATES.find((t) => t.id === s.templateId)!).movers.length > 0) expect(s.minY).toBeLessThanOrEqual(low)
+      else expect(s.minY).toBe(low)
     }
   })
 

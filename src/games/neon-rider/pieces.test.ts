@@ -332,10 +332,10 @@ describe('TEMPLATES', () => {
     }
     expect(n).toBe(5) // spikepit, spikefloor, onetime, onetime2 × 2
   })
-  it('spikefloor: 길 위에 약 24 m 가시 띠(녹화 119.5–133 s), 그 위에 도는 노란 초승달 디딤돌이 띠와 닿지 않게 떠 있다', () => {
+  it('spikefloor: 길 위에 긴 가시 띠(18 m, 녹화 약 24 m를 통과 가능하게 줄임, 판정 기록 하한 16 m), 그 위에 도는 노란 초승달 디딤돌이 띠와 닿지 않게 떠 있다', () => {
     const b = buildTemplate(TEMPLATES.find((t) => t.id === 'spikefloor')!)
     const bar = b.hazards[0].shape as Extract<HazardShape, { s: 'bar' }>
-    expect(bar.x1 - bar.x0).toBeGreaterThanOrEqual(24000 * MM)
+    expect(bar.x1 - bar.x0).toBeGreaterThanOrEqual(16000 * MM)
     for (const m of b.movers) {
       expect(m.pivotX).toBeGreaterThan(bar.x0)
       expect(m.pivotX).toBeLessThan(bar.x1)

@@ -770,7 +770,7 @@ describe('움직이는 길', () => {
     const before = [
       '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
       '{"tick":378,"rear":{"x":936344,"y":52061,"px":934107,"py":52520,"ground":false},"front":{"x":916208,"y":61878,"px":915063,"py":64574,"ground":false},"progress":88,"nextSection":1,"sectionScore":1,"flipScore":1,"airAngle":1705,"pending":{"flips":0,"perfect":false,"grace":9},"lastAward":{"tick":195,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
-      '{"tick":527,"rear":{"x":669049,"y":-5120,"px":665937,"py":-5127,"ground":true},"front":{"x":647387,"y":590,"px":644782,"py":2503,"ground":false},"progress":195,"nextSection":0,"sectionScore":0,"flipScore":1,"airAngle":1842,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":{"tick":387,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
+      '{"tick":502,"rear":{"x":1316789,"y":-42439,"px":1314078,"py":-42586,"ground":false},"front":{"x":1295148,"y":-48213,"px":1292396,"py":-48213,"ground":true},"progress":211,"nextSection":2,"sectionScore":2,"flipScore":1,"airAngle":2198,"pending":null,"lastAward":{"tick":291,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
       '{"tick":249,"rear":{"x":478770,"y":-72646,"px":477591,"py":-69925,"ground":false},"front":{"x":456536,"y":-75391,"px":455326,"py":-72398,"ground":false},"progress":8,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2125,"pending":null,"lastAward":null,"gems":1,"takenGems":[3],"dead":"crash","airBefore":true}',
       '{"tick":232,"rear":{"x":662729,"y":11678,"px":659826,"py":10166,"ground":true},"front":{"x":640476,"y":9103,"px":637102,"py":11678,"ground":false},"progress":76,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2044,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":false}'
     ]
@@ -780,10 +780,11 @@ describe('움직이는 길', () => {
       'cup', 'quarter', 'boostjump', 'spikefloor', 'spikepit', 'roofs', 'stepup', 'crestgap', 'stairs', 'bowldrop',
       'loop', 'humps', 'sinuous', 'vplat', 'curl', 'hook', 'arcs', 'loop2', 'spiral',
     ]
-    const CHANGED = ['waves', 'boostjump', 'crestgap', 'loop', 'spikepit']
+    // 움직이는 길·연결 조각을 더한 loop2·spikefloor도 바뀐 템플릿이라 뺀다(셋째 값은 arcs·spiral·ramp로 바꿔 eadbecc에서 뽑음)
+    const CHANGED = ['waves', 'boostjump', 'crestgap', 'loop', 'spikepit', 'loop2', 'spikefloor']
     const statics = TEMPLATES.filter((t) => PRE_HAZARD_IDS.includes(t.id) && !CHANGED.includes(t.id))
     const after: string[] = []
-    for (const [ids, seed] of [[['ramp', 'hill', 'bowl'], 7], [['quarter', 'humps', 'valley'], 3], [['loop2', 'spikefloor', 'ramp'], 5]] as const) {
+    for (const [ids, seed] of [[['ramp', 'hill', 'bowl'], 7], [['quarter', 'humps', 'valley'], 3], [['arcs', 'spiral', 'ramp'], 5]] as const) {
       const c = courseOf(ids)
       after.push(JSON.stringify(run(initSim(c), 1500, randomInput(seed), c)))
     }
