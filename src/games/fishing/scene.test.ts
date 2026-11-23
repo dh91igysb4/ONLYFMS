@@ -85,6 +85,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     hudTop: 0,
     fade: 0,
     opened: new Set<AreaId>(DEFAULT_AREAS),
+    teleporterOn: false,
     ...extra,
   }
 }
@@ -842,5 +843,82 @@ describe('산 호수·동굴·섬 타일', () => {
     const lb = leaves(b, below.camera)
     expect(lb.length).toBeGreaterThan(0)
     expect(lb.every(({ i }) => i < players(b)[0].at)).toBe(true)
+  })
+})
+
+describe('순간이동기', () => {
+  // 3×? 풀밭, 이동기 칸 (3,3)~(4,4), 도착 자리 (3,5)
+  const FIELD = defineMap('river', [
+    'TTTTTTTTT',
+    'T,,,,,,,T',
+    'T,,,,,,,T',
+    'T,,,,,,,T',
+    'T,,,,,,,T',
+    'T,,,,,,,T',
+    'T,,,,,,,T',
+    'TTTTTTTTT',
+  ], { teleporter: { tiles: { tx: 3, ty: 3, w: 2, h: 2 }, front: { tx: 3, ty: 5, facing: 'down' } } })
+  const size = { w: 160, h: 240 }
+  const fieldScene = (p: Player, extra: Partial<WorldScene> = {}): WorldScene =>
+    ({ ...scene('idle', p, size), map: FIELD, camera: cameraFor(FIELD, p.pos, size), ...extra })
+  const named = (c: RecordingCtx, name: string) => c.sprites.filter((s) => s.name === name)
+
+  test('이동기는 칸 왼쪽 위에서 한 칸 위(탑 끝)부터 한 번 그리고, 꺼져 있으면 불빛이 없다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const sc = fieldScene(player(tileCentre(3, 5), 'up'))
+    const c = new RecordingCtx()
+    drawWorld(asCtx(c), sc, size)
+    expect(named(c, 'teleporter').map((s) => [s.x, s.y])).toEqual([[3 * TILE - sc.camera.x, 2 * TILE - sc.camera.y]])
+    expect(c.sprites.some((s) => s.name.startsWith('teleporter-glow'))).toBe(false)
+  })
+
+  test('켜져 있으면 같은 자리에 불빛이 두 장 번갈아(물 박자) 얹힌다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const glows = new Set<string>()
+    for (const tMs of [0, 500]) {
+      const sc = fieldScene(player(tileCentre(3, 5), 'up'), { teleporterOn: true, tMs })
+      const c = new RecordingCtx()
+      drawWorld(asCtx(c), sc, size)
+      const g = c.sprites.filter((s) => s.name.startsWith('teleporter-glow'))
+      expect(g).toHaveLength(1)
+      expect([g[0].x, g[0].y]).toEqual([3 * TILE - sc.camera.x, 2 * TILE - sc.camera.y])
+      expect(g[0].at).toBeGreaterThanOrEqual(named(c, 'teleporter')[0].at)
+      glows.add(g[0].name)
+    }
+    expect([...glows].sort()).toEqual(['teleporter-glow-0', 'teleporter-glow-1'])
+  })
+
+  test('정적 캐시에는 넣지 않는다: 켜짐을 바꿔도 캐시를 다시 만들지 않는다', () => {
+    const made: RecordingCtx[] = []
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+      const c = new RecordingCtx()
+      made.push(c)
+      return c as unknown as RenderingContext
+    })
+    const p = player(tileCentre(3, 5), 'up')
+    for (const on of [false, false, true, false]) drawWorld(asCtx(new RecordingCtx()), fieldScene(p, { teleporterOn: on }), size)
+    expect(made).toHaveLength(2)
+    expect(made.some((c) => c.sprites.some((s) => s.name.startsWith('teleporter')))).toBe(false)
+  })
+
+  test('캐릭터가 이동기 위 줄(뒤)에 서면 탑이 나중에, 도착 자리(앞)에 서면 먼저 그려진다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const behind = new RecordingCtx()
+    drawWorld(asCtx(behind), fieldScene(player(tileCentre(3, 2), 'down')), size)
+    expect(named(behind, 'teleporter')[0].at).toBeGreaterThan(players(behind)[0].at)
+    const side = new RecordingCtx()
+    drawWorld(asCtx(side), fieldScene(player(tileCentre(5, 4), 'left')), size)
+    expect(named(side, 'teleporter')[0].at).toBeGreaterThan(players(side)[0].at)
+    const front = new RecordingCtx()
+    drawWorld(asCtx(front), fieldScene(player(tileCentre(3, 5), 'up')), size)
+    expect(named(front, 'teleporter')[0].at).toBeLessThan(players(front)[0].at)
+  })
+
+  test('이동기가 화면 밖이면 그리지 않는다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const sc = fieldScene(player(tileCentre(3, 5), 'up'), { camera: { x: 9 * TILE, y: 0 } })
+    const c = new RecordingCtx()
+    drawWorld(asCtx(c), sc, size)
+    expect(named(c, 'teleporter')).toHaveLength(0)
   })
 })

@@ -354,3 +354,30 @@ describe('산 호수·동굴·섬 물고기 스프라이트', () => {
     for (const id of ['moray', 'lava-eel', 'sturgeon']) expectBodyUnbroken(id)
   })
 })
+
+describe('순간이동기(등대 신호기) 스프라이트', () => {
+  it('teleporter는 32×48(아래 32줄이 2×2 칸), 불빛 두 장은 32×16이고 서로 다르다', () => {
+    expect([SPRITES.teleporter?.w, SPRITES.teleporter?.h]).toEqual([32, 48])
+    for (const n of ['teleporter-glow-0', 'teleporter-glow-1']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([32, 16])
+    expect(SPRITES['teleporter-glow-0'].rows.join('\n')).not.toBe(SPRITES['teleporter-glow-1'].rows.join('\n'))
+  })
+
+  it('teleporter는 다른 어느 스프라이트와도 다르고, 아래 두 칸(16~47줄)에 받침이 있어 양옆 아래까지 채운다', () => {
+    const own = SPRITES.teleporter.rows.join('\n')
+    for (const [name, sp] of Object.entries(SPRITES)) if (name !== 'teleporter') expect(sp.rows.join('\n'), name).not.toBe(own)
+    const rows = SPRITES.teleporter.rows
+    // 받침 가장 넓은 줄은 거의 두 칸 폭(28px 이상)
+    const widest = Math.max(...rows.slice(32).map((r) => r.replace(/^\.+|\.+$/g, '').length))
+    expect(widest).toBeGreaterThanOrEqual(28)
+    // 위 16줄(한 칸 위로 솟는 부분)은 가운데 탑만: 가장자리 6열은 비어 있다
+    for (const r of rows.slice(0, 16)) expect(r.slice(0, 6) + r.slice(26), r).toBe('.'.repeat(12))
+  })
+
+  it('불빛은 등롱(3~8줄) 유리 칸에 겹친다', () => {
+    const glass = SPRITES.teleporter.rows.slice(3, 9).map((r) => r.slice(12, 20))
+    const lit = SPRITES['teleporter-glow-0'].rows.slice(3, 9).map((r) => r.slice(12, 20))
+    let over = 0
+    glass.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && lit[y][x] !== '.') over++ }))
+    expect(over).toBeGreaterThanOrEqual(24)
+  })
+})

@@ -5,7 +5,7 @@ import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
 import { AREAS, bagSize, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
-import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
+import { price, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
@@ -215,6 +215,9 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'teleporter') return 'teleporter'
   return 'shop'
 }
+/** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
+const tpOpen = (view: View | null, area: AreaId): boolean =>
+  !!view && teleporterOpen({ areas: view.areas, challenges: view.challenges ?? {} }, area)
 /** 열린 지역: 기본 지역(마을·강·숲)과 서버 상태의 areas. 아직 못 받았으면 기본 지역만 */
 const openedOf = (view: View | null): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...(view?.areas ?? [])])
 
@@ -655,6 +658,7 @@ export function Game({ gameId }: WorldGameProps) {
       hudTop: hudTopFor(touch, fit.scale),
       fade: rt.fade,
       opened,
+      teleporterOn: tpOpen(viewRef.current, rt.map.id),
     }, size)
   }
 
