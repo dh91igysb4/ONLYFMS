@@ -304,7 +304,7 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
       )}
       <div className="fish-map-detail">
         <h4 className="fish-map-detail-title" aria-live="polite">{detailTitle}</h4>
-        {pickedSpot && spotNote(area, pickedSpot) && <p className="muted fish-map-spot-note">{spotNote(area, pickedSpot)}</p>}
+        {pickedSpot && spotNote(area, pickedSpot) && <p className="muted">{spotNote(area, pickedSpot)}</p>}
         {pickedSpot && spotRows[pickedSpot] ? (
           <FishList rows={filterFish(spotRows[pickedSpot], filter)} view={view} />
         ) : pickedMark ? (

@@ -1322,3 +1322,21 @@ describe('늪지 그림 다듬기', () => {
     expect(plain).toBeGreaterThan(lily * 2)
   })
 })
+
+describe('늪지 풀밭 물가', () => {
+  test('풀에 닿은 늪 칸에는 물가 풀 띠, 풀이 없는 늪 칸에는 없다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const size = { w: 195, h: 280 }
+    const m = defineMap('forest', [',,,,,', 'zzzzz', 'zzzzz', 'zzzzz', ',,,,,'], { spots: { marsh: 'marsh' } })
+    const p = player(tileCentre(2, 4))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    const inTile = (r: { x: number; y: number }, tx: number, ty: number) =>
+      r.x >= tx * 16 - cam.x && r.x < (tx + 1) * 16 - cam.x && r.y >= ty * 16 - cam.y && r.y < (ty + 1) * 16 - cam.y
+    const sedge = (tx: number, ty: number) => ctx.rects.filter((r) => r.color === '#6f9a52' && inTile(r, tx, ty)).length
+    expect(sedge(2, 1)).toBeGreaterThan(0)
+    expect(sedge(2, 3)).toBeGreaterThan(0)
+    expect(sedge(2, 2)).toBe(0)
+  })
+})

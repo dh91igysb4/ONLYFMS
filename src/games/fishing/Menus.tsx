@@ -7,7 +7,6 @@ import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
 const ICON_SCALE = 2
-/** 이 단계까지가 기본 낚싯대. 그 위(5·6단계)는 어떤 어종에도 필요 없는 고급 장비 */
 /** 신화를 뺀 어종이 요구하는 가장 높은 낚싯대. 이보다 높은 단계는 "고급 장비"(신화만 그 단계를 요구할 수 있다) */
 const PREMIUM_ROD = Math.max(...SPECIES.filter((s) => s.rarity !== 'mythic').map((s) => s.minRod))
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`

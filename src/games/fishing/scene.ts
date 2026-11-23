@@ -90,6 +90,8 @@ const C = {
   foam: '#e9f6fb',
   bogRim: '#65805a', // 수렁 둘레 늪물(늪 바탕과 같은 색)
   bogEdge: '#3e3a2a', // 수렁 가장자리 진흙
+  sedge: '#6f9a52', // 늪 물가 풀(풀밭과 늪 사이)
+  sedgeDark: '#58794a', // 물가 풀 끝 그늘
   grass: '#78b85c',
   grassDark: '#5f9e4a',
   pierFace: '#6e4526',
@@ -460,6 +462,7 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     drawSprite(ctx, `${name}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
     if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
+    if (kind === 'marsh') drawSedgeFringe(ctx, g, tx, ty)
   } else if (ground === 'cave') {
     drawSprite(ctx, 'tile-cave-floor', x, y, 1)
   } else if (ground === 'sand') {
@@ -479,6 +482,48 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
   else if (kind === 'boardwalk') drawSprite(ctx, boardwalkVertical(g.map, tx, ty) ? 'boardwalk-plank-v' : 'boardwalk-plank', x, y, 1)
+}
+
+/**
+ * 늪물 칸 가장자리에 풀이 닿으면 물가 풀(사초) 띠: 칸마다 고정된 들쭉날쭉 2~4px, 풀색에서 늪색으로 한 단계 어둡게.
+ * 늪지 풀밭 섬이 늪 위에 네모로 떠 보이지 않게 물가를 부드럽게 잇는다.
+ */
+function drawSedgeFringe(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const x = tx * TILE
+  const y = ty * TILE
+  const grass = (dx: number, dy: number) => groundAt(g, tx + dx, ty + dy) === 'grass'
+  const up = grass(0, -1)
+  const down = grass(0, 1)
+  const left = grass(-1, 0)
+  const right = grass(1, 0)
+  for (let i = 0; i < TILE; i++) {
+    const d = (a: number, b: number) => 2 + (hash(a, b) % 3)
+    if (up) {
+      const n = d(x + i, y)
+      rect(ctx, x + i, y, 1, n - 1, C.sedge)
+      rect(ctx, x + i, y + n - 1, 1, 1, C.sedgeDark)
+    }
+    if (down) {
+      const n = d(x + i, y + TILE)
+      rect(ctx, x + i, y + TILE - n + 1, 1, n - 1, C.sedge)
+      rect(ctx, x + i, y + TILE - n, 1, 1, C.sedgeDark)
+    }
+    if (left) {
+      const n = d(x, y + i)
+      rect(ctx, x, y + i, n - 1, 1, C.sedge)
+      rect(ctx, x + n - 1, y + i, 1, 1, C.sedgeDark)
+    }
+    if (right) {
+      const n = d(x + TILE, y + i)
+      rect(ctx, x + TILE - n + 1, y + i, n - 1, 1, C.sedge)
+      rect(ctx, x + TILE - n, y + i, 1, 1, C.sedgeDark)
+    }
+  }
+  // 대각선으로만 풀이 닿는 모서리: 작은 풀 덩이
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    if (!grass(dx, dy) || grass(dx, 0) || grass(0, dy)) continue
+    rect(ctx, dx < 0 ? x : x + TILE - 3, dy < 0 ? y : y + TILE - 3, 3, 3, C.sedge)
+  }
 }
 
 /** 위아래로만 데크가 이어지는 칸(세로 데크 그림). 갈림길·가로 데크·외톨이는 가로 그림 */
