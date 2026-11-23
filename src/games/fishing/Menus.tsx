@@ -118,12 +118,12 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
 }
 
 /** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
-const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안' }
+const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포' }
 
-/** 도감에 보일 출현 조건: 자리(전설만) · 계절 · 시간 · 날씨 */
+/** 도감에 보일 출현 조건: 자리(spots가 있는 어종) · 계절 · 시간 · 날씨 */
 export function conditionLabel(s: Species): string {
   const parts: string[] = []
-  if (s.legend && s.spots) parts.push(s.spots.map((x) => SPOT_NAMES[x] ?? x).join(' · '))
+  if (s.spots) parts.push(s.spots.map((x) => SPOT_NAMES[x] ?? x).join(' · '))
   parts.push(s.seasons ? s.seasons.map((x) => SEASON_NAMES[x]).join(' · ') : '사계절')
   if (s.hours) parts.push(`${s.hours[0]}~${s.hours[1]}시`)
   if (s.weather) parts.push(s.weather === 'rain' ? '비' : '맑음')

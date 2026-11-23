@@ -293,7 +293,7 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 3,
+  version: 4,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.

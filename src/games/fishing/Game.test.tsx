@@ -757,16 +757,16 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('hook')).toHaveLength(1)
   })
-  test('dex shows spawn conditions only for caught species, legend mark, and n/16', async () => {
+  test('dex shows spawn conditions only for caught species, legend mark, and n/33', async () => {
     await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/16종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
     expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
     expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
     expect(within(dex).getByText('전설')).toBeInTheDocument()
     expect(within(dex).queryByText('봄 · 가을')).not.toBeInTheDocument() // 못 잡은 멸치
-    expect(within(dex).getAllByText('???')).toHaveLength(14)
+    expect(within(dex).getAllByText('???')).toHaveLength(31)
   })
 
   test('server_now가 기기 시각과 같으면 cond는 conditionsAt(Date.now())', async () => {
@@ -796,10 +796,16 @@ describe('conditionLabel', () => {
     expect(conditionLabel(sp('goby'))).toBe('사계절')
     expect(conditionLabel(sp('grouper'))).toBe('부두 · 겨울')
   })
+  test('spots가 있는 어종은 전설이 아니어도 자리를 앞에 붙이고, 없으면 붙이지 않는다', () => {
+    expect(conditionLabel(sp('stream-minnow'))).toBe('폭포 · 사계절')
+    expect(conditionLabel(sp('snakehead'))).toBe('연못 · 여름 · 가을 · 20~5시')
+    expect(conditionLabel(sp('catfish'))).toBe('봄 · 여름 · 가을 · 비')
+    expect(conditionLabel(sp('pale-chub'))).toBe('사계절')
+  })
   test('legend spot comes from spots: shore → 해안, unknown id stays as is', () => {
     const grouper = sp('grouper')
     expect(conditionLabel({ ...grouper, spots: ['shore'] })).toBe('해안 · 겨울')
-    expect(conditionLabel({ ...grouper, spots: ['river'] })).toBe('river · 겨울')
+    expect(conditionLabel({ ...grouper, spots: ['zzz'] })).toBe('zzz · 겨울')
   })
 })
 

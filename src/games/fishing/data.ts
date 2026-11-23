@@ -63,6 +63,25 @@ export const SPECIES: Species[] = [
   { id: 'yellowtail', name: '방어', rarity: 'rare', basePrice: 600, minCm: 60, maxCm: 110, difficulty: 0.75, minRod: 2, behavior: 'smooth', area: 'village', seasons: ['winter'] },
   { id: 'octopus', name: '문어', rarity: 'rare', basePrice: 350, minCm: 30, maxCm: 90, difficulty: 0.85, minRod: 2, behavior: 'sinker', area: 'village', seasons: ['summer'], hours: [6, 13] },
   { id: 'grouper', name: '다금바리', rarity: 'legend', basePrice: 2500, minCm: 80, maxCm: 140, difficulty: 0.95, minRod: 3, behavior: 'mixed', area: 'village', spots: ['pier'], seasons: ['winter'], legend: { power: 0.95 } },
+  // 마을 강
+  { id: 'pale-chub', name: '피라미', rarity: 'common', basePrice: 20, minCm: 8, maxCm: 15, difficulty: 0.2, minRod: 1, behavior: 'dart', area: 'river' },
+  { id: 'dark-chub', name: '갈겨니', rarity: 'common', basePrice: 25, minCm: 10, maxCm: 18, difficulty: 0.25, minRod: 1, behavior: 'mixed', area: 'river' },
+  { id: 'skin-carp', name: '누치', rarity: 'common', basePrice: 45, minCm: 25, maxCm: 50, difficulty: 0.3, minRod: 1, behavior: 'smooth', area: 'river', seasons: ['spring', 'summer', 'autumn'], hours: [6, 19] },
+  { id: 'aucha-perch', name: '꺽지', rarity: 'uncommon', basePrice: 90, minCm: 12, maxCm: 25, difficulty: 0.45, minRod: 1, behavior: 'sinker', area: 'river' },
+  { id: 'sweetfish', name: '은어', rarity: 'uncommon', basePrice: 120, minCm: 15, maxCm: 30, difficulty: 0.5, minRod: 1, behavior: 'dart', area: 'river', seasons: ['summer'], hours: [6, 19] },
+  { id: 'catfish', name: '메기', rarity: 'uncommon', basePrice: 130, minCm: 30, maxCm: 80, difficulty: 0.55, minRod: 1, behavior: 'mixed', area: 'river', seasons: ['spring', 'summer', 'autumn'], weather: 'rain' },
+  { id: 'mandarin-fish', name: '쏘가리', rarity: 'rare', basePrice: 350, minCm: 25, maxCm: 55, difficulty: 0.7, minRod: 2, behavior: 'mixed', area: 'river' },
+  { id: 'eel', name: '뱀장어', rarity: 'rare', basePrice: 400, minCm: 40, maxCm: 90, difficulty: 0.75, minRod: 2, behavior: 'smooth', area: 'river', seasons: ['summer', 'autumn'], hours: [20, 5] },
+  { id: 'golden-mandarin', name: '황금 쏘가리', rarity: 'legend', basePrice: 3000, minCm: 50, maxCm: 80, difficulty: 0.92, minRod: 3, behavior: 'mixed', area: 'river', seasons: ['summer'], weather: 'rain', legend: { power: 0.95 } },
+  // 숲
+  { id: 'crucian', name: '붕어', rarity: 'common', basePrice: 25, minCm: 10, maxCm: 30, difficulty: 0.2, minRod: 1, behavior: 'mixed', area: 'forest', spots: ['pond'] },
+  { id: 'carp', name: '잉어', rarity: 'common', basePrice: 40, minCm: 30, maxCm: 80, difficulty: 0.25, minRod: 1, behavior: 'smooth', area: 'forest', spots: ['pond'] },
+  { id: 'bluegill', name: '블루길', rarity: 'common', basePrice: 15, minCm: 8, maxCm: 20, difficulty: 0.15, minRod: 1, behavior: 'mixed', area: 'forest', spots: ['pond'], seasons: ['spring', 'summer', 'autumn'], hours: [6, 19] },
+  { id: 'loach', name: '미꾸라지', rarity: 'uncommon', basePrice: 60, minCm: 8, maxCm: 18, difficulty: 0.4, minRod: 1, behavior: 'sinker', area: 'forest', spots: ['pond'], seasons: ['spring', 'summer', 'autumn'], weather: 'rain' },
+  { id: 'snakehead', name: '가물치', rarity: 'uncommon', basePrice: 150, minCm: 40, maxCm: 90, difficulty: 0.65, minRod: 1, behavior: 'mixed', area: 'forest', spots: ['pond'], seasons: ['summer', 'autumn'], hours: [20, 5] },
+  { id: 'stream-minnow', name: '버들치', rarity: 'common', basePrice: 20, minCm: 6, maxCm: 12, difficulty: 0.25, minRod: 1, behavior: 'dart', area: 'forest', spots: ['waterfall'] },
+  { id: 'lenok', name: '열목어', rarity: 'rare', basePrice: 380, minCm: 30, maxCm: 70, difficulty: 0.72, minRod: 2, behavior: 'dart', area: 'forest', spots: ['waterfall'], seasons: ['autumn', 'winter'] },
+  { id: 'century-snakehead', name: '백년 가물치', rarity: 'legend', basePrice: 2800, minCm: 90, maxCm: 150, difficulty: 0.9, minRod: 3, behavior: 'sinker', area: 'forest', spots: ['pond'], seasons: ['spring'], hours: [20, 5], legend: { power: 0 } },
 ]
 
 export const RODS: Rod[] = [
