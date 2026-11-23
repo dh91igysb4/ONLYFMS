@@ -44,4 +44,7 @@ export const LAKE = defineMap('lake', [
   spots: { lake: 'lake' },
   // 남쪽 출구 → 강 북쪽 출구 한 칸 안쪽(골짜기 다리 북쪽 길)
   exits: [{ edge: 's', from: 24, to: 25, target: 'river', entry: { tx: 24, ty: 1, facing: 'down' } }],
+  // 순간이동기: 남쪽 풀밭 길(tx 24) 동쪽. 세계 지도에서 강 북쪽
+  teleporter: { tiles: { tx: 27, ty: 24, w: 2, h: 2 }, front: { tx: 27, ty: 26, facing: 'down' } },
+  world: { tx: 0, ty: -68 },
 })

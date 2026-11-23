@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import { availableHeight, canvasScale, fitScene, Game, hudTopFor, TOUCH_HINT_BAND } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
+import { releaseMinimapCache } from './minimap.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
@@ -16,6 +17,7 @@ import { CAVE } from './maps/cave.ts'
 import { ISLAND } from './maps/island.ts'
 import { DEFAULT_AREAS } from './data.ts'
 import { feetBlocked } from './walk.ts'
+import { teleportFee } from './teleport.ts'
 import type { AreaId } from './data.ts'
 import fishingCss from './fishing.css?raw'
 import { WALK_SPEED, type Player } from './walk.ts'
@@ -34,6 +36,10 @@ const mapGate = vi.hoisted(() => ({ hideRiver: false }))
 vi.mock('./maps/index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./maps/index.ts')>()
   return { ...orig, mapFor: (area: AreaId) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area)) }
+})
+vi.mock('./minimap.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./minimap.ts')>()
+  return { ...orig, minimapUrl: vi.fn(() => 'data:mini'), spotHighlightUrl: vi.fn(() => 'data:hl'), releaseMinimapCache: vi.fn() }
 })
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
@@ -65,7 +71,7 @@ const worldMock = vi.mocked(world)
 const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null, ...over }
 }
 
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
@@ -582,7 +588,11 @@ describe('fishing Game', () => {
     await flush()
     expect(screen.getByRole('button', { name: '가방' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '도감' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '지도' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '전체화면' })).toBeDisabled()
+    // 낚시 중에는 M 키도 지도를 열지 않는다
+    fireEvent.keyDown(window, { code: 'KeyM', key: 'm' })
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
   })
 
   test('canvas size uses the height left below the stage, not a fixed allowance', async () => {
@@ -1065,10 +1075,10 @@ describe('fishing Game: walking and interaction', () => {
     expect(actionButton()).not.toHaveAttribute('disabled')
   })
 
-  test('the bottom row has bag, dex and fullscreen but no shop; the bag says where to sell', async () => {
+  test('the bottom row has bag, dex, challenges, map and fullscreen but no shop; the bag says where to sell', async () => {
     const { container } = await mount()
     const bottom = container.querySelector('.fish-bottom') as HTMLElement
-    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '전체화면'])
+    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '전체화면'])
     expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
@@ -2258,5 +2268,259 @@ describe('찌 상점·장비', () => {
     const plain = await barSize([])
     const corked = await barSize(['cork'])
     expect(corked).toBeCloseTo(plain * 1.2)
+  })
+})
+
+describe('도전과제·순간이동기', () => {
+  const BASE: AreaId[] = [...DEFAULT_AREAS]
+  const DONE = { progress: 9, done: true }
+  const VT = VILLAGE.teleporter!
+  /** 마을 순간이동기 도착 자리에서 위(구조물)를 본다 */
+  const AT_VILLAGE_TP: At = { area: 'village', pos: tileCenter(VT.front.tx, VT.front.ty), facing: 'up' }
+  const tpPanel = () => screen.getByRole('region', { name: '순간이동기' })
+  const savedPos = () => JSON.parse(localStorage.getItem(POS_KEY) ?? 'null') as At
+  async function interact() {
+    press()
+    release()
+    await advance(300)
+  }
+
+  test('과제 버튼 → 도전과제 6개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/6', async () => {
+    await mount(makeView({ challenges: { 'pier-perfect': { progress: 1, done: false }, 'river-rain': { progress: 5, done: true } } }), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '과제' }))
+    const panel = screen.getByRole('region', { name: '도전과제' })
+    const items = within(panel).getAllByRole('listitem')
+    expect(items).toHaveLength(6)
+    expect(items[0]).toHaveTextContent('바닷가 마을 · 부두의 명수')
+    expect(items[0]).toHaveTextContent('부두에서 완벽하게 3마리 낚기')
+    expect(items[0]).toHaveTextContent('1/3')
+    expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
+    expect(items[2]).toHaveTextContent('0/3')
+    expect(within(panel).getByText('깬 과제 1/6')).toBeInTheDocument()
+  })
+
+  test('잡은 결과에 completed가 있으면 완료 알림', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({
+      hook: () => ok(view, { species: 'goby', sizeCm: 12 }),
+      resolve: () => {
+        const fish = { species: 'goby', sizeCm: 12, perfect: true }
+        return ok({ ...view, bag: [fish], challenges: { 'pier-perfect': { progress: 3, done: true } } }, { caught: fish, completed: ['pier-perfect'] })
+      },
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(MIN_FIGHT_MS + 300)
+    expect(calls('resolve')).toHaveLength(1)
+    expect(screen.getByText('도전과제 완료! 부두의 명수 — 바닷가 마을 순간이동기가 켜졌어요')).toBeInTheDocument()
+  })
+
+  test('꺼진 마을 이동기 앞: 안내 살펴보기, 행동 → 창(아직 꺼져 있어요, 과제와 진행), 이동 버튼 없음; 장면 teleporterOn false', async () => {
+    await mount(makeView({ challenges: { 'pier-perfect': { progress: 2, done: false } } }), AT_VILLAGE_TP)
+    await advance(50)
+    expect(lastScene().teleporterOn).toBe(false)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 살펴보기')).toBeInTheDocument()
+    await interact()
+    const panel = tpPanel()
+    expect(screen.getByRole('heading', { name: '바닷가 마을 순간이동기' })).toBeInTheDocument()
+    expect(within(panel).getByText('아직 꺼져 있어요')).toBeInTheDocument()
+    expect(within(panel).getByText('부두의 명수')).toBeInTheDocument()
+    expect(within(panel).getByText('2/3')).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: /이동/ })).not.toBeInTheDocument()
+  })
+
+  test('켜진 마을 이동기: 안내 순간이동, 강과 요금, 이동 → teleport; 창 닫힘, 페이드 뒤 강 이동기 앞에 서고 위치 저장, 바로 다시 행동해도 창이 안 열린다', async () => {
+    const fee = teleportFee('village', 'river')
+    const view = makeView({ gold: 500, areas: BASE, challenges: { 'pier-perfect': DONE, 'river-rain': DONE } })
+    await mount(view, AT_VILLAGE_TP)
+    await advance(50)
+    expect(lastScene().teleporterOn).toBe(true)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 순간이동')).toBeInTheDocument()
+    await interact()
+    const panel = tpPanel()
+    const rows = within(panel).getAllByRole('listitem')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('마을 강')
+    expect(rows[0]).toHaveTextContent(`${fee} G`)
+    expect(within(panel).getByText('보유 500 G')).toBeInTheDocument()
+    route({ teleport: () => ok({ ...view, gold: 500 - fee }, { from: 'village', to: 'river', fee }) })
+    fireEvent.click(within(panel).getByRole('button', { name: '마을 강 이동' }))
+    await flush()
+    expect(calls('teleport')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'teleport', from: 'village', to: 'river' } }])
+    expect(screen.queryByRole('region', { name: '순간이동기' })).not.toBeInTheDocument()
+    // 서버가 받자마자(맵을 바꾸기 전) 도착 자리를 저장한다
+    const dest = RIVER.teleporter!.front
+    expect(lastScene().map.id).toBe('village')
+    expect(savedPos()).toEqual({ area: 'river', pos: tileCenter(dest.tx, dest.ty), facing: dest.facing })
+    await advance(400)
+    const front = RIVER.teleporter!.front
+    expect(lastScene().map.id).toBe('river')
+    expect(lastScene().fade).toBe(0)
+    expect(lastScene().player.pos).toEqual(tileCenter(front.tx, front.ty))
+    expect(lastScene().player.facing).toBe(front.facing)
+    expect(savedPos()).toEqual({ area: 'river', pos: tileCenter(front.tx, front.ty), facing: front.facing })
+    expect(screen.getByText(`${(500 - fee).toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    await interact()
+    expect(screen.queryByRole('region', { name: '순간이동기' })).not.toBeInTheDocument()
+  })
+
+  test('골드가 요금보다 1 모자라면 이동 비활성·문구; 서버 busy면 창 유지·문구', async () => {
+    const fee = teleportFee('village', 'river')
+    const { unmount } = await mount(makeView({ gold: fee - 1, areas: BASE, challenges: { 'pier-perfect': DONE, 'river-rain': DONE } }), AT_VILLAGE_TP)
+    await advance(50)
+    await interact()
+    expect(within(tpPanel()).getByRole('button', { name: '마을 강 이동' })).toBeDisabled()
+    expect(within(tpPanel()).getByText('골드가 모자라요')).toBeInTheDocument()
+    unmount()
+
+    await mount(makeView({ gold: 9999, areas: BASE, challenges: { 'pier-perfect': DONE, 'river-rain': DONE } }), AT_VILLAGE_TP)
+    await advance(50)
+    await interact()
+    route({ teleport: () => Promise.reject(new ApiError('busy', 400)) })
+    fireEvent.click(within(tpPanel()).getByRole('button', { name: '마을 강 이동' }))
+    await flush()
+    expect(tpPanel()).toBeInTheDocument()
+    expect(screen.getByText('낚시를 마친 뒤에 이동할 수 있어요')).toBeInTheDocument()
+    expect(lastScene().map.id).toBe('village')
+  })
+
+  test('켜진 곳이 자기뿐이면 안내 문구', async () => {
+    await mount(makeView({ challenges: { 'pier-perfect': DONE } }), AT_VILLAGE_TP)
+    await advance(50)
+    await interact()
+    expect(within(tpPanel()).getByText('다른 지역의 순간이동기를 켜면 오갈 수 있어요')).toBeInTheDocument()
+  })
+
+  test('창이 뜬 지 300ms 안의 클릭(여는 손가락의 유령 클릭)은 이동을 누르지 않는다', async () => {
+    await mount(makeView({ gold: 9999, areas: BASE, challenges: { 'pier-perfect': DONE, 'river-rain': DONE } }), AT_VILLAGE_TP)
+    await advance(50)
+    route({ teleport: () => new Promise(() => {}) })
+    press()
+    release()
+    fireEvent.click(within(tpPanel()).getByRole('button', { name: '마을 강 이동' }))
+    expect(calls('teleport')).toHaveLength(0)
+  })
+
+  test('터치: 켜진 이동기 앞 행동 버튼은 순간이동, 꺼지면 살펴보기', async () => {
+    stubTouch()
+    const { unmount } = await mount(makeView({ challenges: { 'pier-perfect': DONE } }), AT_VILLAGE_TP)
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('순간이동')
+    unmount()
+    await mount(makeView(), AT_VILLAGE_TP)
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('살펴보기')
+  })
+
+  test('challenges가 없는 옛 서버 응답: 그려지고 이동기는 꺼짐, 과제 목록은 0/6', async () => {
+    const old = makeView() as Partial<View>
+    delete old.challenges
+    await mount(old as View, AT_VILLAGE_TP)
+    await advance(50)
+    expect(lastScene().teleporterOn).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '과제' }))
+    expect(screen.getByText('깬 과제 0/6')).toBeInTheDocument()
+  })
+})
+
+describe('큰 지도', () => {
+  const mapPanel = () => screen.getByRole('region', { name: '지도' })
+  const pressM = () => fireEvent.keyDown(window, { code: 'KeyM', key: 'ㅡ' })
+
+  test('지도 버튼으로 열고 닫고, 제목은 지도, 처음 탭은 지금 지역', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(screen.getByRole('heading', { name: '지도' })).toBeInTheDocument()
+    expect(within(mapPanel()).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+    expect(within(mapPanel()).getByLabelText('현재 위치')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+  })
+
+  test('M 키로 열고 닫는다(한글 입력 상태 e.key와 무관), 가방이 열려 있으면 무시', async () => {
+    await mount(makeView(), SAND)
+    pressM()
+    expect(mapPanel()).toBeInTheDocument()
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '가방' })).toBeInTheDocument()
+  })
+
+  test('레이어를 끄고 닫았다 다시 열면 꺼진 그대로', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    fireEvent.click(within(mapPanel()).getByRole('button', { name: '길' }))
+    expect(within(mapPanel()).queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(mapPanel()).getByRole('button', { name: '길' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(mapPanel()).queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
+  })
+
+  test('지도 안 어떤 버튼을 눌러도 서버 행동을 부르지 않는다', async () => {
+    await mount(makeView(), SAND)
+    const before = worldMock.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    for (let round = 0; round < 2; round++) {
+      for (const b of within(mapPanel()).getAllByRole('button')) fireEvent.click(b)
+    }
+    expect(worldMock.mock.calls.length).toBe(before)
+  })
+
+  test('Esc로 지도를 닫는다. 전체화면에서도 Esc는 지도만 닫고 전체화면은 그대로', async () => {
+    const { container } = await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    expect(container.querySelector('.fish-full')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    expect(container.querySelector('.fish-full')).not.toBeNull()
+    // 지도가 닫힌 뒤의 Esc는 원래대로 전체화면을 나간다
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
+    expect(container.querySelector('.fish-full')).toBeNull()
+  })
+
+  test('첫 서버 상태 전에 누른 M은 무시한다(불러온 뒤 지도가 저절로 열리지 않는다)', async () => {
+    localStorage.setItem(POS_KEY, JSON.stringify(SAND))
+    let resolve: (v: Awaited<ReturnType<typeof ok>>) => void = () => {}
+    route({ load: () => new Promise((r) => { resolve = r }) })
+    render(<Game gameId="fishing" />)
+    pressM()
+    resolve({ view: makeView(), result: null, server_now: Date.now() })
+    await flush()
+    await flush()
+    expect(screen.getByRole('button', { name: '지도' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+  })
+
+  test('지역 전환(페이드) 중에는 M·지도 버튼으로 열리지 않는다', async () => {
+    await mount(makeView(), { area: 'village', pos: tileCenter(24, 1), facing: 'up' })
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    pressM()
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(screen.queryByRole('region', { name: '지도' })).not.toBeInTheDocument()
+    await advance(400)
+    expect(lastScene().fade).toBe(0)
+    pressM()
+    expect(within(mapPanel()).getByRole('tab', { selected: true })).toHaveTextContent('마을 강')
+  })
+
+  test('떠나면 축소 그림 캐시를 비운다', async () => {
+    vi.mocked(releaseMinimapCache).mockClear()
+    const { unmount } = await mount()
+    expect(releaseMinimapCache).not.toHaveBeenCalled()
+    unmount()
+    expect(releaseMinimapCache).toHaveBeenCalledTimes(1)
   })
 })

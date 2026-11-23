@@ -1,11 +1,11 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
 // 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
-import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
+import { AREAS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
+import { price, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
@@ -15,7 +15,9 @@ import { VILLAGE } from './maps/village.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
 import { loadPosition, savePosition, startPosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
-import { BagPanel, DexPanel, ShopPanel, UnlockPanel } from './Menus.tsx'
+import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
+import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
+import { releaseMinimapCache } from './minimap.ts'
 import './fishing.css'
 
 const OUTCOME_MS = 1200
@@ -69,8 +71,13 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
   return innerH - stageTop - belowH - FIT_MARGIN
 }
 
-/** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock'
+/** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map'
+/** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
+const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport'])
+const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
+/** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
+const PANEL_PAD = 12
 type Outcome =
   | { kind: 'caught'; fish: Fish; isNew: boolean }
   | { kind: 'lost'; early: boolean }
@@ -160,15 +167,23 @@ const FISHING_MESSAGES: Record<string, string> = {
   too_many: '칸이 모자라요',
   already_open: '이미 열려 있어요',
   busy: '낚시 중에는 바꿀 수 없어요',
+  bad_teleporter: RETRY,
+  same: RETRY,
+  not_open: '아직 켜지지 않은 순간이동기예요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 /** 서버에 낚시(pending)가 남아 있어 지역을 못 열 때. 다시 던졌다 거두면 풀린다 */
 const UNLOCK_BUSY = '낚시를 마친 뒤에 열 수 있어요'
+/** 서버에 낚시(pending)가 남아 있어 순간이동을 못 할 때 */
+const TELEPORT_BUSY = '낚시를 마친 뒤에 이동할 수 있어요'
+const areaNameOf = (id: AreaId) => AREAS.find((a) => a.id === id)?.name ?? id
 
 const DESKTOP_IDLE_HINT = '방향키로 이동 · 스페이스로 낚시/상점'
 /** 잠긴 문·선착장 앞에서 행동이 하는 일(행동 버튼 글자, 데스크톱 안내) */
 const GATE_ACTION = '살펴보기'
 const DOCK_ACTION = '배 타기'
+/** 순간이동기 앞: 켜졌으면 순간이동, 꺼졌으면 살펴보기(켜는 과제를 보여 준다) */
+const TELEPORT_ACTION = '순간이동'
 /** 지역을 연 뒤 알림 */
 const UNLOCK_NOTICES: Partial<Record<AreaId, string>> = {
   lake: '산 호수 가는 다리를 고쳤어요',
@@ -212,8 +227,12 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'fish') return `fish-${i.spot}`
   if (i.kind === 'gate') return `gate-${i.area}`
   if (i.kind === 'dock') return `dock-${i.target}`
+  if (i.kind === 'teleporter') return 'teleporter'
   return 'shop'
 }
+/** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
+const tpOpen = (view: View | null, area: AreaId): boolean =>
+  !!view && teleporterOpen({ areas: view.areas, challenges: view.challenges ?? {} }, area)
 /** 열린 지역: 기본 지역(마을·강·숲)과 서버 상태의 areas. 아직 못 받았으면 기본 지역만 */
 const openedOf = (view: View | null): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...(view?.areas ?? [])])
 
@@ -232,6 +251,8 @@ export function Game({ gameId }: WorldGameProps) {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
+  /** 큰 지도 레이어·필터(창을 닫아도 접속 동안 유지) */
+  const [mapLayers, setMapLayers] = useState<MapLayers>(DEFAULT_LAYERS)
 
   const rootRef = useRef<HTMLElement>(null)
   /** 사용자가 지금 전체화면을 원하는지, 요소 전체화면 요청이 아직 끝나지 않았는지 */
@@ -244,6 +265,8 @@ export function Game({ gameId }: WorldGameProps) {
   const menuRef = useRef<Menu | null>(null)
   /** 해금 창이 보여 주는 지역 */
   const [unlockTarget, setUnlockTarget] = useState<AreaId | null>(null)
+  /** 순간이동 창을 연 이동기의 지역(창이 열린 동안은 걷지 않으므로 그대로다) */
+  const [tpArea, setTpArea] = useState<AreaId>('village')
   const panelOpenedAt = useRef(0)
   /** 마지막 위치. 첫 서버 상태(열린 지역)를 받은 뒤에야 쓸 수 있는지 보고 자리를 잡는다 */
   const savedStart = useRef(userId !== null ? loadPosition(userId) : null)
@@ -262,6 +285,8 @@ export function Game({ gameId }: WorldGameProps) {
     }
   })
   const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
+  /** 서버 보정 시각. 큰 지도에도 넘기므로 같은 함수를 유지한다(지도 타이머를 다시 걸지 않게) */
+  const serverNow = useCallback(() => Date.now() + rt.offset, [rt])
   const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
@@ -311,7 +336,7 @@ export function Game({ gameId }: WorldGameProps) {
       rt.held.clear()
       rt.chargeKey = null
       rt.openPress = null
-      if (m === 'shop' || m === 'unlock') panelOpenedAt.current = performance.now()
+      if (GUARDED.has(m)) panelOpenedAt.current = performance.now()
     }
     menuRef.current = m
     setMenuState(m)
@@ -327,7 +352,6 @@ export function Game({ gameId }: WorldGameProps) {
     for (const id of timers.current) window.clearTimeout(id)
     timers.current.clear()
   }
-  const serverNow = () => Date.now() + rt.offset
   const resetFight = () => {
     rt.bar = null
     rt.params = null
@@ -462,9 +486,9 @@ export function Game({ gameId }: WorldGameProps) {
 
   async function finishFight(success: boolean, perfect: boolean) {
     const before = viewRef.current
-    let res: WorldView<View, { caught: Fish | null }>
+    let res: WorldView<View, { caught: Fish | null; completed?: string[] }>
     try {
-      res = await act<{ caught: Fish | null }>({ type: 'resolve', success, perfect })
+      res = await act<{ caught: Fish | null; completed?: string[] }>({ type: 'resolve', success, perfect })
     } catch (e) {
       if (alive.current) await recover(codeOf(e))
       return
@@ -473,6 +497,9 @@ export function Game({ gameId }: WorldGameProps) {
     const fish = res.result?.caught ?? null
     if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species] })
     else showOutcome({ kind: 'lost', early: false })
+    // 이번 잡이로 깬 과제(서버가 정한다): 첫 과제를 알린다. 나머지는 과제 목록에서 보인다
+    const done = CHALLENGES.find((c) => res.result?.completed?.includes(c.id))
+    if (done) setNotice({ kind: 'info', text: `도전과제 완료! ${done.title} — ${areaNameOf(done.area)} 순간이동기가 켜졌어요` })
   }
 
   // ------------------------------------------------------------ 입력
@@ -529,6 +556,10 @@ export function Game({ gameId }: WorldGameProps) {
         // 대상 지역이 열렸으면 배를 타고, 아니면 배 구매 창
         if (opened.has(at.target)) sail(at.target)
         else openUnlock(at.target)
+      } else if (at.kind === 'teleporter') {
+        setNotice(null)
+        setTpArea(rt.map.id)
+        setMenu('teleport')
       }
       return
     }
@@ -654,12 +685,21 @@ export function Game({ gameId }: WorldGameProps) {
       hudTop: hudTopFor(touch, fit.scale),
       fade: rt.fade,
       opened,
+      teleporterOn: tpOpen(viewRef.current, rt.map.id),
     }, size)
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
-  const handlers = useRef({ press, release, frame })
-  handlers.current = { press, release, frame }
+  /** 큰 지도 열고 닫기. 첫 서버 상태 전·지역 전환(페이드) 중에는 열지 않는다(닫기는 늘 된다) */
+  const toggleMap = () => {
+    if (menuRef.current !== 'map' && (!viewRef.current || rt.trans)) return
+    toggleMenu('map')
+  }
+  const closeMap = () => {
+    if (menuRef.current === 'map') closeMenu()
+  }
+  const handlers = useRef({ press, release, frame, toggleMap, closeMap })
+  handlers.current = { press, release, frame, toggleMap, closeMap }
 
   // ------------------------------------------------------------ 효과
   useEffect(() => {
@@ -676,6 +716,7 @@ export function Game({ gameId }: WorldGameProps) {
 
   // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
   useEffect(() => releaseSceneCache, [])
+  useEffect(() => releaseMinimapCache, [])
 
   // 마지막 위치: 걸음이 멈출 때(프레임), 탭이 가려질 때, 화면을 떠날 때 저장한다.
   // 창이 초점을 잃거나 가려지면 키·손가락을 뗀 알림을 놓칠 수 있으므로 누르고 있던 입력을 모두 놓는다.
@@ -841,6 +882,32 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }, [rt])
 
+  // M 키 = 큰 지도 열고 닫기(e.code라 한글 입력 상태에서도). 입력칸·낚시 중·다른 창이 열려 있으면 무시한다.
+  // Esc = 열린 지도 닫기. 캡처 단계에서 받아 멈추므로 전체화면 나가기 등 다른 Esc 처리로 새지 않는다.
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || menuRef.current !== 'map') return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      handlers.current.closeMap()
+    }
+    window.addEventListener('keydown', esc, true)
+    return () => window.removeEventListener('keydown', esc, true)
+  }, [])
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select') !== null)) return
+      if (rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting') return
+      if (menuRef.current && menuRef.current !== 'map') return
+      e.preventDefault()
+      handlers.current.toggleMap()
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [rt])
+
   // ------------------------------------------------------------ 메뉴 행동
   async function sell() {
     setNotice(null)
@@ -916,6 +983,30 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
+  /** 순간이동: 서버가 요금을 받으면 창을 닫고 지역 전환(페이드)으로 도착 맵 이동기 앞에 선다 */
+  async function teleport(to: AreaId) {
+    const from = tpArea
+    setNotice(null)
+    try {
+      await act({ type: 'teleport', from, to })
+    } catch (e) {
+      if (!alive.current) return
+      const code = codeOf(e)
+      // 창은 열어 둔 채 오류만 알린다
+      setNotice({ kind: 'error', text: code === 'busy' ? TELEPORT_BUSY : fishingMessage(code) })
+      return
+    }
+    if (!alive.current) return
+    if (menuRef.current === 'teleport') closeMenu()
+    const dest = mapFor(to)?.teleporter
+    if (!dest) return
+    // 요금은 이미 냈으니 도착 자리를 바로 저장한다(맵을 바꾸기 전 새로고침해도 출발지로 돌아가지 않게)
+    const id = userIdRef.current
+    const { tx, ty, facing } = dest.front
+    if (id !== null && placed.current) savePosition(id, { area: to, pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing })
+    startTransition(to, dest.front)
+  }
+
   /** 진행 중인 낚시는 건드리지 않고 view만 다시 불러온다. 실패하면 오류 알림 */
   async function reload() {
     try {
@@ -937,7 +1028,7 @@ export function Game({ gameId }: WorldGameProps) {
   /** 상점·해금 창이 막 열렸으면 누르기·클릭을 버린다(여는 손가락의 유령 클릭 방지) */
   const guardPanel = (e: SyntheticEvent) => {
     const m = menuRef.current
-    if ((m === 'shop' || m === 'unlock') && performance.now() - panelOpenedAt.current < PANEL_GUARD_MS) {
+    if (m && GUARDED.has(m) && performance.now() - panelOpenedAt.current < PANEL_GUARD_MS) {
       e.preventDefault()
       e.stopPropagation()
     }
@@ -1007,7 +1098,10 @@ export function Game({ gameId }: WorldGameProps) {
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
   // 전체화면에서는 알림이 캔버스에 겹쳐 뜨므로(데스크톱은 아래쪽, 터치는 조작을 가리지 않게 위쪽) 그동안 안내 줄은 숨긴다.
   // 터치에서는 아래쪽에 조작이 있으므로 안내 줄을 위에 띄우고, 대기 중 안내는 데스크톱에만 둔다.
-  const placeAction = here?.kind === 'gate' ? GATE_ACTION : here?.kind === 'dock' ? DOCK_ACTION : null
+  const placeAction = here?.kind === 'gate' ? GATE_ACTION
+    : here?.kind === 'dock' ? DOCK_ACTION
+      : here?.kind === 'teleporter' ? (tpOpen(view, rt.map.id) ? TELEPORT_ACTION : GATE_ACTION)
+        : null
   const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
   const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
   const atShop = here?.kind === 'shop'
@@ -1019,7 +1113,10 @@ export function Game({ gameId }: WorldGameProps) {
           : here?.kind === 'fish' ? { label: '낚시', enabled: true }
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
-  const panelTitle = menu === 'bag' ? '가방' : menu === 'shop' ? '상점' : menu === 'unlock' ? unlockName : '도감'
+  const PANEL_TITLES: Record<Menu, string> = {
+    bag: '가방', shop: '상점', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+  }
+  const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
   return (
     <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef} tabIndex={-1}>
@@ -1115,6 +1212,20 @@ export function Game({ gameId }: WorldGameProps) {
                 <UnlockPanel view={view} area={unlockTarget} busy={busy} onUnlock={() => void unlock(unlockTarget)} />
               )}
               {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
+              {menu === 'challenges' && <ChallengePanel view={view} />}
+              {menu === 'map' && (
+                <MapPanel
+                  view={view}
+                  here={{ area: rt.map.id, ...tileOf(rt.player.pos), facing: rt.player.facing }}
+                  now={serverNow}
+                  innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
+                  layers={mapLayers}
+                  onLayers={setMapLayers}
+                />
+              )}
+              {menu === 'teleport' && (
+                <TeleportPanel view={view} area={tpArea} busy={busy} onTeleport={(to) => void teleport(to)} />
+              )}
             </div>
           )}
           {fullscreen && notices && <div className={touch ? 'fish-notices fish-notices-top' : 'fish-notices'}>{notices}</div>}
@@ -1128,16 +1239,16 @@ export function Game({ gameId }: WorldGameProps) {
           가방 <strong>{view.bag.length}/{bagSize(view.bagTier)}</strong>
         </span>
         <div className="fish-menu">
-          {(['bag', 'dex'] as const).map((m) => (
+          {(['bag', 'dex', 'challenges', 'map'] as const).map((m) => (
             <button
               key={m}
               type="button"
               className={`btn btn-sm ${menu === m ? 'btn-primary' : 'btn-ghost'}`}
               aria-pressed={menu === m}
               disabled={menuLocked}
-              onClick={() => toggleMenu(m)}
+              onClick={() => (m === 'map' ? toggleMap() : toggleMenu(m))}
             >
-              {m === 'bag' ? '가방' : '도감'}
+              {MENU_LABELS[m]}
             </button>
           ))}
           <button

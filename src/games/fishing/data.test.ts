@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS } from './data.ts'
+import { AREAS, areaHasSpecies, CHALLENGES, DEFAULT_AREAS, TP_BASE, TP_PER_10, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
 const WEATHERS: Weather[] = ['sun', 'rain']
@@ -190,5 +190,40 @@ describe('찌', () => {
   })
   it('TACKLE_FX 값', () => {
     expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 })
+  })
+})
+
+describe('도전과제', () => {
+  it('6개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
+    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
+    expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big'])
+    for (const c of CHALLENGES) {
+      expect(c.title.length, c.id).toBeGreaterThan(0)
+      expect(c.desc.length, c.id).toBeGreaterThan(0)
+      expect(Number.isInteger(c.count) && c.count >= 1, c.id).toBe(true)
+      if (c.filter.spot) expect(AREAS.find((a) => a.id === c.area)!.spots, c.id).toContain(c.filter.spot)
+      if (c.filter.minSizePct !== undefined) expect(c.filter.minSizePct > 0 && c.filter.minSizePct < 1, c.id).toBe(true)
+    }
+  })
+
+  it('어떤 계절에도 깰 수 있다: 계절마다 rod 1로 조건(자리·날씨·밤)을 만족하는 어종이 있고, distinct면 count종 이상', () => {
+    for (const c of CHALLENGES) {
+      const area = AREAS.find((a) => a.id === c.area)!
+      const spots = c.filter.spot ? [c.filter.spot] : area.spots
+      const weathers: Weather[] = c.filter.weather ? [c.filter.weather] : WEATHERS
+      const hours = Array.from({ length: 24 }, (_, h) => h).filter((h) => !c.filter.night || isNight(h * 60))
+      for (const season of SEASONS) {
+        const found = new Set<string>()
+        for (const spot of spots) for (const weather of weathers) for (const h of hours) {
+          for (const s of SPECIES) if (!s.legend && speciesAvailable(s, c.area, spot, cond(season, h, weather), 1)) found.add(s.id)
+        }
+        expect(found.size, `${c.id} ${season}`).toBeGreaterThanOrEqual(c.filter.distinct ? c.count : 1)
+      }
+    }
+  })
+
+  it('순간이동 요금 상수', () => {
+    expect([TP_BASE, TP_PER_10]).toEqual([30, 1])
   })
 })

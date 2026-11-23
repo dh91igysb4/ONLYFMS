@@ -52,6 +52,28 @@ export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: str
 }
 export const LEGEND_CHANCE = 0.08
 
+// ---------------------------------------------------------------- 도전과제·순간이동기
+/**
+ * 도전과제 판정 조건. 모두 만족해야 센다(과제 지역에서 잡은 것만).
+ * spot: 그 자리, perfect: 완벽하게, weather: 그 날씨, night: 밤(20~5시, isNight), minSizePct: 크기 백분위 이상,
+ * distinct: 서로 다른 어종 수를 센다. 조건은 모두 던질 때(pending) 기준이다.
+ */
+export type ChallengeFilter = { spot?: string; perfect?: true; weather?: 'rain'; night?: true; minSizePct?: number; distinct?: true }
+export type Challenge = { id: string; area: AreaId; title: string; desc: string; count: number; filter: ChallengeFilter }
+// 지역마다 하나(AREAS 순서). 어떤 계절에도 깰 수 있어야 한다(계절 한정 어종을 요구하지 않는다, data.test가 확인).
+// 숲은 설계 초안 "폭포에서 3종"이 폭포 어종 2종뿐이라 깰 수 없어 "숲에서 3종"으로 바꿨다.
+export const CHALLENGES: readonly Challenge[] = [
+  { id: 'pier-perfect', area: 'village', title: '부두의 명수', desc: '부두에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'pier', perfect: true } },
+  { id: 'river-rain', area: 'river', title: '빗속의 강태공', desc: '비 오는 날 강에서 5마리 낚기', count: 5, filter: { weather: 'rain' } },
+  { id: 'forest-variety', area: 'forest', title: '숲의 탐험가', desc: '숲에서 서로 다른 물고기 3종 낚기', count: 3, filter: { distinct: true } },
+  { id: 'lake-night', area: 'lake', title: '호수의 밤', desc: '밤(20~5시)에 산 호수에서 5마리 낚기', count: 5, filter: { night: true } },
+  { id: 'cave-deep', area: 'cave', title: '용암 낚시꾼', desc: '동굴 가장 깊은 용암에서 5마리 낚기', count: 5, filter: { spot: 'cave3' } },
+  { id: 'island-big', area: 'island', title: '섬의 대물', desc: '섬에서 크기 상위 30% 물고기 3마리 낚기', count: 3, filter: { minSizePct: 0.7 } },
+]
+/** 순간이동 요금 = TP_BASE + ceil(두 이동기 세계 거리(칸) / 10) * TP_PER_10 */
+export const TP_BASE = 30
+export const TP_PER_10 = 1
+
 export const SPECIES: Species[] = [
   { id: 'anchovy', name: '멸치', rarity: 'common', basePrice: 20, minCm: 8, maxCm: 15, difficulty: 0.15, minRod: 1, behavior: 'dart', area: 'village', seasons: ['spring', 'autumn'] },
   { id: 'goby', name: '망둥어', rarity: 'common', basePrice: 25, minCm: 8, maxCm: 20, difficulty: 0.2, minRod: 1, behavior: 'mixed', area: 'village' },

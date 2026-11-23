@@ -2711,6 +2711,125 @@ const BOAT = sprite(BOAT_PALETTE, [
   '....cc......cc.......cc.........',
 ])
 
+// 순간이동기(teleporter, 32×48): 둥근 돌 받침 위에 선 흰·붉은 줄무늬 등대 신호기. 철제 등롱과 회랑, 붉은 지붕과 금빛 꼭지.
+// 아래 32줄이 구조물 2×2 칸, 위 16줄은 한 칸 위로 솟는다. 꺼진 상태는 유리가 어둡고,
+// 켜지면 teleporter-glow-0/1(32×16, 위 16줄에 겹침)이 등롱에 불을 밝히고 빛살이 번갈아 뻗는다.
+const TELEPORTER_PALETTE: Record<string, string> = {
+  k: '#2a2135', // 외곽선
+  x: '#1f2a1c55', // 바닥 그림자
+  s: '#a7b0b8', // 받침 돌 윗면
+  S: '#78828c', // 받침 돌 옆면·이음매
+  h: '#d3d9de', // 받침 밝은 테
+  w: '#f4f0e4', // 탑 흰 칠
+  W: '#cbc3b0', // 흰 칠 그늘
+  v: '#ffffff', // 흰 칠 밝은 줄
+  r: '#d6453a', // 붉은 띠
+  R: '#a1322b', // 붉은 띠 그늘
+  d: '#7a4a2a', // 문
+  D: '#553220', // 문 그늘
+  y: '#ffd23f', // 금빛 꼭지·문고리
+  i: '#3c4352', // 철제 등롱틀·난간
+  I: '#646d80', // 회랑 윗면
+  g: '#35505f', // 꺼진 유리
+  G: '#6f8ea0', // 유리 반사
+  c: '#c4473c', // 붉은 지붕
+  C: '#8e2f29', // 지붕 그늘
+  e: '#ee8a7d', // 지붕 하이라이트
+}
+const TELEPORTER = sprite(TELEPORTER_PALETTE, [
+  '..............kyyk..............',
+  '.............kcccCk.............',
+  '..........kcecccccCCCk..........',
+  '...........kGgiGgiggk...........',
+  '...........kGgiGgiggk...........',
+  '...........kggiggiggk...........',
+  '........iiikggiggiggkiii........',
+  '........i..kggiggiggk..i........',
+  '........i..kggiggiggk..i........',
+  '.......kIIIIIIIIIIIIIIIIk.......',
+  '.......kiiiiiiiiiiiiiiiik.......',
+  '.......kkkkkwvwwwwWWkkkkk.......',
+  '...........kwvwwwwWWk...........',
+  '...........kwvwwwwWWk...........',
+  '...........krrrrrrRRk...........',
+  '...........krrrrrrRRk...........',
+  '...........krrrrrrRRk...........',
+  '...........krrrrrrrRRk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........kwvwwGiwwWWk..........',
+  '..........kwvwwiiwwWWk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........krrrrrrrrRRk..........',
+  '..........krrrrrrrrRRk..........',
+  '..........krrrrrrrrRRk..........',
+  '..........krrrrrrrrRRk..........',
+  '..........kwvwwwwwwWWk..........',
+  '..........kwvwwwwwwWWk..........',
+  '........kkwvwwwkkwwWWkkk........',
+  '.....kkkhkwvwwkDDkwwWWkhkkk.....',
+  '...kkhssskwvwkdddDkwWWkssshkk...',
+  '..khssssskwvwkdddDkwWWkssssshk..',
+  '..kssSssskwvwkddyDkwWWksssSssk..',
+  '.khsssSsskwvwkdddDkwWWkssSssshk.',
+  '..ksssssskwvwkdddDkwWWkssssssk..',
+  '..ksSsssskwvwkdddDkwWWkssssSsk..',
+  '.kSssssssSSSSSSSSSSSSSSssssssSk.',
+  '..kSSssssssssssssssssssssssSSk..',
+  '..kSSSSkssssSssssssSsssskSSSSk..',
+  '...kkSSSSSSSSSSSSSSSSSSSSSSkk...',
+  '..xxxkkkSSSkSSSSkSSSkSSSkkkxxx..',
+  '.xxxxxxxkkkkkkkkkkkkkkkkxxxxxxx.',
+  '..xxxxxxxxxxxxxxxxxxxxxxxxxxxx..',
+  '....xxxxxxxxxxxxxxxxxxxxxxxx....',
+  '.........xxxxxxxxxxxxxx.........',
+])
+const TELEPORTER_GLOW: Record<string, string> = {
+  y: '#ffe27a', // 불빛
+  Y: '#fff3b0', // 밝은 불빛
+  W: '#ffffff', // 불빛 심지
+  a: '#fff3b0cc', // 가까운 빛살
+  b: '#ffe27a77', // 먼 빛살
+}
+const TELEPORTER_GLOW_0 = sprite(TELEPORTER_GLOW, [
+  '................................',
+  '................................',
+  '................................',
+  '............yy.yy.yy............',
+  '............Yy.YY.yY............',
+  '..bbbbbaaaa.Yy.WW.yY.aaaabbbb...',
+  '...bbbbaaaa.Yy.WW.yY.aaaabbbbb..',
+  '............Yy.YY.yY............',
+  '............yy.yy.yy............',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+])
+const TELEPORTER_GLOW_1 = sprite(TELEPORTER_GLOW, [
+  '................................',
+  '.......a.......WW.......a.......',
+  '........a..............a........',
+  '.........a..yy.yy.yy..a.........',
+  '............Yy.YY.yY............',
+  '.....b......Yy.WW.yY......b.....',
+  '....b.......Yy.WW.yY.......b....',
+  '......b.....Yy.YY.yY.....b......',
+  '............yy.yy.yy............',
+  '................................',
+  '................................',
+  '................................',
+  '.........a............a.........',
+  '................................',
+  '................................',
+  '................................',
+])
+
 // ── 3단계 지역 타일: 산 호수·동굴·섬 ──
 // 물 다섯 종은 2프레임, 칸을 꽉 채우고 가장자리끼리 이어진다
 const LAKE: Record<string, string> = {
@@ -3211,6 +3330,93 @@ const TACKLE_CURIOUS = sprite(
   ],
 )
 
+// ── 큰 지도 표시(9×9): 축소 그림 위에서 눈에 띄게 어두운 외곽선 1px. 전부 자체 디자인 ──
+const MAP_INK = '#2a2135'
+// 현재 위치: 위에서 본 비니(청록)와 산호색 방울, 흰 테두리
+const MAP_YOU = sprite({ k: MAP_INK, w: '#fbf7ee', h: '#2f6b7c', p: '#f27d5e', P: '#ffb199' }, [
+  '..kkkkk..',
+  '.kwwwwwk.',
+  'kwwhhhwwk',
+  'kwhhphhwk',
+  'kwhpPphwk',
+  'kwhhphhwk',
+  'kwwhhhwwk',
+  '.kwwwwwk.',
+  '..kkkkk..',
+])
+// 낚시 자리: 빨강·흰 찌
+const MAP_SPOT = sprite({ k: MAP_INK, r: '#e2483b', R: '#ff9a8a', w: '#fbf7ee', s: '#c9d1d8' }, [
+  '...kkk...',
+  '..krrrk..',
+  '.krrRrrk.',
+  '.krrrrrk.',
+  '.kkkkkkk.',
+  '.kwwwwsk.',
+  '.kwwwwsk.',
+  '..kwwsk..',
+  '...kkk...',
+])
+// 출구: 화살 모양 나무 표지판
+const MAP_EXIT = sprite({ k: MAP_INK, u: '#e9c58e', U: '#a2703f', b: '#7a4e30' }, [
+  '.kkkkkk..',
+  'kuuuuuuk.',
+  'kuUUUUuuk',
+  'kuuuuuuk.',
+  '.kkkkkk..',
+  '...kbk...',
+  '...kbk...',
+  '...kbk...',
+  '..kkkkk..',
+])
+// 잠긴 문: 금빛 자물쇠
+const MAP_GATE = sprite({ k: MAP_INK, y: '#f4c542', Y: '#c8962a', s: '#c9d1d8' }, [
+  '...kkk...',
+  '..ksssk..',
+  '.ks...sk.',
+  'kkkkkkkkk',
+  'kyyyyyyyk',
+  'kyyykyyyk',
+  'kyyykyyyk',
+  'kYYYYYYYk',
+  'kkkkkkkkk',
+])
+// 선착장: 흰 돛 단 작은 배
+const MAP_DOCK = sprite({ k: MAP_INK, w: '#fbf7ee', W: '#d9dfe6', b: '#b97d4c', B: '#7c4b2b' }, [
+  '....k....',
+  '...kwk...',
+  '..kwwWk..',
+  '.kwwwwWk.',
+  '....k....',
+  'kkkkkkkkk',
+  'kbbbbbbbk',
+  '.kBBBBBk.',
+  '..kkkkk..',
+])
+// 상점: 붉은 지붕 집
+const MAP_SHOP = sprite({ k: MAP_INK, r: '#d9654b', R: '#ef8f6c', w: '#e9f2f5', d: '#6b4430' }, [
+  '....k....',
+  '...kRk...',
+  '..kRrrk..',
+  '.kRrrrrk.',
+  'kkkkkkkkk',
+  '.kwwwwwk.',
+  '.kwwdwwk.',
+  '.kwwdwwk.',
+  '.kkkkkkk.',
+])
+// 순간이동기: 흰·붉은 줄무늬 등대 신호기(게임 속 구조물을 줄인 모양), 금빛 등롱
+const MAP_TELEPORTER = sprite({ k: MAP_INK, y: '#ffd23f', r: '#d9483b', w: '#fbf7ee', g: '#9eabb3' }, [
+  '...kyk...',
+  '..krrrk..',
+  '..kyyyk..',
+  '..kkkkk..',
+  '..kwwwk..',
+  '..krrrk..',
+  '..kwwwk..',
+  '.kgggggk.',
+  '.kkkkkkk.',
+])
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
@@ -3260,6 +3466,9 @@ export const SPRITES: Record<string, Sprite> = {
   'gate-broken-bridge': GATE_BROKEN_BRIDGE,
   'gate-rubble': GATE_RUBBLE,
   boat: BOAT,
+  teleporter: TELEPORTER,
+  'teleporter-glow-0': TELEPORTER_GLOW_0,
+  'teleporter-glow-1': TELEPORTER_GLOW_1,
   bobber: BOBBER,
   bang: BANG,
   splash: SPLASH,
@@ -3352,6 +3561,13 @@ export const SPRITES: Record<string, Sprite> = {
   'tile-fence-v': TILE_FENCE_V,
   'tile-tree': TILE_TREE,
   shop: SHOP,
+  'map-you': MAP_YOU,
+  'map-spot': MAP_SPOT,
+  'map-exit': MAP_EXIT,
+  'map-gate': MAP_GATE,
+  'map-dock': MAP_DOCK,
+  'map-shop': MAP_SHOP,
+  'map-teleporter': MAP_TELEPORTER,
 }
 
 const SILHOUETTE = '#1b1f2a'

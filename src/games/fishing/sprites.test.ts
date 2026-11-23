@@ -354,3 +354,61 @@ describe('산 호수·동굴·섬 물고기 스프라이트', () => {
     for (const id of ['moray', 'lava-eel', 'sturgeon']) expectBodyUnbroken(id)
   })
 })
+
+describe('순간이동기(등대 신호기) 스프라이트', () => {
+  it('teleporter는 32×48(아래 32줄이 2×2 칸), 불빛 두 장은 32×16이고 서로 다르다', () => {
+    expect([SPRITES.teleporter?.w, SPRITES.teleporter?.h]).toEqual([32, 48])
+    for (const n of ['teleporter-glow-0', 'teleporter-glow-1']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([32, 16])
+    expect(SPRITES['teleporter-glow-0'].rows.join('\n')).not.toBe(SPRITES['teleporter-glow-1'].rows.join('\n'))
+  })
+
+  it('teleporter는 다른 어느 스프라이트와도 다르고, 아래 두 칸(16~47줄)에 받침이 있어 양옆 아래까지 채운다', () => {
+    const own = SPRITES.teleporter.rows.join('\n')
+    for (const [name, sp] of Object.entries(SPRITES)) if (name !== 'teleporter') expect(sp.rows.join('\n'), name).not.toBe(own)
+    const rows = SPRITES.teleporter.rows
+    // 받침 가장 넓은 줄은 거의 두 칸 폭(28px 이상)
+    const widest = Math.max(...rows.slice(32).map((r) => r.replace(/^\.+|\.+$/g, '').length))
+    expect(widest).toBeGreaterThanOrEqual(28)
+    // 위 16줄(한 칸 위로 솟는 부분)은 가운데 탑만: 가장자리 6열은 비어 있다
+    for (const r of rows.slice(0, 16)) expect(r.slice(0, 6) + r.slice(26), r).toBe('.'.repeat(12))
+  })
+
+  it('불빛은 등롱(3~8줄) 유리 칸에 겹친다', () => {
+    const glass = SPRITES.teleporter.rows.slice(3, 9).map((r) => r.slice(12, 20))
+    const lit = SPRITES['teleporter-glow-0'].rows.slice(3, 9).map((r) => r.slice(12, 20))
+    let over = 0
+    glass.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && lit[y][x] !== '.') over++ }))
+    expect(over).toBeGreaterThanOrEqual(24)
+  })
+})
+
+describe('큰 지도 표시 스프라이트', () => {
+  const NAMES = ['map-you', 'map-spot', 'map-exit', 'map-gate', 'map-dock', 'map-shop', 'map-teleporter']
+  it('7개가 9×9이고 서로 다르다', () => {
+    for (const n of NAMES) {
+      expect(SPRITES[n], n).toBeDefined()
+      expect([SPRITES[n].w, SPRITES[n].h], n).toEqual([9, 9])
+      for (const row of SPRITES[n].rows) expect(row, n).toHaveLength(9)
+    }
+    expect(new Set(NAMES.map((n) => SPRITES[n].rows.join('/'))).size).toBe(NAMES.length)
+  })
+  it('겉 테두리(투명·바깥과 닿는 칸)의 절반 이상이 어두운 외곽선', () => {
+    const dark = (hex: string) => {
+      const v = parseInt(hex.slice(1, 7), 16)
+      return ((v >> 16) & 255) + ((v >> 8) & 255) + (v & 255) < 200
+    }
+    for (const n of NAMES) {
+      const sp = SPRITES[n]
+      const opaque = (x: number, y: number) => x >= 0 && y >= 0 && x < sp.w && y < sp.h && sp.rows[y][x] !== '.'
+      let edge = 0
+      let inked = 0
+      for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) {
+        if (!opaque(x, y)) continue
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => opaque(x + dx, y + dy))) continue
+        edge++
+        if (dark(sp.palette[sp.rows[y][x]])) inked++
+      }
+      expect(inked / edge, n).toBeGreaterThanOrEqual(0.5)
+    }
+  })
+})

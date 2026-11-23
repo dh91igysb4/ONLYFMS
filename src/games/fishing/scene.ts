@@ -31,6 +31,8 @@ export type WorldScene = {
   fade: number
   /** 열린 지역. 여기 없는 지역의 문은 잠긴 그림(look)으로 덮는다 */
   opened: Opened
+  /** 이 맵의 순간이동기가 켜져 있는가(등롱 불빛) */
+  teleporterOn: boolean
 }
 
 /** 화면 좌표 사각형 */
@@ -771,6 +773,14 @@ function drawPlaces(ctx: CanvasRenderingContext2D, s: WorldScene, k: number, tx0
   }
 }
 
+/** 순간이동기 탑: 구조물 칸(2×2) 왼쪽 위에서 한 칸 위부터 그린다(탑 끝이 위 칸으로 솟는다). 켜져 있으면 등롱 불빛을 얹는다 */
+function drawTeleporter(ctx: CanvasRenderingContext2D, s: WorldScene, r: Rect, k: number): void {
+  const x = r.tx * TILE
+  const y = (r.ty + r.h) * TILE - SPRITES.teleporter.h
+  drawSprite(ctx, 'teleporter', x, y, 1)
+  if (s.teleporterOn) drawSprite(ctx, `teleporter-glow-${k}`, x, y, 1)
+}
+
 /** 월드 좌표로 그리는 움직이는 것들 */
 function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, cam: Vec, w: number, h: number): void {
   const t = s.tMs
@@ -807,19 +817,26 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
     }
   }
 
-  // 캐릭터와 나무·야자수 윗부분: 발 y가 작은(먼) 것부터
-  const trees: { name: string; x: number; y: number; key: number }[] = []
+  // 캐릭터와 서 있는 것들(나무·야자수 윗부분, 순간이동기 탑): 기준선이 캐릭터 발 이하면 캐릭터 뒤(먼저), 아니면 앞
+  const tall: { key: number; draw: () => void }[] = []
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
       const kind = tileAt(s.map, tx, ty)
       const name = kind === null ? undefined : TALL_SPRITE[kind]
-      if (name) trees.push({ name, x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })
+      if (name) tall.push({ key: ty * TILE + TREE_BASE, draw: () => drawSpritePart(ctx, name, tx * TILE, (ty - 1) * TILE, TREE_TOP) })
     }
   }
+  const tp = s.map.teleporter
+  // 탑 끝이 한 칸 위로 솟으므로 그 줄까지 화면에 걸치면 그린다. 기준선은 구조물 칸 아래 끝(캐릭터는 그 칸에 설 수 없다)
+  if (tp && rectInView({ ...tp.tiles, ty: tp.tiles.ty - 1, h: tp.tiles.h + 1 }, tx0, ty0, tx1, ty1)) {
+    tall.push({ key: (tp.tiles.ty + tp.tiles.h) * TILE, draw: () => drawTeleporter(ctx, s, tp.tiles, waterFrame(t)) })
+  }
+  // 기준선 순으로 그린다(이동기 바로 아래 칸의 나무처럼 훑은 순서와 깊이가 다른 경우)
+  tall.sort((a, b) => a.key - b.key)
   const feet = s.player.pos.y
-  for (const tr of trees) if (tr.key <= feet) drawSpritePart(ctx, tr.name, tr.x, tr.y, TREE_TOP)
+  for (const it of tall) if (it.key <= feet) it.draw()
   drawPlayer(ctx, s, pose, px, py, tip)
-  for (const tr of trees) if (tr.key > feet) drawSpritePart(ctx, tr.name, tr.x, tr.y, TREE_TOP)
+  for (const it of tall) if (it.key > feet) it.draw()
 
   // 입질 느낌표는 찌 위, 나무보다도 위
   if (b && s.phase === 'bite') {

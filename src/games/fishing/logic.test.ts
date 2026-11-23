@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
+import { teleportFee } from './teleport.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, type Species, type TackleId } from './data.ts'
-import { logic, pickPool, price, rollCatch, sizePercentile, type Action, type CastCtx, type Fish, type State } from './logic.ts'
+import { BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, type Species, type TackleId } from './data.ts'
+import { challengeMatches, logic, pickPool, price, progressChallenges, rollCatch, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
@@ -303,9 +304,9 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(7)
+    expect(logic.version).toBe(8)
     expect(logic.init()).toEqual({
-      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null,
+      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null,
     })
   })
 
@@ -741,7 +742,7 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
     const dex = { grouper: { count: 1, maxCm: 100 }, goby: { count: 2, maxCm: 12 } }
     const m = logic.migrate({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }, 2)
-    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], pending: null })
+    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], challenges: {}, pending: null })
     expect(logic.migrate({ dex: { goby: { count: 1, maxCm: 10 } }, areas: ['pier'] }, 2).legends).toEqual([])
   })
 
@@ -749,9 +750,9 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
     const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
     const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
-    expect(logic.migrate(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [] })
+    expect(logic.migrate(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {} })
     const v2 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }
-    expect(logic.migrate(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], areas: [...DEFAULT_AREAS] })
+    expect(logic.migrate(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, areas: [...DEFAULT_AREAS] })
   })
 
   it('migrate legends: 모르는 id·비전설 id는 버리고, 기본 지역은 항상 포함, 알려진 추가 지역은 유지', () => {
@@ -785,12 +786,14 @@ describe('fishing WorldLogic', () => {
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
       { key: 'dex', value: 0, detail: '0/56' },
+      { key: 'challenges', value: 0, detail: '0/6' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
       { key: 'dex', value: 2, detail: '2/56' },
+      { key: 'challenges', value: 0, detail: '0/6' },
     ])
   })
 
@@ -875,7 +878,7 @@ describe('fishing WorldLogic', () => {
       const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
       const dex = { grouper: { count: 1, maxCm: 100 } }
       const v4 = { gold: 300, totalEarned: 900, rodTier: 4, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper'], pending: null }
-      expect(logic.migrate(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [] })
+      expect(logic.migrate(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [], challenges: {} })
     })
     it('migrate v5: 모르는 id·중복 제거, 미보유 장착 제거, 칸 초과분은 뒤에서 자른다', () => {
       const m = (raw: Record<string, unknown>) => logic.migrate(raw, 5)
@@ -927,7 +930,7 @@ describe('지역 해금', () => {
       bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
       legends: [], tackles: ['cork'], equipped: ['cork'], pending: null,
     }
-    expect(logic.migrate(v6, 6)).toEqual(v6)
+    expect(logic.migrate(v6, 6)).toEqual({ ...v6, challenges: {} })
   })
 })
 
@@ -992,5 +995,213 @@ describe('가방 잠금', () => {
     expect(m.tackles).toEqual([])
     expect(m.equipped).toEqual([])
     expect(m.gold).toBe(900)
+  })
+})
+
+describe('도전과제', () => {
+  const ALL_OPEN = [...DEFAULT_AREAS, 'lake', 'cave', 'island'] as State['areas']
+  /** 챈 상태: 던질 때 지역·자리·조건은 p로 정한다 */
+  const hooked = (p: Partial<Pending>, over: Partial<State> = {}): State =>
+    fresh({
+      areas: ALL_OPEN,
+      pending: { species: 'goby', sizeCm: 10, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5, ...p },
+      ...over,
+    })
+  /** 잡기 성공. now는 어느 계절·날씨여도 판정은 던질 때 조건으로 */
+  const land = (s: State, perfect = false, now = BITE + MIN_FIGHT_MS) => ok(logic.apply(deepFreeze(s), { type: 'resolve', success: true, perfect }, ctx(now)))
+  /** 같은 조건으로 n번 잡는다 */
+  const landTimes = (p: Partial<Pending>, n: number, perfect = false, start: State['challenges'] = {}) => {
+    let challenges = start
+    let last: ReturnType<typeof land> | null = null
+    for (let i = 0; i < n; i++) {
+      last = land(hooked(p, { challenges }), perfect)
+      challenges = last.state.challenges
+    }
+    return { challenges, last: last! }
+  }
+
+  it('init: challenges {}', () => {
+    expect(logic.init().challenges).toEqual({})
+  })
+
+  it('부두 완벽: 해안·완벽 아님은 안 세고, 3마리째에 done과 completed, 깬 뒤에는 더 세지 않는다', () => {
+    expect(land(hooked({ spot: 'shore' }), true).state.challenges).toEqual({})
+    expect(land(hooked({ spot: 'pier' }), false).state.challenges).toEqual({})
+    const one = land(hooked({ spot: 'pier' }), true)
+    expect(one.state.challenges['pier-perfect']).toEqual({ progress: 1, done: false })
+    expect(one.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true } })
+    const { challenges, last } = landTimes({ spot: 'pier' }, 3, true)
+    expect(challenges['pier-perfect']).toEqual({ progress: 3, done: true })
+    expect(last.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true }, completed: ['pier-perfect'] })
+    const more = land(hooked({ spot: 'pier' }, { challenges }), true)
+    expect(more.state.challenges['pier-perfect']).toEqual({ progress: 3, done: true })
+    expect(more.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true } })
+  })
+
+  it('강 비: 비 오는 날 던지고 맑은 날 거둬도 센다; 맑은 날 던지고 비 올 때 거두면 안 센다', () => {
+    const rainCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'rain') })
+    // 거두는 시각(now)은 맑은 날·다른 계절이어도 된다
+    const sunnyNow = nowAt(5, 9)
+    expect(conditionsAt(sunnyNow).weather === 'sun' || conditionsAt(sunnyNow).season !== 'summer').toBe(true)
+    expect(land(rainCast, false, sunnyNow).state.challenges['river-rain']).toEqual({ progress: 1, done: false })
+    const sunCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'sun') })
+    expect(land(sunCast).state.challenges).toEqual({})
+    expect(landTimes({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('winter', 3, 'rain') }, 5).challenges['river-rain']).toEqual({ progress: 5, done: true })
+  })
+
+  it('숲 3종: 같은 어종 두 번은 하나, 다른 어종이면 늘고 seen에 쌓인다', () => {
+    const at = (species: string, spot: string) => ({ area: 'forest' as const, spot, species, cond: cond('winter', 12) })
+    let s = land(hooked(at('crucian', 'pond'))).state.challenges
+    s = land(hooked(at('crucian', 'pond'), { challenges: s })).state.challenges
+    expect(s['forest-variety']).toEqual({ progress: 1, seen: ['crucian'], done: false })
+    s = land(hooked(at('carp', 'pond'), { challenges: s })).state.challenges
+    const r = land(hooked(at('stream-minnow', 'waterfall'), { challenges: s }))
+    expect(r.state.challenges['forest-variety']).toEqual({ progress: 3, seen: ['crucian', 'carp', 'stream-minnow'], done: true })
+    expect((r.result as { completed?: string[] }).completed).toEqual(['forest-variety'])
+  })
+
+  it('산 호수 밤: 20~5시에 던진 것만', () => {
+    const at = (hour: number) => ({ area: 'lake' as const, spot: 'lake', species: 'rainbow-trout', cond: cond('autumn', hour) })
+    expect(land(hooked(at(12))).state.challenges).toEqual({})
+    expect(land(hooked(at(19))).state.challenges).toEqual({})
+    expect(land(hooked(at(20))).state.challenges['lake-night']).toEqual({ progress: 1, done: false })
+    expect(land(hooked(at(4))).state.challenges['lake-night']).toEqual({ progress: 1, done: false })
+    expect(land(hooked(at(5))).state.challenges).toEqual({})
+  })
+
+  it('동굴 용암: cave3만', () => {
+    expect(land(hooked({ area: 'cave', spot: 'cave1', species: 'blind-fish' })).state.challenges).toEqual({})
+    expect(land(hooked({ area: 'cave', spot: 'cave3', species: 'ember-carp' })).state.challenges['cave-deep']).toEqual({ progress: 1, done: false })
+  })
+
+  it('섬 대물: 크기 백분위 0.7 이상만', () => {
+    // 청줄돔 8~18cm: 15cm → 0.7, 14cm → 0.6
+    expect(sizePercentile('blue-damsel', 15)).toBeCloseTo(0.7)
+    expect(land(hooked({ area: 'island', spot: 'sea', species: 'blue-damsel', sizeCm: 14 })).state.challenges).toEqual({})
+    expect(land(hooked({ area: 'island', spot: 'sea', species: 'blue-damsel', sizeCm: 15 })).state.challenges['island-big']).toEqual({ progress: 1, done: false })
+  })
+
+  it('실패 resolve와 다른 지역 잡이는 세지 않는다', () => {
+    const miss = ok(logic.apply(hooked({ spot: 'pier' }), { type: 'resolve', success: false, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(miss.state.challenges).toEqual({})
+    // 강에서 비 오는 날 완벽하게 잡아도 마을 과제(부두)·숲 과제는 그대로
+    const r = land(hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('spring', 12, 'rain') }), true)
+    expect(Object.keys(r.state.challenges)).toEqual(['river-rain'])
+  })
+
+  it('pending에 cond·area가 없는(비정상) 상태: 물고기는 들어오고 과제만 그대로', () => {
+    const base = hooked({ spot: 'pier' })
+    const { cond: _c, area: _a, ...rest } = base.pending!
+    const broken = { ...base, pending: rest as unknown as Pending }
+    const r = land(broken, true)
+    expect(r.state.bag).toEqual([{ species: 'goby', sizeCm: 10, perfect: true }])
+    expect(r.state.challenges).toEqual({})
+  })
+
+  it('progressChallenges·challengeMatches는 순수: 이전 객체를 바꾸지 않는다', () => {
+    const prev = deepFreeze({ 'pier-perfect': { progress: 1, done: false } })
+    const facts = { area: 'village' as const, spot: 'pier', cond: cond('spring', 12), species: 'goby', sizeCm: 10, perfect: true }
+    expect(challengeMatches(CHALLENGES.find((c) => c.id === 'pier-perfect')!, facts)).toBe(true)
+    const out = progressChallenges(prev, facts)
+    expect(out.challenges['pier-perfect']).toEqual({ progress: 2, done: false })
+    expect(out.completed).toEqual([])
+    expect(prev['pier-perfect'].progress).toBe(1)
+  })
+
+  it('teleporterOpen: 과제 done이고 지역이 열려 있을 때만', () => {
+    const done = { 'cave-deep': { progress: 5, done: true } }
+    expect(teleporterOpen({ areas: ALL_OPEN, challenges: done }, 'cave')).toBe(true)
+    expect(teleporterOpen({ areas: [...DEFAULT_AREAS], challenges: done }, 'cave')).toBe(false)
+    expect(teleporterOpen({ areas: ALL_OPEN, challenges: { 'cave-deep': { progress: 4, done: false } } }, 'cave')).toBe(false)
+    expect(teleporterOpen({ areas: ALL_OPEN, challenges: {} }, 'village')).toBe(false)
+  })
+
+  it('migrate v7 세이브(던진 중 포함) → challenges {}, pending null, 나머지 그대로', () => {
+    const v7 = {
+      gold: 10, totalEarned: 70000, rodTier: 3, bagTier: 2, areas: ALL_OPEN,
+      bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
+      legends: [], tackles: ['cork'], equipped: ['cork'],
+      pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'pier', cond: cond('spring', 12), power: 0.5 },
+    }
+    expect(logic.migrate(v7, 7)).toEqual({ ...v7, pending: null, challenges: {} })
+    expect(logic.migrate({ ...v7, pending: { species: 'anchovy' } }, 2).challenges).toEqual({})
+  })
+
+  it('migrate v8 세이브: challenges를 정리해 유지(모르는 id·잘못된 값 버림, done 유지)', () => {
+    const raw = {
+      challenges: {
+        'pier-perfect': { progress: 3, done: true },
+        'forest-variety': { progress: 2, seen: ['crucian', 'zzz', 'crucian', 'carp'], done: false },
+        'river-rain': { progress: -1, done: 'yes' },
+        'lake-night': { progress: 2.5, done: false },
+        'cave-deep': 'x',
+        zzz: { progress: 1, done: true },
+        ['__proto__']: { progress: 1, done: true },
+      },
+    }
+    expect(logic.migrate(raw, 8).challenges).toEqual({
+      'pier-perfect': { progress: 3, done: true },
+      'forest-variety': { progress: 2, seen: ['crucian', 'carp'], done: false },
+      'river-rain': { progress: 0, done: false },
+      'lake-night': { progress: 2, done: false },
+    })
+  })
+
+  it('records: 도전과제 n/6', () => {
+    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/6' })
+    const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
+    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/6' })
+  })
+})
+
+describe('순간이동', () => {
+  const ALL_OPEN = [...DEFAULT_AREAS, 'lake', 'cave', 'island'] as State['areas']
+  const DONE = { progress: 9, done: true }
+  const allDone = Object.fromEntries(CHALLENGES.map((c) => [c.id, DONE]))
+  const tp = (from: unknown, to: unknown) => ({ type: 'teleport', from, to }) as unknown as Action
+  const rich = (over: Partial<State> = {}) => deepFreeze(fresh({ gold: 10_000, totalEarned: 777, areas: ALL_OPEN, challenges: allDone, ...over }))
+
+  it('village → river: 요금만큼 골드가 줄고 totalEarned 그대로, result {from, to, fee}', () => {
+    const fee = teleportFee('village', 'river')
+    const r = ok(logic.apply(rich(), tp('village', 'river'), ctx()))
+    expect(r.state.gold).toBe(10_000 - fee)
+    expect(r.state.totalEarned).toBe(777)
+    expect(r.result).toEqual({ from: 'village', to: 'river', fee })
+    // 요금이 딱 맞으면 0이 된다
+    expect(ok(logic.apply(rich({ gold: fee }), tp('village', 'river'), ctx())).state.gold).toBe(0)
+  })
+
+  it('모르는 id·프로토타입 키·문자열 아님 → bad_teleporter', () => {
+    const s = rich()
+    for (const [from, to] of [['zzz', 'river'], ['village', 'zzz'], ['__proto__', 'river'], ['village', 'constructor'], [3, 'river'], ['village', null], [undefined, undefined]]) {
+      expect(err(logic.apply(s, tp(from, to), ctx())), `${String(from)}→${String(to)}`).toBe('bad_teleporter')
+    }
+  })
+
+  it('같은 곳 → same, 낚시 중 → busy', () => {
+    expect(err(logic.apply(rich(), tp('river', 'river'), ctx()))).toBe('same')
+    const p = withPending().pending
+    expect(err(logic.apply(rich({ pending: p }), tp('village', 'river'), ctx()))).toBe('busy')
+  })
+
+  it('꺼진 이동기(과제 미완, 또는 과제는 깼지만 지역이 안 열림) → not_open', () => {
+    const partial = { ...allDone, 'river-rain': { progress: 4, done: false } }
+    expect(err(logic.apply(rich({ challenges: partial }), tp('village', 'river'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ challenges: partial }), tp('river', 'village'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ areas: [...DEFAULT_AREAS, 'lake'] }), tp('village', 'island'), ctx()))).toBe('not_open')
+    expect(err(logic.apply(rich({ challenges: {} }), tp('village', 'river'), ctx()))).toBe('not_open')
+  })
+
+  it('골드가 요금보다 1 모자라면 not_enough_gold, 상태 불변', () => {
+    const fee = teleportFee('cave', 'island')
+    const s = rich({ gold: fee - 1 })
+    expect(err(logic.apply(s, tp('cave', 'island'), ctx()))).toBe('not_enough_gold')
+    expect(s.gold).toBe(fee - 1)
+  })
+
+  it('섬으로 가는 요금은 마을→강의 세 배보다 비싸다', () => {
+    const toIsland = ok(logic.apply(rich(), tp('village', 'island'), ctx())).result as { fee: number }
+    const toRiver = ok(logic.apply(rich(), tp('village', 'river'), ctx())).result as { fee: number }
+    expect(toIsland.fee).toBeGreaterThan(3 * toRiver.fee)
   })
 })

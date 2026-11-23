@@ -1,11 +1,12 @@
 // 낚시 추첨·가격. 순수 함수만, 외부 의존 없음.
 import type { WorldLogic, WorldRecord } from '../types.ts'
-import { conditionsAt, type Conditions } from './clock.ts'
+import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
-  AREAS, areaHasSpecies, BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
+  AREAS, areaHasSpecies, BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
   PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
-  type AreaId, type Rod, type Species, type TackleId,
+  type AreaId, type Challenge, type Rod, type Species, type TackleId,
 } from './data.ts'
+import { teleportFee, teleporterWorld } from './teleport.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -93,6 +94,58 @@ export function price(speciesId: string, sizeCm: number, perfect: boolean): numb
   return Math.round(scaled / 10000)
 }
 
+// ---------------------------------------------------------------- 도전과제
+/** 과제 하나의 진행. seen은 distinct 과제가 센 어종 id. done은 한 번 true가 되면 되돌아가지 않는다 */
+export type ChallengeProgress = { progress: number; seen?: string[]; done: boolean }
+/** 잡은 물고기 하나와 던질 때의 지역·자리·조건 */
+export type CatchFacts = { area: AreaId; spot: string; cond: Conditions; species: string; sizeCm: number; perfect: boolean }
+
+/** 이 잡이가 과제 조건을 모두 만족하는가 (distinct의 "새 어종" 여부는 보지 않는다) */
+export function challengeMatches(ch: Challenge, c: CatchFacts): boolean {
+  const f = ch.filter
+  if (ch.area !== c.area) return false
+  if (f.spot !== undefined && f.spot !== c.spot) return false
+  if (f.perfect && !c.perfect) return false
+  if (f.weather !== undefined && f.weather !== c.cond.weather) return false
+  if (f.night && !isNight(c.cond.gameMinute)) return false
+  if (f.minSizePct !== undefined && sizePercentile(c.species, c.sizeCm) < f.minSizePct) return false
+  return true
+}
+
+/** 잡이 하나로 과제 진행을 센다. 깬 과제는 건드리지 않는다. completed는 이번에 깬 과제 id(CHALLENGES 순서) */
+export function progressChallenges(
+  prev: Readonly<Record<string, ChallengeProgress>>,
+  c: CatchFacts,
+): { challenges: Record<string, ChallengeProgress>; completed: string[] } {
+  const challenges: Record<string, ChallengeProgress> = { ...prev }
+  const completed: string[] = []
+  for (const ch of CHALLENGES) {
+    const old = prev[ch.id]
+    if (old?.done || !challengeMatches(ch, c)) continue
+    let next: ChallengeProgress
+    if (ch.filter.distinct) {
+      const seen = old?.seen ?? []
+      if (seen.includes(c.species)) continue
+      const more = [...seen, c.species]
+      next = { progress: more.length, seen: more, done: false }
+    } else {
+      next = { progress: (old?.progress ?? 0) + 1, done: false }
+    }
+    if (next.progress >= ch.count) {
+      next.done = true
+      completed.push(ch.id)
+    }
+    challenges[ch.id] = next
+  }
+  return { challenges, completed }
+}
+
+/** 그 지역 순간이동기가 켜져 있는가: 지역이 열려 있고 그 지역 과제를 깼다 */
+export function teleporterOpen(state: Pick<State, 'areas' | 'challenges'>, area: AreaId): boolean {
+  const ch = CHALLENGES.find((c) => c.area === area)
+  return !!ch && state.areas.includes(area) && state.challenges[ch.id]?.done === true
+}
+
 // ---------------------------------------------------------------- WorldLogic
 /** locked: 가방에서 잠근 물고기. "전부 팔기"에서 빠진다. 잠기지 않았으면 필드가 없다. */
 export type Fish = { species: string; sizeCm: number; perfect: boolean; locked?: true }
@@ -130,6 +183,8 @@ export type State = {
   tackles: TackleId[]
   /** 장착한 찌. 칸 수(tackleSlots) 이하, 산 것만, 중복 없음 */
   equipped: TackleId[]
+  /** 도전과제 진행(과제 id → 진행). 배포 뒤부터 센다 */
+  challenges: Record<string, ChallengeProgress>
   pending: Pending | null
 }
 export type Action =
@@ -143,6 +198,7 @@ export type Action =
   | { type: 'buyTackle'; id: string }
   | { type: 'equip'; ids: string[] }
   | { type: 'unlockArea'; area: string }
+  | { type: 'teleport'; from: string; to: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
@@ -170,6 +226,7 @@ const init = (): State => ({
   legends: [],
   tackles: [],
   equipped: [],
+  challenges: {},
   pending: null,
 })
 
@@ -228,7 +285,21 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     [p.species]: { count: (prev?.count ?? 0) + 1, maxCm: Math.max(prev?.maxCm ?? 0, p.sizeCm) },
   }
   const legends = isLegend && !state.legends.includes(p.species) ? [...state.legends, p.species] : state.legends
-  return { state: { ...state, bag: [...state.bag, fish], dex, legends, pending: null }, result: { caught: fish } }
+  // 과제는 던질 때 저장한 지역·자리·조건으로 센다. 그 값이 없는(비정상) pending이면 과제만 건너뛴다
+  const facts = catchFacts(p, a.perfect)
+  const judged = facts ? progressChallenges(state.challenges, facts) : { challenges: state.challenges, completed: [] }
+  return {
+    state: { ...state, bag: [...state.bag, fish], dex, legends, challenges: judged.challenges, pending: null },
+    result: judged.completed.length > 0 ? { caught: fish, completed: judged.completed } : { caught: fish },
+  }
+}
+
+function catchFacts(p: Pending, perfect: boolean): CatchFacts | null {
+  const raw = p as Partial<Pending>
+  if (!AREAS.some((x) => x.id === raw.area) || typeof raw.spot !== 'string' || !isObj(raw.cond)) return null
+  const cond = raw.cond as Conditions
+  if (!isNum(cond.gameMinute) || typeof cond.weather !== 'string') return null
+  return { area: raw.area as AreaId, spot: raw.spot, cond, species: p.species, sizeCm: p.sizeCm, perfect }
 }
 
 function sell(state: State): Out {
@@ -287,6 +358,23 @@ function unlockArea(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, gold: state.gold - u.price, areas: [...state.areas, area] } }
 }
 
+/** 이동기가 있는 알려진 지역 id인가(자기 키만 본다: '__proto__' 같은 키가 걸리지 않게) */
+function teleporterArea(id: unknown): id is AreaId {
+  return typeof id === 'string' && AREAS.some((a) => a.id === id) && teleporterWorld(id as AreaId) !== null
+}
+
+// 화면이 알려 준 from을 믿는다(설계 §8.4). 둘 다 켜진 이동기이고 골드가 요금 이상이면 요금을 뺀다.
+function teleport(state: State, a: Record<string, unknown>): Out {
+  const { from, to } = a
+  if (!teleporterArea(from) || !teleporterArea(to)) return { error: 'bad_teleporter' }
+  if (from === to) return { error: 'same' }
+  if (state.pending) return { error: 'busy' }
+  if (!teleporterOpen(state, from) || !teleporterOpen(state, to)) return { error: 'not_open' }
+  const fee = teleportFee(from, to)
+  if (state.gold < fee) return { error: 'not_enough_gold' }
+  return { state: { ...state, gold: state.gold - fee }, result: { from, to, fee } }
+}
+
 function equip(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   const ids = a.ids
@@ -332,6 +420,22 @@ function migrate(raw: unknown, fromVersion: number): State {
   const uniqueTackles = (v: unknown): TackleId[] => (Array.isArray(v) ? [...new Set(v.filter(knownTackle))] : [])
   const tackles = uniqueTackles(raw.tackles)
   const equipped = uniqueTackles(raw.equipped).filter((id) => tackles.includes(id)).slice(0, tackleSlots(rodTier))
+  // v7 이하에는 과제가 없다(배포 뒤부터 센다). 알려진 과제만, 진행은 0 이상 정수, seen은 distinct 과제의 알려진 어종만
+  const challenges: State['challenges'] = {}
+  if (isObj(raw.challenges)) {
+    for (const ch of CHALLENGES) {
+      if (!Object.prototype.hasOwnProperty.call(raw.challenges, ch.id)) continue
+      const e = raw.challenges[ch.id]
+      if (!isObj(e)) continue
+      const entry: ChallengeProgress = { progress: isNum(e.progress) && e.progress >= 0 ? Math.floor(e.progress) : 0, done: e.done === true }
+      if (ch.filter.distinct) {
+        const seen = Array.isArray(e.seen) ? [...new Set(e.seen.filter(knownSpecies))] : []
+        entry.progress = seen.length
+        entry.seen = seen
+      }
+      challenges[ch.id] = entry
+    }
+  }
   return {
     gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
@@ -343,6 +447,7 @@ function migrate(raw: unknown, fromVersion: number): State {
     legends,
     tackles,
     equipped,
+    challenges,
     pending: null,
   }
 }
@@ -354,15 +459,17 @@ function records(state: State): WorldRecord[] {
   const name = best && SPECIES.find((s) => s.id === best!.id)?.name
   if (name) biggest.detail = name
   const found = Object.keys(state.dex).length
+  const done = CHALLENGES.filter((c) => state.challenges[c.id]?.done).length
   return [
     { key: 'total_earned', value: state.totalEarned },
     biggest,
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
+    { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
   ]
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 7,
+  version: 8,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
@@ -389,6 +496,8 @@ export const logic: WorldLogic<State, Action, View> = {
         return equip(state, action)
       case 'unlockArea':
         return unlockArea(state, action)
+      case 'teleport':
+        return teleport(state, action)
       default:
         return { error: 'bad_action' }
     }
