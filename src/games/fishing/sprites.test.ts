@@ -44,6 +44,26 @@ const REQUIRED = [
   ...SEASON_ICONS,
 ]
 
+const INLAND_FISH = [
+  'pale-chub',
+  'dark-chub',
+  'skin-carp',
+  'aucha-perch',
+  'sweetfish',
+  'catfish',
+  'mandarin-fish',
+  'eel',
+  'golden-mandarin',
+  'crucian',
+  'carp',
+  'bluegill',
+  'loach',
+  'snakehead',
+  'stream-minnow',
+  'lenok',
+  'century-snakehead',
+]
+
 const REGION_TILES = ['river-0', 'river-1', 'pond-0', 'pond-1', 'basin-0', 'basin-1', 'falls-0', 'falls-1', 'bridge-plank', 'tile-cliff']
 
 describe('SPRITES', () => {
@@ -107,6 +127,41 @@ describe('SPRITES', () => {
   it('all fish are drawn differently', () => {
     const drawings = SPECIES.map((s) => SPRITES[`fish-${s.id}`].rows.join('\n'))
     expect(new Set(drawings).size).toBe(SPECIES.length)
+  })
+
+  it('강·숲 17종 스프라이트가 모두 있고 16×16 안, 서로 다르고 기존 16종과도 다르다', () => {
+    expect(new Set(INLAND_FISH).size).toBe(17)
+    for (const id of INLAND_FISH) {
+      const sp = SPRITES[`fish-${id}`]
+      expect(sp, id).toBeDefined()
+      expect(sp.w, id).toBeLessThanOrEqual(16)
+      expect(sp.h, id).toBeLessThanOrEqual(16)
+    }
+    const inland = INLAND_FISH.map((id) => SPRITES[`fish-${id}`].rows.join('\n'))
+    expect(new Set(inland).size).toBe(17)
+    const village = SPECIES.filter((s) => !INLAND_FISH.includes(s.id)).map((s) => SPRITES[`fish-${s.id}`].rows.join('\n'))
+    for (const art of inland) expect(village).not.toContain(art)
+  })
+
+  it('전설 2종(golden-mandarin, century-snakehead)은 금빛/거대함 등으로 일반종(mandarin-fish, snakehead)과 구별된다', () => {
+    const diff = (a: string, b: string) => {
+      const A = SPRITES[`fish-${a}`]
+      const B = SPRITES[`fish-${b}`]
+      let n = 0
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          const ca = A.rows[y]?.[x] ?? '.'
+          const cb = B.rows[y]?.[x] ?? '.'
+          // 글자가 아니라 실제 색으로 비교한다(팔레트 글자가 달라도 같은 색이면 같은 칸)
+          const colA = ca === '.' ? null : A.palette[ca]
+          const colB = cb === '.' ? null : B.palette[cb]
+          if (colA !== colB) n++
+        }
+      }
+      return n
+    }
+    expect(diff('golden-mandarin', 'mandarin-fish')).toBeGreaterThanOrEqual(30)
+    expect(diff('century-snakehead', 'snakehead')).toBeGreaterThanOrEqual(30)
   })
 
   it('village art has the sizes the tile map expects', () => {
