@@ -1,10 +1,10 @@
 // 낚시 추첨·가격. 순수 함수만, 외부 의존 없음.
 import type { WorldLogic, WorldRecord } from '../types.ts'
-import { AREAS, BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, type Rarity, type Species } from './data.ts'
+import { AREAS, BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, type Rarity, type Rod, type Species } from './data.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 
-const RARITIES: Rarity[] = ['common', 'uncommon', 'rare', 'legend']
+const RARITIES: (keyof Rod['weights'])[] = ['common', 'uncommon', 'rare']
 
 function speciesById(id: string): Species {
   const s = SPECIES.find((x) => x.id === id)

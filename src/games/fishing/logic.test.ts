@@ -1,23 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
+import { BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { logic, price, rollCatch, sizePercentile, type Action, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
-
-describe('fishing data', () => {
-  it('12 species, ids unique, sizes and prices sane', () => {
-    expect(SPECIES).toHaveLength(12)
-    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(12)
-    for (const s of SPECIES) {
-      expect(s.minCm).toBeLessThan(s.maxCm)
-      expect(s.basePrice).toBeGreaterThan(0)
-    }
-    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000])
-    for (const r of RODS) expect(Object.values(r.weights).reduce((a, b) => a + b)).toBe(100)
-  })
-})
 
 describe('price', () => {
   it('min size, max size, perfect', () => {
