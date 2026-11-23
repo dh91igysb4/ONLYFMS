@@ -145,7 +145,8 @@ const MOVE_KEYS: Record<string, keyof Keys> = {
   ArrowLeft: 'left', KeyA: 'left',
   ArrowRight: 'right', KeyD: 'right',
 }
-const COARSE_QUERY = '(pointer: coarse)'
+/** 터치 입력이 하나라도 있으면(마우스가 함께 있는 터치 노트북·태블릿 포함) 터치 조작을 보인다 */
+const COARSE_QUERY = '(any-pointer: coarse)'
 const coarseQuery = (): MediaQueryList | null =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(COARSE_QUERY) : null
 
@@ -211,6 +212,19 @@ export function Game({ gameId }: WorldGameProps) {
     rt.stick = STOP
     rt.keys = { ...NO_KEYS }
   }
+  /**
+   * 창이 초점을 잃거나 가려졌다: 뗀 알림이 오지 않을 수 있으므로 누르고 있던 것을 모두 놓는다.
+   * 아직 던지지 않은 충전은 던지지 않고 대기로 돌아간다(던지는 요청이 이미 나갔으면 그대로 둔다).
+   */
+  const dropInput = () => {
+    clearMove()
+    rt.held.clear()
+    rt.chargeKey = null
+    rt.shopKey = null
+    if (rt.phase === 'charging' && !rt.busy) setPhase('idle')
+  }
+  /** 초점을 게임으로 돌려 스페이스(던지기)가 방금 누른 버튼을 다시 누르지 않게 한다 */
+  const focusGame = () => rootRef.current?.focus({ preventScroll: true })
   const savePlayer = () => {
     const id = userIdRef.current
     if (id !== null) savePosition(id, { pos: rt.player.pos, facing: rt.player.facing })
@@ -397,8 +411,10 @@ export function Game({ gameId }: WorldGameProps) {
           rt.shopKey = key
           break
         }
-        // 충전부터는 걷지 않으므로 자리와 방향이 그대로 고정된다
+        // 충전부터는 걷지 않으므로 자리와 방향이 그대로 고정된다.
+        // 뗀 알림을 잃은 상점 누르기가 남아 있으면 버린다(같은 열쇠의 떼기를 상점 쪽이 가로채지 않게).
         setNotice(null)
+        rt.shopKey = null
         rt.chargeKey = key
         rt.castSpot = at.spot
         rt.chargeStart = performance.now()
@@ -503,12 +519,12 @@ export function Game({ gameId }: WorldGameProps) {
   useEffect(() => releaseSceneCache, [])
 
   // 마지막 위치: 걸음이 멈출 때(프레임), 탭이 가려질 때, 화면을 떠날 때 저장한다.
-  // 창이 초점을 잃거나 가려지면 키를 뗀 알림을 놓칠 수 있으므로 걷기 입력도 놓는다.
+  // 창이 초점을 잃거나 가려지면 키·손가락을 뗀 알림을 놓칠 수 있으므로 누르고 있던 입력을 모두 놓는다.
   useEffect(() => {
-    const onBlur = () => clearMove()
+    const onBlur = () => dropInput()
     const onVisibility = () => {
       if (document.visibilityState !== 'hidden') return
-      clearMove()
+      dropInput()
       savePlayer()
     }
     window.addEventListener('blur', onBlur)
@@ -521,7 +537,7 @@ export function Game({ gameId }: WorldGameProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 터치 기기((pointer: coarse))에서만 조이스틱·행동 버튼을 보인다
+  // 터치 입력이 있는 기기((any-pointer: coarse))에서만 조이스틱·행동 버튼을 보인다
   useEffect(() => {
     const mq = coarseQuery()
     if (!mq || typeof mq.addEventListener !== 'function') return
@@ -703,12 +719,18 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
-  const toggleMenu = (m: Menu) => setMenu(menuRef.current === m ? null : m)
+  const toggleMenu = (m: Menu) => {
+    focusGame()
+    setMenu(menuRef.current === m ? null : m)
+  }
+  const closeMenu = () => {
+    focusGame()
+    setMenu(null)
+  }
 
   function toggleFullscreen() {
     const root = rootRef.current
-    // 초점을 게임으로 돌려 스페이스(던지기)가 이 버튼을 누르지 않게 한다
-    root?.focus({ preventScroll: true })
+    focusGame()
     if (fullscreen) {
       wantFullscreen.current = false
       setFullscreen(false)
@@ -759,7 +781,7 @@ export function Game({ gameId }: WorldGameProps) {
     </>
   )
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
-  // 전체화면에서는 알림이 캔버스 아래쪽에 겹쳐 뜨므로 그동안 안내 줄은 숨긴다.
+  // 전체화면에서는 알림이 캔버스에 겹쳐 뜨므로(데스크톱은 아래쪽, 터치는 조작을 가리지 않게 위쪽) 그동안 안내 줄은 숨긴다.
   // 터치에서는 아래쪽에 조작이 있으므로 안내 줄을 위에 띄우고, 대기 중 안내는 데스크톱에만 둔다.
   const idleHint = touch ? undefined : DESKTOP_IDLE_HINT
   const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
@@ -797,6 +819,7 @@ export function Game({ gameId }: WorldGameProps) {
             }}
             onPointerUp={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
             onPointerCancel={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
+            onLostPointerCapture={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
           />
           {touch && !menu && (
             <Controls
@@ -806,8 +829,12 @@ export function Game({ gameId }: WorldGameProps) {
               action={action}
               onActionDown={() => handlers.current.press('action', 'button')}
               onActionUp={() => handlers.current.release('button')}
-              walking={phase === 'idle'}
-              onTapDown={(id) => handlers.current.press('canvas', `stick:${id}`)}
+              // 결과 표시 중에 잡은 조이스틱은 걷기로 잡아 두면 대기로 돌아오자마자 걷는다(프레임은 대기에서만 걷는다)
+              walking={phase === 'idle' || phase === 'caught' || phase === 'lost'}
+              // 입질 전(대기)에는 조이스틱을 만지작거려도 일찍 챈 것으로 치지 않는다. 챔·감기는 입질·싸움에서만
+              onTapDown={(id) => {
+                if (rt.phase !== 'waiting') handlers.current.press('canvas', `stick:${id}`)
+              }}
               onTapUp={(id) => handlers.current.release(`stick:${id}`)}
             />
           )}
@@ -839,7 +866,7 @@ export function Game({ gameId }: WorldGameProps) {
             >
               <div className="fish-panel-head">
                 <h3 className="fish-panel-title">{menu === 'bag' ? '가방' : menu === 'shop' ? '상점' : '도감'}</h3>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMenu(null)}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={closeMenu}>
                   닫기
                 </button>
               </div>
@@ -856,7 +883,7 @@ export function Game({ gameId }: WorldGameProps) {
               {menu === 'dex' && <DexPanel view={view} />}
             </div>
           )}
-          {fullscreen && notices && <div className="fish-notices">{notices}</div>}
+          {fullscreen && notices && <div className={touch ? 'fish-notices fish-notices-top' : 'fish-notices'}>{notices}</div>}
         </div>
       </div>
 

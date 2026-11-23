@@ -16,7 +16,7 @@ type Props = {
   action: ActionState
   onActionDown(): void
   onActionUp(): void
-  /** 걸을 수 있는 때(대기)인가. 아니면 조이스틱 자리를 누르는 것은 캔버스를 누르는 것과 같다(챔·감기). */
+  /** 조이스틱을 걷기로 잡는 때(대기·결과 표시)인가. 아니면 조이스틱 자리를 누르는 것은 캔버스를 누르는 것과 같다(챔·감기). */
   walking: boolean
   onTapDown(pointerId: number): void
   onTapUp(pointerId: number): void
@@ -57,18 +57,25 @@ export function Controls({ onMove, action, onActionDown, onActionUp, walking, on
       latest.current.onMove(STOP)
     }
   }
-  const endAction = () => {
+  /** notify가 false면 화면 쪽에 떼기를 알리지 않고 손가락만 놓는다 */
+  const endAction = (notify = true) => {
     if (actionId.current === null) return
     actionId.current = null
     setPressed(false)
-    latest.current.onActionUp()
+    if (notify) latest.current.onActionUp()
   }
 
-  // 창이 초점을 잃으면 손가락을 뗀 알림이 오지 않을 수 있다. 화면을 떠날 때도 놓는다.
+  // 창이 초점을 잃으면 손가락을 뗀 알림이 오지 않을 수 있으므로 두 조작을 모두 놓는다.
+  // 행동 버튼은 떼기를 알리지 않는다: 초점을 잃은 것은 뗀 것이 아니고(충전 중이면 던지지 않는다),
+  // 누르고 있던 입력은 화면이 창 blur에서 직접 정리한다. 화면을 떠날 때도 놓는다.
   useEffect(() => {
-    window.addEventListener('blur', endStick)
+    const onBlur = () => {
+      endStick()
+      endAction(false)
+    }
+    window.addEventListener('blur', onBlur)
     return () => {
-      window.removeEventListener('blur', endStick)
+      window.removeEventListener('blur', onBlur)
       endStick()
       endAction()
     }
@@ -106,6 +113,8 @@ export function Controls({ onMove, action, onActionDown, onActionUp, walking, on
 
   const actionDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.preventDefault()
+    // 비활성(aria-disabled)일 때 누르기는 버린다. disabled 속성을 쓰지 않아 떼기 알림은 늘 온다.
+    if (!action.enabled) return
     capture(e)
     actionId.current = e.pointerId
     setPressed(true)
@@ -133,7 +142,7 @@ export function Controls({ onMove, action, onActionDown, onActionUp, walking, on
         type="button"
         className={`fish-action${pressed && action.enabled ? ' fish-action-on' : ''}`}
         data-testid="fish-action"
-        disabled={!action.enabled}
+        aria-disabled={!action.enabled}
         onPointerDown={actionDown}
         onPointerUp={actionUp}
         onPointerCancel={actionUp}

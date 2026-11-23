@@ -200,6 +200,60 @@ describe('drawWorld without an offscreen canvas (direct drawing)', () => {
     expect(pick('fighting', player(beach, 'left'))).toBe('player-reel-side:flip')
   })
 
+  /** 캐릭터가 화면 가운데·좌우 끝·위아래 끝 근처에 오는 카메라들 (맵 가장자리에서 카메라가 멈춘 경우) */
+  const outcomeViews = (w: number, h: number): [string, Player, Vec][] => {
+    const out: [string, Player, Vec][] = []
+    for (const [where, p] of SPOTS) {
+      for (const sx of [30, Math.floor(w / 2), w - 30]) {
+        for (const sy of [60, Math.floor(h / 2), h - 20]) {
+          out.push([`${w}×${h} ${where} at screen (${sx}, ${sy})`, p, { x: p.pos.x - sx, y: p.pos.y - sy }])
+        }
+      }
+    }
+    return out
+  }
+
+  test('caught: the fish is held up above the player head, centred on the player, inside the canvas', () => {
+    for (const [w, h] of SIZES) {
+      for (const [label0, p, camera] of outcomeViews(w, h)) {
+        for (const tMs of [0, 400]) {
+          const ctx = new RecordingCtx()
+          drawWorld(asCtx(ctx), scene('caught', p, { w, h }, { camera, tMs }), { w, h })
+          const [pl] = players(ctx)
+          const fish = ctx.sprites.find((c) => c.name === 'fish-mackerel')
+          const label = `${label0} t=${tMs}`
+          expect(fish, label).toBeDefined()
+          const f = fish as SpriteCall
+          // 2배로 그린 16×16 물고기
+          expect(f.y + 32, label).toBeLessThanOrEqual(pl.y)
+          expect(Math.abs(f.x + 16 - (pl.x + 8)), label).toBeLessThanOrEqual(8)
+          expect(f.x, label).toBeGreaterThanOrEqual(0)
+          expect(f.x + 32, label).toBeLessThanOrEqual(w)
+          expect(f.y, label).toBeGreaterThanOrEqual(0)
+        }
+      }
+    }
+  })
+
+  test('lost: the fish shadow and splash appear above the player head, centred on the player', () => {
+    for (const [w, h] of SIZES) {
+      for (const [label, p, camera] of outcomeViews(w, h)) {
+        const ctx = new RecordingCtx()
+        drawWorld(asCtx(ctx), scene('lost', p, { w, h }, { camera }), { w, h })
+        const [pl] = players(ctx)
+        const shadow = ctx.sprites.find((c) => c.name === 'fish-shadow')
+        const splash = ctx.sprites.find((c) => c.name === 'splash')
+        expect(shadow, label).toBeDefined()
+        expect(splash, label).toBeDefined()
+        const s = shadow as SpriteCall
+        // 2배로 그린 10×5 그림자
+        expect(s.y + 10, label).toBeLessThanOrEqual(pl.y)
+        expect(Math.abs(s.x + 10 - (pl.x + 8)), label).toBeLessThanOrEqual(8)
+        expect((splash as SpriteCall).y + 5, label).toBeLessThanOrEqual(pl.y)
+      }
+    }
+  })
+
   test('bobber and bite mark sit on the bobber spot, only while fishing', () => {
     const size = { w: 195, h: 280 }
     const p = player(PIER_SPOT, 'down')

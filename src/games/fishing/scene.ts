@@ -501,23 +501,30 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
   }
 }
 
-/** 화면 가운데 위: 잡은 물고기를 2배로 들어 보이거나, 놓친 물고기 그림자가 물보라 속으로 사라진다 */
-function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, w: number): void {
+/**
+ * 캐릭터 머리 위(화면 좌표, 캔버스 안으로 당김): 잡은 물고기를 2배로 들어 보이거나,
+ * 놓친 물고기 그림자가 물보라 속으로 사라진다. 화면 가운데 위는 HTML 결과 알림 자리라 피한다.
+ * cx = 캐릭터 가운데 x, top = 캐릭터 그림 위 끝 y.
+ */
+function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, cx: number, top: number, w: number): void {
   const t = s.tMs
-  const cx = Math.round(w / 2)
+  const inX = (x: number, sw: number) => Math.max(0, Math.min(w - sw, x))
   if (s.phase === 'caught' && s.caughtSpecies && SPRITES[`fish-${s.caughtSpecies}`]) {
     const fish = SPRITES[`fish-${s.caughtSpecies}`]
-    const fx = cx - fish.w
-    const fy = 10 - (Math.floor(t / 400) % 2)
+    const fx = inX(cx - fish.w, fish.w * 2)
+    const fy = Math.max(0, top - fish.h * 2 - 2 - (Math.floor(t / 400) % 2))
     drawSprite(ctx, `fish-${s.caughtSpecies}`, fx, fy, 2)
     const blink = Math.floor(t / 250) % 2
     drawSprite(ctx, 'sparkle', fx - 6, fy + (blink ? 2 : 8), 1)
     drawSprite(ctx, 'sparkle', fx + fish.w * 2 + 1, fy + (blink ? 10 : 4), 1)
     if (blink) drawSprite(ctx, 'sparkle', fx + fish.w - 2, fy - 4, 1)
   } else if (s.phase === 'lost') {
+    const shadow = SPRITES['fish-shadow']
     const drift = Math.floor((t % 1200) / 300)
-    drawSprite(ctx, 'fish-shadow', cx - 10 + drift * 2, 16, 2)
-    drawSprite(ctx, 'splash', cx - 14 + drift * 2, 12 + (Math.floor(t / 150) % 2), 1)
+    const sx = inX(cx - shadow.w + drift * 2, shadow.w * 2)
+    const sy = Math.max(4, top - shadow.h * 2 - 4)
+    drawSprite(ctx, 'fish-shadow', sx, sy, 2)
+    drawSprite(ctx, 'splash', sx - 4, sy - 4 + (Math.floor(t / 150) % 2), 1)
   }
 }
 
@@ -563,7 +570,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   const screenX = Math.round(s.player.pos.x) - cam.x
   if (s.phase === 'charging') drawGauge(ctx, s.gauge, screenX, py - cam.y, w, h)
   if (s.phase === 'fighting' && s.bar && s.barParams) drawTrack(ctx, s.bar, s.barParams, s.tMs, hudSide(screenX, w), w, h)
-  drawOutcome(ctx, s, w)
+  drawOutcome(ctx, s, screenX, py - cam.y, w)
 }
 
 /** 월드 좌표로 그리는 움직이는 것들 */
