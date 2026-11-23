@@ -240,10 +240,10 @@ function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): G
   return 'grass'
 }
 
-/** 이웃 땅 위에 놓이는 타일: 바위, 갈대·고사목(늪 속 갈대는 늪물 위에) */
+/** 이웃 물 그림을 빌려 쓰는 타일: 바위, 갈대·고사목(늪 속 갈대는 늪물 위에) */
 const ON_NEIGHBOUR_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['rock', 'reed', 'deadtree'])
 
-/** 바위(갈대·고사목도)는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
+/** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
 function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
   const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
@@ -255,12 +255,20 @@ function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
   return best
 }
 
+/** 갈대·고사목: 이웃에 땅(풀 > 모래 > 동굴)이 하나라도 있으면 그 땅, 모두 물이면 물(늪 한가운데 갈대) */
+function tallGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
+  const near = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([dx, dy]) => baseGround(map, tx + dx, ty + dy, tide))
+  for (const g of ['grass', 'sand', 'cave'] as Ground[]) if (near.includes(g)) return g
+  return near.includes('water') ? 'water' : 'grass'
+}
+
 /** 맵 전체의 바탕 땅(행 우선). 맵 캐시와 함께 만들고 버린다. */
 function computeGround(map: MapDef, tide: Tide): (Ground | null)[] {
   const ground: (Ground | null)[] = []
   for (let ty = 0; ty < map.h; ty++) {
     for (let tx = 0; tx < map.w; tx++) {
-      ground.push(ON_NEIGHBOUR_GROUND.has(tileAt(map, tx, ty)!) ? rockGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
+      const kind = tileAt(map, tx, ty)
+      ground.push(kind === 'rock' ? rockGround(map, tx, ty, tide) : kind === 'reed' || kind === 'deadtree' ? tallGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
     }
   }
   return ground
@@ -397,6 +405,11 @@ function waterSpriteAt(map: MapDef, tx: number, ty: number): string {
   const count = new Map<string, number>()
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const k = tileAt(map, tx + dx, ty + dy)
+    // 진흙 이웃은 밀물 흙탕물(이 칸이 물 위에 놓이는 것은 밀물일 때뿐이다 — 썰물이면 진흙이 모래 땅이라 여기 오지 않는다)
+    if (k === 'mud') {
+      count.set('tile-mud-wet', (count.get('tile-mud-wet') ?? 0) + 1)
+      continue
+    }
     if (k === null || !WATER_GROUND.has(k) || k === 'falls') continue
     const name = WATER_SPRITE[k] ?? 'water'
     count.set(name, (count.get(name) ?? 0) + 1)

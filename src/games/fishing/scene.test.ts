@@ -1268,3 +1268,18 @@ describe('낚시 5부 M2: 늪 속 갈대·고사목', () => {
     expect(at(4, 1).some((n) => n.startsWith('tile-grass'))).toBe(true)
   })
 })
+
+describe('낚시 5부 M2: 밀물 진흙 옆 갈대', () => {
+  test('둘레가 갈대·밀물 진흙뿐인 갈대는 흙탕물 위에 그린다(바다 그림이 아니다)', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const size = { w: 195, h: 280 }
+    const m = defineMap('tideflat', ['.RRR.', '.RRR.', 'mmmmm', 'mmmmm', '.....', '.....'], { tidal: true, spots: { mud: 'estuary' } })
+    const p = player(tileCentre(2, 5))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam, dyn: { tide: 'high', holes: new Set() } }, size)
+    const at = ctx.sprites.filter((c) => c.x === 2 * 16 - cam.x && c.y === 1 * 16 - cam.y).map((c) => c.name)
+    expect(at).toContainEqual(expect.stringMatching(/^tile-mud-wet-[01]$/))
+    expect(at.some((n) => /^water-[01]$/.test(n))).toBe(false)
+  })
+})
