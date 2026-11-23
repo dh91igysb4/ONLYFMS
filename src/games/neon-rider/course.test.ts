@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { REST_LEN, START_BACK, START_LEN, TIER_WEIGHTS } from './constants.ts'
-import { courseCacheSize, courseFromTemplates, courseOf, getCourse, makeSeededCourse } from './course.ts'
+import { FALL_DEPTH, REST_LEN, START_BACK, START_LEN, TIER_WEIGHTS } from './constants.ts'
+import { courseCacheSize, courseFromTemplates, courseOf, getCourse, makeSeededCourse, type Course } from './course.ts'
+import type { Box } from './collide.ts'
+import type { HazardDef } from './hazards.ts'
+import type { Motion } from './motion.ts'
+import type { MoverDef } from './movers.ts'
 import type { Prim, Template } from './pieces.ts'
+import { TURN } from './trig.ts'
 
 const flat = (id: string, tier: 1 | 2 | 3 | 4, extra: Prim[] = []): Template => ({
   id,
@@ -158,5 +163,152 @@ describe('neon-rider 코스', () => {
     for (const s of ['c1', 'c2', 'c3', 'c4', 'c5', 'c6']) getCourse(s)
     expect(courseCacheSize()).toBeLessThanOrEqual(4)
     expect(getCourse('c6')).toBe(getCourse('c6'))
+  })
+})
+
+// ── 위험물·움직이는 길·블록 (이 파일 안의 시험용 템플릿) ──
+const NONE: Motion = { k: 'none' }
+const hz = (dx: number, dy: number, h: HazardDef): Prim => ({ t: 'hazard', dx, dy, h })
+const mv = (dx: number, dy: number, m: MoverDef): Prim => ({ t: 'mover', dx, dy, m })
+const line = (dx: number): Prim => ({ t: 'line', dx, dy: 0 })
+const disc = (x: number, y: number, r: number): HazardDef => ({ shape: { s: 'disc', x, y, r }, motion: NONE, look: 'saw' })
+const yellow = (x1: number, motion: Motion): MoverDef => ({
+  segs: [{ x0: 0, y0: 0, x1, y1: 0, boost: false }],
+  pivotX: 0,
+  pivotY: 0,
+  motion,
+  start: { k: 'time' },
+  look: 'yellow',
+})
+// 템플릿 길이 40000. 구간 k의 템플릿 원점은 section(k).startX + REST_LEN, 높이 0.
+const HZ: Template = flat('hz', 1, [hz(5000, 1000, disc(0, 0, 500))]) // 원 중심 = 템플릿 (25000, 1000)
+const PLAIN: Template = flat('plain', 1)
+const origin = (c: Course, k: number): number => c.section(k).startX + REST_LEN
+const at = (x: number, y: number, r = 10): Box => ({ x0: x - r, y0: y - r, x1: x + r, y1: y + r })
+
+describe('neon-rider 코스: 위험물·움직이는 길·블록', () => {
+  it('위험물을 월드 좌표로 옮기고, 같은 구간·다음 구간까지 상자와 겹치는 것만 준다', () => {
+    const c = courseFromTemplates([HZ])
+    const x0 = origin(c, 0) + 25000
+    const x1 = origin(c, 1) + 25000
+    expect(c.hazardsNear(at(x0, 1000))).toEqual([{ id: 0, shape: { s: 'disc', x: x0, y: 1000, r: 500 }, motion: NONE, look: 'saw' }])
+    expect(c.hazardsNear({ x0, y0: 0, x1, y1: 2000 }).map((h) => h.id)).toEqual([0, 1])
+    expect(c.hazardsNear(at(x1, 1000)).map((h) => h.id)).toEqual([1])
+    expect(c.hazardsNear({ x0: x0 + 600, y0: 0, x1: x1 - 600, y1: 2000 })).toEqual([]) // 두 원 사이
+    expect(c.hazardsNear(at(x0, 2000))).toEqual([]) // 위로 빗나감
+    expect(c.moversNear(at(x0, 1000))).toEqual([])
+    expect(c.blocksNear(at(x0, 1000))).toEqual([])
+  })
+
+  it('Review Focus 3: 구간 끝을 넘어 뻗은 날, 구간 앞으로 뻗은 막대, 다음 구간까지 가는 왕복 길도 찾는다', () => {
+    const blades: HazardDef = { shape: { s: 'blades', x: 0, y: 0, rIn: 0, rOut: 8000, n: 2, w: 600 }, motion: { k: 'rotate', a0: 0, w: 5 }, look: 'blades' }
+    const BIG: Template = { id: 'big', tier: 1, prims: [line(20000), line(20000), hz(-1000, 0, blades)] } // 중심 x 39000, 끝 40000을 7000 넘음
+    const end0 = (c: Course): number => c.section(0).endX
+    const a = courseFromTemplates([BIG, PLAIN])
+    expect(a.hazardsNear(at(end0(a) + 5000, 0)).map((h) => h.id)).toEqual([0])
+    expect(a.hazardsNear(at(end0(a) + 7500, 0))).toEqual([])
+
+    // 템플릿 원점에서 뒤로 30000: 앞 구간(평지) 안까지 뻗는다. 새 코스에서 구간 1을 만들기 전에 묻는다.
+    const back: HazardDef = { shape: { s: 'bar', x0: -30000, y0: 0, x1: 0, y1: 0, r: 100 }, motion: NONE, look: 'laser' }
+    const BACK: Template = { id: 'back', tier: 1, prims: [hz(0, 0, back), line(20000), line(20000)] }
+    const ref = courseFromTemplates([PLAIN, BACK])
+    const s1 = ref.section(1).startX
+    const fresh = courseFromTemplates([PLAIN, BACK])
+    expect(fresh.hazardsNear(at(s1 - 10000, 0)).map((h) => h.shape)).toEqual([{ s: 'bar', x0: s1 + REST_LEN - 30000, y0: 0, x1: s1 + REST_LEN, y1: 0, r: 100 }])
+
+    // 왕복 범위: 템플릿 x 38000에서 오른쪽으로 20000 더 간다(구간 끝 40000 너머).
+    const SW: Template = { id: 'sw', tier: 1, prims: [line(20000), line(20000), mv(-2000, 0, yellow(1000, { k: 'swing', ax: 20000, ay: 0, period: 120, phase: 0 }))] }
+    const b = courseFromTemplates([SW, PLAIN])
+    expect(b.moversNear(at(end0(b) + 15000, 0)).map((m) => m.id)).toEqual([0])
+    expect(b.moversNear(at(end0(b) + 25000, 0))).toEqual([])
+  })
+
+  it('움직이는 길: 월드 좌표(선분·기준점·pass.x), 회전 범위, fall은 아래로 FALL_DEPTH까지', () => {
+    const pass: MoverDef = { ...yellow(3000, { k: 'fall', w: 0 }), pivotX: 1500, start: { k: 'pass', x: -4000, delay: 6 } }
+    const T: Template = flat('mv', 1, [mv(1000, 500, pass), mv(10000, 0, { ...yellow(3000, { k: 'rotate', a0: 0, w: 7 }), look: 'green' })])
+    const c = courseFromTemplates([T])
+    const ox = origin(c, 0)
+    const [m] = c.moversNear(at(ox + 22000, 500))
+    expect(m).toEqual({
+      ...pass,
+      id: 0,
+      segs: [{ x0: ox + 21000, y0: 500, x1: ox + 24000, y1: 500, boost: false }],
+      pivotX: ox + 22500,
+      pivotY: 500,
+      start: { k: 'pass', x: ox + 17000, delay: 6 },
+    })
+    expect(c.moversNear(at(ox + 22000, 500 - FALL_DEPTH + 20)).map((x) => x.id)).toEqual([0])
+    expect(c.moversNear(at(ox + 22000, 500 - FALL_DEPTH - 20))).toEqual([])
+    // 회전 길: 기준점 (ox + 30000, 0) 둘레 반지름 3000
+    expect(c.moversNear(at(ox + 30000 - 2900, 0, 50)).map((x) => x.id)).toEqual([1])
+    expect(c.moversNear(at(ox + 30000, 2900, 50)).map((x) => x.id)).toEqual([1])
+    expect(c.moversNear(at(ox + 30000, 3200, 50))).toEqual([])
+  })
+
+  it('블록: 처음 자세 상자(바닥 변 가운데 기준, 처음 각도로 돈 상자)로 찾는다', () => {
+    const T: Template = flat('blk', 1, [
+      { t: 'block', dx: 5000, dy: 0, b: { x: 0, y: 0, w: 1000, h: 4000, a: 0 } },
+      { t: 'block', dx: 10000, dy: 0, b: { x: 0, y: 0, w: 1000, h: 4000, a: TURN / 4 } }, // 왼쪽으로 누운 블록
+    ])
+    const c = courseFromTemplates([T])
+    const bx = origin(c, 0) + 25000
+    const cx = origin(c, 0) + 30000
+    expect(c.blocksNear(at(bx, 3980, 5))).toEqual([{ id: 0, x: bx, y: 0, w: 1000, h: 4000, a: 0 }])
+    expect(c.blocksNear(at(bx, 4100, 5))).toEqual([])
+    expect(c.blocksNear(at(bx + 600, 100, 5))).toEqual([])
+    expect(c.blocksNear(at(cx - 3500, 0, 5)).map((b) => b.id)).toEqual([1])
+    expect(c.blocksNear(at(cx - 3500, 1000, 5))).toEqual([])
+    expect(c.blocksNear(at(cx + 600, 0, 5))).toEqual([])
+  })
+
+  it('공중 비행 상자: 진행 번호와 상관없이 x 범위로 찾고, 필요한 구간을 만든다', () => {
+    const ref = courseFromTemplates([HZ])
+    const x4 = origin(ref, 4) + 25000
+    const fresh = courseFromTemplates([HZ]) // seg·section을 한 번도 부르지 않음
+    expect(fresh.hazardsNear(at(x4, 1000)).map((h) => [h.id, h.shape])).toEqual([[4, { s: 'disc', x: x4, y: 1000, r: 500 }]])
+  })
+
+  it('id는 시드에 대해 결정적이고 종류마다 0부터 중복 없이 이어지며, 먼저 만든 구간 수와 상관없다', () => {
+    const items: Prim[][] = [
+      [hz(3000, 800, disc(0, 0, 400)), { t: 'block', dx: 9000, dy: 0, b: { x: 0, y: 0, w: 800, h: 1600, a: 0 } }],
+      [mv(2000, 0, yellow(4000, { k: 'swing', ax: 0, ay: 900, period: 90, phase: 10 })), hz(8000, 600, disc(0, 0, 300)), hz(9000, 600, disc(0, 0, 300))],
+      [mv(0, 0, { ...yellow(2000, { k: 'fall', w: 1 }), start: { k: 'touch', delay: 3 } })],
+    ]
+    const pool: Template[] = ([1, 2, 3, 4] as const).flatMap((tier) =>
+      items.map((extra, n) => ({ id: `m${tier}-${n}`, tier, prims: [line(10000 + 3000 * n), ...extra, line(10000 + 1000 * tier)] })),
+    )
+    const all = (c: Course, x1: number) => {
+      const box = { x0: -START_BACK, y0: -100000000, x1, y1: 100000000 }
+      return { h: c.hazardsNear(box), m: c.moversNear(box), b: c.blocksNear(box) }
+    }
+    const x1 = makeSeededCourse('d00d', pool).section(25).endX
+    const a = all(makeSeededCourse('d00d', pool), x1)
+    const ahead = makeSeededCourse('d00d', pool)
+    ahead.section(60)
+    expect(all(ahead, x1)).toEqual(a)
+    for (const list of [a.h, a.m, a.b]) {
+      expect(list.length).toBeGreaterThan(5)
+      expect(list.map((x) => x.id)).toEqual(list.map((_, i) => i))
+    }
+    expect(all(makeSeededCourse('beef', pool), x1)).not.toEqual(a)
+    for (const m of a.m) expect(ahead.moverById(m.id)).toEqual(m)
+  })
+
+  it('moverById: 만든 구간의 길은 같은 내용, 없는 id는 던진다', () => {
+    const c = courseFromTemplates([flat('one', 1, [mv(0, 0, yellow(1000, NONE))])])
+    const near = c.moversNear(at(origin(c, 2) + 20500, 0))
+    expect(near.map((m) => m.id)).toEqual([2])
+    expect(c.moverById(2)).toEqual(near[0])
+    expect(c.moverById(0)).toEqual(c.moversNear(at(origin(c, 0) + 20500, 0))[0])
+    expect(c.moverById(0).pivotX).toBe(origin(c, 0) + 20000)
+    expect(() => c.moverById(-1)).toThrow()
+    expect(() => c.moverById(1.5)).toThrow()
+    expect(() => c.moverById(1000000)).toThrow()
+  })
+
+  it('위험물이 없는 코스에서 *Near는 빈 목록', () => {
+    const c = makeSeededCourse('1234abcd', POOL)
+    const box = { x0: 0, y0: -1000000, x1: c.section(10).endX, y1: 1000000 }
+    expect([c.hazardsNear(box), c.moversNear(box), c.blocksNear(box)]).toEqual([[], [], []])
   })
 })

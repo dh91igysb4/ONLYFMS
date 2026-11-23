@@ -1,7 +1,13 @@
 // 시드 → 템플릿 이어붙이기. 구간·선분 조회는 게으르게 무한히 생성한다 (설계 §6). 순수 정수 TS.
+// 위험물·움직이는 길·블록은 구간을 만들 때 월드로 옮겨 종류마다 전역 번호를 붙인다 (움직임 설계 §4.4).
+import type { Block, BlockDef } from './blocks.ts'
+import type { Box } from './collide.ts'
 import { REST_LEN, START_BACK, START_LEN, TIER_WEIGHTS } from './constants.ts'
-import { TEMPLATES, buildTemplate } from './pieces.ts'
+import { hazardBox, type Hazard } from './hazards.ts'
+import { moverBox, type Mover } from './movers.ts'
+import { TEMPLATES, buildTemplate, shiftBlock, shiftHazard, shiftMover } from './pieces.ts'
 import type { Built, Seg, Template } from './pieces.ts'
+import { TRIG_ONE, cosT, sinT } from './trig.ts'
 
 export type Section = { index: number; templateId: string; startX: number; endX: number; firstSeg: number; lastSeg: number; minY: number }
 export type Gem = { id: number; x: number; y: number }
@@ -9,6 +15,11 @@ export type Course = {
   seg(i: number): Seg // 필요하면 i까지 생성
   section(k: number): Section // 필요하면 k까지 생성
   gemsBetween(segFrom: number, segTo: number): readonly Gem[]
+  // 상자와 "움직임 전체를 덮는 상자"(블록은 처음 자세)가 겹치는 것, id 오름차순. 필요한 구간까지 만든다(x 범위로 찾는다).
+  hazardsNear(box: Box): readonly Hazard[]
+  moversNear(box: Box): readonly Mover[]
+  blocksNear(box: Box): readonly Block[]
+  moverById(id: number): Mover // 이미 만든 구간의 길만(상태에 남은 id로 다시 찾기)
 }
 
 // 최근 몇 개 구간의 템플릿을 피하는지, 캐시에 몇 개 seed를 두는지 (조정 수치가 아니라 구조 값).
@@ -56,25 +67,85 @@ function checkIndex(i: number, what: string): void {
   if (!Number.isInteger(i) || i < 0) throw new RangeError(`${what} 인덱스는 0 이상의 정수여야 한다: ${i}`)
 }
 
-// k번째 구간에 쓸 템플릿을 정하는 함수를 받아 코스를 만든다. pick은 k 오름차순으로 한 번씩만 불린다.
-function buildCourse(pick: (k: number) => Template): Course {
+/** 블록 처음 자세의 상자: 바닥 변 가운데 (x, y) 둘레로 a만큼 돈 w×h 직사각형. 꼭짓점 내림 여유 2. */
+function blockRestBox(b: BlockDef): Box {
+  const c = cosT(b.a)
+  const s = sinT(b.a)
+  const left = -Math.floor(b.w / 2)
+  const right = b.w + left
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const [rx, ry] of [[left, 0], [right, 0], [right, b.h], [left, b.h]]) {
+    const x = b.x + Math.floor((c * rx - s * ry) / TRIG_ONE)
+    const y = b.y + Math.floor((s * rx + c * ry) / TRIG_ONE)
+    x0 = Math.min(x0, x)
+    y0 = Math.min(y0, y)
+    x1 = Math.max(x1, x)
+    y1 = Math.max(y1, y)
+  }
+  return { x0: x0 - 2, y0: y0 - 2, x1: x1 + 2, y1: y1 + 2 }
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1
+}
+
+type Boxed<T> = { item: T; box: Box }
+type SectionItems = { hazards: Boxed<Hazard>[]; movers: Boxed<Mover>[]; blocks: Boxed<Block>[] }
+
+// k번째 구간에 쓸 템플릿을 정하는 함수를 받아 코스를 만든다. pick은 k 오름차순으로 한 번씩만 불리고 templates 중 하나를 돌려준다.
+function buildCourse(templates: readonly Template[], pick: (k: number) => Template): Course {
   // 선분 0은 시작 평지. 코스 시작점(x = 0) 뒤로 START_BACK만큼 이어져 있어 첫 구간에서 되굴러가도 길 위에 남는다.
   const segs: Seg[] = [{ x0: -START_BACK, y0: 0, x1: START_LEN, y1: 0, boost: false }]
   const sections: Section[] = []
   const sectionGems: Gem[][] = []
+  const sectionItems: SectionItems[] = []
+  const movers: Mover[] = [] // movers[id]
   const builtCache = new Map<Template, Built>()
   let penX = START_LEN
   let penY = 0
   let gemId = 0
+  let hazardId = 0
+  let blockId = 0
 
-  const addSection = (): void => {
-    const k = sections.length
-    const tpl = pick(k)
+  const builtOf = (tpl: Template): Built => {
     let built = builtCache.get(tpl)
     if (!built) {
       built = buildTemplate(tpl)
       builtCache.set(tpl, built)
     }
+    return built
+  }
+
+  // 항목 상자가 자기 구간 [startX, endX] 밖으로 뻗는 최대 거리(back: 앞쪽, fwd: 뒤쪽). 템플릿 전체에서 한 번 정하므로
+  // 조회 결과가 그때까지 만든 구간 수와 상관없다(같은 코스를 그림·시뮬이 함께 쓴다).
+  let reach: { back: number; fwd: number } | null = null
+  const reachOf = (): { back: number; fwd: number } => {
+    if (reach) return reach
+    let back = 0
+    let fwd = 0
+    for (const tpl of templates) {
+      const b = builtOf(tpl)
+      const boxes = [
+        ...b.hazards.map((h) => hazardBox({ ...h, id: 0 })),
+        ...b.movers.map((m) => moverBox({ ...m, id: 0 })),
+        ...b.blocks.map(blockRestBox),
+      ]
+      for (const x of boxes) {
+        back = Math.max(back, -(REST_LEN + x.x0))
+        fwd = Math.max(fwd, x.x1 - b.endX)
+      }
+    }
+    reach = { back, fwd }
+    return reach
+  }
+
+  const addSection = (): void => {
+    const k = sections.length
+    const tpl = pick(k)
+    const built = builtOf(tpl)
     const startX = penX
     const firstSeg = segs.length
     segs.push({ x0: penX, y0: penY, x1: penX + REST_LEN, y1: penY, boost: false })
@@ -82,6 +153,20 @@ function buildCourse(pick: (k: number) => Template): Course {
     for (const s of built.segs) segs.push({ x0: s.x0 + tx, y0: s.y0 + penY, x1: s.x1 + tx, y1: s.y1 + penY, boost: s.boost })
     const gems: Gem[] = []
     for (const g of built.gems) gems.push({ id: gemId++, x: g.x + tx, y: g.y + penY })
+    const items: SectionItems = { hazards: [], movers: [], blocks: [] }
+    for (const h of built.hazards) {
+      const item: Hazard = { ...shiftHazard(h, tx, penY), id: hazardId++ }
+      items.hazards.push({ item, box: hazardBox(item) })
+    }
+    for (const m of built.movers) {
+      const item: Mover = { ...shiftMover(m, tx, penY), id: movers.length }
+      movers.push(item)
+      items.movers.push({ item, box: moverBox(item) })
+    }
+    for (const b of built.blocks) {
+      const item: Block = { ...shiftBlock(b, tx, penY), id: blockId++ }
+      items.blocks.push({ item, box: blockRestBox(item) })
+    }
     sections.push({
       index: k,
       templateId: tpl.id,
@@ -92,8 +177,29 @@ function buildCourse(pick: (k: number) => Template): Course {
       minY: Math.min(penY, built.minY + penY),
     })
     sectionGems.push(gems)
+    sectionItems.push(items)
     penX = built.endX + tx
     penY += built.endY
+  }
+
+  // 상자와 겹칠 수 있는 구간: startX − back ≤ box.x1 이고 endX + fwd ≥ box.x0. 앞쪽 조건을 만족하는 구간을 모두 만든 뒤
+  // endX로 이진 탐색해 시작 구간을 찾고 오른쪽으로 훑는다.
+  const near = <T>(box: Box, list: (s: SectionItems) => Boxed<T>[]): T[] => {
+    if (!Number.isFinite(box.x0) || !Number.isFinite(box.x1)) throw new RangeError(`상자 x 범위는 유한해야 한다: ${box.x0}, ${box.x1}`)
+    const { back, fwd } = reachOf()
+    while (sections.length === 0 || sections[sections.length - 1].startX - back <= box.x1) addSection()
+    let lo = 0
+    let hi = sections.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (sections[mid].endX + fwd >= box.x0) hi = mid
+      else lo = mid + 1
+    }
+    const out: T[] = []
+    for (let k = lo; k < sections.length && sections[k].startX - back <= box.x1; k++) {
+      for (const e of list(sectionItems[k])) if (overlaps(e.box, box)) out.push(e.item)
+    }
+    return out
   }
 
   return {
@@ -123,12 +229,20 @@ function buildCourse(pick: (k: number) => Template): Course {
       for (let k = lo; k < sections.length && sections[k].firstSeg <= segTo; k++) for (const g of sectionGems[k]) out.push(g)
       return out
     },
+    hazardsNear: (box) => near(box, (s) => s.hazards),
+    moversNear: (box) => near(box, (s) => s.movers),
+    blocksNear: (box) => near(box, (s) => s.blocks),
+    moverById(id) {
+      checkIndex(id, 'mover')
+      if (id >= movers.length) throw new RangeError(`아직 만들지 않은 움직이는 길: ${id}`)
+      return movers[id]
+    },
   }
 }
 
 export function courseFromTemplates(templates: readonly Template[]): Course {
   if (templates.length === 0) throw new Error('템플릿이 비어 있다')
-  return buildCourse((k) => templates[k % templates.length])
+  return buildCourse(templates, (k) => templates[k % templates.length])
 }
 
 export function courseOf(templateIds: readonly string[]): Course {
@@ -154,7 +268,7 @@ export function makeSeededCourse(seed: string, templates: readonly Template[]): 
   const byTier: Template[][] = [[], [], [], []]
   for (const t of templates) byTier[t.tier - 1].push(t)
   const recent: string[] = []
-  return buildCourse((k) => {
+  return buildCourse(templates, (k) => {
     // 템플릿이 없는 티어는 가중치 0으로 본다. 전부 0이면 있는 템플릿 전체에서 뽑는다.
     const w = weightsAt(k).map((x, i) => (byTier[i].length > 0 ? x : 0))
     const total = w[0] + w[1] + w[2] + w[3]

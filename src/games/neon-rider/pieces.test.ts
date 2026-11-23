@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { COLLIDE_WINDOW, MM, SEG_LEN } from './constants.ts'
-import { TEMPLATES, buildTemplate, type Seg, type Template } from './pieces.ts'
+import { COLLIDE_WINDOW, LEAD_FLAT_MAX, MM, SEG_LEN } from './constants.ts'
+import type { HazardShape } from './hazards.ts'
+import { TEMPLATES, buildTemplate, type Prim, type Seg, type Template } from './pieces.ts'
 import { TURN, angDiff, atan2T, isqrt } from './trig.ts'
 
 // 선분 a의 두 끝점에서 선분 b까지 거리 중 작은 것(근사: 겹침 판정용).
@@ -93,7 +94,91 @@ describe('buildTemplate', () => {
     const b = buildTemplate(mk([{ t: 'line', dx: 10, dy: -7 }, { t: 'line', dx: 10, dy: 20 }]))
     expect(b.minY).toBe(-7)
   })
+
+  it('위험물·움직이는 길·블록 없는 템플릿은 빈 목록', () => {
+    const b = buildTemplate(mk([{ t: 'line', dx: 10, dy: 0 }]))
+    expect([b.hazards, b.movers, b.blocks]).toEqual([[], [], []])
+  })
+
+  it('hazard·mover·block은 (펜 + dx, dy) 기준 상대 좌표로 놓이고 펜은 그대로', () => {
+    const b = buildTemplate(mk([{ t: 'line', dx: 100, dy: 50 }, ...EXTRAS, { t: 'line', dx: 10, dy: 0 }]))
+    // 기준점 = 펜(100, 50) + 각 prim의 (dx, dy)
+    expect(b.hazards).toEqual([
+      { shape: { s: 'disc', x: 111, y: 72, r: 5 }, motion: SWING, look: 'saw' },
+      { shape: { s: 'bar', x0: 98, y0: 51, x1: 103, y1: 56, r: 2 }, motion: { k: 'none' }, look: 'spikes' },
+      { shape: { s: 'blades', x: 100, y: 50, rIn: 0, rOut: 9, n: 2, w: 100 }, motion: { k: 'rotate', a0: 0, w: 3 }, look: 'blades' },
+    ])
+    expect(b.movers).toEqual([
+      {
+        segs: [{ x0: 130, y0: 80, x1: 140, y1: 80, boost: false }],
+        pivotX: 135,
+        pivotY: 81,
+        motion: { k: 'fall', w: 0 },
+        start: { k: 'pass', x: 125, delay: 4 },
+        look: 'yellow',
+      },
+      { segs: [{ x0: 130, y0: 80, x1: 130, y1: 90, boost: false }], pivotX: 130, pivotY: 80, motion: { k: 'rotate', a0: 0, w: 1 }, start: { k: 'time' }, look: 'green' },
+    ])
+    expect(b.blocks).toEqual([{ x: 103, y: 50, w: 40, h: 60, a: 7 }])
+    expect(b.segs[1]).toEqual({ x0: 100, y0: 50, x1: 110, y1: 50, boost: false })
+    expect([b.endX, b.endY]).toEqual([110, 50])
+  })
+
+  it('trimFlats: 앞쪽 평지를 자르면 위험물·길·블록도 보석과 같은 양만큼 x로 옮긴다', () => {
+    const prims: Template['prims'] = [
+      { t: 'line', dx: LEAD_FLAT_MAX + 5000, dy: 0 },
+      { t: 'gem', dx: 10, dy: 20 },
+      ...EXTRAS,
+      { t: 'line', dx: 3000, dy: 500 },
+      { t: 'line', dx: 3000, dy: 0 },
+    ]
+    const raw = buildTemplate({ id: 'raw', tier: 1, prims })
+    const cut = buildTemplate({ id: 'cut', tier: 1, prims, trimFlats: true })
+    const d = raw.gems[0].x - cut.gems[0].x
+    expect(d).toBe(5000)
+    expect(cut.gems[0].y).toBe(raw.gems[0].y)
+    const sh = (s: HazardShape): HazardShape =>
+      s.s === 'bar' ? { ...s, x0: s.x0 - d, x1: s.x1 - d } : { ...s, x: s.x - d }
+    expect(cut.hazards).toEqual(raw.hazards.map((h) => ({ ...h, shape: sh(h.shape) })))
+    expect(cut.movers).toEqual(
+      raw.movers.map((m) => ({
+        ...m,
+        segs: m.segs.map((s) => ({ ...s, x0: s.x0 - d, x1: s.x1 - d })),
+        pivotX: m.pivotX - d,
+        start: m.start.k === 'pass' ? { ...m.start, x: m.start.x - d } : m.start,
+      })),
+    )
+    expect(cut.blocks).toEqual(raw.blocks.map((k) => ({ ...k, x: k.x - d })))
+  })
 })
+
+// 기준점 (dx, dy)를 기준으로 한 상대 좌표. 위 두 테스트가 함께 쓴다.
+const SWING = { k: 'swing', ax: 30, ay: 0, period: 60, phase: 0 } as const
+const EXTRAS: Prim[] = [
+  { t: 'hazard', dx: 10, dy: 20, h: { shape: { s: 'disc', x: 1, y: 2, r: 5 }, motion: SWING, look: 'saw' } },
+  { t: 'hazard', dx: 0, dy: 0, h: { shape: { s: 'bar', x0: -2, y0: 1, x1: 3, y1: 6, r: 2 }, motion: { k: 'none' }, look: 'spikes' } },
+  { t: 'hazard', dx: 0, dy: 0, h: { shape: { s: 'blades', x: 0, y: 0, rIn: 0, rOut: 9, n: 2, w: 100 }, motion: { k: 'rotate', a0: 0, w: 3 }, look: 'blades' } },
+  {
+    t: 'mover',
+    dx: 30,
+    dy: 30,
+    m: {
+      segs: [{ x0: 0, y0: 0, x1: 10, y1: 0, boost: false }],
+      pivotX: 5,
+      pivotY: 1,
+      motion: { k: 'fall', w: 0 },
+      start: { k: 'pass', x: -5, delay: 4 },
+      look: 'yellow',
+    },
+  },
+  {
+    t: 'mover',
+    dx: 30,
+    dy: 30,
+    m: { segs: [{ x0: 0, y0: 0, x1: 0, y1: 10, boost: false }], pivotX: 0, pivotY: 0, motion: { k: 'rotate', a0: 0, w: 1 }, start: { k: 'time' }, look: 'green' },
+  },
+  { t: 'block', dx: 3, dy: 0, b: { x: 0, y: 0, w: 40, h: 60, a: 7 } },
+]
 
 describe('TEMPLATES', () => {
   it('id 중복 없음', () => {

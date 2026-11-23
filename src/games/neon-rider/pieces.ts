@@ -1,5 +1,8 @@
 // 장애물 템플릿 → 선분. 순수 정수 TS (설계 §6). 좌표 x 앞, y 위, 단위 u.
+import type { BlockDef } from './blocks.ts'
 import { LEAD_FLAT_MAX, MM, SEG_LEN, TAIL_FLAT_MAX } from './constants.ts'
+import type { HazardDef, HazardShape } from './hazards.ts'
+import type { MoverDef } from './movers.ts'
 import { TRIG_ONE, TURN, cosT, sinT } from './trig.ts'
 
 export type Seg = { x0: number; y0: number; x1: number; y1: number; boost: boolean }
@@ -9,11 +12,19 @@ export type Prim =
   | { t: 'gap'; dx: number; dy: number } // 길 없이 펜만 이동
   | { t: 'boost'; len: number } // 수평 부스터 직선
   | { t: 'gem'; dx: number; dy: number } // 현재 점 기준 위치에 보석 하나(펜은 그대로)
+  // 아래 셋의 좌표(도형·선분·기준점·pass.x·블록 위치)는 (현재 점 + (dx, dy))를 원점으로 한 상대 좌표. 펜은 그대로. 설계 §4.3.
+  | { t: 'hazard'; dx: number; dy: number; h: HazardDef }
+  | { t: 'mover'; dx: number; dy: number; m: MoverDef }
+  | { t: 'block'; dx: number; dy: number; b: BlockDef }
 // trimFlats: 앞뒤 맨 평지를 LEAD_FLAT_MAX·TAIL_FLAT_MAX로 자른다. TEMPLATES의 템플릿은 모두 켠다(테스트용 지형은 끈 채로 쓴다).
 export type Template = { id: string; tier: 1 | 2 | 3 | 4; prims: readonly Prim[]; trimFlats?: boolean }
+// hazards·movers·blocks는 템플릿 좌표(코스가 구간을 만들 때 월드로 옮긴다).
 export type Built = {
   segs: Seg[]
   gems: { x: number; y: number }[]
+  hazards: HazardDef[]
+  movers: MoverDef[]
+  blocks: BlockDef[]
   endX: number
   endY: number
   minY: number
@@ -32,9 +43,37 @@ function arcCount(r: number, span: number): number {
   return Math.max(1, Math.floor((r * Math.abs(span) * ARC_NUM + unit - 1) / unit))
 }
 
+function shiftShape(s: HazardShape, dx: number, dy: number): HazardShape {
+  if (s.s === 'bar') return { ...s, x0: s.x0 + dx, y0: s.y0 + dy, x1: s.x1 + dx, y1: s.y1 + dy }
+  return { ...s, x: s.x + dx, y: s.y + dy }
+}
+
+/** 위험물을 (dx, dy)만큼 옮긴다. 움직임(swing 진폭 등)은 상대량이라 그대로. */
+export function shiftHazard(h: HazardDef, dx: number, dy: number): HazardDef {
+  return { ...h, shape: shiftShape(h.shape, dx, dy) }
+}
+
+/** 움직이는 길을 (dx, dy)만큼 옮긴다: 선분·기준점·pass.x. */
+export function shiftMover(m: MoverDef, dx: number, dy: number): MoverDef {
+  return {
+    ...m,
+    segs: m.segs.map((s) => ({ ...s, x0: s.x0 + dx, y0: s.y0 + dy, x1: s.x1 + dx, y1: s.y1 + dy })),
+    pivotX: m.pivotX + dx,
+    pivotY: m.pivotY + dy,
+    start: m.start.k === 'pass' ? { ...m.start, x: m.start.x + dx } : m.start,
+  }
+}
+
+export function shiftBlock(b: BlockDef, dx: number, dy: number): BlockDef {
+  return { ...b, x: b.x + dx, y: b.y + dy }
+}
+
 export function buildTemplate(t: Template): Built {
   const segs: Seg[] = []
   const gems: { x: number; y: number }[] = []
+  const hazards: HazardDef[] = []
+  const movers: MoverDef[] = []
+  const blocks: BlockDef[] = []
   let px = 0
   let py = 0
   let minY = Infinity
@@ -51,6 +90,9 @@ export function buildTemplate(t: Template): Built {
       px += p.dx
       py += p.dy
     } else if (p.t === 'gem') gems.push({ x: px + p.dx, y: py + p.dy })
+    else if (p.t === 'hazard') hazards.push(shiftHazard(p.h, px + p.dx, py + p.dy))
+    else if (p.t === 'mover') movers.push(shiftMover(p.m, px + p.dx, py + p.dy))
+    else if (p.t === 'block') blocks.push(shiftBlock(p.b, px + p.dx, py + p.dy))
     else {
       const start = arcPoint(0, 0, p.r, p.a0)
       const cx = px - start.x
@@ -63,7 +105,7 @@ export function buildTemplate(t: Template): Built {
     }
   }
   if (segs.length === 0) throw new Error(`선분이 없는 템플릿: ${t.id}`)
-  const built = { segs, gems, endX: px, endY: py, minY }
+  const built = { segs, gems, hazards, movers, blocks, endX: px, endY: py, minY }
   return t.trimFlats ? trimFlats(built) : built
 }
 
@@ -72,7 +114,7 @@ export function buildTemplate(t: Template): Built {
 function trimFlats(b: Built): Built {
   const flat = (s: Seg): boolean => !s.boost && s.y0 === s.y1
   let segs = b.segs
-  let gems = b.gems
+  let { gems, hazards, movers, blocks } = b
   let lead = 0
   let k = 0 // 앞쪽 맨 평지 선분 수
   for (; k < segs.length && flat(segs[k]) && segs[k].y0 === segs[0].y0 && (k === 0 || segs[k].x0 === segs[k - 1].x1); k++)
@@ -85,6 +127,9 @@ function trimFlats(b: Built): Built {
     const head = moved.slice(0, k).filter((s) => s.x1 > 0).map((s) => (s.x0 < 0 ? { ...s, x0: 0 } : s))
     segs = [...head, ...moved.slice(k)]
     gems = gems.map((g) => ({ x: g.x - d, y: g.y }))
+    hazards = hazards.map((h) => shiftHazard(h, -d, 0))
+    movers = movers.map((m) => shiftMover(m, -d, 0))
+    blocks = blocks.map((k) => shiftBlock(k, -d, 0))
     endX -= d
   }
   let tail = 0
@@ -108,7 +153,7 @@ function trimFlats(b: Built): Built {
     segs = out
     endX = segs[segs.length - 1].x1
   }
-  return { ...b, segs, gems, endX }
+  return { ...b, segs, gems, hazards, movers, blocks, endX }
 }
 
 // 호 시작점을 기준으로 한 원 위의 점 (보석 배치용).
