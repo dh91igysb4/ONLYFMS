@@ -7,6 +7,7 @@ import {
   type AreaId, type BagTier, type Challenge, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
+import { DEFAULT_OUTFIT, isShopItem, isWearSlot, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -185,6 +186,10 @@ export type State = {
   equipped: TackleId[]
   /** 도전과제 진행(과제 id → 진행). 배포 뒤부터 센다 */
   challenges: Record<string, ChallengeProgress>
+  /** 산 옷 `부위:id`(영구, 중복 없음). 무료·업적 품목은 넣지 않는다 (logic.version 10) */
+  wardrobe: string[]
+  /** 입은 옷. 부위마다 가진 품목 */
+  outfit: Outfit
   pending: Pending | null
 }
 export type Action =
@@ -199,6 +204,8 @@ export type Action =
   | { type: 'equip'; ids: string[] }
   | { type: 'unlockArea'; area: string }
   | { type: 'teleport'; from: string; to: string }
+  | { type: 'buyWear'; slot: string; id: string }
+  | { type: 'wear'; slot: string; id: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 export type View = Omit<State, 'pending'> & { pending: PendingView | null }
 
@@ -227,6 +234,8 @@ const init = (): State => ({
   tackles: [],
   equipped: [],
   challenges: {},
+  wardrobe: [],
+  outfit: { ...DEFAULT_OUTFIT },
   pending: null,
 })
 
@@ -384,6 +393,33 @@ function equip(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, equipped: [...ids] } }
 }
 
+// 옷 사기(설계 옷장 §5.2). 지갑이 들어오면 골드를 빼는 이 자리만 지갑으로 옮긴다(다른 낚시 구매와 같다).
+function buyWear(state: State, a: Record<string, unknown>): Out {
+  if (!isWearSlot(a.slot)) return { error: 'bad_wear' }
+  const w = wearItem(a.slot, a.id)
+  if (!w) return { error: 'bad_wear' }
+  if (w.unlock) return { error: 'not_for_sale' }
+  if (!isShopItem(w) || ownsWear(state, w.slot, w.id)) return { error: 'already_owned' }
+  if (state.gold < w.price) return { error: 'not_enough_gold' }
+  return {
+    state: {
+      ...state,
+      gold: state.gold - w.price,
+      wardrobe: [...state.wardrobe, wearKey(w.slot, w.id)],
+      outfit: { ...state.outfit, [w.slot]: w.id },
+    },
+  }
+}
+
+// 옷 입기. 성능과 무관해서 낚시 중에도 된다
+function wear(state: State, a: Record<string, unknown>): Out {
+  if (!isWearSlot(a.slot)) return { error: 'bad_wear' }
+  const w = wearItem(a.slot, a.id)
+  if (!w) return { error: 'bad_wear' }
+  if (!ownsWear(state, w.slot, w.id)) return { error: 'not_owned' }
+  return { state: { ...state, outfit: { ...state.outfit, [w.slot]: w.id } } }
+}
+
 function migrate(raw: unknown, fromVersion: number): State {
   const base = init()
   if (!isObj(raw)) return base
@@ -436,6 +472,16 @@ function migrate(raw: unknown, fromVersion: number): State {
       challenges[ch.id] = entry
     }
   }
+  // v9 이하에는 옷장이 없다. 알려진 상점 품목 키만 중복 없이. 입은 옷은 부위마다 가진 품목만, 아니면 기본값
+  const shopKeys = new Set(WEAR.filter(isShopItem).map((w) => wearKey(w.slot, w.id)))
+  const wardrobe = Array.isArray(raw.wardrobe) ? [...new Set(raw.wardrobe.filter((k): k is string => typeof k === 'string' && shopKeys.has(k)))] : []
+  const facts = { wardrobe, legends, challenges, dex }
+  const rawOutfit = isObj(raw.outfit) ? raw.outfit : {}
+  const outfit = { ...DEFAULT_OUTFIT }
+  for (const slot of WEAR_SLOTS) {
+    const id = Object.prototype.hasOwnProperty.call(rawOutfit, slot) ? rawOutfit[slot] : undefined
+    if (typeof id === 'string' && ownsWear(facts, slot, id)) outfit[slot] = id
+  }
   return {
     gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
@@ -448,6 +494,8 @@ function migrate(raw: unknown, fromVersion: number): State {
     tackles,
     equipped,
     challenges,
+    wardrobe,
+    outfit,
     pending: null,
   }
 }
@@ -470,7 +518,8 @@ function records(state: State): WorldRecord[] {
 
 export const logic: WorldLogic<State, Action, View> = {
   // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
-  version: 9,
+  // 10: 옷장(wardrobe·outfit, buyWear·wear). v9 세이브는 빈 옷장·기본 옷차림
+  version: 10,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
@@ -499,10 +548,16 @@ export const logic: WorldLogic<State, Action, View> = {
         return unlockArea(state, action)
       case 'teleport':
         return teleport(state, action)
+      case 'buyWear':
+        return buyWear(state, action)
+      case 'wear':
+        return wear(state, action)
       default:
         return { error: 'bad_action' }
     }
   },
   view: (state): View => ({ ...state, pending: state.pending && pendingView(state.pending) }),
   records,
+  // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
+  avatar: (state) => JSON.stringify(state.outfit),
 }

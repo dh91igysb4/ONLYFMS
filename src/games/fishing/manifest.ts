@@ -10,6 +10,7 @@ export const manifest: Manifest = {
   dailyTimeLimitSec: null,
   options: [],
   category: 'world',
+  avatar: { label: '낚시꾼' },
   records: [
     { key: 'total_earned', label: '누적 수익', unit: 'G' },
     { key: 'biggest', label: '최대어', unit: 'cm' },

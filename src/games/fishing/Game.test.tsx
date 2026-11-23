@@ -9,6 +9,7 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
+import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
@@ -71,7 +72,7 @@ const worldMock = vi.mocked(world)
 const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, wardrobe: [], outfit: { ...DEFAULT_OUTFIT }, pending: null, ...over }
 }
 
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }

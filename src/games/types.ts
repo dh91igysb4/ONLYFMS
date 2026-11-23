@@ -56,6 +56,8 @@ export type Manifest = {
   category?: 'solo' | 'duel' | 'world'
   /** 지속형(world) 게임이 남기는 기록 종류. key는 `WorldRecord.key`와 맞고 게임 안에서 유일하다 */
   records?: { key: string; label: string; unit?: string }[]
+  /** 지속형 게임이 프로필 요약 탭에 캐릭터를 보여 준다(`WorldLogic.avatar`·`getAvatarComponent`와 함께). label은 제목 */
+  avatar?: { label: string }
   /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
   duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
   /**
@@ -126,7 +128,15 @@ export interface WorldLogic<State, Action, View> {
   /** 브라우저에 보낼 상태 */
   view(state: State, ctx: { now: number }): View
   records(state: State): WorldRecord[]
+  /**
+   * 프로필에 그릴 캐릭터 문자열(manifest `avatar`가 있는 게임만). world 함수가 행동 뒤
+   * `game_records`의 키 `AVATAR_RECORD_KEY`(값 0, detail = 이 문자열)에 쓰고, 화면 `getAvatarComponent`가 읽는다.
+   */
+  avatar?(state: State): string
 }
+
+/** 프로필 캐릭터가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */
+export const AVATAR_RECORD_KEY = 'avatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WorldModule = { manifest: Manifest; logic: WorldLogic<any, any, any> }

@@ -198,7 +198,7 @@ State += {
 - 업적 조건 종류: `{ kind: 'challenge', id }`, `{ kind: 'allChallenges' }`, `{ kind: 'legends', count }`, `{ kind: 'areaDex' }`(어느 한 지역이라도 그 지역 어종을 모두 도감에).
 
 ### 5.2 행동
-- `{ type: 'buyWear', id }`: 상점 품목(가격 > 0, 업적 아님)만. 이미 가졌으면 `already_owned`, 업적 품목이면 `not_for_sale`, 모르는 id `bad_wear`, 골드 부족 `not_enough_gold`. 성공하면 골드를 빼고 `wardrobe`에 넣고 **그 부위에 바로 입힌다**.
+- `{ type: 'buyWear', slot, id }`: 상점 품목(가격 > 0, 업적 아님)만. 이미 가졌으면 `already_owned`, 업적 품목이면 `not_for_sale`, 모르는 id `bad_wear`, 골드 부족 `not_enough_gold`. 성공하면 골드를 빼고 `wardrobe`에 넣고 **그 부위에 바로 입힌다**.
 - `{ type: 'wear', slot, id }`: 부위가 맞고 가진 품목만. 모르는 부위·id `bad_wear`, 부위가 다르면 `bad_wear`, 안 가졌으면 `not_owned`.
 - 둘 다 낚시 중(`pending`)에도 된다(성능 영향 없음). 화면은 낚시 중 메뉴를 잠그므로 실제로는 대기 중에만 누른다.
 - 상점 위치는 서버가 보지 않는다(지금 상점 구매와 같음, 세계 설계 §8.4).
