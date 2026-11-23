@@ -381,3 +381,34 @@ describe('순간이동기(등대 신호기) 스프라이트', () => {
     expect(over).toBeGreaterThanOrEqual(24)
   })
 })
+
+describe('큰 지도 표시 스프라이트', () => {
+  const NAMES = ['map-you', 'map-spot', 'map-exit', 'map-gate', 'map-dock', 'map-shop', 'map-teleporter']
+  it('7개가 9×9이고 서로 다르다', () => {
+    for (const n of NAMES) {
+      expect(SPRITES[n], n).toBeDefined()
+      expect([SPRITES[n].w, SPRITES[n].h], n).toEqual([9, 9])
+      for (const row of SPRITES[n].rows) expect(row, n).toHaveLength(9)
+    }
+    expect(new Set(NAMES.map((n) => SPRITES[n].rows.join('/'))).size).toBe(NAMES.length)
+  })
+  it('겉 테두리(투명·바깥과 닿는 칸)의 절반 이상이 어두운 외곽선', () => {
+    const dark = (hex: string) => {
+      const v = parseInt(hex.slice(1, 7), 16)
+      return ((v >> 16) & 255) + ((v >> 8) & 255) + (v & 255) < 200
+    }
+    for (const n of NAMES) {
+      const sp = SPRITES[n]
+      const opaque = (x: number, y: number) => x >= 0 && y >= 0 && x < sp.w && y < sp.h && sp.rows[y][x] !== '.'
+      let edge = 0
+      let inked = 0
+      for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) {
+        if (!opaque(x, y)) continue
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => opaque(x + dx, y + dy))) continue
+        edge++
+        if (dark(sp.palette[sp.rows[y][x]])) inked++
+      }
+      expect(inked / edge, n).toBeGreaterThanOrEqual(0.5)
+    }
+  })
+})
