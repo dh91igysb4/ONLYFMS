@@ -14,6 +14,7 @@ import {
   GROUND_TOL,
   GEM_R,
   HEAD_OFFSET,
+  BODY_R,
   HEAD_R,
   LAND_GRACE,
   PERFECT_MULT,
@@ -33,6 +34,8 @@ import {
 import { collideWheel, divRound, divTrunc, hitsCircle, nearestCand, windowCands } from './collide.ts'
 import type { Body, Cand } from './collide.ts'
 import type { Course } from './course.ts'
+import { hazardHit } from './hazards.ts'
+import { subtick } from './motion.ts'
 import { TURN, angDiff, atan2T, cosT, isqrt, sinT } from './trig.ts'
 
 export type Wheel = { x: number; y: number; px: number; py: number; ground: boolean } // px,py는 직전 위치(Verlet)
@@ -298,6 +301,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   gravity(r) // ②
   gravity(f)
 
+  const hazards = course.hazardsNear(box) // 틱마다 한 번만 가져오고, 이동 단계마다 그 시각으로 확인한다
   let crashed = false
   for (let k = 0; k < SUBSTEPS && !crashed; k++) {
     // ② 이동을 SUBSTEPS번으로 나눈다. 속도가 그대로면 나눈 이동의 합이 정확히 속도와 같다.
@@ -316,6 +320,24 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     // ⑤ 차체 판정원(이동 단계마다 확인해 빠른 회전에서도 놓치지 않는다).
     const h = headOf(r, f)
     if (hitsCircle(h.x, h.y, HEAD_R, cands)) crashed = true
+    // ⑤' 위험물: 바퀴 둘·차체 판정원·차대 캡슐을 그 이동 단계의 시각으로 확인한다.
+    if (!crashed && hazards.length > 0) {
+      const probe = {
+        circles: [
+          { x: r.x, y: r.y, r: WHEEL_R },
+          { x: f.x, y: f.y, r: WHEEL_R },
+          { x: h.x, y: h.y, r: HEAD_R },
+        ],
+        capsule: { x0: r.x, y0: r.y, x1: f.x, y1: f.y, r: BODY_R },
+      }
+      const T = subtick(s.tick, k)
+      for (const z of hazards) {
+        if (hazardHit(z, T, probe)) {
+          crashed = true
+          break
+        }
+      }
+    }
   }
 
   // ④ 진행 번호: 이번 틱에 닿은 선분 중 가장 큰 번호. 공중이면 그대로.

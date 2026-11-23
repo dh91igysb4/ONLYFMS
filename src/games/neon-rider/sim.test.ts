@@ -26,6 +26,8 @@ import { courseFromTemplates, courseOf } from './course.ts'
 import type { Course } from './course.ts'
 import { TEMPLATES } from './pieces.ts'
 import type { Template } from './pieces.ts'
+import type { HazardDef } from './hazards.ts'
+import type { Motion } from './motion.ts'
 import { bodyAngle, flipsOf, initSim, initSimAt, scoreOf, step } from './sim.ts'
 import type { SimState, Wheel } from './sim.ts'
 import { TRIG_ONE, TURN, angDiff, cosT, isqrt, sinT } from './trig.ts'
@@ -647,5 +649,74 @@ describe('공중제비 수: 거꾸로 선 자세를 지난 횟수 (flipsOf)', ()
     expect(first).not.toBeNull()
     expect(Math.abs(first!.air - first!.angle)).toBeLessThan(D(8)) // 시작 기울기 + 한 틱 회전
     expect(first!.angle).toBeGreaterThan(D(20))
+  })
+})
+
+describe('위험물 판정', () => {
+  const still: Motion = { k: 'none' }
+  // 평지 위, 출발점에서 dx 앞에 놓은 위험물 하나짜리 코스.
+  const withHazard = (h: HazardDef, dx = mm(20000)): Course =>
+    courseFromTemplates([{ id: 'hz', tier: 1, prims: [{ t: 'hazard', dx, dy: 0, h }, { t: 'line', dx: mm(400000), dy: 0 }] }])
+  const drive = (c: Course, ticks = 200): SimState => run(initSimAt(c, TPL_X, V_MAX), ticks, () => true, c)
+
+  it('위험물이 없는 평지는 그대로 달린다', () => {
+    const c = courseFromTemplates([flatT])
+    expect(drive(c).dead).toBeNull()
+  })
+
+  it('제자리 톱니로 달려가면 crash (지급 대기 없이)', () => {
+    const c = withHazard({ shape: { s: 'disc', x: 0, y: mm(100), r: mm(300) }, motion: still, look: 'saw' })
+    const s = drive(c)
+    expect(s.dead).toBe('crash')
+    expect(s.pending).toBeNull()
+  })
+
+  it('원형 배럴: 틈이 있어 시작 위상에 따라 살아 지나가기도, crash하기도 한다', () => {
+    const outcomes = new Set<string | null>()
+    for (let a0 = 0; a0 < TURN; a0 += 256) {
+      const c = withHazard({
+        shape: { s: 'blades', x: 0, y: mm(500), rIn: mm(1500), rOut: mm(3000), n: 1, w: TURN / 8 },
+        motion: { k: 'rotate', a0, w: 20 },
+        look: 'blades',
+      })
+      outcomes.add(drive(c).dead)
+    }
+    expect(outcomes.has('crash')).toBe(true)
+    expect(outcomes.has(null)).toBe(true)
+  })
+
+  it('pop 창: 숨은 위상에 지나가면 살고, 솟은 위상에 지나가면 crash', () => {
+    const pop = (phase: number): HazardDef => ({
+      shape: { s: 'bar', x0: 0, y0: 0, x1: 0, y1: 0, r: mm(300) },
+      motion: { k: 'pop', period: 60, phase, hide: 20, rise: 10, up: 20, fall: 10, height: mm(1500) },
+      look: 'spear',
+    })
+    const results: (string | null)[] = []
+    for (let phase = 0; phase < 60; phase += 5) results.push(drive(withHazard(pop(phase))).dead)
+    expect(results).toContain('crash')
+    expect(results).toContain(null)
+    // 같은 phase는 같은 결과(결정성).
+    expect(drive(withHazard(pop(0))).dead).toBe(results[0])
+  })
+
+  it('두 바퀴 사이로 들어온 가는 레이저는 차대 캡슐에 걸려 crash', () => {
+    // 바퀴(반지름 180 mm)와 차체 판정원(중점 위 200 mm, 반지름 180 mm) 어디에도 닿지 않고 차대(반지름 110 mm)에만 닿는 점.
+    const base = initSimAt(courseFromTemplates([flatT]), TPL_X, 0)
+    const mx = Math.floor((base.rear.x + base.front.x) / 2)
+    const my = base.rear.y
+    const laser = (y: number): HazardDef => ({ shape: { s: 'bar', x0: 0, y0: y, x1: mm(10), y1: y, r: mm(10) }, motion: still, look: 'laser' })
+    const probe = (y: number): SimState => {
+      const c = courseFromTemplates([{ id: 'lz', tier: 1, prims: [{ t: 'hazard', dx: mx - TPL_X, dy: y, h: laser(0) }, { t: 'line', dx: mm(400000), dy: 0 }] }])
+      return step(initSimAt(c, TPL_X, 0), false, c)
+    }
+    expect(probe(my + mm(100)).dead).toBe('crash') // 차대 위쪽 가장자리 안
+    expect(probe(my - mm(400)).dead).toBeNull() // 차대 아래, 땅 속
+  })
+
+  it('같은 입력 600틱은 같은 결과(JSON)', () => {
+    const c = withHazard({ shape: { s: 'disc', x: 0, y: mm(100), r: mm(300) }, motion: { k: 'swing', ax: 0, ay: mm(2000), period: 90, phase: 0 }, look: 'saw' }, mm(60000))
+    const a = JSON.stringify(run(initSimAt(c, TPL_X, V_MAX), 600, () => true, c))
+    const b = JSON.stringify(run(initSimAt(c, TPL_X, V_MAX), 600, () => true, c))
+    expect(a).toBe(b)
   })
 })
