@@ -330,6 +330,39 @@ describe('fishing Game', () => {
     expect(screen.getByText('0/20')).toBeInTheDocument()
   })
 
+  test('가방: 물고기 칸을 누르면 lock을 보내고, 응답 뒤 잠금 표시가 바뀐다', async () => {
+    const fish = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const view = makeView({ bag: [fish] })
+    await mount(view)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    route({
+      lock: (b) => ok({ ...view, bag: [b.action === 'act' && b.payload.locked ? { ...fish, locked: true as const } : fish] }),
+    })
+    const cell = () => within(screen.getByRole('region', { name: '가방' })).getByRole('button', { name: /멸치 10cm/ })
+    expect(cell()).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(cell())
+    await flush()
+    expect(calls('lock')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: true } }])
+    expect(cell()).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(cell())
+    await flush()
+    expect(calls('lock')[1]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: false } })
+    expect(cell()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('상점: 잠긴 물고기는 마릿수·예상 금액에서 빠지고, 전부 잠겨 있으면 팔기 버튼이 꺼진다', async () => {
+    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const grouper = { species: 'grouper', sizeCm: 120, perfect: false, locked: true as const }
+    const { unmount } = await mountAtShop(makeView({ bag: [anchovy, grouper] }))
+    const value = price('anchovy', 10, false).toLocaleString('ko-KR')
+    expect(screen.getByText(`팔 물고기 1마리 · 잠금 1마리 · 예상 ${value} G`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeEnabled()
+    unmount()
+    await mountAtShop(makeView({ bag: [grouper] }))
+    expect(screen.getByText('팔 물고기 0마리 · 잠금 1마리 · 예상 0 G')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeDisabled()
+  })
+
   test('shop: buy button disabled when gold is short; enabled and calls buyRod when enough', async () => {
     const { unmount } = await mountAtShop(makeView({ gold: 1000 }))
     const rods = screen.getByRole('list', { name: '낚싯대 목록' })
