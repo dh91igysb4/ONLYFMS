@@ -282,11 +282,12 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
     expect(mixed).toBeGreaterThan(smooth)
   })
 
-  it('mixed는 변경 전 구현과 같은 궤적이다 (골든: seed 11, 60초)', () => {
-    // 행동 유형 도입 전 minigame.ts(589b409)로 구한 값
+  it('mixed 궤적 골든 (seed 11, 60초)', () => {
+    // 6단계 마무리에서 목표를 바닥 floor(= 바 크기 × 0.8) 위로 옮긴 뒤 구한 값.
+    // 그 전(589b409 ~ 4dc92c8)은 1897.822500257715 / 3750, 35.29450431521198 (목표 범위 0~1)
     const { mean, move } = sim('mixed', 11)
-    expect(mean).toBeCloseTo(1897.822500257715 / 3750, 9)
-    expect(move).toBeCloseTo(35.29450431521198, 9)
+    expect(mean).toBeCloseTo(2162.059748733822 / 3750, 9)
+    expect(move).toBeCloseTo(34.864400795472264, 9)
   })
 
   it('모든 유형에서 위치가 [0, 1] 안에 머문다', () => {
@@ -360,5 +361,43 @@ describe('barParams: 더 새 서버가 준 모르는 값', () => {
     const p = barParams('goby', 9 as never)
     expect(p.barSize).toBeCloseTo(0.22)
     expect(p.difficulty).toBe(SPECIES.find((s) => s.id === 'goby')!.difficulty)
+  })
+})
+
+describe('어떤 유형도 안 누르면 잡히지 않는다', () => {
+  it('모든 어종 × 낚을 수 있는 모든 낚싯대(1~6) × 코르크 있음/없음, 60초 안 누르면 잡히는 비율 ≤ 5% (시드 40개)', () => {
+    const worst: Record<string, number> = {}
+    for (const s of SPECIES) {
+      for (const r of RODS) {
+        if (r.tier < s.minRod) continue
+        for (const eq of [[], ['cork']] as const) {
+          const params = barParams(s.id, r.tier, eq)
+          let caught = 0
+          for (let n = 0; n < 40; n++) {
+            const rng = seeded(500 + n)
+            let bar = initBar()
+            for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, false, 16, params, rng)
+            if (barResult(bar) === 'caught') caught++
+          }
+          worst[s.behavior] = Math.max(worst[s.behavior] ?? 0, caught / 40)
+          expect(caught / 40, `${s.id} rod ${r.tier} ${eq.join()}`).toBeLessThanOrEqual(0.05)
+        }
+      }
+    }
+    expect(Object.keys(worst).sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth'])
+  })
+
+  it('따라가면 쉬운 물고기는 여전히 잘 잡힌다(유형마다, 2단계)', () => {
+    for (const id of ['goby', 'carp', 'anchovy', 'pufferfish', 'rockfish']) {
+      let caught = 0
+      for (let n = 0; n < 20; n++) {
+        const rng = seeded(700 + n)
+        const params = barParams(id, 2)
+        let bar = initBar()
+        for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, bar.fishPos > bar.barPos, 16, params, rng)
+        if (barResult(bar) === 'caught') caught++
+      }
+      expect(caught, id).toBeGreaterThanOrEqual(18)
+    }
   })
 })

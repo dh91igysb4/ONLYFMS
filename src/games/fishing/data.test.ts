@@ -80,7 +80,7 @@ describe('fishing data', () => {
       expect(Object.keys(r.weights).sort()).toEqual(['common', 'rare', 'uncommon'])
       expect(Object.values(r.weights).reduce((a, b) => a + b)).toBe(100)
     }
-    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000, 600_000, 1_300_000])
+    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000, 280_000, 620_000])
   })
 })
 

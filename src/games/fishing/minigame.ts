@@ -40,6 +40,9 @@ const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
 // sinker: 새 목표는 손을 놓아 바닥에 붙은 바 바로 위(barSize + GAP ~ + GAP + SPAN). 트랙 아래쪽에 머물지만
 // 쉬는 바에는 들어오지 않아, 살살 눌러 받쳐야 잡힌다(예전에는 0~0.45라 안 눌러도 잡혔다).
 const SINKER_GAP = 0.03
+// mixed·smooth·dart: 새 목표의 바닥 = 바 크기 × FLOOR_FRAC. 바닥에 붙은 바 깊숙이 머물지 않아 안 눌러도 잡히지 않는다
+// (큰 바 0.41에서 예전에는 smooth 46%·mixed 30%·dart 12%가 안 눌러 잡혔다, minigame.test)
+const FLOOR_FRAC = 0.8
 const SINKER_SPAN = 0.27
 // 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
 // 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
@@ -70,22 +73,24 @@ export function barParams(speciesId: string, rodTier: RodTier, equipped: readonl
 // 유형별 새 목표. rng는 한 번만 부른다(mixed는 예전과 같은 난수열).
 function pickTarget(behavior: Behavior, fishPos: number, barSize: number, rng: () => number): number {
   const r = rng()
+  // 손을 놓아 바닥에 붙은 바가 덮는 칸([0, barSize])보다 깊이(FLOOR_FRAC) 내려가지 않는다. 안 눌러도 잡히는 일을 막는다
+  const floor = barSize * FLOOR_FRAC
   switch (behavior) {
     case 'floater':
       return FLOATER_MIN + (1 - FLOATER_MIN) * r
     case 'sinker':
       return Math.min(1, barSize + SINKER_GAP + SINKER_SPAN * r)
     case 'dart': {
-      // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간을 이어 붙여 고른다
-      const below = Math.max(0, fishPos - DART_MIN_JUMP)
-      const aboveLen = Math.max(0, 1 - (fishPos + DART_MIN_JUMP))
+      // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간(바닥 floor 위)을 이어 붙여 고른다
+      const below = Math.max(0, fishPos - DART_MIN_JUMP - floor)
+      const aboveLen = Math.max(0, 1 - Math.max(floor, fishPos + DART_MIN_JUMP))
       const total = below + aboveLen
-      if (total <= 0) return r
+      if (total <= 0) return floor + (1 - floor) * r
       const x = r * total
-      return x < below ? x : fishPos + DART_MIN_JUMP + (x - below)
+      return x < below ? floor + x : Math.max(floor, fishPos + DART_MIN_JUMP) + (x - below)
     }
     default:
-      return r
+      return floor + (1 - floor) * r
   }
 }
 

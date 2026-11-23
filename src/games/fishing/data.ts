@@ -146,8 +146,8 @@ export const RODS: Rod[] = [
   { tier: 3, name: '카본 낚싯대', price: 8000, barBonus: 0.3, biteScale: 1, weights: { common: 50, uncommon: 34, rare: 16 } },
   { tier: 4, name: '명장의 낚싯대', price: 40000, barBonus: 0.45, biteScale: 0.8, weights: { common: 46, uncommon: 34, rare: 20 } },
   // 고급 장비(6단계 마무리): 어떤 어종에도 필요 없고, 버는 속도만 조금씩 올린다(효과는 갈수록 작게)
-  { tier: 5, name: '별빛 낚싯대', price: 600000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
-  { tier: 6, name: '용왕의 낚싯대', price: 1300000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
+  { tier: 5, name: '별빛 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
+  { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]
 
 /** 지역·자리·계절·시간·날씨·낚싯대 조건을 모두 만족하는가. legend.power는 보지 않는다. */
@@ -170,8 +170,8 @@ export const BAGS: readonly { tier: BagTier; size: number; price: number }[] = [
   { tier: 2, size: 30, price: 800 },
   { tier: 3, size: 40, price: 5000 },
   // 고급 가방(6단계 마무리)
-  { tier: 4, size: 50, price: 100000 },
-  { tier: 5, size: 60, price: 200000 },
+  { tier: 4, size: 50, price: 50000 },
+  { tier: 5, size: 60, price: 100000 },
 ]
 /** 모르는 tier는 기본 가방(20칸) */
 export function bagSize(tier: number): number {

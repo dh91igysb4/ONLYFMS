@@ -431,10 +431,10 @@ describe('fishing WorldLogic', () => {
     expect(err(logic.apply(max, { type: 'buyBag', tier: 6 }, ctx()))).toBe('bad_tier')
   })
 
-  it('고급 가방: 3 → 4(50칸, 100,000), 4 → 5(60칸, 200,000)', () => {
-    expect(err(logic.apply(fresh({ gold: 99_999, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx()))).toBe('not_enough_gold')
-    expect(ok(logic.apply(fresh({ gold: 100_000, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
-    expect(ok(logic.apply(fresh({ gold: 200_000, bagTier: 4 }), { type: 'buyBag', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
+  it('고급 가방: 3 → 4(50칸, 50,000), 4 → 5(60칸, 100,000)', () => {
+    expect(err(logic.apply(fresh({ gold: 49_999, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(logic.apply(fresh({ gold: 50_000, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
+    expect(ok(logic.apply(fresh({ gold: 100_000, bagTier: 4 }), { type: 'buyBag', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
     // 60칸이면 60마리째까지 던지고 61번째는 bag_full
     const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
     expect('state' in logic.apply(fresh({ bagTier: 5, bag: fish(59) }), { type: 'cast', area: 'village', power: 0.5 }, ctx())).toBe(true)
@@ -447,7 +447,7 @@ describe('fishing WorldLogic', () => {
       expect(ok(logic.apply(fresh({ bagTier: 2, bag: fish(n) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBeTruthy()
     }
     expect(err(logic.apply(fresh({ bagTier: 2, bag: fish(30) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
-    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000], [50, 100_000], [60, 200_000]])
+    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000], [50, 50_000], [60, 100_000]])
     expect(bagSize(99)).toBe(20)
   })
 
@@ -693,10 +693,10 @@ describe('fishing WorldLogic', () => {
     }
   })
 
-  it('고급 낚싯대: 4 → 5(600,000), 5 → 6(1,300,000), 6에서 더 없음', () => {
-    expect(err(logic.apply(fresh({ gold: 599_999, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx()))).toBe('not_enough_gold')
-    expect(ok(logic.apply(fresh({ gold: 600_000, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 5 })
-    expect(ok(logic.apply(fresh({ gold: 1_300_000, rodTier: 5 }), { type: 'buyRod', tier: 6 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 6 })
+  it('고급 낚싯대: 4 → 5(280,000), 5 → 6(620,000), 6에서 더 없음', () => {
+    expect(err(logic.apply(fresh({ gold: 279_999, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(logic.apply(fresh({ gold: 280_000, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 5 })
+    expect(ok(logic.apply(fresh({ gold: 620_000, rodTier: 5 }), { type: 'buyRod', tier: 6 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 6 })
     expect(err(logic.apply(fresh({ gold: 1e9, rodTier: 6 }), { type: 'buyRod', tier: 7 }, ctx()))).toBe('bad_tier')
   })
 
