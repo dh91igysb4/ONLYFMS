@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom'
 import { ApiError, errorMessage } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import { syncServerTime } from './clock.ts'
-import { listContests, type ContestRow } from './data.ts'
+import { getEntryCounts, listContests, type ContestRow } from './data.ts'
+import { feeOf } from './fee.ts'
+import { formatGold } from '../wallet/format.ts'
+import '../wallet/wallet.css'
 import { kindLabel, kstLabel, phaseOf } from './format.ts'
 
-function Section({ title, rows, empty }: { title: string; rows: ContestRow[]; empty: string }) {
+function Section({ title, rows, empty, counts }: { title: string; rows: ContestRow[]; empty: string; counts: Map<string, number> }) {
   return (
     <section className="stack" aria-label={title}>
       <h3 className="section-title">{title}</h3>
@@ -19,6 +22,12 @@ function Section({ title, rows, empty }: { title: string; rows: ContestRow[]; em
           </div>
           <strong className="card-title">{c.title}</strong>
           <span className="muted">{kstLabel(c.starts_at)}</span>
+          {feeOf(c) > 0 && (
+            <span className="contest-fee">
+              참가비 <strong>{formatGold(feeOf(c))}</strong>
+              {counts.has(c.id) && <> · 모인 돈 <strong>{formatGold(feeOf(c) * counts.get(c.id)!)}</strong></>}
+            </span>
+          )}
         </Link>
       ))}
     </section>
@@ -29,6 +38,7 @@ export function ContestListPage() {
   const [rows, setRows] = useState<ContestRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [counts, setCounts] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -37,6 +47,12 @@ export function ContestListPage() {
       await syncServerTime()
       const r = await listContests(now())
       if (alive) setRows(r)
+      // 참가비 대회만 참가자 수를 읽어 모인 돈을 보인다(실패해도 목록은 그대로)
+      const feeIds = r.filter((c) => feeOf(c) > 0 && !c.cancelled_at).map((c) => c.id)
+      if (feeIds.length > 0) {
+        const m = await getEntryCounts(feeIds)
+        if (alive) setCounts(m)
+      }
     })().catch((e) => { if (alive) setError(errorMessage(e instanceof ApiError ? e.code : 'network')) })
     return () => { alive = false }
   }, [attempt])
@@ -62,9 +78,9 @@ export function ContestListPage() {
       {!error && rows === null && <p className="page-note" role="status">불러오는 중…</p>}
       {rows && (
         <div className="split split-3">
-          <Section title="진행 중" rows={live} empty="진행 중인 대회가 없어요" />
-          <Section title="예정" rows={upcoming} empty="예정된 대회가 없어요" />
-          <Section title="종료" rows={ended} empty="최근 30일 안에 끝난 대회가 없어요" />
+          <Section title="진행 중" rows={live} counts={counts} empty="진행 중인 대회가 없어요" />
+          <Section title="예정" rows={upcoming} counts={counts} empty="예정된 대회가 없어요" />
+          <Section title="종료" rows={ended} counts={counts} empty="최근 30일 안에 끝난 대회가 없어요" />
         </div>
       )}
     </div>

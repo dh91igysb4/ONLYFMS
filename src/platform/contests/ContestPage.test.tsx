@@ -35,6 +35,7 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
 }))
 
 import { resetServerTime } from '../../lib/serverTime.ts'
+import { setBalance } from '../../lib/walletStore.ts'
 import { ContestPage } from './ContestPage.tsx'
 import { ContestItemPage } from './ContestItemPage.tsx'
 
@@ -86,6 +87,7 @@ beforeEach(() => {
   Object.values(dataMock).forEach((m) => m.mockReset())
   admin = false
   wallet.enabled = true
+  setBalance(100000)
   serverOffset = 0
   resetServerTime()
 })
@@ -368,4 +370,99 @@ test('ended_daily_settled_at_unreadable_does_not_settle', async () => {
   expect(await screen.findByText('kane')).toBeInTheDocument()
   await vi.waitFor(() => expect(dataMock.getSettledAt).toHaveBeenCalled())
   expect(calls).not.toContain('my_wallet')
+})
+
+// ---------------------------------------------------------------- 참가비 (지갑 5단계)
+test('참가비 대회 대기실: 참가비·모인 돈, 확인 뒤 "참가비 N G 내고 참가"가 p_entry_fee를 보낸다', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
+  setup({ entries: ['u9', 'u2'] })
+  renderAt()
+  expect(await screen.findByText(/모인 돈/)).toHaveTextContent('참가비 1,000 G · 모인 돈 2,000 G')
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  // 첫 클릭은 확인 단계
+  expect(screen.getByText(/참가비 1,000 G를 내고 참가할까요/)).toBeInTheDocument()
+  expect(calls).not.toContain('join_contest')
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  await vi.waitFor(() => expect(rpcMock).toHaveBeenCalledWith('join_contest', { p_id: 'c1', p_entry_fee: 1000 }))
+  await vi.waitFor(() => expect(screen.getByText(/모인 돈/)).toHaveTextContent('모인 돈 3,000 G'))
+  expect(calls).toContain('my_wallet') // 참가 뒤 잔액 다시 읽기
+})
+
+test('잔액이 참가비보다 적으면 참가 버튼이 막히고 "골드가 부족해요"', async () => {
+  setBalance(500)
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
+  setup({ entries: ['u9'] })
+  renderAt()
+  expect(await screen.findByRole('button', { name: '참가비 1,000 G 내고 참가' })).toBeDisabled()
+  expect(screen.getByText(/골드가 부족해요/)).toBeInTheDocument()
+})
+
+test('진행 중인 공개 참가비 대회는 자동 참가하지 않고 버튼을 보인다', async () => {
+  dataMock.getContest.mockResolvedValue(
+    contest({ entry_fee: 500, starts_at: iso(sNow() - 10 * MIN), ends_at: iso(sNow() + 50 * MIN) }),
+  )
+  setup({ entries: [] })
+  renderAt()
+  expect(await screen.findByRole('button', { name: '참가비 500 G 내고 참가' })).toBeInTheDocument()
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+  expect(calls).not.toContain('join_contest')
+})
+
+test('fee_mismatch면 대회를 다시 읽고 안내한다', async () => {
+  const { ApiError } = await import('../../lib/api.ts')
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
+  setup({ entries: ['u9'] })
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'join_contest') throw new ApiError('fee_mismatch', 400, { details: '2000' })
+    return null
+  })
+  renderAt()
+  fireEvent.click(await screen.findByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  expect(await screen.findByText('참가비를 다시 확인해 주세요')).toBeInTheDocument()
+  await vi.waitFor(() => expect(dataMock.getContest.mock.calls.length).toBeGreaterThan(1))
+})
+
+test('참가비 0 대회는 지금처럼 "참가" 한 번', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 0 }))
+  setup({ entries: [] })
+  renderAt()
+  fireEvent.click(await screen.findByRole('button', { name: '참가' }))
+  await vi.waitFor(() => expect(rpcMock).toHaveBeenCalledWith('join_contest', { p_id: 'c1' }))
+  expect(screen.queryByText(/참가비/)).toBeNull()
+})
+
+test('취소된 참가비 대회에 참가했으면 "참가비를 돌려받았어요"', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000, cancelled_at: iso(sNow() - MIN) }))
+  setup({ entries: ['u1'] })
+  renderAt()
+  expect(await screen.findByText('참가비를 돌려받았어요')).toBeInTheDocument()
+})
+
+test('끝난 참가비 대회: 모인 돈·상금 열·내 상금, 정산 전이면 my_wallet로 정산', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000, starts_at: iso(sNow() - 120 * MIN), ends_at: iso(sNow() - 60 * MIN) }))
+  setupPrizes([[], [
+    { user_id: 'u1', handle: 'kane', amount: 2000, note: '1등' },
+  ]])
+  renderAt()
+  expect(await screen.findByText('내 상금 +2,000 G (1등)')).toBeInTheDocument()
+  expect(screen.getByText(/모인 돈/)).toHaveTextContent('참가비 1,000 G · 모인 돈 2,000 G')
+  expect(screen.getByRole('columnheader', { name: '상금' })).toBeInTheDocument()
+  expect(calls.filter((c) => c === 'my_wallet')).toHaveLength(1)
+})
+
+test('끝난 참가비 대회에서 순위(행동 1번 이상)에 든 사람이 없으면 "참가비를 돌려받았어요"', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000, starts_at: iso(sNow() - 120 * MIN), ends_at: iso(sNow() - 60 * MIN) }))
+  setupPrizes([[]], '2026-11-24T00:00:00Z')
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'lb_contest') return [{ rank: 1, user_id: 'u1', handle: 'kane', score: 0, solved_items: 0, action_count: 0, last_finished_at: null }]
+    if (name === 'contest_prizes') return []
+    return null
+  })
+  renderAt()
+  expect(await screen.findByText('순위에 든 사람이 없어 참가비를 돌려받았어요')).toBeInTheDocument()
 })

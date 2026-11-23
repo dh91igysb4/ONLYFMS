@@ -31,6 +31,12 @@ test('rpc P0001 -> code = message', async () => {
   expect([e.code, e.status]).toEqual(['handle_taken', 400])
 })
 
+test('rpc P0001 DETAIL -> body.details (fee_mismatch의 지금 참가비)', async () => {
+  rpcMock.mockResolvedValue({ data: null, error: { message: 'fee_mismatch', code: 'P0001', details: '700' } })
+  const e = await err(rpc('join_by_invite_code', { p_code: 'x' }))
+  expect([e.code, e.body]).toEqual(['fee_mismatch', { details: '700' }])
+})
+
 test('rpc fetch-failure shape -> network/0', async () => {
   rpcMock.mockResolvedValue({ data: null, error: { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' } })
   const e = await err(rpc('my_profile'))

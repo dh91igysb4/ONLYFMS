@@ -99,6 +99,10 @@ const MESSAGES: Record<string, string> = {
   not_player: '참가한 대국이 아니에요',
   not_found: '없는 대국이에요',
   not_enough_gold: '골드가 부족해요',
+  fee_invalid: '참가비를 0~41,000 G로 적어 주세요',
+  fee_not_allowed: '숨김 게임이 든 대회는 참가비를 받을 수 없어요',
+  fee_mismatch: '참가비를 확인하고 대회 페이지에서 다시 참가해 주세요',
+  fee_immutable: '참가비는 만든 뒤 바꿀 수 없어요',
 }
 
 export function errorMessage(code: string): string {
@@ -141,16 +145,17 @@ function notifyDenied(e: ApiError): ApiError {
 
 const NETWORK_RE = /Failed to fetch|NetworkError|Load failed|fetch failed/i
 
-function rpcError(e: { message: string; code?: string; status?: number }): ApiError {
+function rpcError(e: { message: string; code?: string; status?: number; details?: string | null }): ApiError {
   // supabase.rpc는 fetch 실패를 throw하지 않고 code 없는 error로 돌려준다.
   if (!e.code || e.status === 0 || NETWORK_RE.test(e.message)) return new ApiError('network', 0)
-  if (e.code === 'P0001') return new ApiError(e.message, 400)
+  // DETAIL은 body.details로 넘긴다 (fee_mismatch가 지금 참가비를 싣는다)
+  if (e.code === 'P0001') return new ApiError(e.message, 400, e.details ? { details: e.details } : undefined)
   if (e.code === '42501') return new ApiError('forbidden', 403)
   return new ApiError('unknown', 400)
 }
 
 export async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
-  let res: { data: unknown; error: { message: string; code?: string } | null }
+  let res: { data: unknown; error: { message: string; code?: string; details?: string | null } | null }
   try {
     res = (await supabase.rpc(name, args)) as typeof res
   } catch {

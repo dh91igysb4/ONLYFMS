@@ -60,3 +60,6 @@
 .stake-won { color: var(--win-text); }
 .stake-lost { color: var(--lose-text); }
 .stake-confirm { display: flex; flex-direction: column; gap: 10px; }
+/* 대회 참가비 (지갑 5단계) */
+.contest-fee { margin: 0; }
+.contest-fee strong { color: var(--accent-strong); font-variant-numeric: tabular-nums; }

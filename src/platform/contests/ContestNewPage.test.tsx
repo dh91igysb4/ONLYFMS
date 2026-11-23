@@ -11,13 +11,16 @@ vi.mock('../../lib/api.ts', async (orig) => ({
   ...(await orig<typeof import('../../lib/api.ts')>()),
   rpc: (...a: unknown[]) => rpcMock(...a),
 }))
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
 
+import { setBalance } from '../../lib/walletStore.ts'
 import { ContestNewPage } from './ContestNewPage.tsx'
 
-beforeEach(() => { rpcMock.mockReset(); admin = false })
+beforeEach(() => { rpcMock.mockReset(); admin = false; wallet.enabled = true; setBalance(100000) })
 
 test('official checkbox is admin only', () => {
   render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
@@ -75,4 +78,57 @@ test('start time is read as KST even when the browser is not in KST', async () =
   expect(Date.parse(args.p_starts_at) - Date.now()).toBeGreaterThan(115 * 60_000)
   expect(Date.parse(args.p_starts_at) - Date.now()).toBeLessThan(125 * 60_000)
   expect(rpcMock).toHaveBeenCalledWith('server_now')
+})
+
+// ---------------------------------------------------------------- 참가비 (지갑 5단계)
+test('참가비 입력: 1,000을 고르면 버튼이 "참가비 1,000 G 내고 만들기"이고 p_entry_fee를 보낸다', async () => {
+  rpcMock.mockImplementation(async (name: string) => (name === 'create_contest' ? [{ id: 'c1', invite_code: null }] : null))
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  expect(screen.getByText(/모인 참가비를 1~3등이 6:3:1로 나눠 가져요/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('제목'), { target: { value: '참가비 대회' } })
+  fireEvent.click(screen.getByRole('button', { name: '1,000 G' }))
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 만들기' }))
+  await screen.findByText('대회를 만들었어요')
+  expect(rpcMock).toHaveBeenCalledWith('create_contest', expect.objectContaining({ p_entry_fee: 1000 }))
+})
+
+test('참가비 0이면 p_entry_fee를 보내지 않는다(옛 DB 호환)', async () => {
+  rpcMock.mockImplementation(async (name: string) => (name === 'create_contest' ? [{ id: 'c1', invite_code: null }] : null))
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  fireEvent.change(screen.getByLabelText('제목'), { target: { value: '무료 대회' } })
+  fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }))
+  await screen.findByText('대회를 만들었어요')
+  const args = rpcMock.mock.calls.find((c) => c[0] === 'create_contest')![1] as Record<string, unknown>
+  expect('p_entry_fee' in args).toBe(false)
+})
+
+test('잔액보다 큰 참가비는 "골드가 부족해요"이고 만들기 버튼이 막힌다', () => {
+  setBalance(500)
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  fireEvent.change(screen.getByLabelText('참가비'), { target: { value: '1000' } })
+  expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '참가비 1,000 G 내고 만들기' })).toBeDisabled()
+})
+
+test('상한을 넘는 참가비 문구', () => {
+  setBalance(100000)
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  fireEvent.change(screen.getByLabelText('참가비'), { target: { value: '41001' } })
+  expect(screen.getByText('참가비는 41,000 G까지예요')).toBeInTheDocument()
+})
+
+test('서버의 not_enough_gold는 참가비 칸에 보인다', async () => {
+  const { ApiError } = await import('../../lib/api.ts')
+  rpcMock.mockRejectedValue(new ApiError('not_enough_gold', 400))
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  fireEvent.change(screen.getByLabelText('제목'), { target: { value: '참가비 대회' } })
+  fireEvent.click(screen.getByRole('button', { name: '500 G' }))
+  fireEvent.click(screen.getByRole('button', { name: '참가비 500 G 내고 만들기' }))
+  expect(await screen.findByText('골드가 부족해요')).toBeInTheDocument()
+})
+
+test('지갑 게임이 없으면 참가비 입력이 없다', () => {
+  wallet.enabled = false
+  render(<MemoryRouter><ContestNewPage /></MemoryRouter>)
+  expect(screen.queryByLabelText('참가비')).toBeNull()
 })
