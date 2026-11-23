@@ -395,6 +395,31 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
 - 확인 쿼리: 끝난 대국의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'duel\_%' and l.ref in (select id::text from duel_matches where status in ('finished','void')) group by 1 having sum(l.delta) <> 0;`(0행. 진 사람 계정이 지워진 대국만 예외로 나올 수 있다 — 그 사람 장부가 계정과 함께 지워진다), 진행 중 맡긴 돈 `select sum(-delta) from gold_ledger where reason = 'duel_stake' and ref in (select id::text from duel_matches where status in ('waiting','active'));`(예약 작업이 없으므로 **둘 다 떠난 진행 중 대국·아무도 열지 않은 만료 대기 대국도 누가 열거나(view·tick·기권·대전 탭) 다음 대국을 만들 때까지 여기에 남는다**. 게임이 등록부에서 빠진 대국은 시간 초과가 돌지 않아 기권으로만 끝난다), 이중 지급 없음은 장부 unique가 보장한다.
 - 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 판돈 0으로만 만들고, 판돈 > 0 대국에 링크로 들어오면 `stake_mismatch` 오류 문구). 함수 문제면 이전 `duel` 함수로 되돌린다 — 옛 함수는 `stake`를 모르고 맡기지 않으므로 판돈 0으로만 만든다. 이미 판돈이 걸린 대국은 트리거가 끝날 때 그대로 지급·환불한다(DB는 되돌리지 않는다).
 
+## 지갑 배포 (5단계 대회 참가비, `feat/wallet-contest`)
+설계 §10·§14, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 5단계(Task 23~25). 4단계(`feat/wallet-duel`) 뒤에 쌓인 브랜치라 **4단계 PR이 먼저 머지·배포**돼야 한다.
+
+바뀌는 것:
+- 마이그레이션 `20261124020000_contest_fee.sql`: `contests.entry_fee`(0~41,000, 기본 0, 데일리는 0만 — check, 만든 뒤 변경 금지 — 트리거 `_contest_fee_guard`, 숨김 게임 문제가 든 참가비 대회 금지 — `contest_items` 트리거 `_contest_item_fee_guard`), 참가 한 곳 `_contest_enter`(처음 참가일 때만 `contest_fee`, 화면이 본 참가비가 다르면 `fee_mismatch` + DETAIL 지금 참가비), `create_contest(…, p_entry_fee int default 0)`(옛 6인자 함수는 지움, 옛 인자 조합은 그대로 맞음), `join_contest(p_id, p_invite_code, p_entry_fee default 0)`·`join_by_invite_code(p_code, p_entry_fee default 0)`(대회 행 `for no key update` 뒤 참가), `cancel_contest`(취소와 같은 트랜잭션에서 전원 `contest_refund`, `user_id` 오름차순), `_contest_payouts`에 공식·친선 분배(순위 = 리더보드 가운데 행동 1번 이상, 0명 전원 환불, 1·2명 1등 독식, 3명 이상 30%·10% 내림·나머지 1등, `contest_prize` note `k등`). 분배는 3단계 정산(`settle_due`) 한 길로만 한다.
+- 화면: 대회 만들기의 참가비(빠른 선택 + 직접 입력, 상한 min(내 골드, 41,000), "모인 참가비를 1~3등이 6:3:1로 나눠 가져요 · 만든 뒤에는 바꿀 수 없어요", 버튼 "참가비 N G 내고 만들기"; 지갑 게임이 없거나 숨김 게임이 들어 있으면 입력 없음), 목록 카드·대회 페이지 "참가비 N G · 모인 돈 M G", 참가 버튼 "참가비 N G 내고 참가" → 확인 한 번(잔액 부족이면 비활성 + "골드가 부족해요"), 진행 중 공개 참가비 대회는 자동 참가하지 않음, 초대 링크는 참가비 0으로 먼저 들어가 보고 `fee_mismatch`면 확인 화면, 끝난 대회는 3단계 "상금" 열이 `contest_prize`를 보임, 취소·순위 0명이면 "참가비를 돌려받았어요". 함수 재배포 없음(참가비는 SQL RPC).
+
+순서: DB push → PR 머지 → Vercel.
+
+- [ ] `npx supabase@2 db push`. DB만 먼저: 옛 화면은 `p_entry_fee`를 보내지 않아 참가비 0 대회만 만든다. 옛 화면이 참가비 대회에 참가하려 하면 `fee_mismatch`(돈이 빠지지 않음).
+- [ ] PR 머지 → Vercel 배포 (Vercel이 먼저 올라가도 대회 화면은 `entry_fee` 열이 없으면 없이 다시 읽어 깨지지 않는다)
+- [ ] **낚시 Task 4(지갑 이전) 전에는 참가비 입력이 없다**(`walletEnabled()`). SQL은 등록부를 모르므로 막지 않지만, 지갑 잔액이 없으면 참가비 대회는 `not_enough_gold`로 만들어지지 않는다.
+- [ ] 수동 확인(세 계정 A·B·C, 미리보기 → 운영, 폰 390px·PC):
+  - [ ] 참가비 0 대회: 만들기·참가·자동 참가·결과가 지금과 같다(골드 문구 없음)
+  - [ ] A가 참가비 1,000 친선 대회를 만든다(버튼 "참가비 1,000 G 내고 만들기") → A 헤더 −1,000, 대회 페이지 "참가비 1,000 G · 모인 돈 1,000 G"
+  - [ ] B가 대회 페이지에서 "참가비 1,000 G 내고 참가" → 확인 → 참가 → B 헤더 −1,000, 모인 돈 2,000. C는 초대 대회면 초대 링크 → "참가비가 있는 대회예요" 확인 화면 → 참가
+  - [ ] 셋 다 풀고 끝난 뒤 다음 접속 → 1·2·3등 +1,800/+900/+300, 상금 띠 "대회 상금이 들어왔어요", 대회 페이지 "상금" 열·"내 상금"
+  - [ ] 둘만 풀면 1등이 3,000. 아무도 풀지 않으면(열기만 포함) 전원 "참가비를 돌려받았어요"
+  - [ ] 시작 전 A가 취소 → 전원 환불, "참가비를 돌려받았어요". 관리자가 진행 중 취소 → 환불
+  - [ ] 잔액보다 큰 참가비 입력 → "골드가 부족해요"와 만들기 버튼 비활성. 잔액이 모자란 사람의 참가 버튼 비활성
+  - [ ] 숨김 게임이 든 대회(관리자) → 참가비 입력 없음, "숨김 게임이 든 대회는 참가비를 받을 수 없어요"
+  - [ ] `/admin` 골드 장부: "참가비"·"대회 상금"·"참가비 환불" 줄, 상한 표시 없음
+- 확인 쿼리: 정산·취소된 대회의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'contest\_%' and l.ref in (select id::text from contests where settled_at is not null or cancelled_at is not null) group by 1 having sum(l.delta) <> 0;`(0행. 순위에 들지 않은 사람의 계정이 지워진 경우만 예외), 진행 중 모인 돈 `select sum(-delta) from gold_ledger where reason = 'contest_fee' and ref in (select id::text from contests where settled_at is null and cancelled_at is null);`(끝난 대회는 누가 접속해 정산할 때까지 여기에 남는다).
+- 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 참가비 0으로만 만들고, 참가비 대회 참가는 `fee_mismatch` 오류 문구). DB는 되돌리지 않는다 — 이미 모인 참가비는 취소·정산이 그대로 돌려주거나 나눈다.
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지
