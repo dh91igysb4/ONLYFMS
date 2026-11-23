@@ -45,8 +45,9 @@ describe('장비 가격', () => {
     // 바는 미니게임 균형을 깨지 않게 거의 늘리지 않는다(4단계 0.45에서 +0.05까지)
     expect(RODS[5].barBonus).toBeLessThanOrEqual(0.5)
   })
-  it('새 장비는 어떤 어종에도 필요 없다: 모든 어종이 4단계 낚싯대로 낚인다', () => {
-    for (const s of SPECIES) expect(s.minRod, s.id).toBeLessThanOrEqual(4)
+  it('새 장비는 신화 말고는 필요 없다: 신화를 뺀 모든 어종이 4단계 낚싯대로 낚인다(이무기는 5)', () => {
+    for (const s of SPECIES) if (s.rarity !== 'mythic') expect(s.minRod, s.id).toBeLessThanOrEqual(4)
+    expect(SPECIES.find((s) => s.id === 'imugi')!.minRod).toBe(5)
   })
   it('총액(낚싯대·가방·찌·해금, 순간이동 제외)', () => {
     // 기존 1,186,300 + 갯벌 30,000 + 늪지 60,000
