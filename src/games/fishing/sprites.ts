@@ -1499,6 +1499,237 @@ const SHOP = sprite(SHOP_PALETTE, [
   'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
 ])
 
+// ── 강·연못·웅덩이·폭포·다리·절벽(2단계 지역 타일). 16×16, 0/1 쌍은 물결이 다르다 ──
+const RIVER: Record<string, string> = {
+  a: '#4fa6d6', // 바탕: 바다보다 밝다
+  d: '#3f95c8', // 깊은 결
+  b: '#7cc4e6', // 흐름 줄무늬
+  c: '#d4f0fa', // 줄무늬 끝 반짝임
+}
+const POND: Record<string, string> = {
+  a: '#245f8c', // 바탕: 짙고 잔잔하다
+  d: '#1f5480', // 깊은 결
+  b: '#2f7099', // 잔물결
+  c: '#6fb0cf', // 아주 작은 반짝임
+}
+const BASIN: Record<string, string> = {
+  a: '#3a8fc4', // 바탕
+  b: '#8fd0ea', // 작은 거품
+  c: '#f2fbff', // 흰 거품
+}
+const FALLS: Record<string, string> = {
+  a: '#5aa9d8', // 바탕
+  d: '#3b8abf', // 그늘 줄
+  b: '#7cc4e6', // 물줄기
+  c: '#e4f6fc', // 흰 물보라 줄
+}
+
+const RIVER_0 = sprite(RIVER, [
+  'aaaaaaaaaaaaaaaa',
+  'aabbbbbaaaaaaaaa',
+  'aaaabbbbcaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbbbaa',
+  'adddaaaaaaabccba',
+  'aaaaaaaaaaaaaaaa',
+  'abbbbaaaaaaaaaaa',
+  'aabccbaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaabbbbbbaa',
+  'aaaaaaaaaaabccaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const RIVER_1 = sprite(RIVER, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaabbbbbaaaa',
+  'aaaaaaaaabbbbcaa',
+  'aaaaaaaaaaaaaaaa',
+  'bbbaaaaaaaaaaaab',
+  'bccbaadddaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaabbbbaaaaaa',
+  'aaaaaaabccbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'bbbaaaaaaaaaabbb',
+  'bccaaaaaaaaaaaaa',
+  'aaaaaaaaddaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const POND_0 = sprite(POND, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaadd',
+  'aaaacccaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'adaaaaaaaaaaaaaa',
+  'aaaaaaaabbbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aacccaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaddd',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const POND_1 = sprite(POND, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaddaaaaaaaaaa',
+  'aaaaaaaaaacccaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaadaaaaaaaa',
+  'baaaaaaaaaaaaabb',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaacccaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaadddaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const BASIN_0 = sprite(BASIN, [
+  'aabcaaaabaaacbaa',
+  'baaaacaaaaaaaaab',
+  'aaacbaaaabcaaaaa',
+  'caaaaaaabaaaacaa',
+  'aabaaacaaaaaaaba',
+  'aaaaabaaacbaaaaa',
+  'bcaaaaaaaaaaabca',
+  'aaaaacbaaabaaaaa',
+  'aaabaaaaaaaaaaca',
+  'caaaaaaacbaaabaa',
+  'aaaaabaaaaaaaaaa',
+  'abcaaaaaabaaacba',
+  'aaaaaaacaaaaaaaa',
+  'aacbaaaaaaaabaaa',
+  'baaaaabaacaaaaca',
+  'aaaacaaaaaaabaaa',
+])
+
+const BASIN_1 = sprite(BASIN, [
+  'acabaaaaabaacaaa',
+  'aaaaaaacaaaaaaab',
+  'baaaabcaaaabaaac',
+  'aabbaaaacaaaaaaa',
+  'aaaaaacbaaaabcaa',
+  'caacaaaaaaabaaaa',
+  'abaaabaaacaaaaaa',
+  'aaaaaaaabaaacbaa',
+  'bcabcaaaaaaaaaaa',
+  'aaaaaaaacbaaabaa',
+  'acaaaabaaaaaaaaa',
+  'baacaaaaaaacbaaa',
+  'aaaaaaaabaaaaaaa',
+  'cbaabcaaaaaabaaa',
+  'aaaaaaaaaacaaaaa',
+  'aaaaacbaaaaaaaab',
+])
+
+const FALLS_0 = sprite(FALLS, [
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'adbcaabcdabbcaab',
+  'adbcaabccabbdaab',
+  'abbcaadccabbcaab',
+  'abbdaabccabbcaab',
+  'abbcaabcdabbcaad',
+  'abbcaabccabbcaab',
+  'dbbcaabccadbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabcdabbcaab',
+  'abbcdabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccdbbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+])
+
+const FALLS_1 = sprite(FALLS, [
+  'abbcaabccdbbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'adbcaabcdabbcaab',
+  'adbcaabccabbdaab',
+  'abbcaadccabbcaab',
+  'abbdaabccabbcaab',
+  'abbcaabcdabbcaad',
+  'abbcaabccabbcaab',
+  'dbbcaabccadbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabcdabbcaab',
+  'abbcdabccabbcaab',
+  'abbcaabccabbcaab',
+])
+
+// 다리: 아래 강물 위에 얹는다. 가로 판자 줄, 양옆에 난간(바깥 한 칸은 투명해 물이 보인다)
+const BRIDGE: Record<string, string> = {
+  n: '#3b2a22', // 난간·틈
+  U: '#e2b07a', // 판자 윗면 밝은 줄
+  u: '#c8925a', // 판자
+  g: '#a8723f', // 나뭇결
+  G: '#86562f', // 판자 아래 그늘
+}
+const BRIDGE_PLANK = sprite(BRIDGE, [
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuuguun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuguuuuuguuuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuuguun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuguuuuguuuuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuguuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nnnnnnnnnnnnnn.',
+])
+
+// 절벽: 바위 벽면. 가로 지층 띠와 갈라진 틈, 위쪽 모서리는 밝고 아래는 어둡다
+const CLIFF: Record<string, string> = {
+  k: '#3d3a44', // 틈
+  h: '#b8b2ba', // 윗면 밝은 모서리
+  r: '#8f8993', // 바위
+  m: '#756f7b', // 바위 그늘
+  d: '#5a5560', // 아래 어둠
+}
+const TILE_CLIFF = sprite(CLIFF, [
+  'hhhhhhhhhhhhhhhh',
+  'hrrrrrrrhrrrrrrh',
+  'rrrmrrrrrrrrmrrr',
+  'rrmmrrrkrrrrmmrr',
+  'mmmmmrrkrrrmmmmm',
+  'kkkkkkkkkkkkkkkk',
+  'rrrrrrrrrrrrrrrr',
+  'rmrrrrkrrrrrrrmr',
+  'mmmrrrkrrrrmmmmm',
+  'mmmmmmkmmmmmmmmm',
+  'kkkkkkkkkkkkkkkk',
+  'rrrrrrrrrrrrrrrr',
+  'rrrmrrrrrrkrrrrr',
+  'mrmmmrrrrrkrmmrm',
+  'dmmmmmmmmmkmmmmd',
+  'dddddddddddddddd',
+])
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
@@ -1520,6 +1751,16 @@ export const SPRITES: Record<string, Sprite> = {
   'water-1': WATER_1,
   'pier-plank': PIER_PLANK,
   'pier-post': PIER_POST,
+  'river-0': RIVER_0,
+  'river-1': RIVER_1,
+  'pond-0': POND_0,
+  'pond-1': POND_1,
+  'basin-0': BASIN_0,
+  'basin-1': BASIN_1,
+  'falls-0': FALLS_0,
+  'falls-1': FALLS_1,
+  'bridge-plank': BRIDGE_PLANK,
+  'tile-cliff': TILE_CLIFF,
   bobber: BOBBER,
   bang: BANG,
   splash: SPLASH,

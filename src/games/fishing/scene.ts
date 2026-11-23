@@ -4,7 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
-import { TILE, tileAt, type MapDef, type Vec } from './map.ts'
+import { TILE, tileAt, type MapDef, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
 import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
@@ -197,10 +197,13 @@ function hash(a: number, b: number): number {
 
 type Ground = 'water' | 'sand' | 'grass'
 
+// 땅이 물로 치는 타일: 바다·강·연못·웅덩이·폭포, 부두·다리(아래가 물). 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
+const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge'])
+
 function baseGround(map: MapDef, tx: number, ty: number): Ground | null {
   const kind = tileAt(map, tx, ty)
-  if (kind === null || kind === 'rock') return null
-  if (kind === 'water' || kind === 'pier') return 'water'
+  if (kind === null || kind === 'rock' || kind === 'cliff') return null
+  if (WATER_GROUND.has(kind)) return 'water'
   if (kind === 'sand') return 'sand'
   return 'grass'
 }
@@ -346,6 +349,9 @@ function drawFence(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: num
 }
 
 /** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무 밑동·바위·울타리·부두 판자). 모두 자기 칸 안에 그린다. */
+/** 물 칸 그림 이름 앞부분(다리 밑은 강물). 없으면 바다 */
+const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { river: 'river', pond: 'pond', basin: 'basin', bridge: 'river' }
+
 function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
   const kind = tileAt(g.map, tx, ty)
   if (kind === null) return
@@ -355,9 +361,11 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
 
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
+  else if (kind === 'cliff') drawSprite(ctx, 'tile-cliff', x, y, 1)
+  else if (kind === 'falls') drawSprite(ctx, `falls-${(k + tx) % 2}`, x, y, 1)
   else if (ground === 'water') {
-    // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게
-    drawSprite(ctx, (k + tx + ty * 3) % 2 === 0 ? 'water-0' : 'water-1', x, y, 1)
+    // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게. 다리 밑은 강물
+    drawSprite(ctx, `${WATER_SPRITE[kind] ?? 'water'}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
   } else if (ground === 'sand') {
     drawSprite(ctx, 'tile-sand', x, y, 1)
@@ -372,6 +380,7 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     else drawSprite(ctx, 'tile-rock', x, y, 1)
   } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
+  else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
 }
 
 /** 부두 칸 바깥으로 삐져나오는 것: 그늘, 기둥, 끝 옆면, 외곽선 */

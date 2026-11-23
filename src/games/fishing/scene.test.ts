@@ -109,6 +109,33 @@ describe('hudSide', () => {
   })
 })
 
+describe('new tile kinds', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+
+  test('each new tile is drawn with its own sprite', () => {
+    const region = defineMap('river', ['TTTTTTT', 'T,pb,,T', 'T,rHr,T', 'T,wc..T', 'TTTTTTT'], {
+      spots: { river: 'river', pond: 'pond', basin: 'waterfall' },
+    })
+    const size = { w: 195, h: 280 }
+    const p = player(tileCentre(1, 1))
+    const cam = cameraFor(region, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: region, camera: cam }, size)
+    const at = (tx: number, ty: number) =>
+      ctx.sprites.filter((s) => s.x === tx * 16 - cam.x && s.y === ty * 16 - cam.y).map((s) => s.name)
+    expect(at(2, 1)).toContainEqual(expect.stringMatching(/^pond-[01]$/))
+    expect(at(3, 1)).toContainEqual(expect.stringMatching(/^basin-[01]$/))
+    expect(at(2, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/))
+    expect(at(4, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/))
+    expect(at(3, 2)).toEqual(expect.arrayContaining(['bridge-plank']))
+    expect(at(3, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/)) // 다리 아래 강물
+    expect(at(2, 3)).toContainEqual(expect.stringMatching(/^falls-[01]$/))
+    expect(at(3, 3)).toEqual(['tile-cliff'])
+  })
+})
+
 describe('drawWorld without an offscreen canvas (direct drawing)', () => {
   beforeEach(() => {
     // jsdom처럼 오프스크린 캔버스 컨텍스트가 없으면 보이는 타일만 직접 그린다

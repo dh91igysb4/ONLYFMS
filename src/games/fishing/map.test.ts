@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   TILE,
   TILE_CHARS,
+  WATER_KINDS,
   castTarget,
   defineMap,
   interactionAt,
   isWalkable,
   pierEnd,
   shopSpot,
+  spotFor,
   tileAt,
   tileOf,
   type Facing,
@@ -223,13 +225,13 @@ describe('reachability', () => {
 })
 
 describe('castTarget', () => {
-  const pierEnd = center(PIER_END.tx, PIER_END.ty)
+  const pierCenter = center(PIER_END.tx, PIER_END.ty)
 
   it('lands 1.5 tiles out at power 0 and 5 tiles out at power 1, on water', () => {
-    const near = castTarget(VILLAGE, pierEnd, 'down', 0)
-    const far = castTarget(VILLAGE, pierEnd, 'down', 1)
-    expect(near).toEqual({ x: pierEnd.x, y: pierEnd.y + 1.5 * TILE })
-    expect(far).toEqual({ x: pierEnd.x, y: pierEnd.y + 5 * TILE })
+    const near = castTarget(VILLAGE, pierCenter, 'down', 0)
+    const far = castTarget(VILLAGE, pierCenter, 'down', 1)
+    expect(near).toEqual({ x: pierCenter.x, y: pierCenter.y + 1.5 * TILE })
+    expect(far).toEqual({ x: pierCenter.x, y: pierCenter.y + 5 * TILE })
     const nt = tileOf(near)
     const ft = tileOf(far)
     expect(tileAt(VILLAGE, nt.tx, nt.ty)).toBe('water')
@@ -237,9 +239,9 @@ describe('castTarget', () => {
   })
 
   it('scales linearly with power and clamps it to 0..1', () => {
-    expect(castTarget(VILLAGE, pierEnd, 'down', 0.5)).toEqual({ x: pierEnd.x, y: pierEnd.y + 3.25 * TILE })
-    expect(castTarget(VILLAGE, pierEnd, 'down', -3)).toEqual(castTarget(VILLAGE, pierEnd, 'down', 0))
-    expect(castTarget(VILLAGE, pierEnd, 'down', 7)).toEqual(castTarget(VILLAGE, pierEnd, 'down', 1))
+    expect(castTarget(VILLAGE, pierCenter, 'down', 0.5)).toEqual({ x: pierCenter.x, y: pierCenter.y + 3.25 * TILE })
+    expect(castTarget(VILLAGE, pierCenter, 'down', -3)).toEqual(castTarget(VILLAGE, pierCenter, 'down', 0))
+    expect(castTarget(VILLAGE, pierCenter, 'down', 7)).toEqual(castTarget(VILLAGE, pierCenter, 'down', 1))
   })
 
   it('stops at the center of the last water tile before land', () => {
@@ -261,11 +263,100 @@ describe('castTarget', () => {
   })
 
   it('works in every direction from the pier end (sideways water is open)', () => {
-    const left = castTarget(VILLAGE, pierEnd, 'left', 1)
-    expect(left.y).toBe(pierEnd.y)
-    expect(left.x).toBeLessThan(pierEnd.x)
+    const left = castTarget(VILLAGE, pierCenter, 'left', 1)
+    expect(left.y).toBe(pierCenter.y)
+    expect(left.x).toBeLessThan(pierCenter.x)
     const lt = tileOf(left)
     expect(tileAt(VILLAGE, lt.tx, lt.ty)).toBe('water')
+  })
+})
+
+// 새 타일 종류용 작은 합성 맵. 위에서 아래로: 풀 / 연못 / 웅덩이 / 풀, 오른쪽 열은 강·다리
+const REGION = defineMap(
+  'river',
+  [
+    ',,,,,',
+    ',ppp,',
+    ',pbb,',
+    ',,,,,',
+    'rrHrr',
+    'wcrr,',
+  ],
+  { spots: { river: 'river', pond: 'pond', basin: 'waterfall' } },
+)
+
+describe('new tile kinds', () => {
+  it('reads the new tile characters', () => {
+    expect(tileAt(REGION, 1, 1)).toBe('pond')
+    expect(tileAt(REGION, 2, 2)).toBe('basin')
+    expect(tileAt(REGION, 0, 4)).toBe('river')
+    expect(tileAt(REGION, 2, 4)).toBe('bridge')
+    expect(tileAt(REGION, 0, 5)).toBe('falls')
+    expect(tileAt(REGION, 1, 5)).toBe('cliff')
+  })
+
+  it('bridge is walkable; river, pond, basin, falls and cliff are not', () => {
+    expect(isWalkable(REGION, 2, 4)).toBe(true)
+    for (const [tx, ty] of [[0, 4], [1, 1], [2, 2], [0, 5], [1, 5]]) expect(isWalkable(REGION, tx, ty), `${tx},${ty}`).toBe(false)
+  })
+
+  it('WATER_KINDS holds the four water kinds only', () => {
+    expect([...WATER_KINDS].sort()).toEqual(['basin', 'pond', 'river', 'water'])
+  })
+})
+
+describe('spotFor', () => {
+  it('village: pier standing gives pier, sand gives shore, other fronts give null', () => {
+    expect(spotFor(VILLAGE, 'pier', 'water')).toBe('pier')
+    expect(spotFor(VILLAGE, 'sand', 'water')).toBe('shore')
+    expect(spotFor(VILLAGE, 'sand', 'sand')).toBeNull()
+    expect(spotFor(VILLAGE, 'sand', null)).toBeNull()
+  })
+
+  it('a bridge over a river fishes the river spot', () => {
+    expect(spotFor(REGION, 'bridge', 'river')).toBe('river')
+  })
+
+  it('grass beside a basin or a pond gives each its own spot', () => {
+    expect(spotFor(REGION, 'grass', 'basin')).toBe('waterfall')
+    expect(spotFor(REGION, 'grass', 'pond')).toBe('pond')
+  })
+
+  it('water kinds the map has no spot for give null', () => {
+    expect(spotFor(REGION, 'grass', 'water')).toBeNull()
+    expect(spotFor(defineMap('river', [',,', ',r'], { spots: { pond: 'pond' } }), 'grass', 'river')).toBeNull()
+  })
+})
+
+describe('interactionAt on new tiles', () => {
+  it('facing falls or cliff gives null', () => {
+    const wall = defineMap('river', ['..', 'wc'], { spots: { river: 'river' } })
+    expect(interactionAt(wall, center(0, 0), 'down')).toBeNull() // 폭포
+    expect(interactionAt(wall, center(1, 0), 'down')).toBeNull() // 절벽
+  })
+
+  it('on the bridge, facing the river fishes river', () => {
+    expect(interactionAt(REGION, center(2, 4), 'down')).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(REGION, center(2, 4), 'left')).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(REGION, center(2, 4), 'right')).toEqual({ kind: 'fish', spot: 'river' })
+  })
+
+  it('from the grass, a pond and a basin give their spots', () => {
+    expect(interactionAt(REGION, center(0, 1), 'right')).toEqual({ kind: 'fish', spot: 'pond' })
+    expect(interactionAt(REGION, center(3, 3), 'up')).toEqual({ kind: 'fish', spot: 'waterfall' })
+  })
+})
+
+describe('castTarget over mixed water kinds', () => {
+  it('keeps going from pond into basin and stops at the last water tile before grass', () => {
+    const row = defineMap('river', [',,,,,,', ',pbbb,', ',,,,,,'], { spots: { pond: 'pond', basin: 'waterfall' } })
+    const from = center(0, 1)
+    expect(castTarget(row, from, 'right', 1)).toEqual(center(4, 1))
+    expect(castTarget(row, from, 'right', 0)).toEqual({ x: from.x + 1.5 * TILE, y: from.y })
+  })
+
+  it('stops before grass after a river tile', () => {
+    expect(castTarget(REGION, center(4, 3), 'down', 1)).toEqual(center(4, 4))
   })
 })
 

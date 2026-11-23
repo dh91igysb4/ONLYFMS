@@ -44,6 +44,8 @@ const REQUIRED = [
   ...SEASON_ICONS,
 ]
 
+const REGION_TILES = ['river-0', 'river-1', 'pond-0', 'pond-1', 'basin-0', 'basin-1', 'falls-0', 'falls-1', 'bridge-plank', 'tile-cliff']
+
 describe('SPRITES', () => {
   it('has every required key', () => {
     for (const key of REQUIRED) expect(SPRITES[key], key).toBeDefined()
@@ -115,6 +117,16 @@ describe('SPRITES', () => {
     expect(SPRITES.shop.h % 16).toBe(0)
     // 맵의 건물 사각형(B·D 칸)과 같은 크기라 좌상단에 한 번에 그리면 맞는다
     expect([SPRITES.shop.w, SPRITES.shop.h]).toEqual([VILLAGE.shop!.w * TILE, VILLAGE.shop!.h * TILE])
+  })
+
+  it('지역 타일(강·연못·웅덩이·폭포·다리·절벽)은 16×16이고 0/1 쌍은 서로 다르다', () => {
+    for (const name of REGION_TILES) {
+      expect(SPRITES[name], name).toBeDefined()
+      expect([SPRITES[name].w, SPRITES[name].h], name).toEqual([16, 16])
+    }
+    for (const kind of ['river', 'pond', 'basin', 'falls']) {
+      expect(SPRITES[`${kind}-0`].rows.join('\n'), kind).not.toBe(SPRITES[`${kind}-1`].rows.join('\n'))
+    }
   })
 
   it('walk frames 0 and 1 differ in every direction', () => {
