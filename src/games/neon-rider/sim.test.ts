@@ -396,7 +396,7 @@ describe('neon-rider 시뮬', () => {
     expect([1, 2]).toContain(s.flipScore)
     expect(firstTouch).toBeGreaterThan(0)
     expect(s.lastAward!.tick - firstTouch).toBeLessThanOrEqual(LAND_GRACE)
-    expect(scoreOf(s)).toBe(s.flipScore)
+    expect(scoreOf(s)).toBe(s.flipScore + s.gems)
   })
 
   it('공중제비: 착지 직후 죽으면 flipScore 0', () => {
@@ -537,7 +537,7 @@ describe('neon-rider 시뮬', () => {
     }
     expect(s.sectionScore).toBe(1)
     expect(s.nextSection).toBe(1)
-    expect(scoreOf(s)).toBe(1)
+    expect(scoreOf(s)).toBe(1 + s.flipScore + s.gems)
   })
 
   it('부스터: 떼고 지나가도 직후 속도 ≥ BOOST_V × 0.95', () => {
@@ -560,6 +560,34 @@ describe('neon-rider 시뮬', () => {
       expect(s.gems).toBe(seen.size)
     }
     expect(s.gems).toBeGreaterThan(0)
+  })
+
+  it('점수 = 통과 구간 + 공중제비 점수 + 보석 수', () => {
+    const c = courseOf(['bowl'])
+    const s = run(initSimAt(c, TPL_X, 1200), 900, () => false, c)
+    expect(s.gems).toBeGreaterThan(0)
+    expect(scoreOf(s)).toBe(s.sectionScore + s.flipScore + s.gems)
+  })
+
+  it('충돌 창을 벗어나 버린 보석은 되돌아와도 다시 줍지 않는다(gemFloor)', () => {
+    // 평지 위 바퀴 높이에 보석 하나. 지나며 줍고, 충돌 창 밖으로 멀리 갔다가, 다시 그 자리로 돌아온다.
+    // 충돌 창은 선분 수로 재고 보석은 구간 단위로 찾으므로, 보석 구간 뒤에 250 mm 선분으로 잘게 나눈 긴 평지 구간을 둔다
+    const gemT: Template = { id: 'gem1', tier: 1, prims: [{ t: 'line', dx: mm(3000), dy: 0 }, { t: 'gem', dx: 0, dy: WHEEL_R }, { t: 'line', dx: mm(3000), dy: 0 }] }
+    const fineT: Template = { id: 'fine', tier: 1, prims: Array.from({ length: 240 }, () => ({ t: 'line' as const, dx: mm(250), dy: 0 })) }
+    const c = courseFromTemplates([gemT, fineT])
+    const gemX = TPL_X + mm(3000)
+    let s = run(initSimAt(c, gemX - mm(3000), 1200), 200, () => false, c)
+    expect(s.gems).toBe(1)
+    expect(s.takenGems.length).toBe(1)
+    const carry = (t: SimState) => ({ gems: t.gems, takenGems: t.takenGems, gemFloor: t.gemFloor })
+    // 30 m 앞(충돌 창 10 m 밖)으로 옮기면 그 id를 버리고 gemFloor로 올린다
+    s = step({ ...initSimAt(c, gemX + mm(30000), 0), ...carry(s) }, false, c)
+    expect(s.takenGems).toEqual([])
+    expect(s.gemFloor).toBeGreaterThanOrEqual(0)
+    // 보석 자리로 돌아와 지나가도 늘지 않는다
+    s = run({ ...initSimAt(c, gemX - mm(2000), 1200), ...carry(s) }, 200, () => false, c)
+    expect(s.gems).toBe(1)
+    expect(scoreOf(s)).toBe(s.sectionScore + s.flipScore + 1)
   })
 
   it('되굴러옴: 쿼터파이프에서 속도가 모자라 돌아와도 바닥을 뚫지 않고 progress가 감소', () => {
@@ -765,7 +793,7 @@ describe('움직이는 길', () => {
   const roadVx = (m: Motion, tick: number): number => poseAt(m, (tick + 1) * SUBSTEPS, null).dx - poseAt(m, tick * SUBSTEPS, null).dx
   const carVx = (s: SimState): number => Math.floor((vxOf(s.rear) + vxOf(s.front)) / 2)
 
-  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone·blocks·blocksDone만 늘었다)', () => {
+  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone·blocks·blocksDone과 gemFloor -1만 늘었다)', () => {
     // 움직이는 길을 넣기 전 코드로 만든 최종 상태(JSON). 앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱.
     const before = [
       '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
@@ -792,7 +820,7 @@ describe('움직이는 길', () => {
       const c = makeSeededCourse(seed, statics)
       after.push(JSON.stringify(run(initSim(c), 3000, (_, i) => i % 50 < 30, c)))
     }
-    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[]}'))
+    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[],"gemFloor":-1}'))
   })
 
   it('수평으로 왕복하는 길 위에 (길에 대해) 정지한 차는 방향이 네 번 바뀌는 동안 길과 함께 움직인다', () => {
