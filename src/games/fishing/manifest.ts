@@ -14,5 +14,6 @@ export const manifest: Manifest = {
     { key: 'total_earned', label: '누적 수익', unit: 'G' },
     { key: 'biggest', label: '최대어', unit: 'cm' },
     { key: 'dex', label: '도감', unit: '종' },
+    { key: 'challenges', label: '도전과제', unit: '개' },
   ],
 }
