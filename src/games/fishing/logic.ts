@@ -599,7 +599,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 10: 옷장(wardrobe·outfit, buyWear·wear). v9 세이브는 빈 옷장·기본 옷차림
   // 11: 신화 등급·버프 상태(buffs), 물때 자리(spot_closed)·지역 최소 낚싯대(need_rod) 확인
   // 12: 갯벌·늪지 지역과 어종 19종(신화 이무기). 세이브 형식은 11과 같다(migrate가 새 지역·어종 id를 알게 됨)
-  version: 12,
+  // 13: 산정 호수·난파선 앞바다 지역과 어종 19종(신화 천지 백룡·용왕). 세이브 형식은 12와 같다
+  version: 13,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.

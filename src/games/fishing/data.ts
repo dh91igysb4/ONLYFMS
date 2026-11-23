@@ -32,7 +32,7 @@ export type Species = {
    */
   legend?: { power: number; needs?: readonly string[]; buff?: BuffId }
 }
-/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(일반·전설 어종 minRod는 1~4. 5부 신화(이무기 5)·난파선이 5·6을 쓴다) */
+/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(일반·전설 어종 minRod는 1~4. 5부 난파선 어종이 5, 신화가 5·6(용왕 6)을 쓴다) */
 export type RodTier = 1 | 2 | 3 | 4 | 5 | 6
 export type Rod = {
   tier: RodTier
@@ -205,6 +205,29 @@ export const SPECIES: Species[] = [
   { id: 'lamprey', name: '칠성장어', rarity: 'rare', basePrice: 1300, minCm: 30, maxCm: 60, difficulty: 0.82, minRod: 3, behavior: 'smooth', area: 'swamp', spots: ['bog'], hours: [20, 5] },
   { id: 'thousand-turtle', name: '천년 자라', rarity: 'legend', basePrice: 5500, minCm: 60, maxCm: 100, difficulty: 0.94, minRod: 4, behavior: 'sinker', area: 'swamp', spots: ['bog'], hours: [4, 8], weather: 'rain', legend: { power: 0.95 } },
   { id: 'imugi', name: '이무기', rarity: 'mythic', basePrice: 20000, minCm: 300, maxCm: 600, difficulty: 0.97, minRod: 5, behavior: 'surge', area: 'swamp', spots: ['bog'], hours: [20, 5], weather: 'rain', legend: { power: 0.95, needs: ['century-snakehead', 'thousand-turtle'], buff: 'imugi-scale' } },
+  // 산정 호수(낚시 5부 M3). 일 년 내내 얼어 있어 계절 조건이 없다. 얼음 구멍(ice)·온천(hotspring).
+  // 천지 백룡은 신화(은빛 대왕송어·설백 자치를 먼저 잡아야 한다)
+  { id: 'char', name: '곤들매기', rarity: 'common', basePrice: 110, minCm: 20, maxCm: 40, difficulty: 0.45, minRod: 1, behavior: 'mixed', area: 'summit', spots: ['ice'] },
+  { id: 'gold-minnow', name: '금강모치', rarity: 'common', basePrice: 90, minCm: 6, maxCm: 10, difficulty: 0.4, minRod: 1, behavior: 'dart', area: 'summit', spots: ['ice'] },
+  { id: 'spring-crucian', name: '온천붕어', rarity: 'common', basePrice: 120, minCm: 10, maxCm: 25, difficulty: 0.35, minRod: 1, behavior: 'smooth', area: 'summit', spots: ['hotspring'] },
+  { id: 'burbot', name: '모캐', rarity: 'uncommon', basePrice: 300, minCm: 30, maxCm: 80, difficulty: 0.6, minRod: 1, behavior: 'sinker', area: 'summit', spots: ['ice'], hours: [20, 5] },
+  { id: 'snow-trout', name: '눈송어', rarity: 'uncommon', basePrice: 320, minCm: 25, maxCm: 50, difficulty: 0.6, minRod: 1, behavior: 'dart', area: 'summit', spots: ['ice'], weather: 'rain' },
+  { id: 'spring-tetra', name: '온천 열대어', rarity: 'uncommon', basePrice: 280, minCm: 4, maxCm: 8, difficulty: 0.55, minRod: 1, behavior: 'floater', area: 'summit', spots: ['hotspring'] },
+  { id: 'taimen', name: '자치', rarity: 'rare', basePrice: 1100, minCm: 60, maxCm: 120, difficulty: 0.88, minRod: 4, behavior: 'dart', area: 'summit', spots: ['ice'] },
+  { id: 'snowwhite-taimen', name: '설백 자치', rarity: 'legend', basePrice: 6500, minCm: 90, maxCm: 150, difficulty: 0.95, minRod: 4, behavior: 'dart', area: 'summit', spots: ['ice'], hours: [5, 8], weather: 'sun', legend: { power: 0.95 } },
+  { id: 'white-dragon', name: '천지 백룡', rarity: 'mythic', basePrice: 24000, minCm: 200, maxCm: 400, difficulty: 0.98, minRod: 5, behavior: 'surge', area: 'summit', spots: ['ice'], hours: [0, 4], weather: 'sun', legend: { power: 0.95, needs: ['silver-king-trout', 'snowwhite-taimen'], buff: 'dragon-breath' } },
+  // 난파선 앞바다(낚시 5부 M3). 섬 너머 먼 바다라 계절 조건이 없고, 모든 어종이 백골 낚싯대(5단계) 이상.
+  // 용왕은 신화(다금바리·무지개 청새치·산갈치를 먼저 잡아야 하고 용왕의 낚싯대로만)
+  { id: 'skipjack', name: '가다랑어', rarity: 'common', basePrice: 200, minCm: 40, maxCm: 80, difficulty: 0.5, minRod: 5, behavior: 'dart', area: 'wreck', spots: ['abyss'] },
+  { id: 'amberjack', name: '잿방어', rarity: 'common', basePrice: 240, minCm: 60, maxCm: 150, difficulty: 0.55, minRod: 5, behavior: 'smooth', area: 'wreck', spots: ['wreck'] },
+  { id: 'black-rockfish', name: '볼락', rarity: 'common', basePrice: 180, minCm: 15, maxCm: 35, difficulty: 0.45, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['wreck'] },
+  { id: 'sunfish', name: '개복치', rarity: 'uncommon', basePrice: 550, minCm: 100, maxCm: 250, difficulty: 0.55, minRod: 5, behavior: 'floater', area: 'wreck', spots: ['wreck'], weather: 'sun' },
+  { id: 'flyingfish', name: '날치', rarity: 'uncommon', basePrice: 420, minCm: 20, maxCm: 35, difficulty: 0.6, minRod: 5, behavior: 'dart', area: 'wreck', spots: ['abyss'], hours: [6, 19] },
+  { id: 'anglerfish', name: '아귀', rarity: 'uncommon', basePrice: 560, minCm: 40, maxCm: 100, difficulty: 0.7, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['abyss'], weather: 'rain' },
+  { id: 'bluefin', name: '참다랑어', rarity: 'rare', basePrice: 1400, minCm: 100, maxCm: 250, difficulty: 0.9, minRod: 5, behavior: 'dart', area: 'wreck', spots: ['abyss'] },
+  { id: 'giant-squid', name: '대왕오징어', rarity: 'rare', basePrice: 1500, minCm: 200, maxCm: 600, difficulty: 0.92, minRod: 5, behavior: 'mixed', area: 'wreck', spots: ['abyss'], hours: [20, 5] },
+  { id: 'oarfish', name: '산갈치', rarity: 'legend', basePrice: 9000, minCm: 300, maxCm: 800, difficulty: 0.96, minRod: 5, behavior: 'smooth', area: 'wreck', spots: ['abyss'], hours: [22, 2], legend: { power: 0.95 } },
+  { id: 'dragon-king', name: '용왕', rarity: 'mythic', basePrice: 30000, minCm: 400, maxCm: 900, difficulty: 1, minRod: 6, behavior: 'surge', area: 'wreck', spots: ['abyss'], weather: 'rain', legend: { power: 0.98, needs: ['grouper', 'rainbow-marlin', 'oarfish'], buff: 'dragon-pearl' } },
 ]
 
 export const RODS: Rod[] = [
@@ -212,7 +235,7 @@ export const RODS: Rod[] = [
   { tier: 2, name: '유리섬유 낚싯대', price: 1500, barBonus: 0.15, biteScale: 1, weights: { common: 55, uncommon: 33, rare: 12 } },
   { tier: 3, name: '카본 낚싯대', price: 8000, barBonus: 0.3, biteScale: 1, weights: { common: 50, uncommon: 34, rare: 16 } },
   { tier: 4, name: '명장의 낚싯대', price: 40000, barBonus: 0.45, biteScale: 0.8, weights: { common: 46, uncommon: 34, rare: 20 } },
-  // 고급 장비(6단계 마무리): 어떤 어종에도 필요 없고, 버는 속도만 조금씩 올린다(효과는 갈수록 작게)
+  // 고급 장비(6단계 마무리): 버는 속도를 조금씩 올린다(효과는 갈수록 작게). 낚시 5부: 백골은 난파선 앞바다(어종 모두 5)를 열고, 용왕의 낚싯대는 신화 용왕을 낚는다
   { tier: 5, name: '백골 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
   { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]

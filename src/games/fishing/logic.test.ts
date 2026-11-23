@@ -308,7 +308,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(12)
+    expect(logic.version).toBe(13)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -815,18 +815,18 @@ describe('fishing WorldLogic', () => {
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/75'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/94'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/75' },
+      { key: 'dex', value: 0, detail: '0/94' },
       { key: 'challenges', value: 0, detail: '0/8' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/75' },
+      { key: 'dex', value: 2, detail: '2/94' },
       { key: 'challenges', value: 0, detail: '0/8' },
     ])
   })
@@ -1677,3 +1677,103 @@ describe('갯벌·늪지 도전과제·순간이동기 (낚시 5부 M2)', () => 
   })
 })
 
+
+// ---------------------------------------------------------------- 낚시 5부 M3: 산정 호수·난파선 (logic.version 13)
+describe('산정 호수·난파선 (logic.version 13)', () => {
+  const castAt = (s: State, area: string, spot: string, now: number, rng: () => number = () => 0.5) =>
+    logic.apply(s, { type: 'cast', area, power: 0.5, spot } as unknown as Action, { now, rng })
+
+  it('난파선: 열린 세이브 + 백골 → 심해·난파선 낚시 정상(난파선 어종), 명장(꼬인 세이브) → need_rod', () => {
+    const ids = SPECIES.filter((x) => x.area === 'wreck').map((x) => x.id)
+    for (const spot of ['abyss', 'wreck']) {
+      for (let seed = 0; seed < 10; seed++) {
+        const p = ok(castAt(fresh({ rodTier: 5, areas: [...DEFAULT_AREAS, 'island', 'wreck'] }), 'wreck', spot, nowAt(0, 10), rngFromSeed(seedBytes(seed)))).state.pending!
+        expect(ids).toContain(p.species)
+      }
+    }
+    expect(err(castAt(deepFreeze(fresh({ rodTier: 4, areas: [...DEFAULT_AREAS, 'island', 'wreck'] })), 'wreck', 'abyss', nowAt(0, 10)))).toBe('need_rod')
+  })
+  it('unlockArea: 산정 120,000; 난파선 150,000은 백골 이상(명장 + 골드 충분 → need_rod, 상태 그대로)', () => {
+    const r = ok(logic.apply(fresh({ gold: 120000, areas: [...DEFAULT_AREAS, 'lake'] }), { type: 'unlockArea', area: 'summit' }, ctx()))
+    expect(r.state.gold).toBe(0)
+    expect(r.state.areas).toEqual([...DEFAULT_AREAS, 'lake', 'summit'])
+    const poor = deepFreeze(fresh({ gold: 999999, rodTier: 4, areas: [...DEFAULT_AREAS, 'island'] }))
+    expect(err(logic.apply(poor, { type: 'unlockArea', area: 'wreck' }, ctx()))).toBe('need_rod')
+    const r2 = ok(logic.apply(fresh({ gold: 150000, rodTier: 5, areas: [...DEFAULT_AREAS, 'island'] }), { type: 'unlockArea', area: 'wreck' }, ctx()))
+    expect(r2.state.gold).toBe(0)
+    expect(r2.state.areas).toEqual([...DEFAULT_AREAS, 'island', 'wreck'])
+  })
+  it('산정: 얼음 구멍(ice)·온천(hotspring) 모두 정상, 어느 계절에나 같은 후보(서버는 구멍을 모른다)', () => {
+    const s = fresh({ areas: [...DEFAULT_AREAS, 'lake', 'summit'] })
+    for (const spot of ['ice', 'hotspring']) {
+      const p = ok(castAt(s, 'summit', spot, nowAt(0, 10))).state.pending!
+      const sp = SPECIES.find((x) => x.id === p.species)!
+      expect(sp.area).toBe('summit')
+      expect(sp.spots).toContain(spot)
+    }
+  })
+  it('천지 백룡: 맑은 0~4시 얼음 구멍, 백골 + 은빛 대왕송어·설백 자치 + 힘 0.95 + r0 0 → 백룡; 하나라도 빠지면 아니다', () => {
+    const base = { area: 'summit' as const, spot: 'ice', cond: cond('summer', 2), power: 0.95, rodTier: 5 as const, legends: ['silver-king-trout', 'snowwhite-taimen'] }
+    const roll = (over: Partial<CastCtx> = {}, r0 = 0) => rollCatch(sequence(r0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...base, ...over })).species
+    expect(roll()).toBe('white-dragon')
+    expect(roll({ cond: cond('winter', 2) })).toBe('white-dragon')
+    expect(roll({ legends: ['snowwhite-taimen'] })).not.toBe('white-dragon')
+    expect(roll({ rodTier: 4 })).not.toBe('white-dragon')
+    expect(roll({ cond: cond('summer', 2, 'rain') })).not.toBe('white-dragon')
+    expect(roll({ cond: cond('summer', 5) })).not.toBe('white-dragon')
+    expect(roll({ spot: 'hotspring' })).not.toBe('white-dragon')
+    expect(roll({}, MYTHIC_CHANCE)).not.toBe('white-dragon')
+  })
+  it('설백 자치가 남았으면 같은 자리에서 설백 자치가 후보(맑은 6시)', () => {
+    const c = ctxOf({ area: 'summit', spot: 'ice', cond: cond('spring', 6), power: 0.95, rodTier: 5, legends: ['silver-king-trout'] })
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), c).species).toBe('snowwhite-taimen')
+  })
+  it('용왕: 비 오는 심해, 용왕의 낚싯대 + 다금바리·무지개 청새치·산갈치 + 힘 0.98 → 용왕; 백골·힘 0.95·맑음이면 아니다', () => {
+    const base = { area: 'wreck' as const, spot: 'abyss', cond: cond('autumn', 12, 'rain'), power: 0.98, rodTier: 6 as const, legends: ['grouper', 'rainbow-marlin', 'oarfish'] }
+    const roll = (over: Partial<CastCtx> = {}) => rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...base, ...over })).species
+    expect(roll()).toBe('dragon-king')
+    expect(roll({ rodTier: 5 })).not.toBe('dragon-king')
+    expect(roll({ power: 0.95 })).not.toBe('dragon-king')
+    expect(roll({ cond: cond('autumn', 12) })).not.toBe('dragon-king')
+    expect(roll({ legends: ['grouper', 'rainbow-marlin'] })).not.toBe('dragon-king')
+  })
+  it('천지 백룡을 잡으면 dragon-breath, 용왕을 잡으면 dragon-pearl(버프가 겹친다)', () => {
+    const pend = (species: string, area: 'summit' | 'wreck', spot: string) =>
+      ({ species, sizeCm: 300, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area, spot, cond: cond('spring', 2), power: 0.98 })
+    const a = ok(logic.apply(fresh({ areas: [...DEFAULT_AREAS, 'lake', 'summit'], legends: ['silver-king-trout', 'snowwhite-taimen'], buffs: ['imugi-scale'], pending: pend('white-dragon', 'summit', 'ice') }), { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(a.state.buffs).toEqual(['imugi-scale', 'dragon-breath'])
+    expect(a.result).toMatchObject({ buff: 'dragon-breath' })
+    const b = ok(logic.apply({ ...a.state, legends: [...a.state.legends, 'grouper', 'rainbow-marlin', 'oarfish'], pending: pend('dragon-king', 'wreck', 'abyss') }, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(b.state.buffs).toEqual(['imugi-scale', 'dragon-breath', 'dragon-pearl'])
+    expect(b.state.legends).toContain('dragon-king')
+  })
+  it('records: dex n/94', () => {
+    expect(logic.records(logic.init()).find((r) => r.key === 'dex')).toEqual({ key: 'dex', value: 0, detail: '0/94' })
+  })
+  it('migrate v12 세이브(갯벌·늪지·이무기) → 그대로; v13 세이브(산정·난파선·새 신화·버프 셋) → 그대로, version 13', () => {
+    const v12 = {
+      ...logic.init(), gold: 77, areas: [...DEFAULT_AREAS, 'tideflat', 'swamp'], rodTier: 5,
+      dex: { mudskipper: { count: 3, maxCm: 18 }, imugi: { count: 1, maxCm: 500 } },
+      legends: ['century-snakehead', 'thousand-turtle', 'imugi'], buffs: ['imugi-scale'],
+    }
+    // 전설 셋을 잡은 세이브라 옷장 업적 옷(왕관·금빛 머리)이 함께 생긴다(옷장 규칙, logic.version 10)
+    const m12 = logic.migrate(JSON.parse(JSON.stringify(v12)), 12)
+    expect({ ...m12, wardrobe: [] }).toEqual(v12)
+    expect(m12.wardrobe).toEqual(['hat:crown', 'hairColor:gold'])
+    const v13 = {
+      ...logic.init(), gold: 5, rodTier: 6, areas: [...DEFAULT_AREAS, 'lake', 'island', 'summit', 'wreck'],
+      dex: { char: { count: 2, maxCm: 30 }, 'white-dragon': { count: 1, maxCm: 300 }, 'dragon-king': { count: 1, maxCm: 800 }, skipjack: { count: 4, maxCm: 70 } },
+      legends: ['grouper', 'silver-king-trout', 'rainbow-marlin', 'snowwhite-taimen', 'white-dragon', 'oarfish', 'dragon-king'],
+      buffs: [],
+      bag: [{ species: 'dragon-king', sizeCm: 800, perfect: false, locked: true }],
+    }
+    const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
+    expect(m.areas).toEqual(v13.areas)
+    expect(m.dex).toEqual(v13.dex)
+    expect(m.legends).toEqual(v13.legends)
+    expect(m.bag).toEqual(v13.bag)
+    // 버프는 legends의 신화에서 다시 만든다(BUFFS 순서)
+    expect(m.buffs).toEqual(['dragon-breath', 'dragon-pearl'])
+    expect(logic.version).toBe(13)
+  })
+})

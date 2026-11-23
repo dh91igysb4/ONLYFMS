@@ -47,9 +47,10 @@ describe('장비 가격', () => {
     // 바는 미니게임 균형을 깨지 않게 거의 늘리지 않는다(4단계 0.45에서 +0.05까지)
     expect(RODS[5].barBonus).toBeLessThanOrEqual(0.5)
   })
-  it('새 장비는 신화 말고는 필요 없다: 신화를 뺀 모든 어종이 4단계 낚싯대로 낚인다(이무기는 5)', () => {
-    for (const s of SPECIES) if (s.rarity !== 'mythic') expect(s.minRod, s.id).toBeLessThanOrEqual(4)
-    expect(SPECIES.find((s) => s.id === 'imugi')!.minRod).toBe(5)
+  it('고급 낚싯대가 필요한 곳: 난파선 어종·신화를 뺀 모든 어종은 4단계 이하, 난파선 어종은 5 이상, 용왕 6', () => {
+    for (const s of SPECIES) if (s.rarity !== 'mythic' && s.area !== 'wreck') expect(s.minRod, s.id).toBeLessThanOrEqual(4)
+    for (const s of SPECIES) if (s.area === 'wreck') expect(s.minRod, s.id).toBeGreaterThanOrEqual(5)
+    expect(SPECIES.filter((s) => s.rarity === 'mythic').map((s) => [s.id, s.minRod])).toEqual([['imugi', 5], ['white-dragon', 5], ['dragon-king', 6]])
   })
   it('총액(낚싯대·가방·찌·해금, 순간이동 제외)', () => {
     // 기존 1,186,300 + 갯벌 30,000 + 늪지 60,000 + 산정 120,000 + 난파선 150,000
@@ -68,10 +69,10 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
   it('기존 장비·해금은 지금 속도 그대로(4시간 안에 다 산다)', () => {
     expect(at(plain, '가시 바늘').atHours).toBeLessThan(4)
   })
-  it('상한이 없으면 전부 다 사기까지 약 20시간(±20%, 상한 없이 몰아서 하는 경우의 참고값 — M3 중간값)', () => {
+  it('상한이 없으면 전부 다 사기까지 약 16.6시간(±20%, 상한 없이 몰아서 하는 경우의 참고값)', () => {
     const h = plain[plain.length - 1].atHours
-    expect(h).toBeGreaterThan(20.09 * 0.8)
-    expect(h).toBeLessThan(20.09 * 1.2)
+    expect(h).toBeGreaterThan(16.58 * 0.8)
+    expect(h).toBeLessThan(16.58 * 1.2)
   })
   it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각은 낚시 5부 전과 같다(상한 없음·하루 1시간 상한)', () => {
     expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.36, 1.46, 1.55, 2.2, 2.86, 2.88, 2.9, 2.92])
@@ -107,10 +108,9 @@ describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
 describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', () => {
   const daysFor = (hoursPerDay: number) => simulate(BUY_ORDER, { hoursPerDay, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE }).at(-1)!.atDay
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.1)
-  // M3 Task 2 중간값(산정·난파선 해금만, 어종 전) — Task 7에서 최종값으로 고친다
-  it('하루 3시간: 약 21.1일', () => near(daysFor(3), 21.1))
-  it('하루 5시간: 약 14.8일', () => near(daysFor(5), 14.78))
-  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 20.1일', () => near(plain[plain.length - 1].atHours, 20.09))
+  it('하루 3시간: 약 18.1일', () => near(daysFor(3), 18.06))
+  it('하루 5시간: 약 12.4일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 12.41))
+  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 16.6일', () => near(plain[plain.length - 1].atHours, 16.58))
 })
 
 // ---------------------------------------------------------------- 낚시 5부 M1: 물때 자리·지역 최소 낚싯대·신화 버프
