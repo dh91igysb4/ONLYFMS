@@ -18,6 +18,14 @@ describe('neon-rider 상수', () => {
     expect(C.V_TERMINAL).toBeGreaterThanOrEqual(C.V_MAX)
   })
 
+  it('움직이는 길·블록 상수가 정수이고 양수다', () => {
+    for (const v of [C.BODY_R, C.MOVER_MEMORY, C.BLOCK_MASS, C.BLOCK_CORNER_R, C.BLOCK_WAKE, C.BLOCK_MEMORY, C.CRUSH_DEPTH]) {
+      expect(Number.isInteger(v)).toBe(true)
+      expect(v).toBeGreaterThan(0)
+    }
+    expect(C.CRUSH_DEPTH).toBe(Math.floor(C.WHEEL_R / 2))
+  })
+
   it('부스터 속도가 최고 속도보다 빠르다', () => {
     expect(C.BOOST_V).toBeGreaterThan(C.V_MAX)
   })
