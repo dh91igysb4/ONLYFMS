@@ -6,7 +6,7 @@ import type { WorldGameProps } from '../ui.ts'
 import { AREAS, BAG_SIZE, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
-import { drawScene, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { drawScene, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
@@ -123,6 +123,9 @@ export function Game({ gameId }: WorldGameProps) {
   const [fullscreen, setFullscreen] = useState(false)
 
   const rootRef = useRef<HTMLElement>(null)
+  /** 사용자가 지금 전체화면을 원하는지, 요소 전체화면 요청이 아직 끝나지 않았는지 */
+  const wantFullscreen = useRef(false)
+  const fullscreenPending = useRef(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -367,6 +370,9 @@ export function Game({ gameId }: WorldGameProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId])
 
+  // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
+  useEffect(() => releaseSceneCache, [])
+
   const loaded = view !== null
 
   // rAF 루프: 마운트돼 있고 탭이 보일 때만 하나 돈다
@@ -435,21 +441,27 @@ export function Game({ gameId }: WorldGameProps) {
   // 전체화면: 게임 전체가 화면을 덮는 고정 덮개가 된다(아이폰 사파리처럼 요소 전체화면이 없어도 동작).
   // 있는 동안 페이지 스크롤을 막고, Esc(메뉴 창이 없을 때)나 브라우저 전체화면 종료로 나간다.
   // 나가거나 페이지를 떠나면 스크롤을 되돌리고 브라우저 전체화면도 끝낸다.
+  // 요소 전체화면 요청이 끝나기 전에 알림이 와도(전체화면 요소 없음) 덮개는 그대로 둔다.
   useEffect(() => {
     if (!fullscreen) return
     const root = rootRef.current
     const html = document.documentElement
     const prevOverflow = html.style.overflow
     html.style.overflow = 'hidden'
+    const leave = () => {
+      wantFullscreen.current = false
+      setFullscreen(false)
+    }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !menuRef.current) setFullscreen(false)
+      if (e.key === 'Escape' && !menuRef.current) leave()
     }
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) setFullscreen(false)
+      if (!document.fullscreenElement && !fullscreenPending.current) leave()
     }
     window.addEventListener('keydown', onKey)
     document.addEventListener('fullscreenchange', onFullscreenChange)
     return () => {
+      wantFullscreen.current = false
       window.removeEventListener('keydown', onKey)
       document.removeEventListener('fullscreenchange', onFullscreenChange)
       html.style.overflow = prevOverflow
@@ -505,14 +517,32 @@ export function Game({ gameId }: WorldGameProps) {
   const toggleMenu = (m: Menu) => setMenu(menuRef.current === m ? null : m)
 
   function toggleFullscreen() {
+    const root = rootRef.current
+    // 초점을 게임으로 돌려 스페이스(던지기)가 이 버튼을 누르지 않게 한다
+    root?.focus({ preventScroll: true })
     if (fullscreen) {
+      wantFullscreen.current = false
       setFullscreen(false)
       return
     }
+    wantFullscreen.current = true
     setFullscreen(true)
     // 데스크톱·안드로이드에서는 브라우저 화면 요소까지 숨긴다. 거절돼도 덮개는 그대로 쓴다.
-    const root = rootRef.current
-    if (root && typeof root.requestFullscreen === 'function') ignoreRejection(() => root.requestFullscreen())
+    // 요청이 끝나기 전에 나갔으면(또는 화면을 떠났으면) 끝난 뒤 브라우저 전체화면도 끝낸다.
+    if (root && typeof root.requestFullscreen === 'function') {
+      fullscreenPending.current = true
+      const settle = () => {
+        fullscreenPending.current = false
+      }
+      ignoreRejection(() =>
+        Promise.resolve(root.requestFullscreen()).then(() => {
+          settle()
+          if (!wantFullscreen.current && document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+            ignoreRejection(() => document.exitFullscreen())
+          }
+        }, settle),
+      )
+    }
   }
 
   // ------------------------------------------------------------ 그리기
@@ -530,11 +560,26 @@ export function Game({ gameId }: WorldGameProps) {
     return <p className="muted">불러오는 중…</p>
   }
 
+  const notices = notice && (
+    <>
+      {notice.kind === 'bag_full' && (
+        <div className="notice fish-notice" role="alert">
+          <span>가방이 가득 찼어요. 상점에서 팔아 주세요</span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setMenu('shop')}>
+            상점 열기
+          </button>
+        </div>
+      )}
+      {notice.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
+      {notice.kind === 'info' && <p className="fish-info">{notice.text}</p>}
+    </>
+  )
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
-  const hint = menu ? null : HINTS[phase]
+  // 전체화면에서는 알림이 캔버스 아래쪽에 겹쳐 뜨므로 그동안 안내 줄은 숨긴다
+  const hint = menu || (fullscreen && notices) ? null : HINTS[phase]
 
   return (
-    <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef}>
+    <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef} tabIndex={-1}>
       <div className="fish-top">
         <strong className="fish-gold">{gold(view.gold)}</strong>
       </div>
@@ -594,19 +639,11 @@ export function Game({ gameId }: WorldGameProps) {
               {menu === 'dex' && <DexPanel view={view} />}
             </div>
           )}
+          {fullscreen && notices && <div className="fish-notices">{notices}</div>}
         </div>
       </div>
 
-      {notice?.kind === 'bag_full' && (
-        <div className="notice fish-notice" role="alert">
-          <span>가방이 가득 찼어요. 상점에서 팔아 주세요</span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setMenu('shop')}>
-            상점 열기
-          </button>
-        </div>
-      )}
-      {notice?.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
-      {notice?.kind === 'info' && <p className="fish-info">{notice.text}</p>}
+      {!fullscreen && notices}
 
       <div className="fish-bottom" ref={bottomRef}>
         <span className="fish-bag-count">

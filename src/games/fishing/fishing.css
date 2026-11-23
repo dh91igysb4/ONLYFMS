@@ -130,3 +130,16 @@
 .fish-full > * { flex-shrink: 0; }
 /* 캔버스 칸의 크기는 덮개 배치가 정한다(캔버스 크기에 끌려가지 않게 기준 0, 최소 높이 0). */
 .fish-full > .fish-stage { flex: 1 1 0; min-height: 0; align-items: center; overflow: hidden; }
+/* 전체화면에서 알림(가방 가득·오류·판매)은 캔버스 아래쪽에 겹쳐 띄워 캔버스 칸 크기를 바꾸지 않는다. */
+.fish-notices {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fish-notices .fish-info { padding: 6px 10px; border-radius: 8px; background: var(--panel); text-align: center; }
+/* 토글 뒤 초점을 받는 게임 뿌리(tabIndex -1)는 테두리를 그리지 않는다 */
+.fish:focus { outline: none; }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
-import { drawScene, layout, SCENE_H, SCENE_W, type Phase, type SceneState } from './scene.ts'
+import { drawScene, layout, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type SceneState } from './scene.ts'
 
 // 그려진 스프라이트의 화면 좌표(이동 반영)를 기록하려고 drawSprite를 감싼다. 그리기 자체는 실제 함수가 한다.
 vi.mock('./sprites.ts', async (importOriginal) => {
@@ -197,5 +197,13 @@ describe('drawScene background cache', () => {
     drawScene(asCtx(main), state('idle', 0), { w: 201, h: 300 })
     expect(made).toHaveLength(4)
     expect((main.images[3].img as HTMLCanvasElement).width).toBe(201)
+
+    // 놓아 주면 같은 크기라도 다음 그리기에서 새로 만든다
+    drawScene(asCtx(main), state('idle', 0), { w: 201, h: 300 })
+    expect(made).toHaveLength(4)
+    releaseSceneCache()
+    drawScene(asCtx(main), state('idle', 0), { w: 201, h: 300 })
+    expect(made).toHaveLength(6)
+    expect(main.images[5].img).not.toBe(main.images[4].img)
   })
 })

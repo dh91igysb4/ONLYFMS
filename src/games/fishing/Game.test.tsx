@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
-import { drawScene } from './scene.ts'
+import { drawScene, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type PendingView, type View } from './logic.ts'
@@ -11,7 +11,7 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
   return { ...orig, world: vi.fn() }
 })
-vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -516,6 +516,7 @@ describe('fishing Game', () => {
       const { container, unmount } = await mount()
       const root = container.querySelector('.fish') as HTMLElement
       fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      await flush() // 요청이 끝난다
       expect(request).toHaveBeenCalledTimes(1)
       expect(request.mock.contexts[0]).toBe(root)
       act(() => { document.dispatchEvent(new Event('fullscreenchange')) }) // 들어감 알림: 그대로
@@ -557,6 +558,100 @@ describe('fishing Game', () => {
     } finally {
       delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
     }
+  })
+
+  test('the toggle gives focus back to the game so Space does not press it', async () => {
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    const toggle = screen.getByRole('button', { name: '전체화면' })
+    toggle.focus()
+    fireEvent.click(toggle)
+    const exit = screen.getByRole('button', { name: '나가기' })
+    expect(document.activeElement).not.toBe(exit)
+    expect(document.activeElement).toBe(root)
+    exit.focus()
+    fireEvent.click(exit)
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: '전체화면' }))
+    expect(document.activeElement).toBe(root)
+  })
+
+  test('in fullscreen notices sit over the canvas area and do not resize the canvas', async () => {
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      const { container } = await mount()
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      const c = canvas() as HTMLCanvasElement
+      const before = [c.width, c.height]
+      route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
+      press()
+      await advance(200)
+      release()
+      await flush()
+      const note = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      const stage = container.querySelector('.fish-stage') as HTMLElement
+      expect(stage.contains(note)).toBe(true)
+      expect([c.width, c.height]).toEqual(before)
+      // 보통 화면에서는 예전처럼 무대 아래
+      fireEvent.keyDown(window, { key: 'Escape' })
+      const again = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      expect(stage.contains(again)).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  test('leaving before the element fullscreen request settles exits native fullscreen when it does', async () => {
+    let fsEl: Element | null = null
+    let resolveRequest: () => void = () => {}
+    const request = vi.fn(function (this: Element) {
+      const el = this
+      return new Promise<void>((res) => {
+        resolveRequest = () => {
+          fsEl = el
+          document.dispatchEvent(new Event('fullscreenchange'))
+          res()
+        }
+      })
+    })
+    const exitFs = vi.fn(() => {
+      fsEl = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+      return Promise.resolve()
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request })
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fsEl })
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFs })
+    try {
+      const { container } = await mount()
+      const root = container.querySelector('.fish') as HTMLElement
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      // 요청이 아직 끝나지 않았을 때 오는 알림(전체화면 요소 없음)으로는 나가지 않는다
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
+      expect(root).toHaveClass('fish-full')
+      fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+      expect(root).not.toHaveClass('fish-full')
+      expect(exitFs).not.toHaveBeenCalled()
+      await act(async () => {
+        resolveRequest()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(exitFs).toHaveBeenCalledTimes(1)
+      expect(fsEl).toBeNull()
+      expect(root).not.toHaveClass('fish-full')
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement
+      delete (document as { exitFullscreen?: unknown }).exitFullscreen
+    }
+  })
+
+  test('unmount releases the scene background cache', async () => {
+    vi.mocked(releaseSceneCache).mockClear()
+    const { unmount } = await mount()
+    expect(releaseSceneCache).not.toHaveBeenCalled()
+    unmount()
+    expect(releaseSceneCache).toHaveBeenCalledTimes(1)
   })
 
   test('stops drawing after unmount', async () => {

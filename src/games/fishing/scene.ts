@@ -321,6 +321,11 @@ function renderFrames(world: World): [HTMLCanvasElement, HTMLCanvasElement] | nu
   return [frames[0], frames[1]]
 }
 
+/** 배경 캐시를 놓아 준다(게임 화면을 떠날 때). 다음 그리기에서 다시 만든다. */
+export function releaseSceneCache(): void {
+  background = null
+}
+
 function backgroundFor(w: number, h: number): Background {
   if (background && background.world.w === w && background.world.h === h) return background
   const world = makeWorld(w, h)
