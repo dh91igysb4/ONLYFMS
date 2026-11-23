@@ -363,7 +363,7 @@
 
 ### Task 6: 갯벌·늪지 어종 19종과 이무기, `logic.version` 12
 
-**Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` tideflat 45·swamp 90); Test `data.test.ts`, `logic.test.ts`, `Game.test.tsx`
+**Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` tideflat 45·swamp 90); Test `data.test.ts`, `logic.test.ts`, `Game.test.tsx`, `gold.test.ts`(minRod 검사 고침 — 이무기 minRod 5)
 
 **Interfaces:**
 - Produces: `SPECIES` 75종(설계 §5.1·§5.2 표 그대로). `logic.version` 12. `migrate`: v11 → 그대로(새 지역 id·어종을 알게 됨).
@@ -374,6 +374,7 @@
   - `신화 규칙: 이무기의 지역·자리에서 나올 수 있는 전설(천년 자라)이 needs에 있다; needs는 모두 전설 id; buff imugi-scale` (Review Focus 2)
   - `logic: 갯벌 열린 세이브에서 creek 썰물 → 짱뚱어·낙지 등, 밀물 → spot_closed; estuary 늘 정상; 늪지 bog 비 오는 밤 rod 5 + 두 전설 잡음 + 힘 0.95 + r0 0 → 이무기, buffs에 imugi-scale`
   - `records dex 'n/75', challenges 'n/8'`
+  - `gold.test "새 장비는 어떤 어종에도 필요 없다" → "신화를 뺀 모든 어종이 4단계 이하"` (이무기 minRod 5. M3에서 난파선·용왕 규칙을 더한다). `Menus.tsx`의 `PREMIUM_ROD`(어종 minRod 최댓값)도 5가 되므로 상점 "고급 장비 · 없어도 모든 물고기를 낚아요" 문구를 다시 본다
   - `migrate v11 세이브(areas에 tideflat) → 유지, version 12`
 - [ ] **Step 2~4** — `npx vitest run src/games/fishing && npm run typecheck && npm run fn:test`
 - [ ] **Step 5: 커밋** — `feat: 낚시 갯벌·늪지 어종 19종과 신화 이무기, 로직 버전 12`
@@ -451,14 +452,14 @@
 
 ### Task 6: 산정·난파선 어종 19종과 신화 둘, `logic.version` 13
 
-**Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` summit 90·wreck 120); Test `data.test.ts`, `logic.test.ts`, `gold.test.ts`(minRod 검사 고침)
+**Files:** Modify `data.ts`, `logic.ts`(version), `econSim.ts`(`TRIP_SEC` summit 90·wreck 120); Test `data.test.ts`, `logic.test.ts`, `gold.test.ts`(M2에서 고친 minRod 검사에 난파선·용왕 규칙 추가)
 
 - [ ] **Step 1: 실패하는 테스트**
   - `94종, 기존 75종 스냅숏 불변`
   - `보장(열린 자리, areaMinRod): 난파선은 낚싯대 5로 common ≥ 1`
   - `산정·난파선 어종은 seasons 없음; 지역 규칙(상시 common ≥ 2 등)`
   - `신화 규칙: 천지 백룡 needs ⊇ {설백 자치}, 용왕 needs ⊇ {산갈치}; buff가 셋 모두 다름; 용왕 minRod 6` (Review Focus 2)
-  - `gold.test "새 장비는 어떤 어종에도 필요 없다" → "난파선 어종·신화를 뺀 모든 어종이 4단계 이하, 난파선 어종은 5 이상, 용왕 6"`
+  - `gold.test`(M2에서 고친 검사) → "난파선 어종·신화를 뺀 모든 어종이 4단계 이하, 난파선 어종은 5 이상, 용왕 6". `need_rod` 문구("백골 낚싯대…")가 고정이라 minRod 지역이 하나 더 생기면 `RODS`·`areaMinRod`로 이름을 만든다
   - `logic: 난파선 열린 세이브 rod 5 abyss 정상, rod 4(꼬인 세이브) → need_rod (Review Focus 5); 산정 ice·hotspring 정상(서버는 구멍을 모른다); 천지 백룡(맑은 0~4시, 두 전설) → buffs dragon-breath; 용왕(비, rod 6, 세 전설, 힘 0.98) → dragon-pearl`
   - `records dex 'n/94', challenges 'n/10'`
   - `migrate v12 → 그대로, version 13`
@@ -500,4 +501,5 @@
 - **지도 "지금"**: 설계 §4.9대로 `spotOpen`을 M1에서 함께 넣었다(지금 데이터에는 물때 자리가 없어 결과 동일). 먼저 잡을 전설이 남은 신화는 "지금"이 아니다(이유 `needs` "먼저 잡을 전설" — 안 잡은 행은 이유를 숨기므로 화면에는 보이지 않는다).
 - **판매가 버프 화면**: 상점 예상가뿐 아니라 가방 칸 가격·잡은 알림 가격도 `sellPrice`(실제로 팔리는 값)로 보인다.
 - **시뮬레이션**: `TRIP_SEC`에 없는 지역(합성 테스트 지역)은 가장 먼 왕복으로 본다. 기존 고정값은 모두 그대로(신화·물때 자리가 없어 같은 수).
+- **리뷰 반영(m1-review)**: 신화·전설 동시 후보 없음 데이터 검사(`data.test` — 실제 데이터·합성 신화·깨진 경우), 신화 이중 테두리를 강조색 · 바탕색 틈 · 강조색으로(두 토큰이 같은 색이라 한 띠였다), 뚫은 뒤 발이 구멍에 걸치면 칸 가운데로, 창이 열려 있으면 밀물 이동을 미룸, 진흙으로 이어진 땅이 없으면 맵 시작 위치로, 설계 §6.3·결정 16 수치 갱신. 백룡의 숨결을 용솟음 바 상한에도 곱해 봤더니 봇이 53% → 83%로 범위를 넘어 넣지 않고 문서로 남겼다.
 - **그림**: 진흙(마른 / 흙탕물 두 장)·얼음·구멍(두 장)·뚫는 금 세 단계·물때 아이콘 둘·버프 셋·신화 문장(잡은 알림)을 새로 그렸다. 미리보기 `/home/claude/preview/m1/`.

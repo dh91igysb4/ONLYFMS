@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
 import { SPRITES } from './sprites.ts'
+import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 import {
   AREAS, areaHasSpecies, areaMinRod, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
-  speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS,
+  speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, type Species,
 } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
@@ -289,5 +290,35 @@ describe('신화 버프', () => {
   })
   it('BUFF_FX 값', () => {
     expect(BUFF_FX).toEqual({ imugiBite: 0.85, dragonBar: 1.08, pearlSell: 108 })
+  })
+})
+
+// 신화와 전설이 한 판에 동시에 후보가 될 수 없다(설계 §6.2, rollCatch가 r0를 함께 쓴다): 신화의 지역에서
+// 자리가 겹치는(어느 한쪽이 자리 제한이 없으면 겹친다) 모든 전설이 그 신화의 needs에 있어야 한다.
+function shadowingLegends(list: readonly Species[]): string[] {
+  const out: string[] = []
+  for (const m of list.filter((s) => s.rarity === 'mythic')) {
+    for (const l of list.filter((s) => s.rarity === 'legend' && s.area === m.area)) {
+      const overlap = !m.spots || !l.spots || m.spots.some((sp) => l.spots!.includes(sp))
+      if (overlap && !(m.legend?.needs ?? []).includes(l.id)) out.push(`${m.id} must need ${l.id}`)
+    }
+  }
+  return out
+}
+
+describe('신화·전설 동시 후보 없음', () => {
+  it('실제 데이터', () => {
+    expect(shadowingLegends(SPECIES)).toEqual([])
+  })
+  describe('합성 신화', () => {
+    withTempData(M1_FIXTURE)
+    it('M1_FIXTURE는 통과하고, 같은 자리 전설을 needs에서 빼면 걸린다', () => {
+      expect(shadowingLegends(SPECIES)).toEqual([])
+      const broken = SPECIES.map((s) => (s.id === 'tmp-mythic' ? { ...s, legend: { ...s.legend!, needs: ['grouper'] } } : s))
+      expect(shadowingLegends(broken)).toEqual(['tmp-mythic must need tmp-legend'])
+      // 자리 제한 없는 전설은 모든 자리와 겹친다
+      const spotless = SPECIES.map((s) => (s.id === 'tmp-legend' ? { ...s, spots: undefined } : s))
+      expect(shadowingLegends(spotless)).toEqual(['tmp-mythic2 must need tmp-legend'])
+    })
   })
 })

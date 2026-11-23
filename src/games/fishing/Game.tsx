@@ -661,6 +661,12 @@ export function Game({ gameId }: WorldGameProps) {
     const next = addHole(before, d.tx, d.ty)
     setHoles(next)
     if (before.length >= MAX_HOLES && !before.includes(`${d.tx},${d.ty}`)) flashInfo(REFROZE_TEXT, TIDE_NOTICE_MS)
+    // 발 사각형이 새 구멍에 걸쳐 있으면 서 있던 칸 가운데로 당긴다(그 칸은 늘 걸을 수 있다)
+    const { pos } = rt.player
+    if (feetBlocked(rt.map, pos.x, pos.y, opened, dynNow())) {
+      const t = tileOf(pos)
+      rt.player = { ...rt.player, pos: { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 } }
+    }
   }
 
   /**
@@ -680,11 +686,13 @@ export function Game({ gameId }: WorldGameProps) {
       }
       return
     }
-    if (rt.phase !== 'idle' || rt.busy || rt.drill) return
+    // 창이 열려 있으면 닫은 뒤에 옮긴다
+    if (rt.phase !== 'idle' || rt.busy || rt.drill || menuRef.current) return
     const { pos } = rt.player
     if (!feetBlocked(rt.map, pos.x, pos.y, opened, dyn)) return
-    const dry = nearestDryTile(rt.map, tileOf(pos), opened)
-    if (dry) startTransition(rt.map.id, { tx: dry.tx, ty: dry.ty, facing: rt.player.facing }, TIDE_IN_TEXT)
+    // 진흙으로 이어진 땅이 없으면(맵 데이터 실수) 그 맵 시작 위치로: 물 위에 갇히지 않게
+    const dry = nearestDryTile(rt.map, tileOf(pos), opened) ?? tileOf(rt.map.spawn.pos)
+    startTransition(rt.map.id, { tx: dry.tx, ty: dry.ty, facing: rt.player.facing }, TIDE_IN_TEXT)
   }
 
   /** 해금 창을 연다(잠긴 문 앞, 또는 안 연 지역으로 가는 선착장 앞) */

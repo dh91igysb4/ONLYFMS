@@ -438,6 +438,10 @@ describe('surgePhase', () => {
     expect(effectiveBarSize({ ...p, behavior: 'surge' }, 500)).toBe(p.barSize)
     expect(effectiveBarSize({ ...p, behavior: 'dart' }, 2000)).toBe(p.barSize)
     expect(effectiveBarSize({ ...p, barSize: 0.15, behavior: 'surge' }, 2000)).toBe(0.15)
+    // 용솟음 상한은 백룡의 숨결과도 무관하다(숨결은 고요·다른 물고기에서만)
+    const breath = barParams('anchovy', 6, ['cork'], ['dragon-breath'])
+    expect(effectiveBarSize({ ...breath, behavior: 'surge' }, 2000)).toBe(0.21)
+    expect(effectiveBarSize({ ...breath, behavior: 'surge' }, 500)).toBeCloseTo(breath.barSize)
   })
 })
 
@@ -505,5 +509,11 @@ describe('신화 surge: 안 누르면 못 잡고, 사람 비슷한 봇은 잡을
     expect(best).toBeGreaterThanOrEqual(0.25)
     expect(best).toBeLessThanOrEqual(0.7)
     expect(rate(barParams('tmp-mythic2', 5, []), human200, 100, 900)).toBeGreaterThanOrEqual(0.1)
+  })
+  it('백룡의 숨결을 켜도 봇 범위 안이고, 끈 것보다 덜 잡지는 않는다', () => {
+    const best = rate(barParams('tmp-mythic2', 6, ['cork', 'barbed'], ['dragon-breath']), human200, 100, 900)
+    expect(best).toBeGreaterThanOrEqual(rate(barParams('tmp-mythic2', 6, ['cork', 'barbed']), human200, 100, 900))
+    expect(best).toBeLessThanOrEqual(0.7)
+    expect(rate(barParams('tmp-mythic2', 5, [], ['dragon-breath']), human200, 100, 900)).toBeGreaterThanOrEqual(0.1)
   })
 })

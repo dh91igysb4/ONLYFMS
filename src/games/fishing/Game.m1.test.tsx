@@ -168,8 +168,33 @@ describe('물때', () => {
   })
 })
 
+test('창이 열려 있으면 밀물이 들어도 옮기지 않고, 닫은 뒤에 옮긴다', async () => {
+  vi.setSystemTime(atMinute(5 * 60 + 58))
+  await mount({ area: 'river', pos: tileCenter(3, 5), facing: 'right' })
+  await walk('ArrowRight', 450)
+  const onMud = tileOf(lastScene().player.pos)
+  expect(tileAt(flat, onMud.tx, onMud.ty)).toBe('mud')
+  fireEvent.click(screen.getByRole('button', { name: '가방' }))
+  await advance(3_000) // 6:01 밀물
+  await advance(400)
+  expect(tileOf(lastScene().player.pos)).toEqual(onMud)
+  fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+  await advance(400)
+  expect(tileOf(lastScene().player.pos)).toEqual(nearestDryTile(flat, onMud, ALL_AREAS_OPEN))
+})
+
 describe('얼음 구멍', () => {
   const ICE_FRONT = { area: 'river' as const, pos: tileCenter(24, 30), facing: 'left' as const }
+
+  test('발이 새 구멍에 걸쳐 있으면 뚫은 뒤 서 있던 칸 가운데로 당긴다', async () => {
+    vi.setSystemTime(atMinute(12 * 60))
+    await mount({ ...ICE_FRONT, pos: { x: 24 * TILE + 4.5, y: 30 * TILE + 8 } })
+    press()
+    release()
+    await advance(1300)
+    expect([...lastScene().dyn!.holes]).toEqual(['23,30'])
+    expect(lastScene().player.pos).toEqual(tileCenter(24, 30))
+  })
 
   test('얼음을 보고 행동 → 1.2초 뚫기(그동안 drill 장면) → 같은 자리에서 낚시', async () => {
     vi.setSystemTime(atMinute(12 * 60))

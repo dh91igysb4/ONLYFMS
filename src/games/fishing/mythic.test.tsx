@@ -9,6 +9,7 @@ import { BUFFS, SPECIES } from './data.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { M1_FIXTURE, TMP_MYTH, withTempData } from './testFixtures.ts'
 import { PALETTES, PALETTE_IDS } from '../../app/palettes.ts'
+import fishingCss from './fishing.css?raw'
 
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) => `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -123,5 +124,17 @@ describe('신화의 힘(버프) 화면', () => {
   })
   it('SPECIES에 테스트 어종이 남지 않는다', () => {
     expect(SPECIES.some((s) => s.id.startsWith('tmp-'))).toBe(false)
+  })
+})
+
+describe('신화 테두리 CSS', () => {
+  const rule = (sel: string) => fishingCss.match(new RegExp(`(^|\\n)${sel.replace(/[.*]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? ''
+  it('신화 칸·도감 칸은 강조색 2px · 바탕색 틈 · 강조색 6px의 진짜 이중 테두리, 잠긴 신화는 안쪽에 잉크 한 겹', () => {
+    const double = 'inset 0 0 0 2px var(--accent-strong), inset 0 0 0 4px var(--panel), inset 0 0 0 6px var(--accent-strong)'
+    expect(rule('.fish-cell-mythic')).toContain(double)
+    expect(rule('.fish-dex-item-mythic')).toContain(double)
+    expect(rule('.fish-cell-mythic.fish-cell-locked')).toContain(`${double}, inset 0 0 0 7px var(--ink)`)
+    // 잠긴 전설(4px 한 띠)과 다르다
+    expect(rule('.fish-cell-legend.fish-cell-locked')).not.toContain('var(--panel)')
   })
 })
