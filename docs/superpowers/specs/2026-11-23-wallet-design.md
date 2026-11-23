@@ -1,0 +1,322 @@
+# 지갑과 골드 지급 설계 (펨타듀 밸리 1단계)
+
+- 날짜: 2026-11-23 (초안), 2026-11-24 (확정)
+- 상태: **승인됨 (2026-11-24, 사용자가 확인 없이 진행하도록 위임)**. 초안을 현재 코드(main `401563b`)와 맞춰 고치고, 열린 질문은 §14에 판단으로 정했다.
+- 착수 시점: 펨타듀 낚시 확장(2~6단계)이 끝난 뒤 (사용자 결정, 2026-11-23)
+- 구현 계획: `docs/superpowers/plans/2026-11-24-wallet.md` (1·2단계 PR)
+- 관련: `2026-11-23-fishing-design.md`(world 플랫폼), `2026-11-23-fishing-world-design.md`(낚시 확장), `2026-11-01-duel-platform-design.md`, `2026-10-31-onlyfms-platform-design.md`
+
+## 1. 의도
+
+사이트의 목표를 "게임 여러 개 모음"에서 "집과 캐릭터를 키우는 게임 하나(펨타듀 밸리)"로 바꾼다. 미니게임·낚시·데일리·대전·대회는 모두 골드를 버는 수단이 된다. 밸리는 지금의 낚시 세계이고, 낚시 골드가 사이트 공용 지갑이 된다.
+
+전체는 세 덩어리다. 이 문서는 1번만 다룬다.
+
+1. **지갑과 지급** (이 문서)
+2. 메인 화면 개편 (상단 유지, 가운데 밸리, 아래 이름만 있는 버튼 묶음)
+3. 집과 캐릭터 (골드를 쓰는 곳)
+
+사용자 동기: 게임이 따로 놀지 않고, 친구 6명이 오래 붙잡고 키울 하나의 목표가 있어야 한다.
+
+## 2. 목표 / 비목표 / 실패 조건
+
+**목표**
+- 골드가 플랫폼 지갑 하나에 있고, 모든 증감이 장부에 남는다.
+- 기존 낚시 골드가 그대로 지갑으로 넘어온다.
+- 자유 플레이 미니게임이 점수에 비례해 골드를 준다. 평균 수준 플레이의 시간당 골드가 게임마다 비슷하다.
+- 데일리는 등수별 상금(서버 지급), 대전은 판돈, 대회는 참가비와 등수별 분배.
+- 단계별 PR(§11). 각 단계가 그 자체로 배포 가능하다.
+
+**비목표**
+- 집·캐릭터·땅, 메인 화면 개편 (2·3번 작업)
+- 친구에게 골드 보내기, 재산 순위표
+- 서버가 행동 기록을 다시 돌려 점수를 검증하는 것
+- 서버가 상금을 보태는 대회, 리그·토너먼트
+- 캐릭터·집 성장에 따른 수입 배율
+- 실시간 잔액 구독
+
+**실패 조건 (동작해도 실패)**
+- 이전 과정에서 누군가의 낚시 골드가 사라지거나 두 번 들어온다.
+- 잔액이 음수가 된다. 같은 지급이 재전송·재시도로 두 번 들어간다.
+- 골드가 0인 사람이 할 수 있는 게임이 없다 (판돈 0 대전, 참가비 0 대회, 자유 플레이, 데일리, 낚시는 항상 가능해야 한다).
+- 플랫폼 코드가 게임 id로 분기한다 (`CLAUDE.md` 금지 사항).
+- 조작한 점수로 게임별 하루 상한을 넘는 골드를 번다. 동시에 보낸 여러 판으로 상한을 넘는다.
+- 대전·대회가 중간에 무효·취소됐는데 맡긴 돈이 돌아오지 않는다.
+
+## 3. 접근 방식
+
+**지갑 구조** (사용자 선택: A)
+| | 방식 | 판단 |
+|---|---|---|
+| **A** | **플랫폼 지갑 테이블(`wallets`) + 장부(`gold_ledger`), 변경은 서버 함수 하나로만** | **선택.** 대전·대회·데일리·낚시가 같은 길을 쓰고, 잠글 행이 분명하다. 단점: 낚시 서버 로직과 세이브 이전을 건드린다 → 낚시 확장이 끝난 뒤에 넣는다(사용자 결정) |
+| B | 낚시 세이브의 `gold`를 원본으로 유지 | 버림. 플랫폼이 낚시 세이브 내부를 고쳐야 해 게임별 분기 금지를 어기고, 판돈 맡기기가 지저분함 |
+| C | 잔액 없이 장부 합계만 | 버림. 동시 지출 때 잠글 대상이 없어 음수 잔액 위험 |
+
+**자유 플레이 점수 신뢰** (사용자 선택: 믿되 상한)
+| | 방식 | 판단 |
+|---|---|---|
+| **A** | **브라우저 점수를 믿되 판당 상한 + 게임별 하루 상한** | **선택.** 구현이 가장 작고, 조작해도 벌 수 있는 양이 정해짐 |
+| B | 서버가 행동 기록을 다시 돌려 검증 | 게임마다 재현 가능한 로직이 필요, 새 게임마다 조건이 붙음 |
+| C | 그냥 믿는다 | 한 명의 장난으로 경제 전체가 깨짐 |
+
+**게임 간 균형** (사용자 선택: 실력으로만 오른다)
+| | 방식 | 판단 |
+|---|---|---|
+| **A** | **지급은 점수 비례, 평균 플레이의 시간당 골드를 2단계 낚싯대 낚시에 맞춤** | **선택.** 낚시는 투자로, 미니게임은 실력으로 수입이 오름. 후반 낚시가 더 버는 것은 감수 |
+| B | 캐릭터·집 성장이 모든 수입에 배율 | 부익부가 빨라지고 3번 작업이 1번에 묶임 |
+| C | 전부 고정 | 승인된 낚시 확장의 지역별 가격대를 뒤집어야 함 |
+
+**밸리의 정체** (사용자 선택): 밸리 = 지금 낚시 세계. 낚시 골드가 그대로 사이트 지갑.
+
+## 4. 기준 수입 `REF`
+
+모든 수치는 `REF`(골드/시간)의 배수로 적는다.
+
+- **`REF` = 20,500 G/시간.** 2단계 낚싯대(유리섬유)로 바닷가 마을 물가(`shore`)에서 낚시할 때의 기대 시간당 판매 수입.
+- 계산 (main `401563b`의 `data.ts`·`logic.ts`, 2026-11-24에 저장소 밖 스크립트로 계산):
+  - 조건 평균: 계절 4개 균등, 게임 시각 0~1439분 균등(10분 간격), 날씨 맑음 75%·비 25%(`RAIN_CHANCE`).
+  - 각 조건에서 `rollCatch`와 같은 규칙: 등급 가중치 55/33/12(2단계), 후보 없는 등급은 `pickPool`로 대체, 등급 안 균등, 전설 없음(전설은 `minRod` 3 이상).
+  - 크기: 던지기 강도 0.8(물가라 보너스 없음) → `p = u^0.7`, `price()` 그대로(cm 반올림 포함). 성공한 물고기의 20%가 퍼펙트.
+  - 시간: 한 번 던질 때마다 평균 입질 지연 3.75초(`(1500 + 4500/2) × biteScale 1`) + 미니게임 8초 + 다음 던지기까지 3초 = 14.75초. 성공률 80%. 가방(1단계 20칸)이 찰 때마다 상점 왕복 30초.
+  - 결과: 한 마리 기대가 113.6 G, 시간당 180.6마리 → **20,515 G/h**, 100 단위 반올림 20,500. (참고: 부두에서는 21,700, 가방 30칸이면 21,043. 기준은 물가·20칸으로 고정)
+- 이 계산을 테스트(`src/games/fishing/gold.test.ts`)로 고정한다. 낚시 데이터가 바뀌어 기대값이 `REF`에서 ±25% 넘게 벗어나면 실패한다. 그때 `REF`와 아래 수치를 함께 다시 잡는다.
+- `REF`와 이로부터 나오는 상수는 순수 모듈 `src/games/economy.ts` 한 곳에 둔다 (§12의 상수 규칙).
+
+| 이름 | 값 | 뜻 |
+|---|---|---|
+| `REF` | 20,500 | 기준 시간당 수입 |
+| 자유 플레이 하루 상한(게임별) | `REF × 2` = 41,000 | §7 |
+| 판돈 상한 `STAKE_MAX` | `REF × 2` = 41,000 | §9 |
+| 참가비 상한 `FEE_MAX` | `REF × 2` = 41,000 | §10 |
+| 데일리 상금 | 20,500 / 16,400 / 13,320 / 10,250 / 8,200 / 6,150 (7등 이하 6,150) | §8.1, `REF × [1.0, 0.8, 0.65, 0.5, 0.4, 0.3]`을 10 단위 내림 |
+
+## 5. 지갑과 장부
+
+### 5.1 테이블
+```sql
+wallets      (user_id uuid pk → profiles on delete cascade,
+              balance bigint not null default 0 check (balance >= 0),
+              updated_at timestamptz not null default now())
+gold_ledger  (id bigint identity pk,
+              user_id uuid not null → profiles on delete cascade,
+              delta bigint not null check (delta <> 0),
+              balance_after bigint not null check (balance_after >= 0),
+              reason text not null check (reason in (...아래 목록...)),
+              ref text not null,
+              game_id text,          -- 그 이동을 낳은 게임 (없으면 null)
+              note text,             -- 관리자 메모 등
+              created_at timestamptz not null default now(),
+              unique (user_id, reason, ref))
+index gold_ledger (user_id, reason, game_id, created_at)   -- 자유 플레이 하루 합계
+index gold_ledger (created_at desc)                        -- 관리자 최근 목록
+```
+- `reason` 목록은 처음부터 전부 둔다 (뒤 단계에서 제약을 바꾸지 않게): `migrate` · `world` · `free` · `daily_prize` · `duel_stake` · `duel_payout` · `duel_refund` · `contest_fee` · `contest_prize` · `contest_refund` · `admin`.
+- `ref`: 그 이동을 유일하게 가리키는 값.
+
+| reason | ref | game_id |
+|---|---|---|
+| `migrate` | 게임 id | 게임 id |
+| `world` | 요청마다 `gen_random_uuid()` | 게임 id |
+| `free` | `free_plays.client_id` | 게임 id |
+| `daily_prize` | 대회 id | 게임 id |
+| `duel_stake`·`duel_payout`·`duel_refund` | 대국 id | 게임 id |
+| `contest_fee`·`contest_prize`·`contest_refund` | 대회 id | null |
+| `admin` | `gen_random_uuid()` | null |
+
+- `unique (user_id, reason, ref)`가 같은 지급의 중복을 막는다.
+- **초안에서 고침**: 게임 id를 `note`에 넣으면 하루 상한 합계를 메모 문자열로 걸러야 해서, `game_id` 열을 따로 둔다.
+
+### 5.2 변경 함수
+- `_wallet_lock(p_user uuid) returns bigint`: 지갑 행이 없으면 0으로 만들고(`on conflict do nothing`), `for update`로 잠근 뒤 잔액을 돌려준다.
+- `_gold_move(p_user uuid, p_delta bigint, p_reason text, p_ref text, p_game text default null, p_note text default null) returns bigint`:
+  - `p_delta = 0`이면 아무것도 하지 않고 현재 잔액(`_wallet_lock`)을 돌려준다.
+  - `_wallet_lock` → 같은 `(user, reason, ref)`가 이미 있으면 아무것도 하지 않고 현재 잔액을 돌려준다.
+  - 새 잔액이 음수면 `raise exception using errcode = 'P0001', message = 'not_enough_gold'`.
+  - 잔액을 바꾸고 장부에 한 줄 쓴 뒤 새 잔액을 돌려준다.
+- 두 함수 모두 `security definer`, `public`·`anon`·`authenticated`에서 실행 권한을 뺀다 (Edge Function은 소유자 연결이라 그대로 부를 수 있다).
+- **잠금 순서**: 다른 행(세이브·대국·대회)을 잠그는 경우 그 행을 먼저, 지갑을 나중에. 한 트랜잭션에서 여러 지갑을 바꿀 때는 `user_id` 오름차순.
+- 골드를 바꾸는 길은 `_gold_move`뿐이다. Edge Function도 SQL로 이 함수를 부른다.
+
+### 5.3 읽기
+- `wallets`: 승인된 사용자는 모든 사람의 잔액을 읽을 수 있다 (select 정책 + 열 권한). 쓰기 정책·권한 없음.
+- `gold_ledger`: 본인 것과 관리자만 읽는다. 쓰기 정책·권한 없음.
+- RPC `my_wallet() returns jsonb` → `{ "balance": n, "today": { "<game_id>": n, … } }`. `today`는 오늘(KST) `free` 장부의 게임별 합계. 승인된 사용자만. (3단계부터는 처음에 `settle_due()`를 부른다, §8)
+- RPC `user_wallet(p_handle text) returns bigint`: 프로필용. 승인된 대상이 아니면 null (`user_records`와 같은 규칙). 지갑 행이 없으면 0.
+
+### 5.4 관리자
+- RPC `admin_gold_adjust(p_handle text, p_delta bigint, p_note text) returns bigint` → `reason = 'admin'`, `ref = gen_random_uuid()`. 메모 1~100자 필수. 관리자가 아니면 `forbidden`, 대상이 없으면 `not_found`, 잔액이 모자라면 `not_enough_gold`.
+- RPC `admin_gold_ledger(p_limit int default 50) returns table (id, handle, delta, balance_after, reason, ref, game_id, note, created_at)`: 최근 장부, 최대 200줄. 관리자만.
+- `/admin`에 "골드" 섹션: 최근 장부 목록(사람·이유·금액·잔액·시각)과 조정 입력(아이디·금액·메모).
+
+### 5.5 화면
+- 상단 헤더 오른쪽(아이디 메뉴 왼쪽)에 내 잔액(`1,234 G`). 프로필 요약에 그 사람 잔액.
+- 잔액 저장소는 React 밖의 작은 구독 모듈(`src/lib/walletStore.ts`)이다. 채우는 길:
+  - 앱 로드 때 `my_wallet()`.
+  - `world` 응답의 최상위 `gold`(§6) — 추가 요청 없이 바로 반영.
+  - 자유 플레이 저장 뒤, 대전·대회 참가·종료 뒤 `my_wallet()`.
+- 실시간 구독은 하지 않는다.
+
+## 6. 지속형(world) 게임과 지갑
+
+게임 id로 분기하지 않도록 `WorldLogic` 계약을 넓힌다 (`src/games/types.ts`).
+
+```ts
+type WorldCtx = { now: number; rng: () => number; gold: number }      // gold = 현재 지갑 잔액(잠근 뒤 읽은 값)
+apply(state, action, ctx): { state; result?; gold?: number } | { error }  // gold = 이 행동의 증감(정수, +/-), 없으면 0
+view(state, ctx: { now: number; gold: number }): View                  // gold = 이 응답 시점의 잔액
+legacyGold?(raw: unknown, fromVersion: number): number                  // 옛 세이브 안에 들어 있던 골드 (0 이상 정수)
+```
+
+`world` 핸들러 (한 트랜잭션, 세이브 행 → 지갑 행 순서로 잠금):
+1. 세이브 행을 만들거나 잠근다 (지금과 같다).
+2. `act`면 `_wallet_lock(uid)`로 지갑을 잠그고 잔액을 읽는다. `load`면 잠그지 않고 읽는다.
+3. 세이브 버전이 현재와 다르면: `legacyGold`가 있고 값이 0보다 크면 `_gold_move(uid, n, 'migrate', gameId, gameId)`. 중복 방지는 장부의 unique가 맡는다. 그다음 `migrate`.
+4. `act`면 `apply`에 `ctx.gold`(잔액)를 넘긴다.
+   - `{ error }`면 400. **단 3번에서 이전이 있었으면 이전한 세이브는 저장하고 커밋한다** (초안에서 고침: 지금 핸들러는 오류 때 이전 결과를 버리는데, 지갑 이전이 커밋된 채 세이브만 옛 버전으로 남으면 다음 요청이 다시 이전을 시도하게 된다. unique 덕에 두 번 들어가지는 않지만 상태가 어긋난 채 남지 않게 한다).
+   - `gold`가 0이 아닌 안전한 정수면 `_gold_move(uid, gold, 'world', gen_random_uuid(), gameId)`. 정수가 아니면 게임 버그로 보고 500(트랜잭션 전체 롤백).
+   - `_gold_move`가 `not_enough_gold`를 던지면 트랜잭션 전체를 되돌리고 400 `not_enough_gold`. (세이브·지갑을 같은 순서로 잠그므로 정상 게임에서는 생기지 않는다. 판돈·참가비가 동시에 빠져나가는 경우의 마지막 안전장치)
+5. 기록(`records`)을 쓴다 (지금과 같다).
+6. 응답: `{ view: view(state, { now, gold: 잔액 }), result, server_now, gold: 잔액 }`. 최상위 `gold`는 플랫폼 필드라 화면 저장소가 게임 view를 몰라도 읽는다.
+
+숨김 world 게임도 골드가 실제로 움직인다 (관리자만 들어갈 수 있어서 따로 막지 않는다, §14).
+
+**낚시** (`logic.version`은 착수 시점 main의 버전 + 1. 지금 main은 7, 4단계가 8로 올릴 예정이므로 지갑 변경은 9가 될 가능성이 높다. 계획서는 "현재 버전 + 1"로 적는다):
+- `State.gold`를 없앤다. `totalEarned`(낚시 판매 누적, 프로필 기록)는 세이브에 그대로 둔다.
+- 착수 시점 `logic.ts`의 **모든** 골드 행동을 한꺼번에 바꾼다: 수입(`sell`)은 `gold: +earned`, 지출(`buyRod`·`buyBag`·`buyTackle`·`unlockArea`·4단계 `teleport`, 그 사이 더해진 것 전부)은 `ctx.gold`로 검사(`not_enough_gold`)하고 `gold: -price`를 돌려준다. `State`에서 `gold`를 빼면 남은 참조는 타입 검사가 잡는다.
+- 상수 `LAST_GOLD_IN_SAVE`(= 착수 시점 버전). `legacyGold(raw, from)`: `from <= LAST_GOLD_IN_SAVE`이면 `raw.gold`가 0 이상 유한수일 때 `Math.floor`, 아니면 0. `from > LAST_GOLD_IN_SAVE`면 0.
+- `migrate`는 옛 `gold`를 버린다 (나머지 규칙은 그대로).
+- `View`는 계속 `gold`를 내보낸다 (값은 `ctx.gold`). 낚시 화면은 고치지 않아도 된다.
+- 낚시 수입에는 상한이 없다 (서버가 잡는 물고기를 정하므로).
+- 이전은 **처음 접속할 때 한 번**(지연 이전)만 한다. 낚시를 다시 열지 않은 사람은 그때까지 지갑이 0으로 보인다 (§14).
+
+## 7. 자유 플레이 지급
+
+### 7.1 설정
+- manifest에 `gold?: { perPoint: number; playCap: number; dailyCap: number }`. 없으면 지급 없음.
+- `game_modes`에 `gold_per_point numeric(10,4) not null default 0`, `gold_play_cap int not null default 0`, `gold_daily_cap int not null default 0`.
+- 값은 마이그레이션의 고정 형식 문장으로 넣는다: `update game_modes set gold_per_point = X, gold_play_cap = Y, gold_daily_cap = Z where game_id = 'id';`. `registry.test.ts`가 이 문장을 읽어 manifest `gold`와 비교한다 (`scoreMax`와 같은 방식, 없으면 0/0/0 = 지급 없음).
+- 숨김 게임(`hidden_games`)과 `game_modes.free = false`인 게임은 설정이 있어도 지급하지 않는다.
+
+### 7.2 지급
+- `free_plays`에 새 행이 들어갈 때 `after insert` 트리거(`_free_plays_gold`, security definer)가 계산한다.
+  1. 게임 설정을 읽고, 지급 대상이 아니면(숨김, `free = false`, 설정 0) 끝.
+  2. `amount = least(floor(score × gold_per_point), gold_play_cap)`. 0 이하이면 끝.
+  3. `_wallet_lock(user)`로 지갑을 **먼저 잠근다**. 그 뒤 오늘(KST, 삽입 시각 기준) 그 사람·그 게임의 `free` 장부 합계를 구한다. (초안에서 고침: 잠그기 전에 합계를 읽으면 동시에 들어온 두 판이 같은 합계를 보고 상한을 넘는다)
+  4. `amount = least(amount, gold_daily_cap - 합계)`. 0보다 크면 `_gold_move(user, amount, 'free', client_id::text, game_id)`.
+- 클라이언트 재전송은 `client_id` 충돌(`on conflict do nothing`)로 행 자체가 들어가지 않으므로 트리거도 돌지 않는다.
+- `solved`가 false여도 점수가 있으면 준다 (점수 게임은 `solved`를 쓰지 않는다).
+- 오프라인 대기열이 다음 날 보낸 판은 보낸 날의 상한에 든다.
+
+### 7.3 수치 규칙
+- 기준: 그 게임의 "기준 플레이"(평균 점수 `avgScore`, 한 판 시간 `playSec`)로 쉬지 않고 플레이할 때(판 사이 5초 포함) 시간당 골드 = `3600 / (playSec + 5) × floor(avgScore × perPoint)`가 `REF`의 ±20% 안.
+- 기준 플레이 표 (게임별 `src/games/<id>/gold.test.ts`에 출처와 함께 상수로 적는다):
+
+| 게임 | avgScore | playSec | 출처 | perPoint (잠정) | 판당 | playCap |
+|---|---|---|---|---|---|---|
+| 양치 `toothbrush` | 5.81 | 60 | 봇: `aim`(7.40)과 `sweep`(4.22)의 평균, 판 60초 | 64 | 371 | 1,860 |
+| 몰래 수능 `sneak-exam` | 921 | 96 | 봇: `glassesBot` 시드 100개 평균(점수 920.8, 5,763틱) | 0.62 | 571 | 2,860 |
+| 볼 런 `ball-run` | 60 | 30 | 가정: 30초 생존(0.5초에 1점) | 3.3 | 198 | 990 |
+| 네온 라이더 `neon-rider` | 30 | 45 | 가정 | 9.5 | 285 | 1,430 |
+| 후알야 `who-are-ya` 자유 | 6 | 90 | 가정 | 90 | 540 | 2,700 |
+
+  - **초안에서 고침**: 초안은 양치·네온 라이더에 봇이 없다고 했지만 네 점수 게임 모두 `bots.ts`가 있다. 다만 볼 런(`runBot`, 앞을 내다보는 봇)과 네온 라이더(`findPassCourse`, 통과 경로 탐색)는 통과 게이트용 "완벽한" 봇이라 평균 플레이를 대표하지 못해 가정을 쓴다. 몰래 수능의 `carefulBot`(1,375점, 29초)도 거의 최적이라 `glassesBot`을 평균으로 둔다.
+  - 이름: 기존 `balance.test.ts`(난이도 밸런스 게이트)와 섞이지 않게 지급 검사는 `gold.test.ts`로 둔다.
+  - 가정 값은 운영 데이터로 확인한다: 배포 뒤 `free_plays`의 게임별 평균 점수를 보고 표에서 ±30% 넘게 벗어나면 수치 조정 PR을 낸다 (배포 체크리스트).
+- `playCap`: 기준 플레이 한 판 수입의 5배, 10 단위 반올림. (점수 상한 × perPoint보다 크면 사실상 상한 없음 — 양치·몰래 수능·후알야)
+- `dailyCap`: `REF × 2` = 41,000 (그 게임으로 하루 2시간어치). 모든 게임 같은 값.
+- 게임 로직이 바뀌어 봇 점수가 달라지면 그 게임의 `gold.test.ts`가 실패한다 (봇 출처인 게임만). 그때 `perPoint`를 다시 잡는다.
+
+### 7.4 화면
+- 자유 플레이 화면(`LocalRunner`, 플랫폼)이 판이 끝난 뒤 `+N G`를 보여 준다. N은 순수 함수 `freeGold(score, manifest.gold, 오늘 이 게임으로 번 양)`(서버 계산과 같은 식, `src/games/economy.ts`)로 미리 계산한 값이다. 저장이 끝나면 `my_wallet()`으로 잔액과 오늘 번 양을 다시 읽는다.
+- 오늘 상한에 닿았으면 "오늘 이 게임 골드는 다 벌었어요"를 보여 준다 (플레이는 계속 가능, 기록·리더보드는 그대로).
+- 저장이 대기열에 남으면(오프라인) "저장되면 골드가 들어가요".
+
+## 8. 정산 (`settle_due`) — 3단계
+
+예약 작업을 쓰지 않는다. 끝난 대회를 접속한 사람이 정산시킨다.
+
+- `contests.settled_at timestamptz` 추가, 인덱스 `(ends_at) where settled_at is null`. 이 마이그레이션 시점에 **이미 끝난** 대회는 모두 정산된 것으로 표시한다 (소급 지급 없음). 배포 때 진행 중이던 그날 데일리는 끝난 뒤 정상 정산된다.
+- RPC `settle_due() returns int` (승인된 사용자 누구나, security definer): `ends_at <= now()`이고 `settled_at is null`인 대회를 `for update skip locked`로 잡아 하나씩 정산하고 `settled_at`을 찍는다. 한 번에 최대 20개. 취소된 대회는 환불(§10, 취소 때 이미 끝남)을 확인만 하고 찍는다.
+- 호출 시점: `my_wallet()`이 처음에 부른다 (앱 로드 때 잔액을 읽으므로 앱 로드 = 정산). 여러 사람이 동시에 불러도 결과가 같다.
+- 한 대회의 지급은 `user_id` 오름차순으로 `_gold_move`를 부른다.
+
+### 8.1 데일리 상금
+- 참가비 없음. 대상: 그날 그 게임 데일리의 순위(`_lb_contest_rows(대회, false)`와 같은 정렬) 가운데 **행동을 한 번 이상 한 사람**(`action_count > 0`). 끝내지 못한 기록은 마지막 점수로 순위에 든다 (`lb_daily`와 같다).
+  - **초안에서 고침**: 초안의 "끝낸 사람(시간 초과 확정 포함)"은 SQL이 게임별 제한 시간(후알야 600초)을 알아야 판정할 수 있다. 제한 시간 초과 기록은 그 사람이 다시 열 때만 확정되기 때문이다. 대신 리더보드에 보이는 순위를 그대로 쓰고, 열기만 한 사람은 뺀다.
+- 상금: §4 표 (1등 20,500 … 6등 이하 6,150). 혼자 해도 1등 상금.
+- 숨김 게임 데일리는 상금이 없다 (`_lb_contest_rows(…, false)`가 숨김 게임 기록을 뺀다).
+- `_gold_move(user, amount, 'daily_prize', contest_id, game_id)`.
+- 데일리는 게임마다 대회 하나라 데일리 게임이 늘면 게임마다 따로 준다.
+
+## 9. 대전 판돈 — 4단계
+
+- `duel_matches.stake int not null default 0 check (stake between 0 and 41000)` (`STAKE_MAX`).
+- **만들기**: `create`에 `stake`(기본 0, 정수). 숨김 게임은 0만. 0보다 크면 대국 행을 넣은 뒤 같은 트랜잭션에서 만든 사람 지갑에서 뺀다 (`duel_stake`, ref = 대국 id). 모자라면 409 `not_enough_gold`(롤백).
+- **참가**: `join`에 화면이 본 `stake`를 함께 보낸다. 대국의 판돈과 다르면 409 `stake_mismatch`(최신 판돈 포함). 같으면 들어오는 사람도 같은 금액을 맡긴다. 로비·초대 링크 화면에 판돈을 보여 주고, 판돈 > 0이면 링크로 들어올 때 확인 화면을 한 번 거친다 (지금 링크 참가는 바로 들어가므로 판돈 > 0일 때만 확인을 끼운다).
+- **끝남·무효의 지급은 DB 트리거가 한다**: `duel_matches`의 `status`가 `finished` 또는 `void`로 바뀌면 `after update` 트리거가 장부의 `duel_stake` 줄을 보고 처리한다 (지금 대국을 무효로 만드는 길이 `save()`, `create`의 오래된 대기 대국 일괄 `update`, `expireIfStale` 등 여럿이라 한 곳에 모은다).
+  - `finished` + 승자: 승자에게 맡긴 돈 합계 (`duel_payout`).
+  - `finished` 무승부, `void`: 맡긴 사람마다 그만큼 환불 (`duel_refund`).
+  - 지급 순서는 `user_id` 오름차순. 장부 unique로 한 번만 반영된다.
+- 시간 초과로 진 것·기권은 패배다. **단 지금 규칙상 어느 한쪽이라도 첫 행동 전에 끝나면 대국은 무효**(`finish()` → `voidMatch`)이므로 환불된다 (초안에서 고침: 이 규칙을 그대로 둔다. 참가하고 바로 나가는 판돈 사기를 막는 장치이기도 하다).
+- Elo는 판돈과 무관하게 지금 규칙 그대로다. 랭크·친선 모두 판돈을 걸 수 있다.
+- 같은 화면 2인 모드(`/duel/local`)는 서버 대국이 없으므로 판돈도 없다.
+
+## 10. 대회 참가비 — 5단계
+
+- `contests.entry_fee int not null default 0 check (entry_fee between 0 and 41000)` (`FEE_MAX`), 데일리는 항상 0(제약). 숨김 게임이 든 대회는 0만.
+- **만들기**: `create_contest`에 `p_entry_fee int default 0`. 만든 사람은 지금처럼 자동 참가하므로 만들 때 참가비를 뺀다 (`contest_fee`, ref = 대회 id).
+- **고치기**: 참가비는 만든 뒤 바꿀 수 없다 (`update_contest`는 그대로). 바꾸려면 취소(환불) 후 다시 만든다 (초안에서 고침: 만든 사람이 자동 참가라 "참가자가 생긴 뒤 금지"는 곧 "언제나 금지"다).
+- **참가**: `join_contest`·`join_by_invite_code`가 처음 참가할 때만 참가비를 뺀다(이미 참가했으면 아무 일도 없음). 대회 행을 먼저 `for update`로 잠근 뒤 지갑. 참가 화면에 금액을 보여 준다.
+- **취소**: `cancel_contest`가 전원 환불 (`contest_refund`, 장부의 `contest_fee` 줄 기준).
+- **정산** (`settle_due`): 모인 돈 = 장부의 그 대회 `contest_fee` 합계. 순위는 `_lb_contest_rows(대회, false)`(참가자만 풀 수 있으므로 곧 참가자 중 기록 있는 사람). 순위에 든 사람 수 `N`:
+  - `N = 0`: 전원 환불.
+  - `N = 1` 또는 `2`: 1등이 전부.
+  - `N ≥ 3`: 60 / 30 / 10 %. 각각 1 단위 내림, 나머지는 1등.
+- 서버는 대회 상금에 돈을 보태지 않는다.
+
+## 11. 구현 단계 (PR 단위)
+
+1. **지갑 핵심**: `wallets`·`gold_ledger`·`_wallet_lock`·`_gold_move`·`my_wallet`·`user_wallet`·`admin_gold_adjust`·`admin_gold_ledger`, `WorldLogic` 계약 확장과 `world` 핸들러, 낚시 골드 이전(`logic.version` 현재 + 1), 헤더 잔액·프로필 잔액, `/admin` 골드 섹션. 배포 순서: DB → `world` 함수 → Vercel.
+2. **자유 플레이 지급**: `src/games/economy.ts`(`REF`, `freeGold`), 낚시 `REF` 계산 테스트, manifest·`game_modes` 설정, 트리거, 게임별 `gold.test.ts`, 결과 화면. 배포 순서: DB → Vercel.
+3. **정산과 데일리 상금**: `settled_at`, `settle_due`, `my_wallet`에서 호출, 프로필·데일리 화면에 받은 상금.
+4. **대전 판돈**.
+5. **대회 참가비**.
+
+이 작업 전체는 낚시 확장 2~6단계가 머지된 뒤에 시작한다. 단계마다 `docs/deploy-checklist.md`에 수동 확인 항목을 더한다. 1·2단계는 구현 계획에 Task 단위로, 3~5단계는 개요만 있다.
+
+## 12. 제약
+- `CLAUDE.md` 그대로: 플랫폼에 게임별 분기 금지, 화면 문구 한국어, 모바일 우선, 색은 theme 토큰, `logic.ts`는 순수·상대 import에 `.ts`, DB 변경은 마이그레이션으로만(`npx supabase@2 migration new`), 새 함수는 `public`·`anon`·`authenticated`에서 실행 권한을 뺀 뒤 필요한 역할에만 준다.
+- 골드는 정수. 소수는 내림.
+- 모든 지급·환불은 그 원인이 되는 상태 변경과 같은 트랜잭션에서 일어난다.
+- **상수 규칙**: `REF`와 거기서 나오는 상수의 원본은 `src/games/economy.ts`. 게임별 자유 플레이 수치는 manifest가 원본이고 `game_modes`가 사본(`registry.test.ts`가 비교). 3단계부터 SQL이 쓰는 상수(상금 표, `STAKE_MAX`, `FEE_MAX`)는 SQL 함수 `_economy() returns jsonb`(immutable)에 두고, vitest가 마이그레이션의 그 함수 본문을 읽어 `economy.ts`와 비교한다. 화면은 `economy.ts`를 import한다.
+- DB 테스트(`supabase/tests/`)와 Edge Function 테스트로 다음을 고정한다: 음수 잔액 거절, 중복 지급 무시, 하루 상한(동시 삽입 포함), 낚시 골드 이전(한 번만), 대전 무효·대기 만료 환불, 대회 분배의 인원별 경우.
+
+## 13. 빌더에게 맡기는 것
+- 잔액 배지·관리자 골드 섹션·판돈/참가비 입력의 모양 (theme 토큰, 모바일 우선)
+- `walletStore` 구독 API의 세부 (§5.5의 채우는 길은 지킨다)
+- 가정으로 둔 기준 플레이(볼 런·네온 라이더·후알야)를 더 나은 근거(봇, 운영 데이터)로 바꾸는 것. 바꾸면 표와 이 문서를 고친다.
+
+## 14. 내가 정한 것
+초안의 "사용자 확인 필요" 항목은 사용자가 2026-11-24 확인 없이 진행하도록 위임했으므로 아래로 확정한다. 틀렸을 때 비용을 함께 적는다.
+
+- 잔액은 친구끼리 서로 볼 수 있다, 장부는 본인·관리자만 (§5.3). — 6명 친구 사이, 프로필·판돈 화면에 필요. 비용: 숨기려면 정책 한 줄.
+- 랭크·친선 대전 모두 판돈 가능 (§9).
+- 데일리 상금 1등 `REF × 1.0` … 6등 이하 `REF × 0.3` (§8.1). 대상은 순위표에서 행동을 한 번 이상 한 사람 (초안의 "끝낸 사람"에서 바꿈). — SQL이 게임별 제한 시간을 몰라도 되고, 열기만 하고 받는 것을 막는다. 비용: 한 번 추측하고 떠나도 꼴찌 상금(6,150 G)을 받는다.
+- 대회 분배 60/30/10, 순위 2명 이하면 1등 독식, 0명이면 전원 환불 (§10).
+- 상한: 판돈·참가비 `REF × 2`, 자유 플레이 하루 `REF × 2`/게임, 판당 기준 플레이의 5배 (§7.3, §9, §10).
+- 과거 데일리·대회에는 소급 지급하지 않는다 (§8). 3단계 배포 때 진행 중인 데일리는 정산한다.
+- 숨김 게임은 자유 플레이·데일리 골드를 주지 않고, 대전 판돈·대회 참가비는 0만 허용 (§7.1, §8.1, §9, §10). 숨김 world 게임은 예외로 골드가 움직인다 (관리자 전용이라). 비용: 관리자가 숨김 world 게임을 시험하며 번 골드가 진짜로 남는다 → 필요하면 `admin_gold_adjust`로 되돌린다.
+- `REF` = 20,500 G/h (§4의 가정과 계산). 비용: 가정(싸움 8초 등)이 실제보다 빠르면 모든 수치가 같이 크다. 상대 균형은 유지된다.
+- 장부에 `game_id` 열을 둔다 (§5.1).
+- 자유 플레이 하루 상한은 지갑을 잠근 뒤 합계를 읽는다 (§7.2).
+- `world` 응답에 최상위 `gold`(잔액)를 더해 헤더가 추가 요청 없이 갱신된다 (§6).
+- `world`의 `apply` 오류 때도 이전(migrate·지갑 이전)은 저장한다 (§6).
+- 낚시 골드는 처음 접속 때 지연 이전만 한다 (일괄 SQL 이전 없음). — 일괄 이전은 DB push와 함수 배포 사이에 번 골드를 놓칠 위험이 있다(unique가 두 번째 이전을 막기 때문). 비용: 낚시를 안 연 사람은 그때까지 헤더에 0 G로 보인다. 배포 체크리스트에서 남은 세이브 수를 확인한다.
+- 지급 검사 파일 이름 `gold.test.ts`, 기준 플레이 표와 출처 (§7.3).
+- 대전 판돈 지급·환불은 `duel_matches` 상태 변경 트리거 한 곳에서 (§9). 참가는 화면이 본 판돈을 함께 보내 다르면 `stake_mismatch`.
+- 첫 행동 전 종료 = 무효 = 환불 규칙 유지 (§9).
+- 대회 참가비는 만든 뒤 바꿀 수 없다 (§10).
+- 정산은 `my_wallet()` 안에서 부른다 (§8).
+- 상수 위치: `src/games/economy.ts` 원본, SQL `_economy()` 사본 + 비교 테스트 (§12).
+- 잔액 저장소는 `src/lib/walletStore.ts`, 화면 코드는 `src/platform/wallet/` (§5.5).
+- 프로필 잔액은 `user_wallet(handle)` RPC로 읽는다 (§5.3).
