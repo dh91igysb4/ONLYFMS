@@ -700,7 +700,8 @@ describe('위험물 판정', () => {
   })
 
   it('두 바퀴 사이로 들어온 가는 레이저는 차대 캡슐에 걸려 crash', () => {
-    // 바퀴(반지름 180 mm)와 차체 판정원(중점 위 200 mm, 반지름 180 mm) 어디에도 닿지 않고 차대(반지름 110 mm)에만 닿는 점.
+    // 차체 판정원은 중점 위 200 mm, 반지름 180 mm라 중점 위 20 mm까지만 내려온다. 바퀴(반지름 180 mm)는 x로 700 mm 떨어져 있다.
+    // 그래서 중점 아래 30 mm의 가는 레이저(반지름 10 mm)는 차대(반지름 110 mm)에만 닿는다.
     const base = initSimAt(courseFromTemplates([flatT]), TPL_X, 0)
     const mx = Math.floor((base.rear.x + base.front.x) / 2)
     const my = base.rear.y
@@ -709,8 +710,8 @@ describe('위험물 판정', () => {
       const c = courseFromTemplates([{ id: 'lz', tier: 1, prims: [{ t: 'hazard', dx: mx - TPL_X, dy: y, h: laser(0) }, { t: 'line', dx: mm(400000), dy: 0 }] }])
       return step(initSimAt(c, TPL_X, 0), false, c)
     }
-    expect(probe(my + mm(100)).dead).toBe('crash') // 차대 위쪽 가장자리 안
-    expect(probe(my - mm(400)).dead).toBeNull() // 차대 아래, 땅 속
+    expect(probe(my - mm(30)).dead).toBe('crash') // 차대 안, 차체 판정원·바퀴 밖
+    expect(probe(my - mm(150)).dead).toBeNull() // 차대 아래(−120 mm 밖), 땅(−180 mm) 위
   })
 
   it('같은 입력 600틱은 같은 결과(JSON)', () => {
