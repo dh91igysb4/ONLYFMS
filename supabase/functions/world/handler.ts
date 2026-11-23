@@ -3,7 +3,7 @@
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getWorld } from '../../../src/games/index.ts'
-import type { WorldLogic, WorldModule } from '../../../src/games/types.ts'
+import { AVATAR_RECORD_KEY, type WorldLogic, type WorldModule } from '../../../src/games/types.ts'
 
 export type WorldDeps = {
   sql: Sql
@@ -129,6 +129,14 @@ async function run(
       await tx`
         insert into public.game_records (user_id, game_id, key, value, detail)
         values (${uid}, ${gameId}, ${r.key}, ${r.value}, ${r.detail ?? null})
+        on conflict (user_id, game_id, key)
+        do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
+    }
+    // 프로필 캐릭터(manifest avatar가 있는 게임): 기록과 같은 표에 키 AVATAR_RECORD_KEY, 값 0, detail에 문자열
+    if (logic.avatar) {
+      await tx`
+        insert into public.game_records (user_id, game_id, key, value, detail)
+        values (${uid}, ${gameId}, ${AVATAR_RECORD_KEY}, 0, ${logic.avatar(state)})
         on conflict (user_id, game_id, key)
         do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
     }

@@ -50,6 +50,7 @@ const worlds = new Map<string, WorldModule>([
   ['test-world', { manifest: manifest('test-world', false), logic: base }],
   ['test-world-v2', { manifest: manifest('test-world-v2', false), logic: v2 }],
   ['test-world-hidden', { manifest: manifest('test-world-hidden', true), logic: base }],
+  ['test-world-avatar', { manifest: { ...manifest('test-world-avatar', false), avatar: { label: '캐릭터' } }, logic: { ...base, avatar: (state: S) => `look-${state.n}` } }],
 ])
 const registry = { getWorld: (id: string) => worlds.get(id) }
 
@@ -139,6 +140,24 @@ t('act upserts records', async () => {
   assert.equal(rows.length, 1)
   assert.equal(rows[0].key, 'n')
   assert.equal(Number(rows[0].value), 2)
+})
+
+t('act writes the avatar record when the logic has avatar(); load does not', async () => {
+  const u = await user()
+  await load(u, 'test-world-avatar')
+  let rows = await sql`select key from public.game_records where user_id = ${u} and game_id = 'test-world-avatar'`
+  assert.equal(rows.length, 0)
+  await act(u, { type: 'inc' }, 'test-world-avatar')
+  await act(u, { type: 'inc' }, 'test-world-avatar')
+  rows = await sql`select key, value, detail from public.game_records where user_id = ${u} and game_id = 'test-world-avatar' order by key`
+  assert.deepEqual(rows.map((r) => [r.key, Number(r.value), r.detail]), [['avatar', 0, 'look-2'], ['n', 2, null]])
+})
+
+t('no avatar record for a world without avatar()', async () => {
+  const u = await user()
+  await act(u, { type: 'inc' })
+  const rows = await sql`select key from public.game_records where user_id = ${u} and game_id = 'test-world' and key = 'avatar'`
+  assert.equal(rows.length, 0)
 })
 
 t('logic error changes nothing', async () => {
@@ -275,7 +294,7 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(tp.status, 400)
   assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
-  assert.deepEqual(rows.map((r) => r.key), ['biggest', 'challenges', 'dex', 'total_earned'])
+  assert.deepEqual(rows.map((r) => r.key), ['avatar', 'biggest', 'challenges', 'dex', 'total_earned'])
 })
 
 t('teardown', async () => {

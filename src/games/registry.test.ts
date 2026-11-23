@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
+import { AVATAR_RECORD_KEY } from './types.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -94,6 +95,14 @@ test('manifest records keys are unique per game', () => {
     const keys = (m.records ?? []).map((r) => r.key)
     expect(new Set(keys).size, m.id).toBe(keys.length)
   }
+})
+
+test('world avatar: manifest avatar ⇔ logic.avatar, avatar key is not a record key', () => {
+  for (const w of worlds) {
+    expect(!!w.manifest.avatar, w.manifest.id).toBe(typeof w.logic.avatar === 'function')
+    expect((w.manifest.records ?? []).map((r) => r.key)).not.toContain(AVATAR_RECORD_KEY)
+  }
+  for (const g of [...games, ...duels]) expect(g.manifest.avatar).toBeUndefined()
 })
 
 test('solo modules have no duel category', () => {
