@@ -146,7 +146,7 @@ export const RODS: Rod[] = [
   { tier: 3, name: '카본 낚싯대', price: 8000, barBonus: 0.3, biteScale: 1, weights: { common: 50, uncommon: 34, rare: 16 } },
   { tier: 4, name: '명장의 낚싯대', price: 40000, barBonus: 0.45, biteScale: 0.8, weights: { common: 46, uncommon: 34, rare: 20 } },
   // 고급 장비(6단계 마무리): 어떤 어종에도 필요 없고, 버는 속도만 조금씩 올린다(효과는 갈수록 작게)
-  { tier: 5, name: '별빛 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
+  { tier: 5, name: '백골 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
   { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]
 
@@ -194,7 +194,7 @@ export const TACKLES: readonly Tackle[] = [
   { id: 'spinner', name: '회전 찌', price: 1500, desc: '입질이 30% 빨리 와요' },
   { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설 물고기가 더 잘 나와요' },
 ]
-/** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장·별빛 2칸, 용왕 3칸 */
+/** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장·백골 2칸, 용왕 3칸 */
 export function tackleSlots(rodTier: number): number {
   return rodTier === 3 ? 1 : rodTier === 4 || rodTier === 5 ? 2 : rodTier === 6 ? 3 : 0
 }
