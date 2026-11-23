@@ -5,14 +5,15 @@ import { defineMap } from '../map.ts'
 // 테두리는 동쪽 출구(ty 18~19의 길)를 빼면 나무·절벽이라 걸을 수 없다.
 // 길(=): 동쪽 출구 → 서쪽으로 갈라져 위로는 폭포 웅덩이 빈터, 아래로는 연못 빈터, 남동쪽 꽃 빈터.
 // 웅덩이 가 풀밭에서 웅덩이를 보면 waterfall, 연못 가에서 연못을 보면 pond. 폭포·절벽 앞은 낚시 불가.
-// 동굴 입구 자리: 웅덩이 동쪽 작은 빈터 위 절벽(tx 35, ty 5). 3단계에서 연다. 지금은 절벽으로 막혀 있다.
+// 동굴 입구(E): 웅덩이 동쪽 작은 빈터 위 절벽(tx 35, ty 5). 동굴을 열기 전에는 돌무더기로 막혀 있고,
+// 바로 아래 빈터(tx 35, ty 6)에서 위를 보면 구매 창. 열리면 입구 칸에 들어서는 순간 동굴로 간다.
 export const FOREST = defineMap('forest', [
   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   'TTTTTcccccccccccccccccwwwccccccccccccccccccTTTTT',
   'TTTTTcccccccccccccccccwwwccccccccccccccccccTTTTT',
   'TTTTTcccccccccccccccccwwwccccccccccccccccccTTTTT',
   'TTTTTcccccccccccccccccwwwccccccccccccccccccTTTTT',
-  'TTTTTTTTTcccTTT,T,ccccwwwccc,,,fTccccccTTTTTTTTT',
+  'TTTTTTTTTcccTTT,T,ccccwwwccc,,,fTccEcccTTTTTTTTT',
   'TTTTTTTTTTTTTTT,f,,,obbbbb,,,,T,To,,,TTTTTTTTTTT',
   'TTTTTTTTTTTTTTT,T,obbbbbbbbboT,,T,,,T,,TTTTTTTTT',
   'TTTTTTTTTTTTTTf,,f,bbbbbbbbb,,,f,,f,,,,TTTTTTTTT',
@@ -45,6 +46,11 @@ export const FOREST = defineMap('forest', [
   'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
 ], {
   spots: { pond: 'pond', basin: 'waterfall' },
-  // 동쪽 출구 → 강 서쪽 출구 두 칸 안쪽
-  exits: [{ edge: 'e', from: 18, to: 19, target: 'river', entry: { tx: 2, ty: 6, facing: 'right' } }],
+  exits: [
+    // 동쪽 출구 → 강 서쪽 출구 두 칸 안쪽
+    { edge: 'e', from: 18, to: 19, target: 'river', entry: { tx: 2, ty: 6, facing: 'right' } },
+    // 동굴 입구 → 동굴 남쪽 출구 두 칸 안쪽
+    { at: { tx: 35, ty: 5, w: 1, h: 1 }, target: 'cave', entry: { tx: 24, ty: 31, facing: 'up' } },
+  ],
+  gates: [{ area: 'cave', tiles: { tx: 35, ty: 5, w: 1, h: 1 }, look: 'rubble', front: { tx: 35, ty: 6, facing: 'up' } }],
 })

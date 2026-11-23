@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ALL_AREAS_OPEN,
   TILE,
   TILE_CHARS,
   WATER_KINDS,
@@ -8,16 +9,25 @@ import {
   exitAt,
   interactionAt,
   isWalkable,
+  openExitAt,
   pierEnd,
+  reachableTiles,
   shopSpot,
   spotFor,
   tileAt,
   tileOf,
+  type Dock,
+  type Exit,
   type Facing,
+  type Gate,
+  type Opened,
   type TileKind,
   type Vec,
 } from './map.ts'
+import type { AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
+import { RIVER } from './maps/river.ts'
+import { DEFAULT_AREAS } from './data.ts'
 
 const MAP_W = VILLAGE.w
 const MAP_H = VILLAGE.h
@@ -53,7 +63,7 @@ function bfs(from: { tx: number; ty: number }): Map<string, number> {
     for (const { dx, dy } of Object.values(DIRS)) {
       const n = { tx: tx + dx, ty: ty + dy }
       const key = `${n.tx},${n.ty}`
-      if (!isWalkable(VILLAGE, n.tx, n.ty) || dist.has(key)) continue
+      if (!isWalkable(VILLAGE, n.tx, n.ty, ALL_AREAS_OPEN) || dist.has(key)) continue
       dist.set(key, d + 1)
       queue.push(n)
     }
@@ -82,25 +92,25 @@ describe('map grid', () => {
     for (const k of kinds) expect(used.has(k), k).toBe(true)
   })
 
-  it('walkable kinds are exactly sand, grass, path, pier, flower', () => {
+  it('walkable kinds are exactly sand, grass, path, pier, flower, dock', () => {
     const walkable = new Set<TileKind>()
-    for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty)) walkable.add(tileAt(VILLAGE, tx, ty)!)
-    expect([...walkable].sort()).toEqual(['flower', 'grass', 'path', 'pier', 'sand'])
+    for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) walkable.add(tileAt(VILLAGE, tx, ty)!)
+    expect([...walkable].sort()).toEqual(['dock', 'flower', 'grass', 'path', 'pier', 'sand'])
     for (const { tx, ty } of allTiles()) {
       const k = tileAt(VILLAGE, tx, ty)!
-      expect(isWalkable(VILLAGE, tx, ty)).toBe(['sand', 'grass', 'path', 'pier', 'flower'].includes(k))
+      expect(isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)).toBe(['sand', 'grass', 'path', 'pier', 'flower', 'dock'].includes(k))
     }
   })
 
   it('border tiles are not walkable except the north exit', () => {
     for (let tx = 0; tx < MAP_W; tx++) {
       const isExit = exitAt(VILLAGE, center(tx, 0)) !== null
-      expect(isWalkable(VILLAGE, tx, 0), `(${tx},0)`).toBe(isExit)
-      expect(isWalkable(VILLAGE, tx, MAP_H - 1), `(${tx},${MAP_H - 1})`).toBe(false)
+      expect(isWalkable(VILLAGE, tx, 0, ALL_AREAS_OPEN), `(${tx},0)`).toBe(isExit)
+      expect(isWalkable(VILLAGE, tx, MAP_H - 1, ALL_AREAS_OPEN), `(${tx},${MAP_H - 1})`).toBe(false)
     }
     for (let ty = 0; ty < MAP_H; ty++) {
-      expect(isWalkable(VILLAGE, 0, ty), `(0,${ty})`).toBe(false)
-      expect(isWalkable(VILLAGE, MAP_W - 1, ty), `(${MAP_W - 1},${ty})`).toBe(false)
+      expect(isWalkable(VILLAGE, 0, ty, ALL_AREAS_OPEN), `(0,${ty})`).toBe(false)
+      expect(isWalkable(VILLAGE, MAP_W - 1, ty, ALL_AREAS_OPEN), `(${MAP_W - 1},${ty})`).toBe(false)
     }
   })
 
@@ -109,8 +119,8 @@ describe('map grid', () => {
     expect(tileAt(VILLAGE, 0, -1)).toBeNull()
     expect(tileAt(VILLAGE, MAP_W, 0)).toBeNull()
     expect(tileAt(VILLAGE, 0, MAP_H)).toBeNull()
-    expect(isWalkable(VILLAGE, MAP_W, 0)).toBe(false)
-    expect(isWalkable(VILLAGE, -1, 5)).toBe(false)
+    expect(isWalkable(VILLAGE, MAP_W, 0, ALL_AREAS_OPEN)).toBe(false)
+    expect(isWalkable(VILLAGE, -1, 5, ALL_AREAS_OPEN)).toBe(false)
   })
 
   it('tileOf floors world pixels to tiles', () => {
@@ -144,21 +154,21 @@ describe('shop', () => {
     expect(SHOP_SPOT).toEqual({ tx: SHOP.doorTx, ty: SHOP.ty + SHOP.h })
     expect(SPAWN.pos).toEqual(center(SHOP_SPOT.tx, SHOP_SPOT.ty))
     expect(SPAWN.facing).toBe('down')
-    expect(isWalkable(VILLAGE, SHOP_SPOT.tx, SHOP_SPOT.ty)).toBe(true)
+    expect(isWalkable(VILLAGE, SHOP_SPOT.tx, SHOP_SPOT.ty, ALL_AREAS_OPEN)).toBe(true)
   })
 
   it('SPAWN facing up interacts with the shop; other facings do not', () => {
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'up')).toEqual({ kind: 'shop' })
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'down')).toBeNull()
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'left')).toBeNull()
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'right')).toBeNull()
+    expect(interactionAt(VILLAGE, SPAWN.pos, 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'shop' })
+    expect(interactionAt(VILLAGE, SPAWN.pos, 'down', ALL_AREAS_OPEN)).toBeNull()
+    expect(interactionAt(VILLAGE, SPAWN.pos, 'left', ALL_AREAS_OPEN)).toBeNull()
+    expect(interactionAt(VILLAGE, SPAWN.pos, 'right', ALL_AREAS_OPEN)).toBeNull()
   })
 
   it('SHOP_SPOT is the only tile in the map with a shop interaction', () => {
     const shopTiles: { tx: number; ty: number }[] = []
     for (const { tx, ty } of allTiles()) {
       for (const f of FACINGS) {
-        const hit = interactionAt(VILLAGE, center(tx, ty), f)
+        const hit = interactionAt(VILLAGE, center(tx, ty), f, ALL_AREAS_OPEN)
         if (hit?.kind === 'shop') {
           expect(f).toBe('up')
           shopTiles.push({ tx, ty })
@@ -173,7 +183,7 @@ describe('fishing spots', () => {
   it('PIER_END is a pier tile with water below and interacts as pier fishing', () => {
     expect(tileAt(VILLAGE, PIER_END.tx, PIER_END.ty)).toBe('pier')
     expect(tileAt(VILLAGE, PIER_END.tx, PIER_END.ty + 1)).toBe('water')
-    expect(interactionAt(VILLAGE, center(PIER_END.tx, PIER_END.ty), 'down')).toEqual({ kind: 'fish', spot: 'pier' })
+    expect(interactionAt(VILLAGE, center(PIER_END.tx, PIER_END.ty), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'pier' })
   })
 
   it('PIER_END is the far end of the pier (no pier tile further out)', () => {
@@ -186,20 +196,20 @@ describe('fishing spots', () => {
     const shore = allTiles().find(({ tx, ty }) => tileAt(VILLAGE, tx, ty) === 'sand' && tileAt(VILLAGE, tx, ty + 1) === 'water')
     expect(shore).toBeDefined()
     const pos = center(shore!.tx, shore!.ty)
-    expect(interactionAt(VILLAGE, pos, 'down')).toEqual({ kind: 'fish', spot: 'shore' })
-    expect(interactionAt(VILLAGE, pos, 'up')).toBeNull()
+    expect(interactionAt(VILLAGE, pos, 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'shore' })
+    expect(interactionAt(VILLAGE, pos, 'up', ALL_AREAS_OPEN)).toBeNull()
   })
 
   it('the beach is long enough to fish from many shore tiles', () => {
     const shoreTiles = allTiles().filter(
-      ({ tx, ty }) => tileAt(VILLAGE, tx, ty) === 'sand' && FACINGS.some((f) => interactionAt(VILLAGE, center(tx, ty), f)?.kind === 'fish'),
+      ({ tx, ty }) => tileAt(VILLAGE, tx, ty) === 'sand' && FACINGS.some((f) => interactionAt(VILLAGE, center(tx, ty), f, ALL_AREAS_OPEN)?.kind === 'fish'),
     )
     expect(shoreTiles.length).toBeGreaterThanOrEqual(20)
   })
 
   it('uses the foot position, not the tile corner, to pick the standing tile', () => {
     const p = center(PIER_END.tx, PIER_END.ty)
-    expect(interactionAt(VILLAGE, { x: p.x - 7.9, y: p.y + 7.9 }, 'down')).toEqual({ kind: 'fish', spot: 'pier' })
+    expect(interactionAt(VILLAGE, { x: p.x - 7.9, y: p.y + 7.9 }, 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'pier' })
   })
 })
 
@@ -209,14 +219,14 @@ describe('reachability', () => {
   it('PIER_END and every walkable tile next to water are reachable from SPAWN', () => {
     expect(dist.has(`${PIER_END.tx},${PIER_END.ty}`)).toBe(true)
     for (const { tx, ty } of allTiles()) {
-      if (!isWalkable(VILLAGE, tx, ty)) continue
+      if (!isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) continue
       const nearWater = Object.values(DIRS).some(({ dx, dy }) => tileAt(VILLAGE, tx + dx, ty + dy) === 'water')
       if (nearWater) expect(dist.has(`${tx},${ty}`), `(${tx},${ty})`).toBe(true)
     }
   })
 
   it('every walkable tile is reachable (no sealed pockets)', () => {
-    for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty)) expect(dist.has(`${tx},${ty}`), `(${tx},${ty})`).toBe(true)
+    for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) expect(dist.has(`${tx},${ty}`), `(${tx},${ty})`).toBe(true)
   })
 
   it('shortest walk PIER_END <-> SHOP_SPOT is 30..45 tiles (10..15 s at 3 tiles/s)', () => {
@@ -249,7 +259,7 @@ describe('castTarget', () => {
   it('stops at the center of the last water tile before land', () => {
     let found: { tx: number; ty: number; f: Facing } | undefined
     for (const { tx, ty } of allTiles()) {
-      if (!isWalkable(VILLAGE, tx, ty)) continue
+      if (!isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) continue
       for (const f of FACINGS) {
         const { dx, dy } = DIRS[f]
         const first = tileAt(VILLAGE, tx + dx, ty + dy)
@@ -298,12 +308,12 @@ describe('new tile kinds', () => {
   })
 
   it('bridge is walkable; river, pond, basin, falls and cliff are not', () => {
-    expect(isWalkable(REGION, 2, 4)).toBe(true)
-    for (const [tx, ty] of [[0, 4], [1, 1], [2, 2], [0, 5], [1, 5]]) expect(isWalkable(REGION, tx, ty), `${tx},${ty}`).toBe(false)
+    expect(isWalkable(REGION, 2, 4, ALL_AREAS_OPEN)).toBe(true)
+    for (const [tx, ty] of [[0, 4], [1, 1], [2, 2], [0, 5], [1, 5]]) expect(isWalkable(REGION, tx, ty, ALL_AREAS_OPEN), `${tx},${ty}`).toBe(false)
   })
 
-  it('WATER_KINDS holds the four water kinds only', () => {
-    expect([...WATER_KINDS].sort()).toEqual(['basin', 'pond', 'river', 'water'])
+  it('WATER_KINDS holds the fishable water kinds only (falls excluded)', () => {
+    expect([...WATER_KINDS].sort()).toEqual(['basin', 'cave-pool', 'crystal', 'lagoon', 'lake', 'lava', 'pond', 'river', 'water'])
   })
 })
 
@@ -333,19 +343,19 @@ describe('spotFor', () => {
 describe('interactionAt on new tiles', () => {
   it('facing falls or cliff gives null', () => {
     const wall = defineMap('river', ['..', 'wc'], { spots: { river: 'river' } })
-    expect(interactionAt(wall, center(0, 0), 'down')).toBeNull() // 폭포
-    expect(interactionAt(wall, center(1, 0), 'down')).toBeNull() // 절벽
+    expect(interactionAt(wall, center(0, 0), 'down', ALL_AREAS_OPEN)).toBeNull() // 폭포
+    expect(interactionAt(wall, center(1, 0), 'down', ALL_AREAS_OPEN)).toBeNull() // 절벽
   })
 
   it('on the bridge, facing the river fishes river', () => {
-    expect(interactionAt(REGION, center(2, 4), 'down')).toEqual({ kind: 'fish', spot: 'river' })
-    expect(interactionAt(REGION, center(2, 4), 'left')).toEqual({ kind: 'fish', spot: 'river' })
-    expect(interactionAt(REGION, center(2, 4), 'right')).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(REGION, center(2, 4), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(REGION, center(2, 4), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(REGION, center(2, 4), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'river' })
   })
 
   it('from the grass, a pond and a basin give their spots', () => {
-    expect(interactionAt(REGION, center(0, 1), 'right')).toEqual({ kind: 'fish', spot: 'pond' })
-    expect(interactionAt(REGION, center(3, 3), 'up')).toEqual({ kind: 'fish', spot: 'waterfall' })
+    expect(interactionAt(REGION, center(0, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'pond' })
+    expect(interactionAt(REGION, center(3, 3), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'waterfall' })
   })
 })
 
@@ -387,5 +397,198 @@ describe('defineMap', () => {
     expect(map.shop).toEqual({ tx: 0, ty: 0, w: 3, h: 2, doorTx: 1 })
     expect(shopSpot(map)).toEqual({ tx: 1, ty: 2 })
     expect(map.spawn).toEqual({ pos: center(1, 2), facing: 'down' })
+  })
+})
+
+// ── 3단계: 문(gate)·선착장(dock)·안쪽 출구와 열린 지역 ─────────────────
+describe('문·선착장·안쪽 출구', () => {
+  // 0 TTTTTTTTTT
+  // 1 T,,,,,,,,T   (1,1)~(2,1) 안쪽 출구, (8,1) 돌무더기 문(9,1 나무까지 덮음)
+  // 2 TrrrHrrrrT   (4,2) 다리 = 무너진 다리 문
+  // 3 T,,,,,...T   (4,3)에서 위를 보면 문
+  // 4 T,,,,,.#.T
+  // 5 T~~~~~~#~T   (7,5) 선착장 front(왼쪽), 배 (5,5)
+  // 6 T~~~~~~#~T   (7,6) 부두 끝
+  // 7 T~~~~~~~~T
+  // 8 TTTTTTTTTT
+  const ROWS = [
+    'TTTTTTTTTT',
+    'T,,,,,,,,T',
+    'TrrrHrrrrT',
+    'T,,,,,...T',
+    'T,,,,,.#.T',
+    'T~~~~~~#~T',
+    'T~~~~~~#~T',
+    'T~~~~~~~~T',
+    'TTTTTTTTTT',
+  ]
+  const BRIDGE_GATE: Gate = { area: 'lake', tiles: { tx: 4, ty: 2, w: 1, h: 1 }, look: 'broken-bridge', front: { tx: 4, ty: 3, facing: 'up' } }
+  const RUBBLE_GATE: Gate = { area: 'cave', tiles: { tx: 8, ty: 1, w: 2, h: 1 }, look: 'rubble', front: { tx: 7, ty: 1, facing: 'right' } }
+  const DOCK: Dock = { front: { tx: 7, ty: 5, facing: 'left' }, target: 'island', entry: { tx: 2, ty: 2, facing: 'down' }, boat: { tx: 5, ty: 5 } }
+  const CAVE_EXIT: Exit = { at: { tx: 1, ty: 1, w: 2, h: 1 }, target: 'cave', entry: { tx: 3, ty: 3, facing: 'down' } }
+  const make = (extra: { gates?: Gate[]; docks?: Dock[] } = {}) =>
+    defineMap('river', ROWS, {
+      spots: { river: 'river', water: 'sea' },
+      gates: extra.gates ?? [BRIDGE_GATE, RUBBLE_GATE],
+      docks: extra.docks ?? [DOCK],
+      exits: [CAVE_EXIT],
+    })
+  const MAP = make()
+  const BASE: Opened = new Set<AreaId>(['village', 'river', 'forest'])
+  const ALL: Opened = new Set<AreaId>(['village', 'river', 'forest', 'lake', 'cave', 'island'])
+
+  it('defineMap 기본값: 문·선착장 없음, indoor false. 지정하면 그대로', () => {
+    const plain = defineMap('river', ['TTTT', 'T,,T', 'TTTT'])
+    expect(plain.gates).toEqual([])
+    expect(plain.docks).toEqual([])
+    expect(plain.indoor).toBe(false)
+    expect(MAP.gates).toEqual([BRIDGE_GATE, RUBBLE_GATE])
+    expect(MAP.docks).toEqual([DOCK])
+    expect(defineMap('cave', ['TTTT', 'T,,T', 'TTTT'], { indoor: true }).indoor).toBe(true)
+  })
+
+  it('isWalkable: 문 칸은 opened에 그 지역이 없으면 false, 있으면 rows 원래 칸의 규칙대로', () => {
+    expect(isWalkable(MAP, 4, 2, BASE)).toBe(false)
+    expect(isWalkable(MAP, 4, 2, ALL)).toBe(true) // 다리
+    expect(isWalkable(MAP, 8, 1, BASE)).toBe(false)
+    expect(isWalkable(MAP, 8, 1, ALL)).toBe(true) // 풀
+    expect(isWalkable(MAP, 9, 1, ALL)).toBe(false) // 원래 나무
+    // 그 지역만 열려도 된다(다른 문은 그대로 잠김)
+    const lakeOnly: Opened = new Set<AreaId>([...BASE, 'lake'])
+    expect(isWalkable(MAP, 4, 2, lakeOnly)).toBe(true)
+    expect(isWalkable(MAP, 8, 1, lakeOnly)).toBe(false)
+    // 문 밖 칸은 열림과 무관
+    expect(isWalkable(MAP, 3, 2, ALL)).toBe(false)
+    expect(isWalkable(MAP, 4, 3, BASE)).toBe(true)
+  })
+
+  it('interactionAt: 잠긴 문 front에서 facing을 보면 gate, 열린 뒤에는 gate가 아니다', () => {
+    expect(interactionAt(MAP, center(4, 3), 'up', BASE)).toEqual({ kind: 'gate', area: 'lake' })
+    expect(interactionAt(MAP, center(4, 3), 'up', ALL)).toBeNull() // 앞이 다리
+    expect(interactionAt(MAP, center(4, 3), 'left', BASE)).toBeNull() // 방향이 다르면 아님
+    expect(interactionAt(MAP, center(7, 1), 'right', BASE)).toEqual({ kind: 'gate', area: 'cave' })
+    expect(interactionAt(MAP, center(7, 1), 'right', ALL)).toBeNull()
+  })
+
+  it('interactionAt: 선착장 front → dock(열림 여부와 무관), 부두 끝에서 물 → 낚시 pier 그대로', () => {
+    expect(interactionAt(MAP, center(7, 5), 'left', BASE)).toEqual({ kind: 'dock', target: 'island' })
+    expect(interactionAt(MAP, center(7, 5), 'left', ALL)).toEqual({ kind: 'dock', target: 'island' })
+    expect(interactionAt(MAP, center(7, 5), 'right', BASE)).toEqual({ kind: 'fish', spot: 'pier' })
+    expect(interactionAt(MAP, center(7, 6), 'left', BASE)).toEqual({ kind: 'fish', spot: 'pier' })
+    expect(interactionAt(MAP, center(7, 6), 'down', BASE)).toEqual({ kind: 'fish', spot: 'pier' })
+    expect(interactionAt(MAP, center(5, 3), 'up', BASE)).toEqual({ kind: 'fish', spot: 'river' })
+  })
+
+  it('exitAt: at 출구 사각형 안 칸 → 그 출구, 밖 → null', () => {
+    expect(exitAt(MAP, center(1, 1))).toBe(CAVE_EXIT)
+    expect(exitAt(MAP, center(2, 1))).toBe(CAVE_EXIT)
+    expect(exitAt(MAP, { x: 2 * TILE + TILE - 0.01, y: TILE + 1 })).toBe(CAVE_EXIT)
+    expect(exitAt(MAP, center(3, 1))).toBeNull()
+    expect(exitAt(MAP, center(1, 3))).toBeNull()
+  })
+
+  it('openExitAt: 안 연 지역으로 가는 출구는 null, 열면 그 출구(실제 강 북쪽 출구)', () => {
+    const base: Opened = new Set<AreaId>(DEFAULT_AREAS)
+    const lakeExit = RIVER.exits.find((e) => e.target === 'lake')!
+    for (const tx of [24, 25]) {
+      expect(exitAt(RIVER, center(tx, 0))).toBe(lakeExit)
+      expect(openExitAt(RIVER, center(tx, 0), base)).toBeNull()
+      expect(openExitAt(RIVER, center(tx, 0), new Set<AreaId>([...DEFAULT_AREAS, 'lake']))).toBe(lakeExit)
+    }
+    // 기본 지역으로 가는 출구는 그대로
+    const south = RIVER.exits.find((e) => e.target === 'village')!
+    expect(openExitAt(RIVER, center(24, RIVER.h - 1), base)).toBe(south)
+    expect(openExitAt(RIVER, center(10, 10), base)).toBeNull()
+  })
+
+  it('reachableTiles: 시작 칸에서 열린 지역 기준으로 걸어 닿는 칸. 잠긴 문 너머는 빠지고, 못 걷는 시작 칸은 무시', () => {
+    const base: Opened = new Set<AreaId>(DEFAULT_AREAS)
+    const start = [{ tx: 24, ty: 4 }]
+    const closed = reachableTiles(RIVER, start, base)
+    expect(closed.has('24,4')).toBe(true)
+    expect(closed.has('24,2')).toBe(false)
+    expect(closed.has('24,1')).toBe(false)
+    expect(closed.has('24,0')).toBe(false)
+    const open = reachableTiles(RIVER, start, new Set<AreaId>([...DEFAULT_AREAS, 'lake']))
+    expect(open.has('24,1')).toBe(true)
+    expect(open.has('25,0')).toBe(true)
+    // 시작 칸이 못 걷는 칸(나무)이면 아무 칸도 없다
+    expect(reachableTiles(RIVER, [{ tx: 0, ty: 0 }], base).size).toBe(0)
+  })
+
+  it('defineMap: 문 칸이 맵 밖이면 throw, 선착장 front가 못 걷는 칸이면 throw', () => {
+    expect(() => make({ gates: [{ ...RUBBLE_GATE, tiles: { tx: 9, ty: 1, w: 2, h: 1 } }] })).toThrow(/gate/)
+    expect(() => make({ gates: [{ ...RUBBLE_GATE, tiles: { tx: 8, ty: -1, w: 1, h: 2 } }] })).toThrow(/gate/)
+    expect(() => make({ docks: [{ ...DOCK, front: { tx: 7, ty: 7, facing: 'left' } }] })).toThrow(/dock/)
+    expect(() => make({ docks: [{ ...DOCK, front: { tx: 0, ty: 3, facing: 'left' } }] })).toThrow(/dock/)
+  })
+})
+
+// ── 3단계: 산 호수·동굴·섬 타일 ─────────────────────────────────────
+describe('산 호수·동굴·섬 타일', () => {
+  // 글자 열 개를 한 줄에. 첫 걸을 수 있는 칸('_')이 시작 위치가 된다
+  const ROW = defineMap('island', ['k_WuqLEPlK'])
+  const KINDS: [string, TileKind, boolean][] = [
+    ['k', 'lake', false],
+    ['_', 'cave-floor', true],
+    ['W', 'cave-wall', false],
+    ['u', 'cave-pool', false],
+    ['q', 'crystal', false],
+    ['L', 'lava', false],
+    ['E', 'cave-mouth', true],
+    ['P', 'palm', false],
+    ['l', 'lagoon', false],
+    ['K', 'dock', true],
+  ]
+
+  it('글자 → kind, 걷기는 표대로(동굴 바닥·입구·선착장만 걷는다)', () => {
+    KINDS.forEach(([ch, kind, walk], tx) => {
+      expect(TILE_CHARS[ch], ch).toBe(kind)
+      expect(tileAt(ROW, tx, 0), ch).toBe(kind)
+      expect(isWalkable(ROW, tx, 0, ALL_AREAS_OPEN), kind).toBe(walk)
+    })
+  })
+
+  it('물 종류: 호수·동굴 웅덩이·수정·용암·석호. 동굴 바닥·벽·입구·야자수·선착장은 물이 아니다', () => {
+    for (const kind of ['lake', 'cave-pool', 'crystal', 'lava', 'lagoon'] as const) expect(WATER_KINDS.has(kind), kind).toBe(true)
+    for (const kind of ['cave-floor', 'cave-wall', 'cave-mouth', 'palm', 'dock'] as const) expect(WATER_KINDS.has(kind), kind).toBe(false)
+  })
+
+  it('spotFor: 산 호수는 lake 자리', () => {
+    const lake = defineMap('lake', [',k'], { spots: { lake: 'lake' } })
+    expect(spotFor(lake, 'grass', 'lake')).toBe('lake')
+    expect(spotFor(lake, 'grass', 'water')).toBeNull()
+  })
+
+  it('spotFor: 동굴은 웅덩이 cave1, 수정 cave2, 용암 cave3. 벽·입구 앞은 null', () => {
+    const cave = defineMap('cave', ['_uqL'], { spots: { 'cave-pool': 'cave1', crystal: 'cave2', lava: 'cave3' }, indoor: true })
+    expect(spotFor(cave, 'cave-floor', 'cave-pool')).toBe('cave1')
+    expect(spotFor(cave, 'cave-floor', 'crystal')).toBe('cave2')
+    expect(spotFor(cave, 'cave-floor', 'lava')).toBe('cave3')
+    expect(spotFor(cave, 'cave-floor', 'cave-wall')).toBeNull()
+    expect(spotFor(cave, 'cave-floor', 'cave-mouth')).toBeNull()
+    expect(spotFor(cave, 'cave-floor', 'lake')).toBeNull()
+  })
+
+  it('spotFor: 섬은 바다 sea, 석호 lagoon. 선착장 위에서 바다를 봐도 부두(pier) 보너스가 아니다', () => {
+    const island = defineMap('island', ['.l', 'K~'], { spots: { water: 'sea', lagoon: 'lagoon' } })
+    expect(spotFor(island, 'sand', 'lagoon')).toBe('lagoon')
+    expect(spotFor(island, 'sand', 'water')).toBe('sea')
+    expect(spotFor(island, 'dock', 'water')).toBe('sea')
+    expect(spotFor(island, 'dock', 'lagoon')).toBe('lagoon')
+    expect(spotFor(island, 'sand', 'palm')).toBeNull()
+  })
+
+  it('interactionAt: 동굴 바닥에서 용암을 보면 cave3 낚시, 벽을 보면 null', () => {
+    const cave = defineMap('cave', ['WWW', 'W_L', 'WWW'], { spots: { 'cave-pool': 'cave1', crystal: 'cave2', lava: 'cave3' }, indoor: true })
+    expect(interactionAt(cave, center(1, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'cave3' })
+    expect(interactionAt(cave, center(1, 1), 'up', ALL_AREAS_OPEN)).toBeNull()
+  })
+
+  it('castTarget: 수정 웅덩이에서 용암으로 이어 날아가고 동굴 바닥 앞에서 멈춘다', () => {
+    const cave = defineMap('cave', ['_qqLL_'], { spots: { crystal: 'cave2', lava: 'cave3' } })
+    expect(castTarget(cave, center(0, 0), 'right', 1)).toEqual(center(4, 0))
+    const lavaOnly = defineMap('cave', ['_LLLLLLL'], { spots: { lava: 'cave3' } })
+    expect(castTarget(lavaOnly, center(0, 0), 'right', 1)).toEqual({ x: center(0, 0).x + 5 * TILE, y: center(0, 0).y })
   })
 })

@@ -6,12 +6,15 @@ import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
-import { BagPanel, conditionLabel } from './Menus.tsx'
+import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
+import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
+import { CAVE } from './maps/cave.ts'
+import { ISLAND } from './maps/island.ts'
+import { DEFAULT_AREAS } from './data.ts'
 import { feetBlocked } from './walk.ts'
 import type { AreaId } from './data.ts'
 import fishingCss from './fishing.css?raw'
@@ -416,7 +419,7 @@ describe('fishing Game', () => {
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
     const tabs = within(dex).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8', '산 호수 0/8', '동굴 0/7', '섬 0/8'])
     expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'true')
     expect(within(dex).getAllByText('???')).toHaveLength(9)
     fireEvent.click(within(dex).getByRole('tab', { name: /숲/ }))
@@ -425,11 +428,11 @@ describe('fishing Game', () => {
     expect(within(dex).getAllByText('???')).toHaveLength(8)
   })
 
-  test('dex shows per-area counts and the overall n/33 on top; caught names only on their tab', async () => {
+  test('dex shows per-area counts and the overall n/56 on top; caught names only on their tab', async () => {
     await mount(makeView({ dex: { anchovy: { count: 1, maxCm: 10 }, 'pale-chub': { count: 2, maxCm: 12 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/56종')).toBeInTheDocument()
     expect(within(dex).getByRole('tab', { name: /바닷가 마을/ })).toHaveTextContent('1/16')
     expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveTextContent('1/9')
     expect(within(dex).getByText('멸치')).toBeInTheDocument()
@@ -437,6 +440,19 @@ describe('fishing Game', () => {
     fireEvent.click(within(dex).getByRole('tab', { name: /마을 강/ }))
     expect(within(dex).getByText('피라미')).toBeInTheDocument()
     expect(within(dex).queryByText('멸치')).not.toBeInTheDocument()
+  })
+
+  test('dex: 6 tabs in AREAS order, new spot names shown for caught species', async () => {
+    await mount(makeView({ dex: { 'bat-catfish': { count: 1, maxCm: 50 }, lionfish: { count: 1, maxCm: 30 }, 'rainbow-trout': { count: 1, maxCm: 40 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getAllByRole('tab')).toHaveLength(6)
+    fireEvent.click(within(dex).getByRole('tab', { name: /동굴/ }))
+    expect(within(dex).getByText('수정 웅덩이 · 사계절')).toBeInTheDocument()
+    fireEvent.click(within(dex).getByRole('tab', { name: /섬/ }))
+    expect(within(dex).getByText('석호 · 사계절 · 20~5시')).toBeInTheDocument()
+    fireEvent.click(within(dex).getByRole('tab', { name: /산 호수/ }))
+    expect(within(dex).getByText('사계절')).toBeInTheDocument()
   })
 
   test('dex marks an uncaught legend slot with a border but keeps its name hidden', async () => {
@@ -836,11 +852,11 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('hook')).toHaveLength(1)
   })
-  test('dex shows spawn conditions only for caught species, legend mark, and n/33', async () => {
+  test('dex shows spawn conditions only for caught species, legend mark, and n/56', async () => {
     await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/56종')).toBeInTheDocument()
     expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
     expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
     expect(within(dex).getByText('전설')).toBeInTheDocument()
@@ -1605,24 +1621,26 @@ describe('availableHeight', () => {
 })
 
 
+const lastScene = () => {
+  const call = vi.mocked(drawWorld).mock.calls.at(-1)
+  if (!call) throw new Error('drawWorld was not called')
+  return call[1]
+}
+/** 맵에서 낚시 자리 id가 spot인 걸을 수 있는 자리와 방향. 기본 지역만 열린 것으로 본다(잠긴 문 칸 위는 고르지 않는다) */
+function fishingAt(map: MapDef, spot: string): At {
+  const base = new Set<AreaId>(DEFAULT_AREAS)
+  for (let ty = 0; ty < map.h; ty++)
+    for (let tx = 0; tx < map.w; tx++)
+      for (const facing of ['up', 'down', 'left', 'right'] as const) {
+        const pos = tileCenter(tx, ty)
+        if (feetBlocked(map, pos.x, pos.y, base)) continue
+        const at = interactionAt(map, pos, facing, base)
+        if (at?.kind === 'fish' && at.spot === spot) return { area: map.id, pos, facing }
+      }
+  throw new Error(`no ${spot} spot in ${map.id}`)
+}
+
 describe('fishing Game: 지역 전환', () => {
-  const lastScene = () => {
-    const call = vi.mocked(drawWorld).mock.calls.at(-1)
-    if (!call) throw new Error('drawWorld was not called')
-    return call[1]
-  }
-  /** 맵에서 낚시 자리 id가 spot인 걸을 수 있는 자리와 방향 */
-  function fishingAt(map: MapDef, spot: string): At {
-    for (let ty = 0; ty < map.h; ty++)
-      for (let tx = 0; tx < map.w; tx++)
-        for (const facing of ['up', 'down', 'left', 'right'] as const) {
-          const pos = tileCenter(tx, ty)
-          if (feetBlocked(map, pos.x, pos.y)) continue
-          const at = interactionAt(map, pos, facing)
-          if (at?.kind === 'fish' && at.spot === spot) return { area: map.id, pos, facing }
-        }
-    throw new Error(`no ${spot} spot in ${map.id}`)
-  }
   /** 마을 북쪽 출구 바로 아래 칸에서 위를 보고 시작 */
   const NEAR_EXIT: At = { area: 'village', pos: tileCenter(24, 1), facing: 'up' }
   const ENTRY = VILLAGE.exits[0].entry
@@ -1656,6 +1674,12 @@ describe('fishing Game: 지역 전환', () => {
     expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')).toEqual({
       area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: ENTRY.facing,
     })
+  })
+
+  test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
+    await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
+    await advance(50)
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
@@ -1767,9 +1791,8 @@ describe('fishing Game: 지역 전환', () => {
     for (const s of saved) expect(exitAt(s.area === 'river' ? RIVER : VILLAGE, s.pos)).toBeNull()
   })
 
-  test('맵이 없는 지역으로 가는 출구는 무시한다: 페이드를 시작하지 않고 한 번만 로그한다', async () => {
+  test('맵이 없는 지역으로 가는 출구는 무시한다: 페이드를 시작하지 않고 갇히지 않는다', async () => {
     mapGate.hideRiver = true
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       await mount(makeView(), NEAR_EXIT)
       await advance(50)
@@ -1778,7 +1801,6 @@ describe('fishing Game: 지역 전환', () => {
       key('ArrowUp', false)
       expect(lastScene().map.id).toBe('village')
       expect(lastScene().fade).toBe(0)
-      expect(err).toHaveBeenCalledTimes(1)
       const stuck = lastScene().player.pos.y
       key('ArrowDown', true) // 갇히지 않는다
       await advance(200)
@@ -1803,6 +1825,310 @@ describe('fishing Game: 지역 전환', () => {
     await advance(16)
     raf.mockRestore()
     expect(lastScene().fade).toBeGreaterThan(0)
+  })
+})
+
+/** 산 호수 남쪽 출구 두 칸 안쪽(강에서 들어오는 자리) */
+const LAKE_ENTRY = RIVER.exits.find((e) => e.target === 'lake')!.entry
+
+describe('fishing Game: 지역 해금·배 타기', () => {
+  const BASE: AreaId[] = [...DEFAULT_AREAS]
+  const unlockPanel = () => screen.getByRole('region', { name: '지역 열기' })
+  const savedPos = () => JSON.parse(localStorage.getItem(POS_KEY) ?? 'null') as At
+  /** 강 골짜기 무너진 다리 남쪽 길에서 위(다리)를 본다 */
+  const RIVER_GATE = RIVER.gates[0]
+  const AT_BRIDGE: At = { area: 'river', pos: tileCenter(RIVER_GATE.front.tx, RIVER_GATE.front.ty), facing: RIVER_GATE.front.facing }
+  const VILLAGE_DOCK = VILLAGE.docks[0]
+  const AT_VILLAGE_DOCK: At = { area: 'village', pos: tileCenter(VILLAGE_DOCK.front.tx, VILLAGE_DOCK.front.ty), facing: VILLAGE_DOCK.front.facing }
+  const ISLAND_DOCK = ISLAND.docks[0]
+  const AT_ISLAND_DOCK: At = { area: 'island', pos: tileCenter(ISLAND_DOCK.front.tx, ISLAND_DOCK.front.ty), facing: ISLAND_DOCK.front.facing }
+  /** 행동(스페이스)을 눌렀다 떼고, 창이 열렸으면 유령 클릭 방지 시간을 넘긴다 */
+  async function interact() {
+    press()
+    release()
+    await advance(300)
+  }
+
+  test('잠긴 다리 앞: 안내는 살펴보기, 행동 → 해금 창(무너진 다리 수리 · 5,000 G · 보유 골드); 골드가 모자라면 열기 비활성·문구', async () => {
+    const { unmount } = await mount(makeView({ gold: 4999, areas: BASE }), AT_BRIDGE)
+    await advance(50)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 살펴보기')).toBeInTheDocument()
+    await interact()
+    const panel = unlockPanel()
+    expect(within(panel).getByText('무너진 다리 수리')).toBeInTheDocument()
+    expect(within(panel).getByText('5,000 G')).toBeInTheDocument()
+    expect(within(panel).getByText('보유 4,999 G')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '열기' })).toBeDisabled()
+    expect(within(panel).getByText('골드가 모자라요')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '산 호수' })).toBeInTheDocument()
+    unmount()
+
+    await mount(makeView({ gold: 5000, areas: BASE }), AT_BRIDGE)
+    await interact()
+    expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeEnabled()
+    expect(within(unlockPanel()).queryByText('골드가 모자라요')).not.toBeInTheDocument()
+  })
+
+  test('터치: 잠긴 다리 앞 행동 버튼은 살펴보기, 선착장 앞은 배 타기', async () => {
+    stubTouch()
+    const { unmount } = await mount(makeView({ areas: BASE }), AT_BRIDGE)
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('살펴보기')
+    unmount()
+    await mount(makeView({ areas: BASE }), AT_VILLAGE_DOCK)
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('배 타기')
+  })
+
+  test('열기 → unlockArea lake; 응답 areas에 lake → 창이 닫히고 알림, 다리를 걸어 지나 산 호수로 넘어간다', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await advance(50)
+    // 열기 전에는 다리 칸을 지나갈 수 없다
+    key('ArrowUp', true)
+    await advance(300)
+    key('ArrowUp', false)
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: RIVER_GATE.front.tx, ty: RIVER_GATE.front.ty })
+    await interact()
+    route({ unlockArea: () => ok({ ...view, gold: 1000, areas: [...BASE, 'lake'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'lake' } }])
+    expect(screen.queryByRole('region', { name: '지역 열기' })).not.toBeInTheDocument()
+    expect(screen.getByText('산 호수 가는 다리를 고쳤어요')).toBeInTheDocument()
+    expect(screen.getByText('1,000 G')).toBeInTheDocument()
+    key('ArrowUp', true)
+    await advance(1200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('lake')
+    expect(savedPos().area).toBe('lake')
+  })
+
+  test('해금 창이 뜬 지 300ms 안의 클릭(여는 손가락의 유령 클릭)은 열기를 누르지 않는다', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    route({ unlockArea: () => ok({ ...view, areas: [...BASE, 'lake'] }) })
+    press()
+    release()
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toHaveLength(0)
+    await advance(300)
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toHaveLength(1)
+  })
+
+  test('서버 오류(not_enough_gold) → 해금 창은 그대로, 오류 문구', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({ unlockArea: () => Promise.reject(new ApiError('not_enough_gold', 400)), load: () => ok(view) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(unlockPanel()).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+  })
+
+  test('already_open(다른 기기에서 이미 엶) → 창이 닫히고 알림, view를 다시 불러와 다리를 지나갈 수 있다', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({
+      unlockArea: () => Promise.reject(new ApiError('already_open', 400)),
+      load: () => ok({ ...view, gold: 1000, areas: [...BASE, 'lake'] }),
+    })
+    const loadsBefore = calls('load').length
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    await flush()
+    expect(screen.queryByRole('region', { name: '지역 열기' })).not.toBeInTheDocument()
+    expect(screen.getByText('이미 열려 있어요')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(calls('load')).toHaveLength(loadsBefore + 1)
+    expect(screen.getByText('1,000 G')).toBeInTheDocument()
+    key('ArrowUp', true)
+    await advance(1200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('lake')
+  })
+
+  test('busy(서버에 남은 낚시) → 해금 창은 그대로, 해금 전용 문구(장비 문구가 아니다)', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({ unlockArea: () => Promise.reject(new ApiError('busy', 400)), load: () => ok(view) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(unlockPanel()).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('낚시를 마친 뒤에 열 수 있어요')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('낚시 중에는 바꿀 수 없어요')
+  })
+
+  test('강 북쪽 출구 칸에 서도 산 호수가 닫혀 있으면 넘어가지 않는다(서버 상태에서 lake가 빠진 경우)', async () => {
+    // 산 호수가 열린 상태로 강 북쪽 도착 칸에서 시작한 뒤, 응답의 areas에서 lake가 빠진다
+    const fish = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const view = makeView({ areas: [...BASE, 'lake'], bag: [fish] })
+    await mount(view, { area: 'river', pos: tileCenter(24, 1), facing: 'up' })
+    await advance(50)
+    expect(lastScene().map.id).toBe('river')
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    route({ lock: () => ok({ ...view, areas: BASE, bag: [{ ...fish, locked: true as const }] }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '가방' })).getByRole('button', { name: /멸치 10cm/ }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    key('ArrowUp', true)
+    await advance(600)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(tileOf(lastScene().player.pos).ty).toBe(0) // 출구 칸까지 걸어갔다
+    expect(lastScene().map.id).toBe('river')
+    expect(lastScene().fade).toBe(0)
+  })
+
+  test('성공 응답인데 areas에 지역이 없으면 창은 그대로, 다시 시도 오류 문구', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({ unlockArea: () => ok({ ...view }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(unlockPanel()).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('다시 시도해 주세요')
+  })
+
+  test('숲 동굴 입구를 열면 동굴 알림, 걸어 들어가면 동굴 맵과 지역 이름 알림', async () => {
+    const gate = FOREST.gates[0]
+    const view = makeView({ gold: 20000, areas: BASE })
+    await mount(view, { area: 'forest', pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing })
+    await interact()
+    expect(within(unlockPanel()).getByText('동굴 장비')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('15,000 G')).toBeInTheDocument()
+    route({ unlockArea: () => ok({ ...view, gold: 5000, areas: [...BASE, 'cave'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(screen.getByText('동굴 입구를 치웠어요')).toBeInTheDocument()
+    key('ArrowUp', true)
+    await advance(300)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('cave')
+    expect(screen.getByText('동굴')).toBeInTheDocument()
+  })
+
+  test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 G); 사면 알림, 다시 행동하면 배를 탄다', async () => {
+    const view = makeView({ gold: 60000, areas: BASE })
+    await mount(view, AT_VILLAGE_DOCK)
+    await advance(50)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 배 타기')).toBeInTheDocument()
+    await interact()
+    expect(within(unlockPanel()).getByText('배')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('50,000 G')).toBeInTheDocument()
+    expect(lastScene().map.id).toBe('village')
+    route({ unlockArea: () => ok({ ...view, gold: 10000, areas: [...BASE, 'island'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')[0]).toMatchObject({ payload: { type: 'unlockArea', area: 'island' } })
+    expect(screen.getByText('배를 샀어요 — 선착장에서 섬으로 갈 수 있어요')).toBeInTheDocument()
+    await interact()
+    await advance(400)
+    expect(lastScene().map.id).toBe('island')
+  })
+
+  test('섬 열림: 마을 선착장에서 행동 → 페이드 뒤 섬 entry에 도착(위치 저장); 섬 선착장 → 마을 entry', async () => {
+    const view = makeView({ areas: [...BASE, 'island'] })
+    const { unmount } = await mount(view, AT_VILLAGE_DOCK)
+    await advance(50)
+    press()
+    release()
+    await advance(20)
+    expect(lastScene().map.id).toBe('village')
+    expect(lastScene().fade).toBeGreaterThan(0)
+    expect(screen.queryByRole('region', { name: '지역 열기' })).not.toBeInTheDocument()
+    await advance(400)
+    const entry = VILLAGE_DOCK.entry
+    expect(lastScene().map.id).toBe('island')
+    expect(lastScene().fade).toBe(0)
+    expect(lastScene().player.pos).toEqual(tileCenter(entry.tx, entry.ty))
+    expect(lastScene().player.facing).toBe(entry.facing)
+    expect(savedPos()).toEqual({ area: 'island', pos: tileCenter(entry.tx, entry.ty), facing: entry.facing })
+    expect(screen.getByText('섬')).toBeInTheDocument()
+    unmount()
+
+    await mount(view, AT_ISLAND_DOCK)
+    await advance(50)
+    await interact()
+    await advance(400)
+    const back = ISLAND_DOCK.entry
+    expect(lastScene().map.id).toBe('village')
+    expect(lastScene().player.pos).toEqual(tileCenter(back.tx, back.ty))
+    expect(lastScene().player.facing).toBe(back.facing)
+  })
+
+  test('저장 위치가 섬 선착장이어도 서버 areas에 섬이 없으면 마을 시작 위치에서 시작한다', async () => {
+    await mount(makeView({ areas: ['village'] }), { ...AT_ISLAND_DOCK })
+    await advance(50)
+    // 섬이 안 열렸으니 저장 위치는 쓰지 않고 마을 시작 위치에서 시작한다
+    expect(lastScene().map.id).toBe('village')
+    expect(lastPlayer().pos).toEqual(SPAWN.pos)
+  })
+
+  test('저장 위치 {area:lake}: 서버 areas에 lake가 없으면 마을 SPAWN, 있으면 그 자리에서 시작', async () => {
+    const saved: At = { area: 'lake', pos: tileCenter(LAKE_ENTRY.tx, LAKE_ENTRY.ty), facing: 'up' }
+    const { unmount } = await mount(makeView({ areas: BASE }), saved)
+    await advance(50)
+    expect(lastScene().map.id).toBe('village')
+    expect(lastPlayer().pos).toEqual(SPAWN.pos)
+    expect(lastPlayer().facing).toBe(SPAWN.facing)
+    unmount()
+
+    await mount(makeView({ areas: [...BASE, 'lake'] }), saved)
+    await advance(50)
+    expect(lastScene().map.id).toBe('lake')
+    expect(lastPlayer().pos).toEqual(saved.pos)
+  })
+
+  test('저장 위치가 아직 잠긴 문 칸(무너진 다리)이면 마을 SPAWN에서 시작', async () => {
+    const saved: At = { area: 'river', pos: tileCenter(RIVER_GATE.tiles.tx, RIVER_GATE.tiles.ty), facing: 'up' }
+    await mount(makeView({ areas: BASE }), saved)
+    await advance(50)
+    expect(lastScene().map.id).toBe('village')
+    expect(lastPlayer().pos).toEqual(SPAWN.pos)
+  })
+
+  test('저장된 동굴 위치는 동굴이 열려 있으면 그대로 복원된다', async () => {
+    const entry = FOREST.exits.find((e) => e.target === 'cave')!.entry
+    const saved: At = { area: 'cave', pos: tileCenter(entry.tx, entry.ty), facing: entry.facing }
+    await mount(makeView({ areas: [...BASE, 'cave'] }), saved)
+    await advance(50)
+    expect(lastScene().map.id).toBe('cave')
+    expect(lastPlayer().pos).toEqual(saved.pos)
+  })
+
+  test('첫 응답 전에는 저장 위치를 덮어쓰지 않는다(화면을 떠나도 그대로)', async () => {
+    const saved: At = { area: 'lake', pos: tileCenter(LAKE_ENTRY.tx, LAKE_ENTRY.ty), facing: 'up' }
+    localStorage.setItem(POS_KEY, JSON.stringify(saved))
+    route({ load: () => new Promise(() => {}) })
+    const { unmount } = render(<Game gameId="fishing" />)
+    await flush()
+    expect(screen.getByText('불러오는 중…')).toBeInTheDocument()
+    unmount()
+    expect(savedPos()).toEqual(saved)
+  })
+
+  test('동굴 용암 앞에서 던지면 cast 페이로드 {area:cave, spot:cave3}', async () => {
+    const view = makeView({ areas: [...BASE, 'cave'] })
+    const p = pending()
+    await mount(view, fishingAt(CAVE, 'cave3'))
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
+    expect(payload).toMatchObject({ area: 'cave', spot: 'cave3' })
   })
 })
 
@@ -1844,6 +2170,26 @@ describe('찌 상점·장비', () => {
     cleanup()
     render(<BagPanel view={old as View} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     expect(within(screen.getByRole('group', { name: '장비' })).getAllByTestId('fish-slot')).toHaveLength(1)
+  })
+
+  test('이 판에 없는 어종 id(더 새 서버)가 가방·도감에 있어도 가방·상점·도감이 그려진다', async () => {
+    const unknown = { species: 'future-fish', sizeCm: 50, perfect: false }
+    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const view = makeView({ bag: [unknown, anchovy], dex: { 'future-fish': { count: 1, maxCm: 50 }, anchovy: { count: 1, maxCm: 10 } } })
+    render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
+    const bag = screen.getByRole('region', { name: '가방' })
+    const cell = within(bag).getByRole('button', { name: /future-fish 50cm/ })
+    expect(cell.querySelector('img')).toBeNull() // 모르는 어종은 그림 없이
+    expect(within(cell).getByText('—')).toBeInTheDocument()
+    expect(within(bag).getByRole('button', { name: /멸치 10cm/ })).toBeInTheDocument()
+    cleanup()
+    await mountAtShop(view)
+    const value = price('anchovy', 10, false).toLocaleString('ko-KR')
+    expect(screen.getByText(`팔 물고기 2마리 · 예상 ${value} G`)).toBeInTheDocument()
+    cleanup()
+    render(<DexPanel view={view} />)
+    expect(screen.getByRole('region', { name: '도감' })).toBeInTheDocument()
+    expect(screen.getByText(`1/${SPECIES.length}종`)).toBeInTheDocument()
   })
 
   test('가방: 장비 구역이 가방 칸보다 위, 찌를 사기 전에도 칸과 안내가 보인다', () => {

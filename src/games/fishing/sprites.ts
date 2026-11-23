@@ -1341,6 +1341,515 @@ const FISH_CENTURY_SNAKEHEAD = sprite(
   ],
 )
 
+// ── 산 호수 물고기 8종 ──
+const FISH_RAINBOW_TROUT = sprite(
+  { k: '#22301f', b: '#6f8a4a', B: '#8fa866', d: '#2a2c1c', p: '#e8708a', P: '#f5a3b4', w: '#eef0e0', f: '#7a8a52', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....kkkkkkkk....',
+    '..kkbdbbbdbbkk.k',
+    '.kbbbbBdbbbbdkkf',
+    'kWebdbBBbbdbbbff',
+    'kbPPpPPpPPpPPpkf',
+    'kkwwwwdwwwwdwkkf',
+    '.kkwwwwwwwwwkk.k',
+    '...kkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_LARGEMOUTH_BASS = sprite(
+  { k: '#1c2a16', b: '#5f8a3a', B: '#86b05a', d: '#2c4220', w: '#e4ecc8', m: '#c9d6a0', r: '#a8495a', f: '#6a8a42', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '.....k.k.k.k....',
+    '...kkfkfkfkfk...',
+    '..kBBBBBBBbbbk.k',
+    '.kBWeBbbbbbbbkkf',
+    'kkbbbbbbbbbbbbff',
+    'rrkddddddddddbff',
+    'kkmdbbdbbdbbbkkf',
+    '.kwwwwwwwwwwkk.k',
+    '..kkkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SMELT = sprite(
+  { k: '#6a8090', s: '#d8eaf2', S: '#f4fbff', l: '#9fc0d0', v: '#7fa0b4', f: '#c0d8e4', e: '#1a2a34', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....kkkkkkk..k..',
+    '..kkSSSSSSskkfk.',
+    '.kWesvvvvvvssfk.',
+    '.kslllllllllkfk.',
+    '..kkSSSSSSkkkfk.',
+    '....kkkkkk...k..',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_MASU_SALMON = sprite(
+  { k: '#262a20', b: '#8a9a7a', B: '#b0bc9e', n: '#4a4660', r: '#e05a4a', w: '#f0f2e6', f: '#8a9a7a', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '...kkkkkkkkkk...',
+    '..kBBBBrBBBBbk.k',
+    '.kBnnbbnnbbnnkkf',
+    'kWennbbnnbbnnbff',
+    'kbbnnbrnnbbnnbff',
+    'kkwwnwwwnwwwnkkf',
+    '.kwwwwwwwwwwkk.k',
+    '..kkkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SKYGAZER = sprite(
+  { k: '#26303a', s: '#b4c2cc', S: '#dce6ec', g: '#7e909e', w: '#f2f6f8', f: '#a0b0bc', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kk.............',
+    'kSSk.kkkkkkkkk.k',
+    'ksskkggggggggkkf',
+    '.kssWeSSSSSSSkff',
+    '.ksssssssssssskf',
+    '..kwwwwwwwwwwkff',
+    '...kkkkkkkkkk..k',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_ISRAELI_CARP = sprite(
+  { k: '#2e2a20', b: '#8a8064', B: '#a89c7c', c: '#d8c58a', C: '#f0e2a8', w: '#e2dccb', m: '#d0a080', f: '#7a6e52', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '.....kkkkkkk....',
+    '...kkcCkcCkckk..',
+    '..kbbcckcckcbbk.',
+    '.kbbbbbbbbbbbbkk',
+    'kbWebbbbbbbbbbkf',
+    'kbbbbbbcCbbbbbff',
+    'mmkbbbbbccbbbbff',
+    'm.kbbbbbbbbbbbkf',
+    '..kwwwwwwwwwwwkk',
+    '...kwwwwwwwwkk.k',
+    '....kkkkkkkk....',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_STURGEON = sprite(
+  { k: '#1c2022', b: '#5a6468', P: '#ece6cc', w: '#c8ccc0', m: '#a89880', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '..............kk',
+    '....kkkkkkkkkkbk',
+    '...kPbbPbbPbbPbk',
+    '.kkbbbbbbbbbbbk.',
+    'kbbWebPbbPbbPbk.',
+    '.kkwwwwwwwwwwbbk',
+    '..mkkkkkkkkkkkbk',
+    '..m...........kk',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SILVER_KING_TROUT = sprite(
+  { k: '#26324a', b: '#a8bcd4', B: '#d4e2f0', S: '#ffffff', p: '#f0c4d4', w: '#f6faff', f: '#8ea4c4', Y: '#fff6c4', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '..Y.............',
+    '.YSY............',
+    '..Y..kkkkkk.....',
+    '...kkBBSSBBkk...',
+    '..kBBSBBBBBBbk..',
+    '.kbbbbbbbbbbbkkk',
+    'kWebbBbbbbBbbbff',
+    'kbbppppppppppbff',
+    'kbbbbbbbbbbbbbff',
+    'kkwwwwwwwwwwwkff',
+    '.kkwwwwwwwwwkk.k',
+    '...kkkkkkkkk....',
+    '..........Y.....',
+    '.........YSY....',
+    '..........Y.....',
+    '................',
+  ],
+)
+
+// ── 동굴 물고기 7종 ──
+const FISH_BLIND_FISH = sprite(
+  { k: '#5a3a44', p: '#f2c4cc', P: '#fbe2e6', r: '#e4a0ac', w: '#fff4f4', f: '#eab4be' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....kkkkkkkk.k..',
+    '..kkPPPPPPppkfk.',
+    '.kPPpppprpppffk.',
+    'kPppprpppprpkfk.',
+    '.kwwwwwwwwwkkfk.',
+    '..kkkkkkkkk..k..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CAVE_CRAYFISH = sprite(
+  { k: '#2a1c18', r: '#a0584a', R: '#c47a62', g: '#6e6660', G: '#8e8680', d: '#5a3a30', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '.kkk............',
+    'kRRrk...........',
+    'kkkrrk..........',
+    '..krrkkkkkkk..k.',
+    '...kkWeGgkgkkkrk',
+    '....krRggkgkgrrk',
+    '...kkrrggkgkkkrk',
+    'kkkrrk.kkkkk..k.',
+    'kRRrk...........',
+    '.kkk............',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CRYSTAL_FRY = sprite(
+  { k: '#3a7a9a', c: '#a8e4f8', C: '#dcf6ff', l: '#ffffff', f: '#8cd4f0', e: '#16384a', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.....kkkkk......',
+    '...kkCCCCCk.k...',
+    '..kWecclcccffk..',
+    '..kcclcccckfk...',
+    '...kkCCCCk.kk...',
+    '.....kkkkk......',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_EMBER_CARP = sprite(
+  { k: '#3a160c', o: '#f08a2a', O: '#ffb050', d: '#c4561a', r: '#e83a20', y: '#ffd23f', w: '#ffe0a8', m: '#ffcf80', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '.....y..y.......',
+    '....ryk.ryk.....',
+    '...kkrkkrkkk.r..',
+    '..kOOOOOOOOk.ry.',
+    '.kooodoodoook.ry',
+    'kWeoodoodoodkrry',
+    'koooodoodoodorrk',
+    'mmkoodoodoodkrry',
+    'm.koooooooookkry',
+    '..kwwwwrwwwk..r.',
+    '...kkkkrkkk.....',
+    '......ry........',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_BAT_CATFISH = sprite(
+  { k: '#1a1622', b: '#4e4660', B: '#6a6080', v: '#2e2840', V: '#7a6aa0', w: '#b8b0c4', m: '#d8cce0', e: '#ffe066', E: '#0a0a0a' },
+  [
+    '................',
+    '................',
+    '.....k...k......',
+    '....kvk.kvk.....',
+    '...kvVvkvVvk....',
+    '..kvVvvvvvVvk...',
+    '.kkbbbbbbbbbbk.k',
+    'mkEebbbBBbbbbkkv',
+    'mmkbbbbbbbbbbbvv',
+    'mkkwwwwwwwwwwkkv',
+    '..kvVvvvvvVvk..k',
+    '...kvVvkvVvk....',
+    '....kvk.kvk.....',
+    '.....k...k......',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_LAVA_EEL = sprite(
+  { k: '#140606', b: '#5a1a14', B: '#7a2a1e', g: '#ff7a1a', G: '#ffd040', m: '#c4502a', e: '#ffd040', E: '#140606' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkk...........',
+    'kbEebkkkkkkkkkk.',
+    'kmbbbbGgbbbbGgbk',
+    'kmmbbgGbbbbgGbbk',
+    '.kkbbbbbbgGbbbbk',
+    '...kkkkkkkkkkkk.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_FIRE_DRAGONFISH = sprite(
+  { k: '#3a1a04', g: '#f0b020', G: '#ffe070', d: '#c47a10', r: '#e83a20', o: '#ff8a2a', h: '#fff4c0', w: '#fff0b0', e: '#e83a20', E: '#1a0a00' },
+  [
+    '................',
+    '...kk...o..o....',
+    '..khhk.oro.ro...',
+    '...kkhkkrkkrk.o.',
+    '..kGGGGGGGGGGkro',
+    '.kGEegdggdggdkrr',
+    'kGGggdggdgggdgro',
+    'kwwkgdggdggdgkrr',
+    '.khkggdggdggkoro',
+    '..hkwwwwwwwwk.ro',
+    '..h.kkkrkkkk..o.',
+    '.h....ror.......',
+    '.......r........',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// ── 섬 물고기 8종 ──
+const FISH_CLOWNFISH = sprite(
+  { k: '#2a1408', o: '#ff7a1a', O: '#ffa04a', x: '#1a1008', w: '#ffffff', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....kkkkkkkkk...',
+    '...kOxwxOOxwkk.k',
+    '..kWxwxooxwxokkx',
+    '.kOexwxooxwxooox',
+    '.kooxwxooxwxooxx',
+    '..kkxwxooxwxkkkx',
+    '....kkkkkkkk...k',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_BUTTERFLYFISH = sprite(
+  { k: '#2e2408', y: '#ffd23f', Y: '#ffe880', n: '#1a1408', w: '#fff6d0', f: '#f0b020', e: '#ffffff', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '....kynnYYYkk...',
+    '...kyynnYYYYyk..',
+    '..kyyynnyyyyyk.k',
+    '..kyyneWyyyyykkf',
+    'kkyyynnyyyyynfff',
+    '..kyynnyyyyyykkf',
+    '..kyynnyyyyyyk.k',
+    '...kwnnwwwwwk...',
+    '....knnwwwkk....',
+    '.....kkkkkk.....',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_BLUE_DAMSEL = sprite(
+  { k: '#0e1630', n: '#2a3a7a', N: '#3a50a0', c: '#5ad0ff', y: '#ffd23f', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '...kkNNNNNNkk...',
+    '..kcccccccccck.k',
+    '.kWeNNNNNNNNnkky',
+    'kNNccccccccccyyy',
+    'kNNNNNNNNNNNNyyy',
+    '.kcccccccccccky.',
+    '..kkNNNNNNNkk.yk',
+    '....kkkkkkk...kk',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_LIONFISH = sprite(
+  { k: '#2a0e0a', r: '#c83a2a', R: '#e86a4a', w: '#f6e8dc', s: '#d8b0a0', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '....s.s.s.s.....',
+    '....s.s.s.s.s...',
+    '...kskskskskk...',
+    '..kRRwRRwRRwRk.k',
+    '.kRWeRwRRwRRwkkr',
+    'kRRRRRwRRwRRwrrw',
+    'kkwwRRwRRwRRwkkr',
+    '.kkkwwwwwwwwk..k',
+    '...ksksksk......',
+    '..sksksks.......',
+    '.s.s.s.s........',
+    's.s.s...........',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_MORAY = sprite(
+  { k: '#1a200e', b: '#7a8a2a', B: '#a0ae44', d: '#3a420e', r: '#a03a3a', t: '#ffffff', e: '#0d0d0d', W: '#f0f060' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkk...........',
+    'kbbWebkkkkkkkkk.',
+    'ktttkbbdbbdbbdbk',
+    '.rrrkbdbbdbbdbbk',
+    'ktttkbbbdbbdbbbk',
+    'kbbbbBBBBBBBBBk.',
+    '.kkkkkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_STINGRAY = sprite(
+  { k: '#1e2228', b: '#7a7060', B: '#9a9080', d: '#5a5044', t: '#3a3630', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '.....kk.........',
+    '....kBBk........',
+    '...kBBBbk.......',
+    '..kBWbbbbk......',
+    '.kBbbbbdbbk.....',
+    'kBbbbbbbdbbkkkkk',
+    '.kBWbbbdbbk.....',
+    '..kbbbbbbk......',
+    '...kbbbdk.......',
+    '....kbbk........',
+    '.....kk.........',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_MAHI = sprite(
+  { k: '#14281e', g: '#3aa05a', G: '#60c070', b: '#2a8ac0', y: '#f2d040', Y: '#fff080', w: '#fff8c8', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    'kkkkkkkkkkkk..k.',
+    'kbbbbbbbbbbbkkyk',
+    'kGGGGGGgggggkyyk',
+    'kWeGgggggggykyk.',
+    'kgggggggyyyyyk..',
+    'kgyyyyyyyyyyykyk',
+    'kyywwwwwwyyykyyk',
+    '.kkwwwwwwwkkk.yk',
+    '...kkkkkkk....k.',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_RAINBOW_MARLIN = sprite(
+  { k: '#0e1630', n: '#2a4aa0', N: '#3a6ad0', r: '#ff5a6a', o: '#ffa040', y: '#ffe050', g: '#60d070', c: '#5ad0ff', p: '#c070f0', w: '#e8f0ff', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '.....kkk........',
+    '....kpcck.......',
+    '....kcgyok......',
+    '....kgyorrk...kk',
+    '...kNNNNNNNk.knk',
+    '..kNWeNNNNNNkknk',
+    'nnnkrrrrrrrrrnk.',
+    '..koooooyyyyyk..',
+    '..kgggccccppnnk.',
+    '...kwwwwwwwkknnk',
+    '....kkkkkkk..knk',
+    '..............kk',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
 // ── 날씨 아이콘(8×8, HUD용) ──
 const ICON_SUN = sprite({ y: '#ffd23f', Y: '#fff3b0', o: '#ff9f43' }, [
   '...oo...',
@@ -2105,6 +2614,492 @@ const TILE_CLIFF = sprite(CLIFF, [
   'dddddddddddddddd',
 ])
 
+// ── 3단계: 잠긴 문과 배 ──
+// 무너진 다리(gate-broken-bridge): 물 위에 남은 말뚝, 꺾여 물에 잠긴 판자, 늘어진 밧줄. 배경이 투명해 물 위에 얹는다
+const BROKEN_BRIDGE: Record<string, string> = {
+  n: '#3b2a22', // 외곽선
+  U: '#e2b07a', // 말뚝 머리·판자 밝은 면
+  u: '#c8925a', // 나무
+  g: '#a8723f', // 나뭇결
+  G: '#86562f', // 그늘
+  y: '#e6d3a0', // 밧줄
+  Y: '#b59a62', // 밧줄 끝(젖은 부분)
+  s: '#2f7fb5', // 말뚝 둘레 물그늘
+  c: '#e4f6fc', // 물거품
+}
+const GATE_BROKEN_BRIDGE = sprite(BROKEN_BRIDGE, [
+  '.nnnn...........',
+  'nUUUUn..........',
+  'nuggGn..........',
+  'nugGGnnnnn......',
+  'nugGGnUUUUnn....',
+  'nugGGnuguuuunn..',
+  'nugGGnGGGuuuuun.',
+  'nugGGn.nnGGGgun.',
+  'nugGGny..nnGGGns',
+  'nugGGn.y...nnnsc',
+  'snnnns.y......c.',
+  'cssssc..y.......',
+  '.cccc...y.......',
+  '.........yY.....',
+  '..........cc....',
+  '................',
+])
+
+// 돌무더기(gate-rubble): 크고 작은 돌이 흙과 함께 쌓여 길을 막는다. 배경이 투명해 바닥 위에 얹는다
+const RUBBLE: Record<string, string> = {
+  k: '#39424c', // 외곽선
+  h: '#dfe5e8', // 반짝이는 모서리
+  G: '#c8d1d6', // 윗면
+  g: '#9eabb3', // 몸
+  d: '#727f89', // 그늘
+  D: '#5a6570', // 깊은 그늘
+  b: '#9a7a55', // 흙
+  B: '#6f5639', // 흙 그늘
+  x: GROUND_SHADOW,
+}
+const GATE_RUBBLE = sprite(RUBBLE, [
+  '................',
+  '.......kkkk.....',
+  '......khGGgk....',
+  '..kkk.kGggdk....',
+  '.khGgkkgggdkkk..',
+  '.kGggdkkddkhGgk.',
+  '.kggddkhGkkGggdk',
+  'kkkddkhGggkggddk',
+  'khGkkGGgggdkddDk',
+  'kGggkGggggddkkkk',
+  'kggdkggggddDkhGk',
+  'kgddkdgggdDDkgdk',
+  'kbkkbkddDDDkbkkk',
+  'kBbbbbkkkkkbbbBk',
+  '.xkkkkkkkkkkkkx.',
+  '..xxxxxxxxxxxx..',
+])
+
+// 나룻배(boat, 32×16): 뱃머리가 오른쪽, 가로대 두 개와 노 하나, 붉은 띠, 물에 비친 그늘
+const BOAT_PALETTE: Record<string, string> = {
+  k: '#3b2a22', // 외곽선
+  U: '#e8b87f', // 뱃전 윗면
+  u: '#c8925a', // 가로대
+  g: '#9a6436', // 가로대 나뭇결(낚시 트랙 나무색과 다른 색)
+  i: '#6e4526', // 배 안쪽
+  I: '#57361c', // 배 바닥 그늘
+  o: '#d8b070', // 노
+  O: '#a07c40', // 노 날
+  r: '#d9573f', // 붉은 띠
+  R: '#a8402d', // 붉은 띠 그늘
+  s: '#246593', // 물그늘
+  c: '#d8eef8', // 물거품
+}
+const BOAT = sprite(BOAT_PALETTE, [
+  '................................',
+  '................................',
+  '...kkkkkkkkkkkkkkkkkkkkkk.......',
+  '..kUUUUUUUUUUUUUUUUUUUUUUkk.....',
+  '.kUiiiiiiiiiiiiiiiiiiiiiiUUk....',
+  '.kUiIIIuuuuIIIIIIIuuuuIIiiUUk...',
+  'kUiiIIIugguIIIIIooooooooooOiUk..',
+  'kUiiIoooooooooooOOOuuuuIIiiiUUk.',
+  'kUiiIIIugguIIIIIIIugguIIiiiiiUUk',
+  '.kUiIIIuuuuIIIIIIIuuuuIIiiiiUUk.',
+  '.kUUiiiiiiiiiiiiiiiiiiiiiiiUUk..',
+  '..krrrrrrrrrrrrrrrrrrrrrrrrrk...',
+  '..kRRRRRRRRRRRRRRRRRRRRRRRRk....',
+  '...kkkkkkkkkkkkkkkkkkkkkkkk.....',
+  '..cssssssssssssssssssssssssc....',
+  '....cc......cc.......cc.........',
+])
+
+// ── 3단계 지역 타일: 산 호수·동굴·섬 ──
+// 물 다섯 종은 2프레임, 칸을 꽉 채우고 가장자리끼리 이어진다
+const LAKE: Record<string, string> = {
+  a: '#1f6f78', // 바탕: 차갑고 짙은 청록
+  d: '#185c66', // 깊은 결
+  b: '#3a8f96', // 잔잔한 물결
+  c: '#a6dede', // 차가운 반짝임
+}
+// 동굴 웅덩이: 검푸른 물에 천장에서 떨어진 물방울 고리
+const CAVE_POOL: Record<string, string> = {
+  a: '#14243a', // 바탕
+  d: '#0d1829', // 깊은 결
+  b: '#2a4a70', // 물방울 고리
+  c: '#6f9cc8', // 물방울
+}
+// 수정 웅덩이: 물속에서 솟은 보랏빛 수정과 그 둘레의 빛
+const CRYSTAL: Record<string, string> = {
+  a: '#2e4f96', // 바탕
+  d: '#243f7c', // 깊은 결
+  b: '#5f9fe0', // 수정 둘레 빛
+  c: '#a8f0ff', // 수정 밝은 모서리
+  m: '#c09cff', // 수정
+  M: '#7c55d6', // 수정 그늘
+  w: '#ffffff', // 반짝임
+}
+// 용암: 붉게 일렁이는 바탕 위로 식은 껍질이 떠다니고 뜨거운 줄기가 비친다
+const LAVA: Record<string, string> = {
+  a: '#c8371f', // 바탕
+  d: '#7e1d14', // 식은 껍질
+  b: '#f27a2c', // 뜨거운 줄기
+  c: '#ffd25a', // 가장 뜨거운 곳
+  w: '#fff3b8', // 터지는 거품
+}
+// 석호: 얕고 밝은 옥빛, 바닥에 일렁이는 빛 그물
+const LAGOON: Record<string, string> = {
+  a: '#3cc4b4', // 바탕
+  b: '#86e6d8', // 빛 그물
+  c: '#e6fffa', // 반짝임
+  s: '#5fd3b0', // 비치는 모래 바닥
+}
+
+const LAKE_0 = sprite(LAKE, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaabbbbaaaaaaaaa',
+  'aaaaaaaaaaaddaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaacaaaaaa',
+  'addaaaabbbbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaabbbba',
+  'aaaaaaaaaaaaacaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const LAKE_1 = sprite(LAKE, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbbaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaddaaaaabbbbaaa',
+  'aaaaaaaaaaacaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaabbb',
+  'baaaaaaaaaaaaaaa',
+  'aaaaddaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaacaaabbbaaaaaa',
+  'aaaaaaaaaaaaddda',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CAVE_POOL_0 = sprite(CAVE_POOL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaddaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaabaaaa',
+  'aaaaaaaaaabcbaaa',
+  'aaaaaaaaaaabaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+  'adaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CAVE_POOL_1 = sprite(CAVE_POOL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaabbbaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aadaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CRYSTAL_0 = sprite(CRYSTAL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaadaaa',
+  'aaaawaaaaaaaaaaa',
+  'aaaacaaaaaaaaaaa',
+  'aaacmcaaaaaaaaaa',
+  'aaacmMaaaaaaabaa',
+  'aabcmMMbaaaaaaaa',
+  'aaabbbbaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaacaaaa',
+  'adaaaaaaaacmcaaa',
+  'aaaaaaaaabcmMbaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaabaaaaaaaaaaa',
+  'aaaaaaaaaaaaadaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CRYSTAL_1 = sprite(CRYSTAL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaacaaaaaaaadaa',
+  'aaacmcaaaaaaaaaa',
+  'aaacmMaaaaaaaaaa',
+  'abbcmMMbbaaaaaaa',
+  'aaabbbbaaaaaaaba',
+  'aaaaaaaaaaawaaaa',
+  'aaaaaaaaaaacaaaa',
+  'aaaaaaaaaacmcaaa',
+  'adaaaaaabbcmMbba',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const LAVA_0 = sprite(LAVA, [
+  'aaaaaaaaaaaaaaaa',
+  'aaddddaaaaaabbaa',
+  'adddddaaaabbcbaa',
+  'aaddaaaaaaabbaaa',
+  'aaaaaabbaaaaaaaa',
+  'aaaaabccbaaaddda',
+  'aaaaaabbaaadddda',
+  'abbaaaaaaaaaddaa',
+  'bccbaaaaaaaaaaaa',
+  'abbaaaddaaaaaaaa',
+  'aaaaadddddaaabaa',
+  'aaaaaaddddaabwba',
+  'aaaaaaaaaaaaabaa',
+  'aabbbaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaddaaa',
+])
+
+const LAVA_1 = sprite(LAVA, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaddddaaaaaaaaa',
+  'aadddddaaaaabbaa',
+  'aaaddaaaaaabccba',
+  'aaaaaaaaaaaabbaa',
+  'aaaaaabbaaaaddda',
+  'aaaaabccbaadddda',
+  'aaaaaabbaaaaddaa',
+  'abbaaaaaaaaaaaaa',
+  'bccbaaddaaaaaaaa',
+  'abbaadddddaaaaaa',
+  'aaaaaaddddaaaaaa',
+  'aaaaaaaaaaaaawaa',
+  'aaabbbaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+])
+
+const LAGOON_0 = sprite(LAGOON, [
+  'aaaaabaaaaaaabaa',
+  'aaaabaaaaaaaabaa',
+  'bbbbaaaaaaaabaab',
+  'aaaaabaaaabbaaaa',
+  'aaaaaabbbbaaaaaa',
+  'aaaaaaaabaaaaaaa',
+  'aasaaaaabaaaaaaa',
+  'aaaaaaaaabbbaaaa',
+  'baaaaaabaaaabbbb',
+  'abbbbbbaaaaaaaaa',
+  'aaaaaaabaaaaacaa',
+  'aaaaaaaabaaaaaaa',
+  'aacaaaabaaaasaaa',
+  'aaaaaabaaaaaaaaa',
+  'aaaaaabaaaaaaaba',
+  'aaaaabaaaaaaabaa',
+])
+
+const LAGOON_1 = sprite(LAGOON, [
+  'aaaaaabaaaaaaaba',
+  'aaaaaabaaaaaaaba',
+  'aaaaabaaaaaaaaba',
+  'bbbbbaaaacaaabaa',
+  'aaaaaabaaaabbaaa',
+  'aaaaaaabbbbaaaaa',
+  'aaaaaaaaabaaaaaa',
+  'aaasaaaaabaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'bbaaaaaabaaaabbb',
+  'aabbbbbbaaaaaaaa',
+  'aaaaaaaabaaaaaaa',
+  'aaaaaaaaabaaaaaa',
+  'aaaacaaabaaaasaa',
+  'aaaaaaabaaaaaaaa',
+  'aaaaaaabaaaaaaab',
+])
+
+// 동굴 바닥: 어두운 돌바닥, 갈라진 금과 자갈. 칸을 꽉 채운다
+const CAVE_FLOOR: Record<string, string> = {
+  f: '#4a4553', // 바닥
+  d: '#3c3845', // 얼룩
+  l: '#625c6e', // 자갈 윗면
+  k: '#2c2933', // 갈라진 금
+}
+const TILE_CAVE_FLOOR = sprite(CAVE_FLOOR, [
+  'ffffffffffffffff',
+  'fffffflfffffffff',
+  'ffdffffffffkffff',
+  'fffffffffffkffff',
+  'ffffffffffkdffff',
+  'ffffkkkfffkfffff',
+  'fffkdfffffffffff',
+  'fflkffffffffflff',
+  'ffkfffffffffffdf',
+  'ffffffffddffffff',
+  'fffffffffffffkkf',
+  'ffdfffffffffkdff',
+  'fffffflffffkffff',
+  'fffffffffffkffff',
+  'fffffffffffffffd',
+  'ffffffffffffffff',
+])
+
+// 동굴 벽: 어긋나게 쌓인 큰 바윗덩이, 윗면은 밝고 아래는 어둡다
+const CAVE_WALL: Record<string, string> = {
+  k: '#1e1b24', // 틈
+  h: '#7a7288', // 윗면
+  r: '#5a5366', // 바위
+  m: '#463f52', // 그늘
+  d: '#332e3d', // 아래 어둠
+}
+const TILE_CAVE_WALL = sprite(CAVE_WALL, [
+  'hhhhhrrkhhhhhhrk',
+  'rrrrrrmkrrrrrrmk',
+  'rrrrrmmkrrrrrmmk',
+  'mmrrmmmkmrrrmmmk',
+  'dmmmmmdkmmmmmmdk',
+  'kkkkkkkkkkkkkkkk',
+  'hhhkhhhhhhhhkhhh',
+  'rrrkrrrrrrrmkrrr',
+  'rrmkrrrrrrmmkrrr',
+  'mmmkmmrrrmmmkmmr',
+  'ddmkmmmmmmmdkmmm',
+  'kkkkkkkkkkkkkkkk',
+  'hhhhhhkhhhhhhhkh',
+  'rrrrrmkrrrrrrmkr',
+  'mmrmmmkmmrrmmmkm',
+  'kkkkkkkkkkkkkkkk',
+])
+
+// 동굴 입구: 절벽(tile-cliff와 같은 바위색)에 뚫린 아치형 어둠, 아래는 동굴 바닥
+const CAVE_MOUTH: Record<string, string> = {
+  k: '#3d3a44', // 틈·아치 테두리
+  h: '#b8b2ba', // 윗면 밝은 모서리
+  r: '#8f8993', // 바위
+  m: '#756f7b', // 바위 그늘
+  d: '#5a5560', // 아래 어둠
+  O: '#2a2433', // 입구 안 희미한 벽
+  o: '#141119', // 깊은 어둠
+  f: '#4a4553', // 동굴 바닥
+}
+const TILE_CAVE_MOUTH = sprite(CAVE_MOUTH, [
+  'hhhhhhhhhhhhhhhh',
+  'hrrrrkkkkkkrrrrh',
+  'rrrkkOOOOOOkkrrr',
+  'rrkOOooooooOOkrr',
+  'rmkOooooooooOkmr',
+  'mmkOooooooooOkmm',
+  'mkOooooooooooOkm',
+  'mkOooooooooooOkm',
+  'rkOooooooooooOkr',
+  'rkOooooooooooOkr',
+  'mkOooooooooooOkm',
+  'mkOooooooooooOkm',
+  'dkOOooooooooOOkd',
+  'dkfOOooooooOOfkd',
+  'dkffffOOOOffffkd',
+  'dkffffffffffffkd',
+])
+
+// 선착장 판자: 부두보다 붉고 어두운 가로 판자 네 장(폭이 조금씩 다름), 양옆 어두운 테두리. 물이 비치지 않는다
+const DOCK: Record<string, string> = {
+  n: '#3b2a22', // 틈·테두리
+  U: '#d9a271', // 판자 윗면 밝은 줄
+  u: '#b97d4c', // 판자
+  g: '#9a6238', // 나뭇결
+  G: '#7c4b2b', // 판자 아래 그늘
+}
+const DOCK_PLANK = sprite(DOCK, [
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuggguuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nuuuuuuuuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
+])
+
+// 야자수: 나무처럼 아래 16px가 자기 칸(줄기 밑동), 위 16px는 윗칸에 겹친다. 늘어진 잎 여섯 갈래와 열매
+const PALM: Record<string, string> = {
+  k: '#1d3b2a', // 외곽선
+  L: '#3fa65f', // 잎
+  l: '#82d47c', // 잎 밝은 쪽
+  D: '#2a7a49', // 잎 그늘
+  c: '#6b4a2a', // 열매
+  C: '#9a6c3c', // 열매 밝은 쪽
+  t: '#b08850', // 줄기
+  h: '#d2ad74', // 줄기 밝은 쪽
+  T: '#86603a', // 줄기 마디
+  x: GROUND_SHADOW,
+}
+const TILE_PALM = sprite(PALM, [
+  '................',
+  '..kkk......kkk..',
+  '.kLlLk....kLlLk.',
+  'kLlLLLkkkkLLLlLk',
+  'kLLDDLLlLLLDDLLk',
+  'kLDkkDLLlLDkkDLk',
+  'kDk.kLDLLDLk.kDk',
+  'kk.kLLDcCDLLk.kk',
+  '..kLLDkcCckDLLk.',
+  '.kLDDk.cckckDDLk',
+  '.kDk..kthTk.kkDk',
+  '.kk...kthTk...k.',
+  '......kthTk.....',
+  '.......kthTk....',
+  '.......kTthk....',
+  '.......kthTk....',
+  '.......kthTk....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '......kthTk.....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '.....kthhTTk....',
+  '....xkkkkkkkx...',
+  '....xxxxxxxxxx..',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+
 // ── 찌 5종(상점·가방 아이콘, 16×16): 코르크 / 함정 / 가시 바늘 / 회전 / 호기심 ──
 const TACKLE_CORK = sprite(
   { k: '#2b2118', R: '#e0483c', r: '#a82e2a', w: '#ff9a8a', C: '#c8935a', c: '#e6b87c', d: '#8f6238' },
@@ -2247,6 +3242,24 @@ export const SPRITES: Record<string, Sprite> = {
   'falls-1': FALLS_1,
   'bridge-plank': BRIDGE_PLANK,
   'tile-cliff': TILE_CLIFF,
+  'lake-0': LAKE_0,
+  'lake-1': LAKE_1,
+  'cave-pool-0': CAVE_POOL_0,
+  'cave-pool-1': CAVE_POOL_1,
+  'crystal-0': CRYSTAL_0,
+  'crystal-1': CRYSTAL_1,
+  'lava-0': LAVA_0,
+  'lava-1': LAVA_1,
+  'lagoon-0': LAGOON_0,
+  'lagoon-1': LAGOON_1,
+  'tile-cave-floor': TILE_CAVE_FLOOR,
+  'tile-cave-wall': TILE_CAVE_WALL,
+  'tile-cave-mouth': TILE_CAVE_MOUTH,
+  'dock-plank': DOCK_PLANK,
+  'tile-palm': TILE_PALM,
+  'gate-broken-bridge': GATE_BROKEN_BRIDGE,
+  'gate-rubble': GATE_RUBBLE,
+  boat: BOAT,
   bobber: BOBBER,
   bang: BANG,
   splash: SPLASH,
@@ -2288,6 +3301,29 @@ export const SPRITES: Record<string, Sprite> = {
   'fish-stream-minnow': FISH_STREAM_MINNOW,
   'fish-lenok': FISH_LENOK,
   'fish-century-snakehead': FISH_CENTURY_SNAKEHEAD,
+  'fish-rainbow-trout': FISH_RAINBOW_TROUT,
+  'fish-largemouth-bass': FISH_LARGEMOUTH_BASS,
+  'fish-smelt': FISH_SMELT,
+  'fish-masu-salmon': FISH_MASU_SALMON,
+  'fish-skygazer': FISH_SKYGAZER,
+  'fish-israeli-carp': FISH_ISRAELI_CARP,
+  'fish-sturgeon': FISH_STURGEON,
+  'fish-silver-king-trout': FISH_SILVER_KING_TROUT,
+  'fish-blind-fish': FISH_BLIND_FISH,
+  'fish-cave-crayfish': FISH_CAVE_CRAYFISH,
+  'fish-crystal-fry': FISH_CRYSTAL_FRY,
+  'fish-ember-carp': FISH_EMBER_CARP,
+  'fish-bat-catfish': FISH_BAT_CATFISH,
+  'fish-lava-eel': FISH_LAVA_EEL,
+  'fish-fire-dragonfish': FISH_FIRE_DRAGONFISH,
+  'fish-clownfish': FISH_CLOWNFISH,
+  'fish-butterflyfish': FISH_BUTTERFLYFISH,
+  'fish-blue-damsel': FISH_BLUE_DAMSEL,
+  'fish-lionfish': FISH_LIONFISH,
+  'fish-moray': FISH_MORAY,
+  'fish-stingray': FISH_STINGRAY,
+  'fish-mahi': FISH_MAHI,
+  'fish-rainbow-marlin': FISH_RAINBOW_MARLIN,
   'icon-sun': ICON_SUN,
   'icon-rain': ICON_RAIN,
   'icon-snow': ICON_SNOW,

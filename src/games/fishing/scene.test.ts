@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
-import { TILE, castTarget, defineMap, pierEnd, type Facing, type Vec } from './map.ts'
+import { TILE, castTarget, defineMap, pierEnd, type Facing, type Opened, type Vec } from './map.ts'
+import { DEFAULT_AREAS, type AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
 import { cameraFor, type Player } from './walk.ts'
 import type { Conditions } from './clock.ts'
@@ -83,6 +84,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     cond: NOON_SUN,
     hudTop: 0,
     fade: 0,
+    opened: new Set<AreaId>(DEFAULT_AREAS),
     ...extra,
   }
 }
@@ -644,5 +646,201 @@ describe('hudLayout', () => {
       expect(frames.some((r) => r.x === track.x)).toBe(true)
       expect(frames.some((r) => r.x + r.w === track.x + track.w)).toBe(true)
     }
+  })
+})
+
+describe('문·선착장·실내', () => {
+  // (4,2) 다리 = 호수 문(무너진 다리), (8,1) 돌무더기 문, 배는 (5,5)
+  const GATED = defineMap('river', [
+    'TTTTTTTTTT',
+    'T,,,,,,,,T',
+    'TrrrHrrrrT',
+    'T,,,,,...T',
+    'T,,,,,.#.T',
+    'T~~~~~~#~T',
+    'T~~~~~~#~T',
+    'T~~~~~~~~T',
+    'TTTTTTTTTT',
+  ], {
+    gates: [
+      { area: 'lake', tiles: { tx: 4, ty: 2, w: 1, h: 1 }, look: 'broken-bridge', front: { tx: 4, ty: 3, facing: 'up' } },
+      { area: 'cave', tiles: { tx: 8, ty: 1, w: 1, h: 1 }, look: 'rubble', front: { tx: 7, ty: 1, facing: 'right' } },
+    ],
+    docks: [{ front: { tx: 7, ty: 5, facing: 'left' }, target: 'island', entry: { tx: 2, ty: 2, facing: 'down' }, boat: { tx: 5, ty: 5 } }],
+  })
+  const BASE: Opened = new Set<AreaId>(DEFAULT_AREAS)
+  const ALL: Opened = new Set<AreaId>([...DEFAULT_AREAS, 'lake', 'cave', 'island'])
+  const size = { w: 195, h: 280 }
+  const p = player(tileCentre(4, 3))
+  const cam = cameraFor(GATED, p.pos, size)
+  const gatedScene = (opened: Opened, extra: Partial<WorldScene> = {}): WorldScene => ({ ...scene('idle', p, size), map: GATED, camera: cam, opened, ...extra })
+  const at = (c: RecordingCtx, name: string) => c.sprites.filter((s) => s.name === name)
+
+  describe('with an offscreen canvas', () => {
+    let made: RecordingCtx[]
+    beforeEach(() => {
+      made = []
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+        const c = new RecordingCtx()
+        made.push(c)
+        return c as unknown as RenderingContext
+      })
+    })
+
+    test('잠긴 문 칸에 look 스프라이트, 열리면 안 그린다 — 캐시는 다시 만들지 않는다', () => {
+      const main = new RecordingCtx()
+      drawWorld(asCtx(main), gatedScene(BASE), size)
+      drawWorld(asCtx(main), gatedScene(BASE), size)
+      expect(made).toHaveLength(2)
+      // 문 그림은 캐시가 아니라 매 프레임 화면에
+      expect(made.some((c) => c.sprites.some((s) => s.name.startsWith('gate-')))).toBe(false)
+      const locked = new RecordingCtx()
+      drawWorld(asCtx(locked), gatedScene(BASE), size)
+      expect(at(locked, 'gate-broken-bridge').map((s) => [s.x, s.y])).toEqual([[4 * TILE - cam.x, 2 * TILE - cam.y]])
+      expect(at(locked, 'gate-rubble').map((s) => [s.x, s.y])).toEqual([[8 * TILE - cam.x, 1 * TILE - cam.y]])
+      // 캐릭터보다 아래(먼저) 그린다
+      const playerAt = players(locked)[0].at
+      for (const g of at(locked, 'gate-broken-bridge')) expect(g.at).toBeLessThan(playerAt)
+
+      const lakeOpen = new RecordingCtx()
+      drawWorld(asCtx(lakeOpen), gatedScene(new Set<AreaId>([...DEFAULT_AREAS, 'lake'])), size)
+      expect(at(lakeOpen, 'gate-broken-bridge')).toHaveLength(0)
+      expect(at(lakeOpen, 'gate-rubble')).toHaveLength(1)
+      const opened = new RecordingCtx()
+      drawWorld(asCtx(opened), gatedScene(ALL), size)
+      expect(opened.sprites.some((s) => s.name.startsWith('gate-'))).toBe(false)
+      expect(made).toHaveLength(2) // renderFrame 호출 수 불변
+    })
+
+    test('선착장의 배는 boat 칸에 월드 레이어로, 열림과 무관하게 그린다', () => {
+      for (const opened of [BASE, ALL]) {
+        const main = new RecordingCtx()
+        drawWorld(asCtx(main), gatedScene(opened), size)
+        const boats = at(main, 'boat')
+        expect(boats).toHaveLength(1)
+        expect(boats[0].x).toBe(5 * TILE - cam.x)
+        expect(boats[0].y - (5 * TILE - cam.y)).toBeGreaterThanOrEqual(0)
+        expect(boats[0].y - (5 * TILE - cam.y)).toBeLessThanOrEqual(1) // 물결에 1px 흔들림
+        expect(boats[0].at).toBeLessThan(players(main)[0].at)
+      }
+      expect(made.some((c) => c.sprites.some((s) => s.name === 'boat'))).toBe(false)
+    })
+  })
+
+  test('indoor 맵은 비 오는 밤에도 입자·밤 색조 없음, HUD 시계는 있다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const RAINY_NIGHT: Conditions = { gameMinute: 0, gameDay: 1, season: 'spring', weather: 'rain' }
+    const cave = defineMap('cave', GATED.rows, { indoor: true })
+    const outside = defineMap('river', GATED.rows)
+    const draw = (map: typeof cave) => {
+      const ctx = new RecordingCtx()
+      drawWorld(asCtx(ctx), { ...gatedScene(BASE), map, cond: RAINY_NIGHT }, size)
+      return ctx
+    }
+    const cover = (c: RecordingCtx) => c.rects.filter((r) => r.x === 0 && r.y === 0 && r.w >= size.w && r.h >= size.h && r.color.startsWith('rgba'))
+    const drops = (c: RecordingCtx) => c.rects.filter((r) => r.color === '#bfe6f7' && r.w === 1 && r.h === 3)
+    const out = draw(outside)
+    expect(cover(out)).toHaveLength(1)
+    expect(drops(out).length).toBeGreaterThan(0)
+    const inside = draw(cave)
+    expect(cover(inside)).toHaveLength(0)
+    expect(drops(inside)).toHaveLength(0)
+    expect(inside.sprites.some((s) => s.name === 'icon-rain')).toBe(true)
+    expect(inside.sprites.some((s) => s.name.startsWith('digit-'))).toBe(true)
+    // 겨울 눈도 없다
+    const snowy = new RecordingCtx()
+    drawWorld(asCtx(snowy), { ...gatedScene(BASE), map: cave, cond: { ...RAINY_NIGHT, season: 'winter' } }, size)
+    expect(snowy.rects.filter((r) => r.color === '#ffffff' && r.w === 2 && r.h === 2)).toHaveLength(0)
+  })
+})
+
+describe('산 호수·동굴·섬 타일', () => {
+  const PALM_LEAF = '#3fa65f'
+  const PALM_TRUNK = '#b08850'
+  const GRASS = '#78b85c'
+  const SAND_WET = '#c7a96e'
+  const FOAM = '#e9f6fb'
+  const size = { w: 195, h: 280 }
+  /** 화면 좌표 사각형이 칸 (tx, ty) 안에 있는가 */
+  const inTile = (r: { x: number; y: number }, cam: Vec, tx: number, ty: number) =>
+    r.x >= tx * 16 - cam.x && r.x < (tx + 1) * 16 - cam.x && r.y >= ty * 16 - cam.y && r.y < (ty + 1) * 16 - cam.y
+
+  // 0 WWWWWWWWW
+  // 1 W_uqLE__W   동굴 바닥·웅덩이·수정·용암·입구
+  // 2 Wkl~K..P.   호수·석호·바다·선착장·모래·야자수
+  // 3 .........
+  const MIXED = defineMap('cave', ['WWWWWWWWW', 'W_uqLE__W', 'Wkl~K..P.', '.........'], {
+    spots: { 'cave-pool': 'cave1', crystal: 'cave2', lava: 'cave3', lake: 'lake', lagoon: 'lagoon', water: 'sea' },
+  })
+
+  describe('direct drawing', () => {
+    beforeEach(() => {
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    })
+    const draw = () => {
+      const p = player(tileCentre(1, 1))
+      const cam = cameraFor(MIXED, p.pos, size)
+      const ctx = new RecordingCtx()
+      drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: MIXED, camera: cam }, size)
+      const at = (tx: number, ty: number) => ctx.sprites.filter((s) => s.x === tx * 16 - cam.x && s.y === ty * 16 - cam.y).map((s) => s.name)
+      const rectsIn = (tx: number, ty: number) => ctx.rects.filter((r) => inTile(r, cam, tx, ty))
+      return { at, rectsIn }
+    }
+
+    test('각 칸을 자기 스프라이트로 그린다', () => {
+      const { at, rectsIn } = draw()
+      expect(at(0, 0)).toEqual(['tile-cave-wall'])
+      expect(at(1, 1)).toEqual(['tile-cave-floor'])
+      expect(at(2, 1)).toEqual([expect.stringMatching(/^cave-pool-[01]$/)])
+      expect(at(3, 1)).toEqual([expect.stringMatching(/^crystal-[01]$/)])
+      expect(at(4, 1)).toEqual([expect.stringMatching(/^lava-[01]$/)])
+      expect(at(5, 1)).toEqual(['tile-cave-mouth'])
+      expect(at(1, 2)).toEqual([expect.stringMatching(/^lake-[01]$/)])
+      expect(at(2, 2)).toEqual([expect.stringMatching(/^lagoon-[01]$/)])
+      expect(at(3, 2)).toEqual([expect.stringMatching(/^water-[01]$/)])
+      // 선착장: 아래 바다 + 판자
+      expect(at(4, 2)).toEqual([expect.stringMatching(/^water-[01]$/), 'dock-plank'])
+      // 야자수는 모래 위에 밑동, 잎은 윗칸
+      expect(at(7, 2)).toEqual(['tile-sand'])
+      expect(rectsIn(7, 2).some((r) => r.color === PALM_TRUNK)).toBe(true)
+      expect(rectsIn(7, 1).some((r) => r.color === PALM_LEAF)).toBe(true)
+    })
+
+    test('물가 규칙: 석호는 모래에 거품, 동굴 바닥 옆 물은 거품 없음. 동굴 바닥·입구 옆 모래에 풀 가장자리 없음', () => {
+      const { rectsIn } = draw()
+      // 석호(2,2) 아래가 모래 → 젖은 모래와 거품
+      expect(rectsIn(2, 2).some((r) => r.color === SAND_WET)).toBe(true)
+      expect(rectsIn(2, 2).some((r) => r.color === FOAM)).toBe(true)
+      // 동굴 웅덩이(2,1)·수정(3,1)은 둘레(대각선 포함)에 모래가 없어 거품·젖은 모래 없음. 용암(4,1)은 (5,2) 모래와 대각선이라 뺀다
+      for (const [tx, ty] of [[2, 1], [3, 1]]) {
+        expect(rectsIn(tx, ty).some((r) => r.color === SAND_WET || r.color === FOAM), `${tx},${ty}`).toBe(false)
+      }
+      // 입구(5,1)·바닥(6,1) 아래 모래(5,2)·(6,2)는 풀 가장자리를 받지 않는다
+      for (const tx of [5, 6]) expect(rectsIn(tx, 2).some((r) => r.color === GRASS), `${tx},2`).toBe(false)
+    })
+  })
+
+  test('야자수 윗부분: 캐릭터가 밑동보다 위 줄이면 앞에, 아래 줄이면 뒤에 그린다(나무와 같은 규칙)', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    // (2,3)은 야자수, 잎은 (2,2) 칸
+    const beach = defineMap('island', ['.....', '.....', '.....', '..P..', '.....', '.....'])
+    const leaves = (c: RecordingCtx, cam: Vec) =>
+      c.rects.map((r, i) => ({ r, i })).filter(({ r }) => r.color === PALM_LEAF && inTile(r, cam, 2, 2))
+
+    const above = { ...scene('idle', player(tileCentre(2, 2), 'down'), size), map: beach }
+    above.camera = cameraFor(beach, above.player.pos, size)
+    const a = new RecordingCtx()
+    drawWorld(asCtx(a), above, size)
+    const la = leaves(a, above.camera)
+    expect(la.length).toBeGreaterThan(0)
+    expect(la.every(({ i }) => i >= players(a)[0].at)).toBe(true)
+
+    const below = { ...scene('idle', player(tileCentre(2, 4), 'up'), size), map: beach }
+    below.camera = cameraFor(beach, below.player.pos, size)
+    const b = new RecordingCtx()
+    drawWorld(asCtx(b), below, size)
+    const lb = leaves(b, below.camera)
+    expect(lb.length).toBeGreaterThan(0)
+    expect(lb.every(({ i }) => i < players(b)[0].at)).toBe(true)
   })
 })

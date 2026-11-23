@@ -144,6 +144,32 @@ describe('rollCatch', () => {
       expect(roll({ ...r, legends: ['golden-mandarin'] }, 0.01)).not.toBe('golden-mandarin')
       expect(roll(r, 0.5)).not.toBe('golden-mandarin')
     })
+    it('은빛 대왕송어: 호수·가을 4~7시·rod 3·power 0.95에서만', () => {
+      const r = { area: 'lake' as const, spot: 'lake', cond: cond('autumn', 5), rodTier: 3 as const, power: 0.95 }
+      expect(roll(r, 0.01)).toBe('silver-king-trout')
+      expect(roll({ ...r, power: 0.94 }, 0.01)).not.toBe('silver-king-trout')
+      expect(roll({ ...r, cond: cond('spring', 5) }, 0.01)).not.toBe('silver-king-trout')
+      expect(roll({ ...r, cond: cond('autumn', 8) }, 0.01)).not.toBe('silver-king-trout')
+      expect(roll({ ...r, rodTier: 2 }, 0.01)).not.toBe('silver-king-trout')
+      expect(roll({ ...r, legends: ['silver-king-trout'] }, 0.01)).not.toBe('silver-king-trout')
+    })
+    it('화룡어: cave3·rod 4·power 0.95에서만', () => {
+      const r = { area: 'cave' as const, spot: 'cave3', cond: cond('spring', 12), rodTier: 4 as const, power: 0.95 }
+      expect(roll(r, 0.01)).toBe('fire-dragonfish')
+      expect(roll({ ...r, spot: 'cave2' }, 0.01)).not.toBe('fire-dragonfish')
+      expect(roll({ ...r, spot: 'cave1' }, 0.01)).not.toBe('fire-dragonfish')
+      expect(roll({ ...r, rodTier: 3 }, 0.01)).not.toBe('fire-dragonfish')
+      expect(roll({ ...r, power: 0.94 }, 0.01)).not.toBe('fire-dragonfish')
+    })
+    it('무지개 청새치: sea·맑음·11~14시·rod 4·power 0.95에서만', () => {
+      const r = { area: 'island' as const, spot: 'sea', cond: cond('summer', 12), rodTier: 4 as const, power: 0.95 }
+      expect(roll(r, 0.01)).toBe('rainbow-marlin')
+      expect(roll({ ...r, spot: 'lagoon' }, 0.01)).not.toBe('rainbow-marlin')
+      expect(roll({ ...r, cond: cond('summer', 12, 'rain') }, 0.01)).not.toBe('rainbow-marlin')
+      expect(roll({ ...r, cond: cond('summer', 14) }, 0.01)).not.toBe('rainbow-marlin')
+      expect(roll({ ...r, cond: cond('summer', 10) }, 0.01)).not.toBe('rainbow-marlin')
+      expect(roll({ ...r, rodTier: 3 }, 0.01)).not.toBe('rainbow-marlin')
+    })
     it('백년 가물치: power 0.1에서도 봄 밤 연못 rod 3이면 후보(power 0), 그 외 조건은 아님', () => {
       const f = { area: 'forest' as const, spot: 'pond', cond: cond('spring', 22), rodTier: 3 as const, power: 0.1 }
       expect(roll(f, 0.01)).toBe('century-snakehead')
@@ -277,7 +303,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(6)
+    expect(logic.version).toBe(7)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], pending: null,
     })
@@ -322,7 +348,7 @@ describe('fishing WorldLogic', () => {
     expect(pct('pier')).toBeGreaterThan(pct('shore'))
   })
 
-  it("cast area 'lake'(안 열림, 어종 없음) → bad_area; spot 'zzz' → bad_spot; 오류 시 상태 불변", () => {
+  it("cast area 'lake'(안 열림) → bad_area; spot 'zzz' → bad_spot; 오류 시 상태 불변", () => {
     const s = deepFreeze(fresh())
     const before = JSON.stringify(s)
     expect(err(logic.apply(s, { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
@@ -412,6 +438,61 @@ describe('fishing WorldLogic', () => {
     expect(err(logic.apply(fresh({ bagTier: 2, bag: fish(30) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
     expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000]])
     expect(bagSize(99)).toBe(20)
+  })
+
+  describe('호수·동굴·섬 던지기', () => {
+    const open = (rodTier: State['rodTier'] = 4) => fresh({ rodTier, areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island'] })
+    const cast = (s: State, area: string, spot: string | undefined, seed: number) => {
+      const action = { type: 'cast', area, power: 0.5, ...(spot === undefined ? {} : { spot }) } as unknown as Action
+      return ok(logic.apply(s, action, { now: nowAt(seed % 4, seed % 24), rng: rngFromSeed(seedBytes(seed)) })).state.pending!
+    }
+    it("lake가 열린 세이브에서 {area:'lake'} 정상 → {area:'lake', spot:'lake'}, 안 열린 세이브는 bad_area", () => {
+      const p = cast(fresh({ areas: [...DEFAULT_AREAS, 'lake'] }), 'lake', undefined, 3)
+      expect(p).toMatchObject({ area: 'lake', spot: 'lake' })
+      expect(byId(p.species).area).toBe('lake')
+      expect(err(logic.apply(fresh(), { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
+      // cave만 열린 세이브는 lake가 안 열려 있다
+      expect(err(logic.apply(fresh({ areas: [...DEFAULT_AREAS, 'cave'] }), { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
+    })
+    it('{area:"cave", spot:"cave3"} → 불꽃잉어·용암장어·화룡어만, 열린 세이브 필요', () => {
+      const seen = new Set<string>()
+      for (let seed = 0; seed < 400; seed++) seen.add(cast(open(), 'cave', 'cave3', seed).species)
+      expect([...seen].every((id) => ['ember-carp', 'lava-eel', 'fire-dragonfish'].includes(id))).toBe(true)
+      expect(seen.has('ember-carp')).toBe(true)
+      const low = new Set<string>()
+      for (let seed = 0; seed < 300; seed++) low.add(cast(open(2), 'cave', 'cave3', seed).species)
+      expect([...low]).toEqual(['ember-carp'])
+      const mid = new Set<string>()
+      for (let seed = 0; seed < 400; seed++) mid.add(cast(open(3), 'cave', 'cave3', seed).species)
+      expect(mid.has('lava-eel')).toBe(true)
+      expect(mid.has('fire-dragonfish')).toBe(false)
+      expect(err(logic.apply(fresh(), { type: 'cast', area: 'cave', power: 0.5, spot: 'cave3' }, ctx()))).toBe('bad_area')
+    })
+    it('동굴 cave1·cave2는 각 자리 어종만', () => {
+      const ids = (spot: string) => {
+        const seen = new Set<string>()
+        for (let seed = 0; seed < 300; seed++) seen.add(cast(open(1), 'cave', spot, seed).species)
+        return [...seen].sort()
+      }
+      expect(ids('cave1').every((id) => ['blind-fish', 'cave-crayfish'].includes(id))).toBe(true)
+      expect(ids('cave2').every((id) => ['crystal-fry', 'bat-catfish'].includes(id))).toBe(true)
+    })
+    it('섬 lagoon·sea는 각 자리 어종만', () => {
+      for (const spot of ['lagoon', 'sea']) {
+        const seen = new Set<string>()
+        for (let seed = 0; seed < 400; seed++) {
+          const p = cast(open(), 'island', spot, seed)
+          expect(speciesAvailable(byId(p.species), 'island', spot, p.cond, 4)).toBe(true)
+          seen.add(p.species)
+        }
+        expect(seen.size).toBeGreaterThanOrEqual(2)
+        for (const id of seen) expect(byId(id).spots).toContain(spot)
+      }
+    })
+    it('섬에서 자리를 생략하면 spot은 첫 자리(sea)', () => {
+      expect(cast(open(), 'island', undefined, 5).spot).toBe('sea')
+      expect(cast(open(), 'cave', undefined, 5).spot).toBe('cave1')
+    })
   })
 
   describe('강·숲 던지기', () => {
@@ -699,17 +780,17 @@ describe('fishing WorldLogic', () => {
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/33'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/56'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/33' },
+      { key: 'dex', value: 0, detail: '0/56' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/33' },
+      { key: 'dex', value: 2, detail: '2/56' },
     ])
   })
 
@@ -805,6 +886,48 @@ describe('fishing WorldLogic', () => {
       expect(m({ rodTier: 2, tackles: ['cork'], equipped: ['cork'] })).toMatchObject({ tackles: ['cork'], equipped: [] })
       expect(m({ tackles: 'cork', equipped: 7 })).toMatchObject({ tackles: [], equipped: [] })
     })
+  })
+})
+
+describe('지역 해금', () => {
+  const unlock = (area: string) => ({ type: 'unlockArea', area }) as unknown as Action
+  it('unlockArea lake: 골드 6000 → 1000, areas에 lake, totalEarned 그대로; 다시 → already_open', () => {
+    const r = ok(logic.apply(deepFreeze(fresh({ gold: 6000, totalEarned: 9000 })), unlock('lake'), ctx()))
+    expect(r.state.gold).toBe(1000)
+    expect(r.state.totalEarned).toBe(9000)
+    expect(r.state.areas).toEqual([...DEFAULT_AREAS, 'lake'])
+    expect(err(logic.apply(deepFreeze(r.state), unlock('lake'), ctx()))).toBe('already_open')
+  })
+  it('unlockArea: 골드 4999 → not_enough_gold(불변)', () => {
+    const s = deepFreeze(fresh({ gold: 4999 }))
+    expect(err(logic.apply(s, unlock('lake'), ctx()))).toBe('not_enough_gold')
+    expect(s.gold).toBe(4999)
+    expect(s.areas).toEqual([...DEFAULT_AREAS])
+  })
+  it('unlockArea: 기본 지역·모르는 id·프로토타입 키·비문자열 → bad_area', () => {
+    const s = deepFreeze(fresh({ gold: 99999 }))
+    for (const a of ['village', 'river', 'forest', 'zzz', '__proto__', 'constructor', 'toString', '', 3, null, undefined]) {
+      expect(err(logic.apply(s, { type: 'unlockArea', area: a } as unknown as Action, ctx()))).toBe('bad_area')
+    }
+  })
+  it('unlockArea: pending이 있으면 busy', () => {
+    expect(err(logic.apply(deepFreeze(withPending({ gold: 99999 })), unlock('lake'), ctx()))).toBe('busy')
+  })
+  it('unlockArea cave·island 가격', () => {
+    expect(ok(logic.apply(fresh({ gold: 15000 }), unlock('cave'), ctx())).state.gold).toBe(0)
+    expect(ok(logic.apply(fresh({ gold: 50000 }), unlock('island'), ctx())).state.gold).toBe(0)
+  })
+  it('unlockArea lake 뒤 areas에 lake가 들어간다', () => {
+    const s = ok(logic.apply(fresh({ gold: 5000 }), unlock('lake'), ctx())).state
+    expect(s.areas).toContain('lake')
+  })
+  it('migrate v6 세이브(장비·잠금·해금 지역 포함)는 그대로', () => {
+    const v6 = {
+      gold: 10, totalEarned: 70000, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island'],
+      bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
+      legends: [], tackles: ['cork'], equipped: ['cork'], pending: null,
+    }
+    expect(logic.migrate(v6, 6)).toEqual(v6)
   })
 })
 

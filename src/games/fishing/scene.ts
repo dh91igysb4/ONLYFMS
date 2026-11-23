@@ -4,7 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
-import { TILE, tileAt, type MapDef, type TileKind, type Vec } from './map.ts'
+import { TILE, tileAt, type MapDef, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
 import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
@@ -29,6 +29,8 @@ export type WorldScene = {
   hudTop: number
   /** 지역 전환 페이드: 화면 전체 검정 채우기 알파(0~1). 0이면 그리지 않는다 */
   fade: number
+  /** 열린 지역. 여기 없는 지역의 문은 잠긴 그림(look)으로 덮는다 */
+  opened: Opened
 }
 
 /** 화면 좌표 사각형 */
@@ -41,8 +43,10 @@ export type SceneSize = { w: number; h: number }
 
 const WATER_FRAME_MS = 500
 const WALK_FRAME_MS = 200
-/** 나무 밑동(줄기 아래 끝)의 칸 안 y. 캐릭터 발이 이보다 위면 나무 윗부분이 캐릭터를 가린다. */
+/** 나무·야자수 밑동(줄기 아래 끝)의 칸 안 y. 캐릭터 발이 이보다 위면 윗부분이 캐릭터를 가린다. */
 const TREE_BASE = 10
+/** 16×32 스프라이트로 윗칸까지 솟는 타일: 아래 16px는 정적 레이어, 위 16px는 캐릭터와 발 y 순으로 */
+const TALL_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { tree: 'tile-tree', palm: 'tile-palm' }
 
 // 스프라이트 크기
 const PLAYER_W = 16
@@ -197,28 +201,33 @@ function hash(a: number, b: number): number {
 
 // ── 땅: 타일 아래 깔리는 바탕 ────────────────────────────────────
 
-type Ground = 'water' | 'sand' | 'grass'
+/** cave: 동굴 바닥·입구. 풀 가장자리를 받지도 주지도 않고, 물에 모래 거품을 만들지 않는다 */
+type Ground = 'water' | 'sand' | 'grass' | 'cave'
 
-// 땅이 물로 치는 타일: 바다·강·연못·웅덩이·폭포, 부두·다리(아래가 물). 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
-const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge'])
+// 땅이 물로 치는 타일: 바다·강·연못·웅덩이·폭포·호수·동굴 물·수정·용암·석호, 부두·다리·선착장(아래가 물).
+// 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
+const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
+  'water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'dock',
+])
 
 function baseGround(map: MapDef, tx: number, ty: number): Ground | null {
   const kind = tileAt(map, tx, ty)
-  if (kind === null || kind === 'rock' || kind === 'cliff') return null
+  if (kind === null || kind === 'rock' || kind === 'cliff' || kind === 'cave-wall') return null
   if (WATER_GROUND.has(kind)) return 'water'
-  if (kind === 'sand') return 'sand'
+  if (kind === 'sand' || kind === 'palm') return 'sand'
+  if (kind === 'cave-floor' || kind === 'cave-mouth') return 'cave'
   return 'grass'
 }
 
-/** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물). */
+/** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
 function rockGround(map: MapDef, tx: number, ty: number): Ground {
-  const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0 }
+  const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const g = baseGround(map, tx + dx, ty + dy)
     if (g) count[g]++
   }
   let best: Ground = 'sand'
-  for (const g of ['grass', 'water'] as Ground[]) if (count[g] > count[best]) best = g
+  for (const g of ['grass', 'water', 'cave'] as Ground[]) if (count[g] > count[best]) best = g
   return best
 }
 
@@ -350,10 +359,13 @@ function drawFence(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: num
   })
 }
 
-/** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무 밑동·바위·울타리·부두 판자). 모두 자기 칸 안에 그린다. */
-/** 물 칸 그림 이름 앞부분(다리 밑은 강물). 없으면 바다 */
-const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { river: 'river', pond: 'pond', basin: 'basin', bridge: 'river' }
+/** 물 칸 그림 이름 앞부분(다리 밑은 강물). 없으면 바다(부두·선착장 밑 포함) */
+const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = {
+  river: 'river', pond: 'pond', basin: 'basin', bridge: 'river',
+  lake: 'lake', 'cave-pool': 'cave-pool', crystal: 'crystal', lava: 'lava', lagoon: 'lagoon',
+}
 
+/** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무·야자수 밑동·바위·울타리·부두·선착장 판자). 모두 자기 칸 안에 그린다. */
 function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
   const kind = tileAt(g.map, tx, ty)
   if (kind === null) return
@@ -364,11 +376,15 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
   else if (kind === 'cliff') drawSprite(ctx, 'tile-cliff', x, y, 1)
+  else if (kind === 'cave-wall') drawSprite(ctx, 'tile-cave-wall', x, y, 1)
+  else if (kind === 'cave-mouth') drawSprite(ctx, 'tile-cave-mouth', x, y, 1)
   else if (kind === 'falls') drawSprite(ctx, `falls-${(k + tx) % 2}`, x, y, 1)
   else if (ground === 'water') {
     // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게. 다리 밑은 강물
     drawSprite(ctx, `${WATER_SPRITE[kind] ?? 'water'}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
+  } else if (ground === 'cave') {
+    drawSprite(ctx, 'tile-cave-floor', x, y, 1)
   } else if (ground === 'sand') {
     drawSprite(ctx, 'tile-sand', x, y, 1)
     drawGrassFringe(ctx, g, tx, ty)
@@ -376,13 +392,15 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     drawSprite(ctx, hash(tx, ty) % 4 === 0 ? 'tile-grass-alt' : 'tile-grass', x, y, 1)
   }
 
-  if (kind === 'tree') drawSpritePart(ctx, 'tile-tree', x, y - TILE, TREE_BOTTOM)
+  const tall = TALL_SPRITE[kind]
+  if (tall) drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
   else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
     else drawSprite(ctx, 'tile-rock', x, y, 1)
   } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
+  else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
 }
 
 /** 부두 칸 바깥으로 삐져나오는 것: 그늘, 기둥, 끝 옆면, 외곽선 */
@@ -666,7 +684,8 @@ function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, box: Box): v
 
 /**
  * 장면 한 프레임. size는 캔버스의 논리 크기다.
- * 정적 맵 → 찌·낚싯줄 → 캐릭터와 나무 윗부분(발 y 순) → 입질 느낌표 → 비·눈 → 밤 색조 → 게이지·트랙·결과 → 시계 순으로 그린다.
+ * 정적 맵 → 잠긴 문·배 → 찌·낚싯줄 → 캐릭터와 나무 윗부분(발 y 순) → 입질 느낌표 → 비·눈 → 밤 색조(실내는 둘 다 없음)
+ * → 게이지·트랙·결과 → 시계 순으로 그린다.
  */
 export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: SceneSize): void {
   const w = Math.max(1, Math.floor(size.w) || 0)
@@ -700,8 +719,11 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
     ctx.restore()
   }
 
-  drawPrecipitation(ctx, s.cond, s.tMs, w, h)
-  drawNightTint(ctx, s.cond, w, h)
+  // 실내(동굴 등)에는 비·눈이 오지 않고 밤 색조도 없다. 시계는 그대로
+  if (!s.map.indoor) {
+    drawPrecipitation(ctx, s.cond, s.tMs, w, h)
+    drawNightTint(ctx, s.cond, w, h)
+  }
 
   // HUD (화면 좌표)
   const screenX = Math.round(s.player.pos.x) - cam.x
@@ -718,11 +740,49 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   }
 }
 
+/** 타일 사각형이 화면 타일 범위 [tx0..tx1]×[ty0..ty1]과 겹치는가 */
+const rectInView = (r: Rect, tx0: number, ty0: number, tx1: number, ty1: number): boolean =>
+  r.tx <= tx1 && r.tx + r.w - 1 >= tx0 && r.ty <= ty1 && r.ty + r.h - 1 >= ty0
+
+/**
+ * 잠긴 문과 선착장의 배(월드 좌표, 캐릭터·찌보다 먼저). 정적 캐시에는 넣지 않아 지역이 열려도 캐시를 다시 만들지 않는다.
+ * 무너진 다리는 칸마다 물(물결 박자 그대로)을 깔고 끊긴 판자를 얹는다. 돌무더기는 캐시의 바닥 위에 바로 얹는다.
+ * 같은 그림이 줄지어 보이지 않게 칸마다 좌우를 번갈아 뒤집는다.
+ */
+function drawPlaces(ctx: CanvasRenderingContext2D, s: WorldScene, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
+  for (const gate of s.map.gates) {
+    if (s.opened.has(gate.area) || !rectInView(gate.tiles, tx0, ty0, tx1, ty1)) continue
+    const { tiles } = gate
+    for (let ty = tiles.ty; ty < tiles.ty + tiles.h; ty++) {
+      for (let tx = tiles.tx; tx < tiles.tx + tiles.w; tx++) {
+        const kind = tileAt(s.map, tx, ty)
+        if (gate.look === 'broken-bridge' && kind !== null && WATER_GROUND.has(kind)) {
+          drawSprite(ctx, `${WATER_SPRITE[kind] ?? 'water'}-${(k + tx + ty * 3) % 2}`, tx * TILE, ty * TILE, 1)
+        }
+        drawSprite(ctx, `gate-${gate.look}`, tx * TILE, ty * TILE, 1, (tx + ty) % 2 === 1 ? { flipX: true } : undefined)
+      }
+    }
+  }
+  const boatW = Math.ceil(SPRITES.boat.w / TILE)
+  for (const dock of s.map.docks) {
+    if (!rectInView({ tx: dock.boat.tx, ty: dock.boat.ty, w: boatW, h: 1 }, tx0, ty0, tx1, ty1)) continue
+    // 물 타일과 같은 박자로 1px 출렁인다
+    drawSprite(ctx, 'boat', dock.boat.tx * TILE, dock.boat.ty * TILE + k, 1)
+  }
+}
+
 /** 월드 좌표로 그리는 움직이는 것들 */
 function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, cam: Vec, w: number, h: number): void {
   const t = s.tMs
   const b = s.bobber ? { x: Math.round(s.bobber.x), y: Math.round(s.bobber.y) } : null
   const tip = rodTip(pose, px, py)
+  const tx0 = Math.floor(cam.x / TILE)
+  const tx1 = Math.floor((cam.x + w - 1) / TILE)
+  const ty0 = Math.floor(cam.y / TILE)
+  const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
+
+  // 바닥에 붙은 것(잠긴 문·배)이 맨 먼저
+  drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 
   // 물 위 요소(물결·찌·줄)는 캐릭터보다 먼저
   if (b) {
@@ -747,21 +807,19 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
     }
   }
 
-  // 캐릭터와 나무 윗부분: 발 y가 작은(먼) 것부터
-  const trees: { x: number; y: number; key: number }[] = []
-  const tx0 = Math.floor(cam.x / TILE)
-  const tx1 = Math.floor((cam.x + w - 1) / TILE)
-  const ty0 = Math.floor(cam.y / TILE)
-  const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
+  // 캐릭터와 나무·야자수 윗부분: 발 y가 작은(먼) 것부터
+  const trees: { name: string; x: number; y: number; key: number }[] = []
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
-      if (tileAt(s.map, tx, ty) === 'tree') trees.push({ x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })
+      const kind = tileAt(s.map, tx, ty)
+      const name = kind === null ? undefined : TALL_SPRITE[kind]
+      if (name) trees.push({ name, x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })
     }
   }
   const feet = s.player.pos.y
-  for (const tr of trees) if (tr.key <= feet) drawSpritePart(ctx, 'tile-tree', tr.x, tr.y, TREE_TOP)
+  for (const tr of trees) if (tr.key <= feet) drawSpritePart(ctx, tr.name, tr.x, tr.y, TREE_TOP)
   drawPlayer(ctx, s, pose, px, py, tip)
-  for (const tr of trees) if (tr.key > feet) drawSpritePart(ctx, 'tile-tree', tr.x, tr.y, TREE_TOP)
+  for (const tr of trees) if (tr.key > feet) drawSpritePart(ctx, tr.name, tr.x, tr.y, TREE_TOP)
 
   // 입질 느낌표는 찌 위, 나무보다도 위
   if (b && s.phase === 'bite') {
