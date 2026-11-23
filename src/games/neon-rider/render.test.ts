@@ -4,10 +4,11 @@ import { chassisOf } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { MoverDef } from './movers.ts'
 import type { HazardDef } from './hazards.ts'
-import type { Template } from './pieces.ts'
+import { TEMPLATES, buildTemplate, type Template } from './pieces.ts'
+import { shapeAt, type HazardShape } from './hazards.ts'
 import { initSim, initSimAt, step } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { BODY, cameraFor, createRenderer, praiseFor, toScreen, visibleSegRange } from './render.ts'
+import { BODY, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -395,8 +396,121 @@ describe('위험물·움직이는 길·블록 그리기', () => {
     const t = Math.min(1, Math.max(0, ((ox - A.x) * (B.x - A.x) + (oy - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2)))
     const capHit = Math.hypot(A.x + (B.x - A.x) * t - ox, A.y + (B.y - A.y) * t - oy) < BODY_R * view.scale + rad
     expect(capHit || circles.some((q) => Math.hypot(q.x - ox, q.y - oy) < q.r + rad)).toBe(true)
-    // 그린 톱니의 크기는 판정 반지름과 같은 축척이다(가장 바깥 꼭짓점 = r).
-    expect(rad / (mm(300) * view.scale)).toBeGreaterThan(0.99)
-    expect(rad / (mm(300) * view.scale)).toBeLessThan(1.01)
+    // 그린 톱니의 크기는 판정 반지름과 같은 축척이다(가장 바깥 꼭짓점 = r + 톱니 끝 40 mm).
+    expect(rad / (mm(340) * view.scale)).toBeGreaterThan(0.99)
+    expect(rad / (mm(340) * view.scale)).toBeLessThan(1.01)
+  })
+})
+
+describe('위험물 그림과 판정 경계(설계 §5.4: 45 mm 안)', () => {
+  const mm = (n: number): number => n * MM
+  const TOL = 45 * MM
+  type Pt = readonly [number, number]
+  const segDist = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {
+    const dx = bx - ax
+    const dy = by - ay
+    const l2 = dx * dx + dy * dy
+    const t = l2 > 0 ? Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0
+    return Math.hypot(px - ax - dx * t, py - ay - dy * t)
+  }
+  // 그린 바깥선(닫힌 다각형)까지의 거리
+  const toOutline = (poly: readonly Pt[], x: number, y: number): number => {
+    let d = Infinity
+    for (let i = 0; i < poly.length; i++) {
+      const [ax, ay] = poly[i]
+      const [bx, by] = poly[(i + 1) % poly.length]
+      d = Math.min(d, segDist(x, y, ax, ay, bx, by))
+    }
+    return d
+  }
+  // 판정 경계(원 또는 캡슐 둘레)까지의 거리와 그 경계 위 표본
+  const toJudged = (sh: HazardShape, x: number, y: number): number =>
+    sh.s === 'disc' ? Math.abs(Math.hypot(x - sh.x, y - sh.y) - sh.r) : sh.s === 'bar' ? Math.abs(segDist(x, y, sh.x0, sh.y0, sh.x1, sh.y1) - sh.r) : NaN
+  const judgedSamples = (sh: HazardShape): Pt[] => {
+    const out: Pt[] = []
+    if (sh.s === 'disc') {
+      for (let k = 0; k < 720; k++) out.push([sh.x + Math.cos((k * Math.PI) / 360) * sh.r, sh.y + Math.sin((k * Math.PI) / 360) * sh.r])
+    } else if (sh.s === 'bar') {
+      const len = Math.hypot(sh.x1 - sh.x0, sh.y1 - sh.y0)
+      const ux = len > 0 ? (sh.x1 - sh.x0) / len : 1
+      const uy = len > 0 ? (sh.y1 - sh.y0) / len : 0
+      const n = Math.max(2, Math.ceil(len / mm(10)))
+      for (let k = 0; k <= n; k++) {
+        const t = (len * k) / n
+        for (const sd of [1, -1]) out.push([sh.x0 + ux * t - uy * sh.r * sd, sh.y0 + uy * t + ux * sh.r * sd])
+      }
+      for (let k = 0; k <= 180; k++) {
+        const a = (k * Math.PI) / 180 - Math.PI / 2 // 끝 쪽 반원(앞)과 시작 쪽 반원(뒤)
+        const cx = Math.cos(a)
+        const sy = Math.sin(a)
+        out.push([sh.x1 + (ux * cx - uy * sy) * sh.r, sh.y1 + (uy * cx + ux * sy) * sh.r])
+        out.push([sh.x0 - (ux * cx - uy * sy) * sh.r, sh.y0 - (uy * cx + ux * sy) * sh.r])
+      }
+    }
+    return out
+  }
+  // 두 방향 모두: 판정 경계의 모든 표본이 그린 선에서, 그린 선(변마다 표본)의 모든 점이 판정 경계에서 TOL 안.
+  const worst = (sh: HazardShape, poly: readonly Pt[]): { cover: number; spill: number } => {
+    let cover = 0
+    for (const [x, y] of judgedSamples(sh)) cover = Math.max(cover, toOutline(poly, x, y))
+    let spill = 0
+    for (let i = 0; i < poly.length; i++) {
+      const [ax, ay] = poly[i]
+      const [bx, by] = poly[(i + 1) % poly.length]
+      for (let k = 0; k < 20; k++) spill = Math.max(spill, toJudged(sh, ax + ((bx - ax) * k) / 20, ay + ((by - ay) * k) / 20))
+    }
+    return { cover, spill }
+  }
+  const outlineOf = (look: string, sh: HazardShape, spin: number): Pt[] | null => {
+    if (look === 'saw' && sh.s === 'disc') return sawOutline(sh.x, sh.y, sh.r, spin)
+    if (look === 'spikes' && sh.s === 'bar') return spikeOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r)
+    if (look === 'spear' && sh.s === 'bar') return spearOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r)
+    return null
+  }
+
+  it('템플릿의 모든 톱니·가시 띠·창: 판정 경계와 그린 바깥선이 서로 45 mm 안(움직이는 것은 여러 시각)', () => {
+    const looks = new Set<string>()
+    let checked = 0
+    for (const t of TEMPLATES) {
+      for (const def of buildTemplate(t).hazards) {
+        const hz = { ...def, id: 0 }
+        const times = def.motion.k === 'none' ? [0] : Array.from({ length: 40 }, (_, k) => k * 23)
+        for (const T of times) {
+          const sh = shapeAt(hz, T)
+          if (!sh) continue
+          const poly = outlineOf(def.look, sh, 0.1 + T / 50)
+          if (!poly) continue
+          looks.add(def.look)
+          checked++
+          const { cover, spill } = worst(sh, poly)
+          expect(cover, `${t.id} ${def.look} T=${T}: 그리지 않은 판정 경계`).toBeLessThanOrEqual(TOL)
+          expect(spill, `${t.id} ${def.look} T=${T}: 판정 밖으로 그린 선`).toBeLessThanOrEqual(TOL)
+        }
+      }
+    }
+    expect([...looks].sort()).toEqual(['saw', 'spear', 'spikes'])
+    expect(checked).toBeGreaterThan(20)
+  })
+
+  it('작은·큰 치수에서도 45 mm 안: 톱니 r 0.2~6 m, 가시 띠·창 길이 0~20 m·기울기 여러 개', () => {
+    for (const r of [200, 300, 450, 1000, 2500, 4500, 6000]) {
+      const sh: HazardShape = { s: 'disc', x: mm(1234), y: -mm(567), r: mm(r) }
+      for (const spin of [0, 0.2, 1.7]) {
+        const { cover, spill } = worst(sh, sawOutline(sh.x, sh.y, sh.r, spin))
+        expect(Math.max(cover, spill), `톱니 r ${r} mm`).toBeLessThanOrEqual(TOL)
+      }
+    }
+    for (const len of [0, 50, 400, 3000, 20000]) {
+      for (const deg of [0, 30, 90, 145, 180, 260]) {
+        for (const r of [100, 200]) {
+          const a = (deg * Math.PI) / 180
+          const sh: HazardShape = { s: 'bar', x0: mm(100), y0: mm(200), x1: mm(100) + Math.round(Math.cos(a) * mm(len)), y1: mm(200) + Math.round(Math.sin(a) * mm(len)), r: mm(r) }
+          for (const [name, poly] of [['가시', spikeOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r)], ['창', spearOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r)]] as const) {
+            const { cover, spill } = worst(sh, poly)
+            expect(Math.max(cover, spill), `${name} 길이 ${len} 각도 ${deg} r ${r}`).toBeLessThanOrEqual(TOL)
+          }
+        }
+      }
+    }
   })
 })

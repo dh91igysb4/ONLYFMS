@@ -81,6 +81,87 @@ export function praiseFor(flips: number, perfect: boolean, tick: number): string
   return perfect ? `perfect ${word}` : word
 }
 
+// 위험물 바깥선(세계 좌표 u, y 위, 화면 전용 부동소수). 판정 경계(원·캡슐)와 45 mm 안에 긋는다:
+// 판정 경계의 모든 점이 그린 선에서, 그린 선의 모든 점이 판정 경계에서 45 mm 안이다(설계 §5.4, render.test가 표본으로 확인).
+// 톱니·가시의 끝은 판정 경계 + HAZ_TEETH, 골은 − HAZ_TEETH. 그래서 이빨이 얕고, 모양은 안쪽 장식선으로 보여 준다.
+const HAZ_TEETH = 40 * MM
+const SAW_PITCH = 300 * MM // 톱니 하나(끝 → 끝)의 둘레 길이 목표
+const SPIKE_PITCH = 200 * MM // 가시 하나의 밑변 길이 목표
+const CAP_STEPS = 8 // 캡슐 반원을 나누는 수
+type Pt = [number, number]
+
+/** 톱니 원반: 중심 (x, y), 판정 반지름 r. spin은 화면 전용 회전(라디안). */
+export function sawOutline(x: number, y: number, r: number, spin: number): Pt[] {
+  const teeth = Math.max(12, Math.round((TAU * r) / SAW_PITCH))
+  const out: Pt[] = []
+  for (let i = 0; i < teeth * 2; i++) {
+    const a = spin + (i * Math.PI) / teeth
+    const rr = i % 2 === 0 ? r + HAZ_TEETH : Math.max(0, r - HAZ_TEETH)
+    out.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr])
+  }
+  return out
+}
+
+// 막대 (x0, y0)–(x1, y1)의 단위 방향 u와, 위(세계 y +)를 향하는 수직 n.
+function barFrame(x0: number, y0: number, x1: number, y1: number): { len: number; ux: number; uy: number; nx: number; ny: number } {
+  const len = Math.hypot(x1 - x0, y1 - y0)
+  const ux = len > 0 ? (x1 - x0) / len : 1
+  const uy = len > 0 ? (y1 - y0) / len : 0
+  let nx = -uy
+  let ny = ux
+  if (ny < 0 || (ny === 0 && nx < 0)) {
+    nx = -nx
+    ny = -ny
+  }
+  return { len, ux, uy, nx, ny }
+}
+
+// 중심 (cx, cy), 반지름 r의 반원: 방향 (ax, ay)에서 시작해 (dx, dy) 쪽을 지나 반대 방향까지(양 끝 포함).
+function halfCircle(cx: number, cy: number, r: number, ax: number, ay: number, dx: number, dy: number): Pt[] {
+  const out: Pt[] = []
+  for (let k = 0; k <= CAP_STEPS; k++) {
+    const t = (k * Math.PI) / CAP_STEPS
+    const c = Math.cos(t)
+    const sn = Math.sin(t)
+    out.push([cx + (ax * c + dx * sn) * r, cy + (ay * c + dy * sn) * r])
+  }
+  return out
+}
+
+/** 가시 띠: 판정 캡슐(막대 둘레 r) 전체를 채우고, 위쪽 가장자리만 톱날로 긋는다. */
+export function spikeOutline(x0: number, y0: number, x1: number, y1: number, r: number): Pt[] {
+  const { len, ux, uy, nx, ny } = barFrame(x0, y0, x1, y1)
+  const out: Pt[] = [[x0 - nx * r, y0 - ny * r]]
+  // 아래 변 → 끝 (x1, y1) 쪽 반원(아래 → 앞 → 위) → 위 톱날(뒤로) → 시작 (x0, y0) 쪽 반원(위 → 뒤 → 아래)
+  out.push(...halfCircle(x1, y1, r, -nx, -ny, ux, uy))
+  const m = Math.max(1, Math.round(len / SPIKE_PITCH))
+  for (let i = 1; i < 2 * m; i++) {
+    const t = len - (i * len) / (2 * m)
+    const off = i % 2 === 1 ? r + HAZ_TEETH : r - HAZ_TEETH
+    out.push([x0 + ux * t + nx * off, y0 + uy * t + ny * off])
+  }
+  out.push(...halfCircle(x0, y0, r, nx, ny, -ux, -uy))
+  return out
+}
+
+/** 창: 밑 (x0, y0)은 판정 캡슐처럼 둥글고, 폭 2r의 자루가 끝 (x1, y1)까지 간 뒤 캡슐 끝 반원의 45° 어깨를 지나 끝 + r + HAZ_TEETH에서 뾰족해진다. */
+export function spearOutline(x0: number, y0: number, x1: number, y1: number, r: number): Pt[] {
+  const len = Math.hypot(x1 - x0, y1 - y0)
+  const ux = len > 0 ? (x1 - x0) / len : 1
+  const uy = len > 0 ? (y1 - y0) / len : 0
+  const nx = -uy
+  const ny = ux
+  const d = r * Math.SQRT1_2
+  return [
+    [x1 + nx * r, y1 + ny * r],
+    [x1 + (ux + nx) * d, y1 + (uy + ny) * d],
+    [x1 + ux * (r + HAZ_TEETH), y1 + uy * (r + HAZ_TEETH)],
+    [x1 + (ux - nx) * d, y1 + (uy - ny) * d],
+    [x1 - nx * r, y1 - ny * r],
+    ...halfCircle(x0, y0, r, -nx, -ny, -ux, -uy),
+  ]
+}
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
 }
@@ -390,6 +471,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     c.stroke()
   }
 
+  // 세계 좌표 다각형을 지금 경로에 닫힌 도형으로 더한다.
+  const poly = (c: CanvasRenderingContext2D, view: Camera, pts: readonly Pt[]) => {
+    for (let i = 0; i < pts.length; i++) {
+      const p = toScreen(view, w, h, pts[i][0], pts[i][1])
+      if (i === 0) c.moveTo(p.x, p.y)
+      else c.lineTo(p.x, p.y)
+    }
+    c.closePath()
+  }
+
   // 위험물: 모양과 위치는 시뮬과 같은 shapeAt·bladeAngles(시각 Tr). 톱니의 도는 모습만 화면 전용이다.
   const drawHazards = (c: CanvasRenderingContext2D, view: Camera, course: Course, Tr: number, nowMs: number, box: Box) => {
     const carPx = CAR_LEN * view.scale
@@ -400,23 +491,26 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (!sh) continue
       const glowW = Math.max(5, carPx * 0.1)
       const coreW = Math.max(1.2, carPx * 0.03)
+      let decor: (() => void) | null = null // 바깥선 안쪽의 장식선(본색 위에 심 색으로 긋는다)
       c.beginPath()
       if (sh.s === 'disc') {
         const o = toScreen(view, w, h, sh.x, sh.y)
         const r = sh.r * view.scale
         if (z.look === 'saw') {
-          // 톱니 가장자리: 안쪽 0.78 r과 바깥 r을 번갈아 잇는다.
-          const teeth = 12
+          // 바깥선은 판정 원 ± HAZ_TEETH의 얕은 톱니(sawOutline), 도는 큰 톱니 모양은 안쪽 장식선으로 그린다.
           const spin = nowMs / 1500
-          for (let i = 0; i < teeth * 2; i++) {
-            const ang = spin + (i * Math.PI) / teeth
-            const rr = i % 2 === 0 ? r : r * 0.78
-            const x = o.x + Math.cos(ang) * rr
-            const y = o.y + Math.sin(ang) * rr
-            if (i === 0) c.moveTo(x, y)
-            else c.lineTo(x, y)
+          poly(c, view, sawOutline(sh.x, sh.y, sh.r, spin))
+          decor = () => {
+            const teeth = 8
+            for (let i = 0; i <= teeth * 2; i++) {
+              const ang = spin + (i * Math.PI) / teeth
+              const rr = i % 2 === 0 ? r * 0.82 : r * 0.6
+              const x = o.x + Math.cos(ang) * rr
+              const y = o.y + Math.sin(ang) * rr
+              if (i === 0) c.moveTo(x, y)
+              else c.lineTo(x, y)
+            }
           }
-          c.closePath()
         } else {
           c.moveTo(o.x + r, o.y)
           c.arc(o.x, o.y, r, 0, TAU)
@@ -477,25 +571,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
           continue
         }
         if (z.look === 'spikes') {
-          // 막대 두께(2r) 안에 밑변을 아래쪽 가장자리에, 꼭짓점을 위쪽 가장자리에 둔 삼각형 줄
-          const pitch = Math.max(4, r * 1.6)
-          const n = Math.max(1, Math.ceil(len / pitch))
-          const step = len / n
-          for (let i = 0; i < n; i++) {
-            const bx = A.x + ux * step * i - nx * r
-            const by = A.y + uy * step * i - ny * r
-            if (bx < -step * 2 || bx > w + step * 2 || by < -r * 4 - step || by > h + r * 4 + step) continue
-            c.moveTo(bx, by)
-            c.lineTo(bx + ux * step, by + uy * step)
-            c.lineTo(bx + ux * step * 0.5 + nx * 2 * r, by + uy * step * 0.5 + ny * 2 * r)
-            c.closePath()
+          // 바깥선은 판정 캡슐 전체(위쪽만 얕은 톱날, spikeOutline). 큰 삼각형 줄은 안쪽 장식선: 밑변은 아래 가장자리, 꼭짓점은 위 가장자리.
+          poly(c, view, spikeOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r))
+          decor = () => {
+            const pitch = Math.max(4, r * 1.6)
+            const n = Math.max(1, Math.ceil(len / pitch))
+            const step = len / n
+            for (let i = 0; i < n; i++) {
+              const bx = A.x + ux * step * i - nx * r
+              const by = A.y + uy * step * i - ny * r
+              if (bx < -step * 2 || bx > w + step * 2 || by < -r * 4 - step || by > h + r * 4 + step) continue
+              c.moveTo(bx, by)
+              c.lineTo(bx + ux * step * 0.5 + nx * 2 * r, by + uy * step * 0.5 + ny * 2 * r)
+              c.lineTo(bx + ux * step, by + uy * step)
+            }
           }
         } else if (z.look === 'spear' && len >= 1) {
-          // 뾰족한 막대: 밑 (x0, y0)의 폭 2r에서 끝 (x1, y1)로 좁아진다.
-          c.moveTo(A.x + nx * r, A.y + ny * r)
-          c.lineTo(B.x, B.y)
-          c.lineTo(A.x - nx * r, A.y - ny * r)
-          c.closePath()
+          // 뾰족한 막대: 판정 캡슐 폭 2r의 자루가 끝까지 가고, 캡슐 끝에서 뾰족해진다(spearOutline).
+          poly(c, view, spearOutline(sh.x0, sh.y0, sh.x1, sh.y1, sh.r))
         } else {
           // plain·길이 0: 막대 둘레(캡슐)를 굵은 선으로
           c.moveTo(A.x, A.y)
@@ -517,6 +610,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       c.strokeStyle = HAZ_CORE
       c.lineWidth = coreW
       c.stroke()
+      if (decor) {
+        c.beginPath()
+        decor()
+        c.stroke()
+      }
     }
   }
 
