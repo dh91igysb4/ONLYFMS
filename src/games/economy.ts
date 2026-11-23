@@ -58,7 +58,11 @@ export const FREE_DAILY_CAP = REF * 1 // 20,500
 /** 기준 플레이의 판 사이 대기(초, 설계 §7.3) */
 export const FREE_GAP_SEC = 5
 
-/** 낚시 장비·해금 총액 목표(설계 §4.1). 낚시 다듬기 PR의 fishing/gold.test.ts가 검사한다 */
+/**
+ * 낚시 장비·해금 총액 목표(설계 §4.1, 참고값). 낚시 다듬기 PR(#81)은 총액이 아니라 "하루 1시간 + 사이트 상한으로 약 30일"을
+ * 시뮬레이션으로 맞췄다(총액 1,186,300 = REF × 57.9, 고급 장비가 수입을 올리므로). 진행 속도 검사는 economyPace.test.ts와
+ * 다듬기 PR의 fishing/gold.test.ts가 한다
+ */
 export const FISHING_SINK_TARGET = REF * 40 // 820,000
 
 /** manifest `gold` = game_modes.gold_per_point·gold_play_cap·gold_daily_cap (registry.test.ts가 비교) */
