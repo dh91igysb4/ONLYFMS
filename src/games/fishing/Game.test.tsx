@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
-import { drawScene, releaseSceneCache } from './scene.ts'
+import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type PendingView, type View } from './logic.ts'
@@ -11,7 +11,7 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
   return { ...orig, world: vi.fn() }
 })
-vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -78,7 +78,7 @@ beforeEach(() => {
     () => ({}) as unknown as CanvasRenderingContext2D,
   )
   worldMock.mockReset()
-  vi.mocked(drawScene).mockClear()
+  vi.mocked(drawWorld).mockClear()
   vi.mocked(barResult).mockReset().mockImplementation(actualMinigame.barResult)
 })
 afterEach(() => {
@@ -425,7 +425,7 @@ describe('fishing Game', () => {
       expect(c.style.width).toBe(`${fit.w * fit.scale}px`)
       expect(c.style.height).toBe(`${fit.h * fit.scale}px`)
       await advance(100)
-      const last = vi.mocked(drawScene).mock.calls.at(-1)
+      const last = vi.mocked(drawWorld).mock.calls.at(-1)
       expect(last?.[2]).toEqual({ w: fit.w, h: fit.h })
     } finally {
       restore()
@@ -657,11 +657,11 @@ describe('fishing Game', () => {
   test('stops drawing after unmount', async () => {
     const { unmount } = await mount()
     await advance(100)
-    expect(vi.mocked(drawScene).mock.calls.length).toBeGreaterThan(0)
+    expect(vi.mocked(drawWorld).mock.calls.length).toBeGreaterThan(0)
     unmount()
-    const n = vi.mocked(drawScene).mock.calls.length
+    const n = vi.mocked(drawWorld).mock.calls.length
     await advance(200)
-    expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+    expect(vi.mocked(drawWorld).mock.calls.length).toBe(n)
   })
 })
 

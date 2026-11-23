@@ -6,7 +6,9 @@ import type { WorldGameProps } from '../ui.ts'
 import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
-import { drawScene, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { castTarget, SPAWN } from './map.ts'
+import { cameraFor } from './walk.ts'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
@@ -31,7 +33,7 @@ const sizeOrZero = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
 
 /**
  * 쓸 수 있는 영역에 맞춘 캔버스: 정수 배율과, 그 배율로 영역을 채우는 장면 논리 크기(160~320 × 240~480).
- * 장면은 늘이지 않고 더 넓게 그린다(scene.ts의 안전 상자 밖은 배경).
+ * 장면은 늘이지 않고 더 넓게 그린다(카메라가 맵을 더 넓게 보여 준다).
  */
 export function fitScene(availW: number, availH: number): SceneFit {
   const aw = sizeOrZero(availW)
@@ -342,15 +344,20 @@ export function Game({ gameId }: WorldGameProps) {
       const r = barResult(rt.bar)
       if (r !== 'playing') endFight(r === 'caught', rt.bar.perfect)
     }
-    drawScene(ctx, {
+    // 이동은 아직 없다: 캐릭터는 시작 위치에 서 있고 찌는 그 앞으로 던진 자리(다음 작업에서 이동·입력을 붙인다)
+    const size = { w: fit.w, h: fit.h }
+    const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
+    drawWorld(ctx, {
       phase: rt.phase,
       tMs: now,
       gauge: rt.gauge,
-      castPower: rt.castPower,
+      player: { pos: SPAWN.pos, facing: SPAWN.facing, moving: false, walkMs: 0 },
+      camera: cameraFor(SPAWN.pos, size),
+      bobber: fishing ? castTarget(SPAWN.pos, SPAWN.facing, rt.castPower) : null,
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
-    }, { w: fit.w, h: fit.h })
+    }, size)
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
