@@ -3,6 +3,8 @@
 import {
   AIR_SPIN_DAMP,
   AIR_SPIN_KEEP,
+  BLOCK_MEMORY,
+  BLOCK_WAKE,
   BOOST_V,
   COLLIDE_WINDOW,
   CONSTRAINT_ITERS,
@@ -34,7 +36,27 @@ import {
   WHEEL_R,
 } from './constants.ts'
 import { candVel, collideWheel, depthIn, divRound, divTrunc, far, hitsCircle, nearestCand, windowCands } from './collide.ts'
-import type { Body, Cand } from './collide.ts'
+import type { Body, Box, Cand } from './collide.ts'
+import {
+  blockBox,
+  blockCands,
+  blockPoses,
+  blockPosesBack,
+  blockReachBox,
+  blockSegs,
+  blockState,
+  blockWork,
+  blockWorkCands,
+  blocksNearCar,
+  finishBlocks,
+  isBlockCand,
+  moveBlocks,
+  pushCar,
+  solveBlocks,
+  terrainNear,
+  wakeNear,
+} from './blocks.ts'
+import type { BlockState, BlockWork } from './blocks.ts'
 import type { Course } from './course.ts'
 import { hazardHit } from './hazards.ts'
 import { motionDone, subtick } from './motion.ts'
@@ -65,6 +87,10 @@ export type SimState = {
   movers: { id: number; t0: number }[]
   // 움직임이 끝난 길 id(오래된 것부터, 최대 MOVER_MEMORY). keys 길은 마지막 키 자세로 고정, fall 길은 더 판정하지 않는다
   moversDone: number[]
+  // 깨어 있는 블록(id 오름차순). 차 중심이 처음 위치에서 BLOCK_WAKE 안에 들어오면 처음 자세로 올라온다(설계 §7.3)
+  blocks: BlockState[]
+  // 끝난 블록 id(오래된 것부터, 최대 BLOCK_MEMORY). 다시 깨우지 않는다
+  blocksDone: number[]
 }
 
 // 한 틱 동안의 작업용 바퀴: 속도를 따로 들고, 이번 틱에 닿은 선분을 기록한다.
@@ -198,8 +224,11 @@ function rod(r: Work, f: Work): void {
 }
 
 // ③ 바퀴-선분 충돌과 접촉 효과(착지 마찰, 부스터).
-function contact(w: Work, ox: number, oy: number, cands: readonly Cand[]): void {
-  for (const c of collideWheel(w, ox, oy, WHEEL_R, GROUND_TOL, cands, RESTITUTION_PCT)) {
+// touchOnly(블록 변)는 닿음만 센다: 바퀴와 블록 사이의 위치·속도는 pushCar가 질량비대로 나눠 푼다(여기서 다시 밀면 블록을 무한히 무겁게 친다).
+function contact(w: Work, ox: number, oy: number, cands: readonly Cand[], touchOnly: readonly Cand[]): void {
+  const hits = collideWheel(w, ox, oy, WHEEL_R, GROUND_TOL, cands, RESTITUTION_PCT)
+  if (touchOnly.length > 0) hits.push(...collideWheel({ ...w }, ox, oy, WHEEL_R, GROUND_TOL, touchOnly, RESTITUTION_PCT))
+  for (const c of hits) {
     if (!w.was && !w.scrubbed) {
       w.scrubbed = true
       const vt = tangentSpeed(w, c)
@@ -211,7 +240,7 @@ function contact(w: Work, ox: number, oy: number, cands: readonly Cand[]): void 
     }
     w.hit = c
     w.top = Math.max(w.top, c.i)
-    if (c.prev && !w.rode.includes(moverIdOf(c.i))) w.rode.push(moverIdOf(c.i))
+    if (c.prev && !isBlockCand(c.i) && !w.rode.includes(moverIdOf(c.i))) w.rode.push(moverIdOf(c.i))
   }
 }
 
@@ -278,6 +307,26 @@ function nextMovers(
   }
   if (moversDone.length > MOVER_MEMORY) moversDone.splice(0, moversDone.length - MOVER_MEMORY)
   return { movers, moversDone }
+}
+
+// 블록 정리: 가운데가 차 중심 x보다 BLOCK_WAKE 넘게 뒤이거나, 가장 높은 꼭짓점이 그 자리 코스 바닥 − FALL_DEPTH 아래면 끝난다.
+function nextBlocks(s: SimState, course: Course, bws: readonly BlockWork[], cx: number): Pick<SimState, 'blocks' | 'blocksDone'> {
+  if (bws.length === 0) return { blocks: s.blocks, blocksDone: s.blocksDone }
+  const blocks: BlockState[] = []
+  const blocksDone = s.blocksDone.slice()
+  for (const bw of bws) {
+    const bs = blockState(bw)
+    const b = blockBox(bs)
+    const mx = Math.floor((b.x0 + b.x1) / 2)
+    if (mx < cx - BLOCK_WAKE || b.y1 < floorY(course, s.nextSection, mx) - FALL_DEPTH) blocksDone.push(bs.id)
+    else blocks.push(bs)
+  }
+  if (blocksDone.length > BLOCK_MEMORY) blocksDone.splice(0, blocksDone.length - BLOCK_MEMORY)
+  return { blocks, blocksDone }
+}
+
+function union(a: Box, b: Box): Box {
+  return { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) }
 }
 
 function headOf(r: Body, f: Body): { x: number; y: number } {
@@ -357,6 +406,8 @@ export function initSimAt(course: Course, x: number, vx: number): SimState {
     airBefore: false,
     movers: [],
     moversDone: [],
+    blocks: [],
+    blocksDone: [],
   }
 }
 
@@ -377,8 +428,12 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     y1: Math.max(r.y, f.y) + REACH,
   }
   const cands = windowCands(course, s.progress, COLLIDE_WINDOW, box, !r.was && !f.was)
+  // 블록(설계 §7): 깨어 있는 블록만 시뮬한다. 블록마다 근처 고정 선분을 틱마다 한 번 고른다.
+  const awake = wakeNear(s.blocks, s.blocksDone, course, Math.floor((r.x + f.x) / 2), Math.floor((r.y + f.y) / 2))
+  const bws = awake.map((bs) => blockWork(bs, course.blockById(bs.id), terrainNear(course, s.nextSection, blockReachBox(bs))))
   // 움직이는 길: 이동 단계마다 그 시각의 자세로 고정 선분 뒤에 붙인다(움직임 설계 §6.3). 없으면 고정 지형만으로 예전과 똑같이 돈다.
-  const runs = moverRuns(s, course.moversNear(box))
+  // 블록이 깨어 있으면 블록 근처의 길도 가져온다(블록 꼭짓점도 길과 부딪힌다).
+  const runs = moverRuns(s, course.moversNear(awake.reduce((b, bs) => union(b, blockReachBox(bs)), box)))
   const poses = new Map<number, Seg[][]>() // 부분 틱 → 길마다 선분(이 틱에 T − 2 ~ T를 여러 번 쓴다)
   const posesAt = (T: number): Seg[][] => {
     let p = poses.get(T)
@@ -387,19 +442,24 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   }
   const withMovers = (T: number): readonly Cand[] => (runs.length > 0 ? cands.concat(moverCands(runs, posesAt(T), posesAt(T - 1))) : cands)
 
-  applyInput(r, f, hold, s.airBefore, withMovers(s.tick * SUBSTEPS)) // ① 틱 시작(직전 이동 단계 끝)의 자세
+  const start = withMovers(s.tick * SUBSTEPS) // ① 틱 시작(직전 이동 단계 끝)의 자세
+  applyInput(r, f, hold, s.airBefore, bws.length > 0 ? start.concat(blockCands(awake.map((b) => b.id), awake.map(blockSegs))) : start)
   gravity(r) // ②
   gravity(f)
 
   const hazards = course.hazardsNear(box) // 틱마다 한 번만 가져오고, 이동 단계마다 그 시각으로 확인한다
   let crashed = false
+  // 블록 변의 자세 기록(T − 1, T − 2, T − 3): 블록 자세는 풀어 봐야 알므로 실려 감은 한 이동 단계 늦게 준다.
+  let hist = bws.length > 0 ? [blockPoses(bws), blockPosesBack(bws, 1), blockPosesBack(bws, 2)] : []
   for (let k = 0; k < SUBSTEPS && !crashed; k++) {
     const T = subtick(s.tick, k)
-    const sub = withMovers(T)
+    const mc = runs.length > 0 ? moverCands(runs, posesAt(T), posesAt(T - 1)) : []
+    const sub = runs.length > 0 ? cands.concat(mc) : cands // = withMovers(T)
     if (runs.length > 0) {
       carryOn(r, posesAt(T), posesAt(T - 1), posesAt(T - 2), WHEEL_R + GROUND_TOL)
       carryOn(f, posesAt(T), posesAt(T - 1), posesAt(T - 2), WHEEL_R + GROUND_TOL)
     }
+    for (const w of bws.length > 0 ? [r, f] : []) carryOn(w, hist[0], hist[1], hist[2], WHEEL_R + GROUND_TOL)
     // ② 이동을 SUBSTEPS번으로 나눈다. 속도가 그대로면 나눈 이동의 합이 정확히 속도와 같다.
     const ox = [r.x, f.x]
     const oy = [r.y, f.y]
@@ -407,16 +467,30 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
       w.x += Math.floor((w.vx * (k + 1)) / SUBSTEPS) - Math.floor((w.vx * k) / SUBSTEPS)
       w.y += Math.floor((w.vy * (k + 1)) / SUBSTEPS) - Math.floor((w.vy * k) / SUBSTEPS)
     }
-    // ③ 막대 제약과 충돌.
+    if (bws.length > 0) moveBlocks(bws, k, mc)
+    // ③ 막대 제약과 충돌. 블록: 차와 서로 밀기 → 막대·지형·블록끼리 → 바퀴가 블록 변에 닿았는지(접지, 상대 속도).
+    let bc: Cand[] = []
     for (let it = 0; it < CONSTRAINT_ITERS; it++) {
       rod(r, f)
-      contact(r, ox[0], oy[0], sub)
-      contact(f, ox[1], oy[1], sub)
+      if (bws.length > 0) {
+        pushCar(r, f, headOf, blocksNearCar(bws, [r, f, headOf(r, f)], WHEEL_R)) // 판정원·캡슐 반지름 ≤ WHEEL_R
+        solveBlocks(bws)
+        bc = blockWorkCands(blocksNearCar(bws, [r, f], WHEEL_R + GROUND_TOL + V_TERMINAL)) // 이번 반복에 바퀴가 더 움직여도 닿을 수 있는 것
+      }
+      contact(r, ox[0], oy[0], sub, bc)
+      contact(f, ox[1], oy[1], sub, bc)
     }
-    // ⑤ 차체 판정원(이동 단계마다 확인해 빠른 회전에서도 놓치지 않는다).
+    if (bws.length > 0) {
+      finishBlocks(bws)
+      bc = blockWorkCands(blocksNearCar(bws, [r, f], WHEEL_R + GROUND_TOL))
+      hist = [blockPoses(bws), hist[0], hist[1]]
+    }
+    const all = bc.length > 0 ? sub.concat(bc) : sub
+    // ⑤ 차체 판정원(이동 단계마다 확인해 빠른 회전에서도 놓치지 않는다). 블록에 닿는 것은 죽음이 아니다(설계 §7.2).
     const h = headOf(r, f)
     if (hitsCircle(h.x, h.y, HEAD_R, sub)) crashed = true
-    if (!crashed && runs.length > 0 && (crushed(r, ox[0], oy[0], sub) || crushed(f, ox[1], oy[1], sub))) crashed = true
+    const moving = runs.length > 0 || bws.length > 0
+    if (!crashed && moving && (crushed(r, ox[0], oy[0], all) || crushed(f, ox[1], oy[1], all))) crashed = true
     // ⑤' 위험물: 바퀴 둘·차체 판정원·차대 캡슐을 그 이동 단계의 시각으로 확인한다.
     if (!crashed && hazards.length > 0) {
       const probe = {
@@ -454,6 +528,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     progress,
     airBefore: !s.rear.ground && !s.front.ground,
     ...nextMovers(s, course, rode, passing, cx, s.tick + 1),
+    ...nextBlocks(s, course, bws, cx),
   }
   if (crashed) return { ...base, dead: 'crash' }
   const cy = Math.floor((r.y + f.y) / 2)

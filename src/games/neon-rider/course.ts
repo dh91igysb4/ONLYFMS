@@ -20,6 +20,7 @@ export type Course = {
   moversNear(box: Box): readonly Mover[]
   blocksNear(box: Box): readonly Block[]
   moverById(id: number): Mover // 이미 만든 구간의 길만(상태에 남은 id로 다시 찾기)
+  blockById(id: number): Block // 이미 만든 구간의 블록만(깨어 있는 블록의 처음 치수를 다시 찾기)
 }
 
 // 최근 몇 개 구간의 템플릿을 피하는지, 캐시에 몇 개 seed를 두는지 (조정 수치가 아니라 구조 값).
@@ -118,12 +119,12 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
   const sectionGems: Gem[][] = []
   const sectionItems: SectionItems[] = []
   const movers: Mover[] = [] // movers[id]
+  const blocks: Block[] = [] // blocks[id]
   const builtCache = new Map<Template, Built>()
   let penX = START_LEN
   let penY = 0
   let gemId = 0
   let hazardId = 0
-  let blockId = 0
 
   const builtOf = (tpl: Template): Built => {
     let built = builtCache.get(tpl)
@@ -179,7 +180,8 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
       items.movers.push({ item, box: moverIndexBox(item) })
     }
     for (const b of built.blocks) {
-      const item: Block = { ...shiftBlock(b, tx, penY), id: blockId++ }
+      const item: Block = { ...shiftBlock(b, tx, penY), id: blocks.length }
+      blocks.push(item)
       items.blocks.push({ item, box: blockRestBox(item) })
     }
     sections.push({
@@ -252,6 +254,11 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
       checkIndex(id, 'mover')
       if (id >= movers.length) throw new RangeError(`아직 만들지 않은 움직이는 길: ${id}`)
       return movers[id]
+    },
+    blockById(id) {
+      checkIndex(id, 'block')
+      if (id >= blocks.length) throw new RangeError(`아직 만들지 않은 블록: ${id}`)
+      return blocks[id]
     },
   }
 }

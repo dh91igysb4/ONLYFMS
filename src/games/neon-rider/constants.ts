@@ -34,8 +34,9 @@ export const PERFECT_TOL = 170 // ≈ 15°. 측정 대상 아님
 export const GEM_R = 250 * MM // 보석 줍기 반지름. 바퀴·차체 판정원과 GEM_R + 그 반지름 안이면 줍는다
 export const BODY_R = 110 * MM // 차대 캡슐 반지름(두 바퀴 중심 선분). 차 그림 차체 높이에 맞춰 Task 7에서 확인
 export const MOVER_MEMORY = 64 // 상태에 남기는 끝난 움직이는 길 id 수 상한. 넘치면 가장 오래된 것부터 버린다
-export const BLOCK_MASS = 2 // 블록 꼭짓점 하나의 질량(바퀴 하나 대비 정수 배)
-export const BLOCK_CORNER_R = 60 * MM // 블록 꼭짓점 판정 반지름
+export const BLOCK_MASS = 1 // 블록 꼭짓점 하나의 질량(바퀴 하나 대비 정수 배). 블록 = 바퀴 4개 = 차 둘. 마찰(BLOCK_FRICTION_PCT 30%: 0.3 × 4G = 90)이 차 구동력(2 × DRIVE_ACC = 270)보다 작아 차가 블록을 밀고 갈 수 있다
+export const BLOCK_CORNER_R = 60 * MM // 블록 꼭짓점 판정 반지름(지형과는 이 반지름으로 둥글린 모서리로 닿는다)
+export const BLOCK_FRICTION_PCT = 30 // 블록 꼭짓점–지형 마찰 계수(%). 블록 하나의 마찰 0.3 × 4G = 90: 차 구동력(2 × DRIVE_ACC = 270)으로 맞붙은 블록 둘까지 밀 수 있다. 측정 대상 아님
 export const BLOCK_WAKE = 30000 * MM // 차가 이 거리 안에 오면 블록을 깨워 시뮬한다
 export const BLOCK_MEMORY = 32 // 상태에 남기는 블록 수 상한
 export const CRUSH_DEPTH = Math.floor(WHEEL_R / 2) // 움직이는 길·블록과 고정 지형 사이에 이만큼 넘게 파고들면 끼임
