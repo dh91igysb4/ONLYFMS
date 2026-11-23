@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, areaHasSpecies, CHALLENGES, DEFAULT_AREAS, TP_BASE, TP_PER_10, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS } from './data.ts'
+import {
+  AREAS, areaHasSpecies, areaMinRod, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
+  speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS,
+} from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
 const WEATHERS: Weather[] = ['sun', 'rain']
@@ -44,8 +47,23 @@ describe('fishing data', () => {
   it('모든 어종에 fish-<id> 스프라이트가 있다', () => {
     for (const s of SPECIES) expect(SPRITES[`fish-${s.id}`], s.id).toBeDefined()
   })
-  it('전설 등급과 legend 설정은 함께 다닌다', () => {
-    for (const s of SPECIES) expect(s.rarity === 'legend', s.id).toBe(Boolean(s.legend))
+  it('legend 필드 ⇔ 등급 전설·신화, needs·buff ⇔ 신화, buff는 BUFFS id이고 신화마다 다르다', () => {
+    const buffIds = BUFFS.map((b) => b.id) as string[]
+    const legendIds = SPECIES.filter((s) => s.rarity === 'legend').map((s) => s.id)
+    const used: string[] = []
+    for (const s of SPECIES) {
+      expect(s.rarity === 'legend' || s.rarity === 'mythic', s.id).toBe(Boolean(s.legend))
+      const mythic = s.rarity === 'mythic'
+      expect(Boolean(s.legend?.needs), s.id).toBe(mythic)
+      expect(Boolean(s.legend?.buff), s.id).toBe(mythic)
+      if (mythic) {
+        expect(buffIds, s.id).toContain(s.legend!.buff)
+        expect(s.legend!.needs!.length, s.id).toBeGreaterThan(0)
+        for (const id of s.legend!.needs!) expect(legendIds, `${s.id} needs ${id}`).toContain(id)
+        used.push(s.legend!.buff!)
+      }
+    }
+    expect(new Set(used).size).toBe(used.length)
   })
   it('초보 상시 물고기: 전갱이는 mixed, 멸치는 dart', () => {
     expect(byId('horse-mackerel').behavior).toBe('mixed')
@@ -90,7 +108,7 @@ const nightOnly = (s: (typeof SPECIES)[number]) =>
   Array.from({ length: 24 * 4 }, (_, i) => i * 15).filter((m) => inHours(m, s.hours!)).every((m) => isNight(m))
 
 describe('area guarantee', () => {
-  it('어종이 있는 모든 지역 x 자리 x 계절 x 정각 x 날씨에서 rod 1 common이 하나 이상', () => {
+  it('어종이 있는 모든 지역 x 자리(열린 시각만) x 계절 x 정각 x 날씨에서 지역 최소 낚싯대로 common이 하나 이상', () => {
     expect(SPECIES_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island'])
     for (const area of SPECIES_AREAS) {
       for (const spot of area.spots) {
@@ -98,7 +116,8 @@ describe('area guarantee', () => {
           for (let h = 0; h < 24; h++) {
             for (const weather of WEATHERS) {
               const c = cond(season, h, weather)
-              const ok = SPECIES.some((s) => s.rarity === 'common' && speciesAvailable(s, area.id, spot, c, 1))
+              if (!spotOpen(area.id, spot, c.gameMinute)) continue
+              const ok = SPECIES.some((s) => s.rarity === 'common' && speciesAvailable(s, area.id, spot, c, areaMinRod(area.id)))
               expect(ok, `${area.id}/${spot} ${season} ${h}h ${weather}`).toBe(true)
             }
           }
@@ -189,7 +208,10 @@ describe('찌', () => {
     expect(tackleSlots(99)).toBe(0)
   })
   it('TACKLE_FX 값', () => {
-    expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 })
+    expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5, curiousMythic: 1.5 })
+  })
+  it('호기심 찌 설명에 신화', () => {
+    expect(TACKLES.find((t) => t.id === 'curious')!.desc).toBe('희귀·전설·신화 물고기가 더 잘 나와요')
   })
 })
 
@@ -225,5 +247,47 @@ describe('도전과제', () => {
 
   it('순간이동 요금 상수', () => {
     expect([TP_BASE, TP_PER_10]).toEqual([30, 1])
+  })
+})
+
+describe('물때 자리·지역 최소 낚싯대', () => {
+  it('spotOpen: tideSpots 없는 자리는 늘 열림, 모르는 지역·자리는 false', () => {
+    for (const a of AREAS) for (const spot of a.spots) for (let m = 0; m < 1440; m += 30) expect(spotOpen(a.id, spot, m), `${a.id}/${spot}`).toBe(true)
+    expect(spotOpen('village', 'nowhere', 0)).toBe(false)
+    expect(spotOpen('atlantis' as never, 'pier', 0)).toBe(false)
+  })
+  it('spotOpen: tideSpots 자리는 썰물에만 열린다(합성 지역)', () => {
+    const areas = AREAS as unknown as { id: string; name: string; spots: string[]; tideSpots?: string[] }[]
+    areas.push({ id: 'tmp-flat', name: '임시', spots: ['bank', 'gully'], tideSpots: ['gully'] })
+    try {
+      const id = 'tmp-flat' as never
+      expect(spotOpen(id, 'gully', 3 * 60)).toBe(true)
+      expect(spotOpen(id, 'gully', 6 * 60)).toBe(false)
+      expect(spotOpen(id, 'gully', 15 * 60)).toBe(true)
+      expect(spotOpen(id, 'bank', 6 * 60)).toBe(true)
+    } finally {
+      areas.pop()
+    }
+  })
+  it('areaMinRod: 지금 6지역 모두 1, 모르는 지역도 1', () => {
+    for (const a of AREAS) expect(areaMinRod(a.id)).toBe(1)
+    expect(areaMinRod('atlantis' as never)).toBe(1)
+  })
+  it('TIDE_GRACE_MIN 10, MYTHIC_CHANCE 0.02', () => {
+    expect(TIDE_GRACE_MIN).toBe(10)
+    expect(MYTHIC_CHANCE).toBe(0.02)
+  })
+})
+
+describe('신화 버프', () => {
+  it('BUFFS 3개 id·이름·설명', () => {
+    expect(BUFFS).toEqual([
+      { id: 'imugi-scale', name: '이무기의 비늘', desc: '입질이 15% 빨라져요' },
+      { id: 'dragon-breath', name: '백룡의 숨결', desc: '낚시 바가 8% 길어져요' },
+      { id: 'dragon-pearl', name: '용왕의 여의주', desc: '물고기를 8% 비싸게 팔아요' },
+    ])
+  })
+  it('BUFF_FX 값', () => {
+    expect(BUFF_FX).toEqual({ imugiBite: 0.85, dragonBar: 1.08, pearlSell: 108 })
   })
 })

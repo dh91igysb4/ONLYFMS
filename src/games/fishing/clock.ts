@@ -75,3 +75,20 @@ export function formatClock(gameMinute: number): string {
   const mm = Math.floor((gameMinute % 60) / 10) * 10
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
+
+// ---------------------------------------------------------------- 물때 (낚시 5부)
+// 게임 시각의 고정 구간: 썰물 2~6시·14~18시(하루 두 번, 4시간씩). 나머지는 밀물.
+export type Tide = 'low' | 'high'
+export const LOW_TIDE_HOURS: readonly (readonly [number, number])[] = [[2, 6], [14, 18]]
+
+export function tideAt(gameMinute: number): Tide {
+  const m = mod(gameMinute, 1440)
+  return LOW_TIDE_HOURS.some((h) => inHours(m, h)) ? 'low' : 'high'
+}
+
+/** 다음에 물때가 바뀌는 게임 분(0~1439). HUD·지도 문구용 */
+export function nextTideChange(gameMinute: number): number {
+  const m = mod(gameMinute, 1440)
+  const edges = LOW_TIDE_HOURS.flatMap(([from, to]) => [from * 60, to * 60]).sort((a, b) => a - b)
+  return edges.find((e) => e > m) ?? edges[0]
+}

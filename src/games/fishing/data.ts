@@ -1,7 +1,9 @@
 // 낚시 어종·낚싯대 데이터. 순수 데이터, 외부 의존 없음(브라우저·Deno 공용).
-import { inHours, type Conditions, type Season, type Weather } from './clock.ts'
+import { inHours, tideAt, type Conditions, type Season, type Weather } from './clock.ts'
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend'
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
+/** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
+export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
 export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island'
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker'
 export type Species = {
@@ -12,7 +14,7 @@ export type Species = {
   minCm: number
   maxCm: number
   difficulty: number
-  minRod: 1 | 2 | 3 | 4
+  minRod: RodTier
   behavior: Behavior
   area: AreaId
   /** 없으면 그 지역의 모든 자리 */
@@ -23,10 +25,13 @@ export type Species = {
   hours?: readonly [number, number]
   /** 없으면 날씨 무관 */
   weather?: Weather
-  /** 전설 어종. power는 이 어종이 나오는 데 필요한 최소 던지기 힘 (rollCatch가 확인한다) */
-  legend?: { power: number }
+  /**
+   * 전설·신화 어종(세이브당 한 마리). power는 이 어종이 나오는 데 필요한 최소 던지기 힘 (rollCatch가 확인한다).
+   * needs·buff는 신화만: needs는 먼저 잡아야 할 전설 id(그 자리 전설을 모두 넣는다), buff는 잡으면 얻는 버프.
+   */
+  legend?: { power: number; needs?: readonly string[]; buff?: BuffId }
 }
-/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(어종 minRod는 1~4라 4단계로 모든 어종을 낚는다) */
+/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(지금 어종 minRod는 1~4. 5부 난파선·신화가 5·6을 쓴다) */
 export type RodTier = 1 | 2 | 3 | 4 | 5 | 6
 export type Rod = {
   tier: RodTier
@@ -37,7 +42,9 @@ export type Rod = {
   weights: Record<'common' | 'uncommon' | 'rare', number>
 }
 
-export const AREAS: readonly { id: AreaId; name: string; spots: readonly string[] }[] = [
+/** tideSpots: 썰물에만 열리는 자리(spotOpen). minRod: 들어가고 던지는 데 필요한 낚싯대 단계(areaMinRod, 없으면 1) */
+export type AreaDef = { id: AreaId; name: string; spots: readonly string[]; tideSpots?: readonly string[]; minRod?: RodTier }
+export const AREAS: readonly AreaDef[] = [
   { id: 'village', name: '바닷가 마을', spots: ['pier', 'shore'] },
   { id: 'river', name: '마을 강', spots: ['river'] },
   { id: 'forest', name: '숲', spots: ['pond', 'waterfall'] },
@@ -47,12 +54,37 @@ export const AREAS: readonly { id: AreaId; name: string; spots: readonly string[
 ]
 export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest']
 // 돈으로 여는 지역. 기본 지역(DEFAULT_AREAS)은 여기 없다.
-export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: string }>>> = {
+// minRod: 이 단계 이상 낚싯대가 있어야 살 수 있다(서버 unlockArea가 확인)
+export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: string; minRod?: RodTier }>>> = {
   lake: { price: 5000, name: '무너진 다리 수리' },
   cave: { price: 15000, name: '동굴 장비' },
   island: { price: 50000, name: '배' },
 }
 export const LEGEND_CHANCE = 0.08
+
+// ---------------------------------------------------------------- 물때 자리·지역 최소 낚싯대·신화 (낚시 5부)
+/** 화면·서버 시계 차이를 봐주는 여유: 이만큼(게임 분) 전에 열려 있었으면 던지기를 받는다 */
+export const TIDE_GRACE_MIN = 10
+/** 그 자리가 지금 열려 있는가. tideSpots 자리는 썰물에만. 모르는 지역·자리는 false */
+export function spotOpen(area: AreaId, spot: string, gameMinute: number): boolean {
+  const a = AREAS.find((x) => x.id === area)
+  if (!a || !a.spots.includes(spot)) return false
+  return !a.tideSpots?.includes(spot) || tideAt(gameMinute) === 'low'
+}
+/** 그 지역에 들어가 던지는 데 필요한 낚싯대 단계. 없으면 1 */
+export function areaMinRod(area: AreaId): RodTier {
+  return AREAS.find((x) => x.id === area)?.minRod ?? 1
+}
+/** 신화 판정 확률(r0와 비교). 자격 있는 전설이 없을 때만 후보가 된다 */
+export const MYTHIC_CHANCE = 0.02
+export const BUFFS: readonly { id: BuffId; name: string; desc: string }[] = [
+  { id: 'imugi-scale', name: '이무기의 비늘', desc: '입질이 15% 빨라져요' },
+  { id: 'dragon-breath', name: '백룡의 숨결', desc: '낚시 바가 8% 길어져요' },
+  { id: 'dragon-pearl', name: '용왕의 여의주', desc: '물고기를 8% 비싸게 팔아요' },
+]
+/** imugiBite: 입질 지연 배율, dragonBar: 바 크기 배율, pearlSell: 판매가 정수 백분율(반올림 오차를 피하려고 정수) */
+export const BUFF_FX = { imugiBite: 0.85, dragonBar: 1.08, pearlSell: 108 } as const
+export const isBuffId = (v: unknown): v is BuffId => typeof v === 'string' && BUFFS.some((b) => b.id === v)
 
 // ---------------------------------------------------------------- 도전과제·순간이동기
 /**
@@ -192,10 +224,10 @@ export const TACKLES: readonly Tackle[] = [
   { id: 'trap', name: '함정 찌', price: 1500, desc: '물고기가 바 밖일 때 진행도가 25% 덜 줄어요' },
   { id: 'barbed', name: '가시 바늘', price: 2000, desc: '물고기가 바 안에 있으면 바가 물고기 쪽으로 끌려요' },
   { id: 'spinner', name: '회전 찌', price: 1500, desc: '입질이 30% 빨리 와요' },
-  { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설 물고기가 더 잘 나와요' },
+  { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설·신화 물고기가 더 잘 나와요' },
 ]
 /** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장·백골 2칸, 용왕 3칸 */
 export function tackleSlots(rodTier: number): number {
   return rodTier === 3 ? 1 : rodTier === 4 || rodTier === 5 ? 2 : rodTier === 6 ? 3 : 0
 }
-export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const
+export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5, curiousMythic: 1.5 } as const

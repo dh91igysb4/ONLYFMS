@@ -70,7 +70,7 @@ export function fishValue(area: AreaId, spot: string, rodTier: Gear['rodTier'], 
         const cond: Conditions = { gameMinute, gameDay: 0, season, weather }
         const byRarity: Record<NormalRarity, Species[]> = { common: [], uncommon: [], rare: [] }
         for (const s of SPECIES) {
-          if (s.rarity !== 'legend' && speciesAvailable(s, area, spot, cond, rodTier)) byRarity[s.rarity].push(s)
+          if (!s.legend && s.rarity !== 'legend' && s.rarity !== 'mythic' && speciesAvailable(s, area, spot, cond, rodTier)) byRarity[s.rarity].push(s)
         }
         let v = 0
         for (const r of RARITIES) {

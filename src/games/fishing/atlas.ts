@@ -172,7 +172,7 @@ export type NotNow = 'legend-done' | 'rod' | 'season' | 'hours' | 'weather'
 export type FishRow = { species: Species; found: boolean; now: boolean; legendDone: boolean; reason: NotNow | null }
 export type FishView = Pick<View, 'dex' | 'legends' | 'rodTier'>
 
-const RARITY_ORDER: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, legend: 3 }
+const RARITY_ORDER: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, legend: 3, mythic: 4 }
 
 /** 지금 안 나오는 첫 이유(자리는 보지 않는다): 이미 잡은 전설 → 낚싯대 → 계절 → 시간 → 날씨 */
 function notNow(s: Species, legendDone: boolean, cond: Conditions, rodTier: number): NotNow | null {

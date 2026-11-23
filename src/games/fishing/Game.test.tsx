@@ -2224,7 +2224,7 @@ describe('찌 상점·장비', () => {
     route({ buyTackle: () => ok({ ...view, gold: 200, tackles: ['trap', 'cork'] }) })
     const list = screen.getByRole('list', { name: '찌 목록' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(5)
-    expect(within(list).getByText('희귀·전설 물고기가 더 잘 나와요')).toBeInTheDocument()
+    expect(within(list).getByText('희귀·전설·신화 물고기가 더 잘 나와요')).toBeInTheDocument()
     expect(within(list).getByText('보유 중 · 가방에서 낄 수 있어요')).toBeInTheDocument()
     expect(within(list).getByRole('button', { name: '가시 바늘 사기' })).toBeDisabled()
     expect(screen.queryByText('카본 낚싯대부터 낄 수 있어요')).not.toBeInTheDocument()

@@ -17,7 +17,7 @@ import type { View } from './logic.ts'
 
 export type MapLayers = { paths: boolean; spots: boolean; now: boolean; undiscovered: boolean }
 export const DEFAULT_LAYERS: MapLayers = { paths: true, spots: true, now: false, undiscovered: false }
-export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설' }
+export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설', mythic: '신화' }
 
 const MARK_SCALE = 2
 /** 표시 버튼(28px)·현재 위치(18px)의 반폭 */

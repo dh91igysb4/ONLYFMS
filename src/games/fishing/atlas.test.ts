@@ -139,7 +139,7 @@ describe('spotFish / areaFish', () => {
     expect(row(rows, 'goby')).toMatchObject({ now: true, reason: null, found: false })
     const firstOff = rows.findIndex((r) => !r.now)
     expect(rows.slice(firstOff).every((r) => !r.now)).toBe(true)
-    const rank = { common: 0, uncommon: 1, rare: 2, legend: 3 }
+    const rank = { common: 0, uncommon: 1, rare: 2, legend: 3, mythic: 4 }
     const nowRanks = rows.filter((r) => r.now).map((r) => rank[r.species.rarity])
     expect(nowRanks).toEqual([...nowRanks].sort((a, b) => a - b))
   })

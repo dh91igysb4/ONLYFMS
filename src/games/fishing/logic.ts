@@ -70,7 +70,8 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
       pick -= weight(r)
     }
     const byRarity: Record<NormalRarity, Species[]> = { common: [], uncommon: [], rare: [] }
-    for (const s of available) if (s.rarity !== 'legend') byRarity[s.rarity].push(s)
+    // 전설·신화(legend 필드)는 일반 등급 추첨에 넣지 않는다
+    for (const s of available) if (!s.legend && s.rarity !== 'legend' && s.rarity !== 'mythic') byRarity[s.rarity].push(s)
     const pool = pickPool(byRarity, rarity)
     if (pool.length === 0) throw new Error(`no species for ${c.area}/${c.spot} at rod ${c.rodTier}`)
     species = pool[Math.floor(r2 * pool.length)]
