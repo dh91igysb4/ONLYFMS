@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AIR_SPIN_DAMP,
   AIR_SPIN_KEEP,
   BOOST_V,
   COLLIDE_WINDOW,
+  DRIVE_ACC,
   FALL_DEPTH,
   G,
   GROUND_TOL,
@@ -11,6 +13,7 @@ import {
   PERFECT_MULT,
   PERFECT_TOL,
   REST_LEN,
+  SPIN_MAX,
   START_LEN,
   V_MAX,
   V_TERMINAL,
@@ -203,6 +206,41 @@ describe('neon-rider 시뮬', () => {
     expect(speed(s)).toBeLessThan(before)
   })
 
+  it('정지에서 계속 누르면 ceil(V_MAX / DRIVE_ACC)틱(가속 1.5배로 22틱) 만에 V_MAX', () => {
+    const c = courseFromTemplates([flatT])
+    let s = initSim(c)
+    let reached = -1
+    for (let i = 1; i <= 120 && reached < 0; i++) {
+      s = step(s, true, c)
+      if (speed(s) >= V_MAX) reached = i
+    }
+    const want = Math.ceil(V_MAX / DRIVE_ACC)
+    expect(reached).toBeGreaterThanOrEqual(want)
+    expect(reached).toBeLessThanOrEqual(want + 1)
+  })
+
+  it('공중에서 누르면 약 12틱에 최대 회전(SPIN_MAX), 한 바퀴는 약 56틱(회전 1.2배)', () => {
+    const cc = courseFromTemplates([cliffT])
+    let a = airborne(cc, TPL_X + mm(30000), mm(40000), 0, 0)
+    let total = 0
+    let full = -1
+    let turn = -1
+    for (let i = 1; i <= 100; i++) {
+      const prev = a
+      a = step(a, true, cc)
+      const w = omega(prev, a)
+      total += w
+      if (full < 0 && w >= SPIN_MAX - 2) full = i
+      if (turn < 0 && total >= TURN) turn = i
+    }
+    // 녹화: 정지에서 최대까지 11~12프레임 [M8]. SPIN_ACC·SPIN_MAX를 같은 비율로 올려 그대로다(첫 틱은 airBefore로 회전 없음).
+    expect(full).toBeGreaterThanOrEqual(11)
+    expect(full).toBeLessThanOrEqual(13)
+    // 한 바퀴: 4096 / 82 ≈ 50틱 + 처음 가속 구간. 측정값 기준 1.2배 이전 66틱.
+    expect(turn).toBeGreaterThanOrEqual(55)
+    expect(turn).toBeLessThanOrEqual(57)
+  })
+
   it.skipIf(WHEELIE_ACC <= 0)('앞 들림: 정지 상태에서 누르면 60틱 안에 앞바퀴가 뒷바퀴보다 높아진다', () => {
     const c = courseFromTemplates([flatT])
     let s = initSim(c)
@@ -304,7 +342,7 @@ describe('neon-rider 시뮬', () => {
     for (let i = 0; i < 20; i++) a = step(a, true, cc)
     let prev = a
     a = step(a, true, cc)
-    expect(omega(prev, a)).toBeGreaterThanOrEqual(66) // SPIN_MAX 근처
+    expect(omega(prev, a)).toBeGreaterThanOrEqual(SPIN_MAX - 2)
     const ws: number[] = []
     for (let i = 0; i < 60; i++) {
       prev = a
@@ -330,11 +368,12 @@ describe('neon-rider 시뮬', () => {
   it('공중제비: 낭떠러지에서 1바퀴 돌고 착지 → flipScore 1~2, flips 1, LAND_GRACE 안에 지급', () => {
     const c = courseFromTemplates([cliffT])
     let s = initSimAt(c, TPL_X, V_MAX)
-    // 뗀 뒤에도 (SPIN_MAX - AIR_SPIN_KEEP) × AIR_SPIN_DAMP ≈ 180만큼 더 돌고, 그 뒤 AIR_SPIN_KEEP으로 계속 돈다.
+    // 뗀 뒤에도 (SPIN_MAX - AIR_SPIN_KEEP) × AIR_SPIN_DAMP(= 74 × 3 = 222)만큼 더 돌고, 그 뒤 AIR_SPIN_KEEP으로 계속 돈다.
+    const coast = (SPIN_MAX - AIR_SPIN_KEEP) * AIR_SPIN_DAMP
     let firstTouch = -1
     let releasedAt: number | null = null
     for (let i = 0; i < 600 && !s.dead && !s.lastAward; i++) {
-      const hold = s.airAngle !== null && s.pending === null && s.airAngle < TURN - 200
+      const hold = s.airAngle !== null && s.pending === null && s.airAngle < TURN - coast
       if (!hold && s.airAngle !== null && releasedAt === null) releasedAt = s.airAngle
       const n = step(s, hold, c)
       if (firstTouch < 0 && s.airAngle !== null && s.airAngle > TURN / 2 && (n.rear.ground || n.front.ground)) firstTouch = n.tick
