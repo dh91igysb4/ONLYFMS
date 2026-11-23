@@ -49,7 +49,8 @@ describe('장비 가격', () => {
     for (const s of SPECIES) expect(s.minRod, s.id).toBeLessThanOrEqual(4)
   })
   it('총액(낚싯대·가방·찌·해금, 순간이동 제외)', () => {
-    expect(totalSinks()).toBe(1_186_300)
+    // 기존 1,186,300 + 갯벌 30,000 + 늪지 60,000
+    expect(totalSinks()).toBe(1_276_300)
   })
 })
 
@@ -69,9 +70,12 @@ describe('진행 시뮬레이션 (상한 없음)', () => {
     expect(h).toBeGreaterThan(15.86 * 0.8)
     expect(h).toBeLessThan(15.86 * 1.2)
   })
-  it('고급 장비는 살 때마다 시간당 수입이 오른다', () => {
+  it('고급 장비는 살 때마다 시간당 수입이 오른다(새 지역 해금은 오르거나 같다 — 버는 곳이 아니라 갈 곳이 늘어서)', () => {
     const i = plain.findIndex((m) => m.label === '가시 바늘')
-    for (let k = i + 1; k < plain.length; k++) expect(plain[k].incomeAfter, plain[k].label).toBeGreaterThan(plain[k - 1].incomeAfter)
+    for (let k = i + 1; k < plain.length; k++) {
+      if (plain[k].label.endsWith('해금')) expect(plain[k].incomeAfter, plain[k].label).toBeGreaterThanOrEqual(plain[k - 1].incomeAfter)
+      else expect(plain[k].incomeAfter, plain[k].label).toBeGreaterThan(plain[k - 1].incomeAfter)
+    }
   })
 })
 

@@ -71,11 +71,15 @@ describe('fishing data', () => {
     expect(byId('anchovy').behavior).toBe('dart')
   })
   it('areas and defaults', () => {
-    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island'])
+    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
   })
-  it('UNLOCKS: lake·cave·island, 가격 5000/15000/50000', () => {
-    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island'])
+  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000', () => {
+    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp'])
+    expect(UNLOCKS.tideflat).toEqual({ price: 30000, name: '갯벌 장화' })
+    expect(UNLOCKS.swamp).toEqual({ price: 60000, name: '늪 나무 데크' })
+    expect(AREAS.find((a) => a.id === 'tideflat')).toEqual({ id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] })
+    expect(AREAS.find((a) => a.id === 'swamp')).toEqual({ id: 'swamp', name: '늪지', spots: ['marsh', 'bog'] })
     expect(UNLOCKS.lake).toEqual({ price: 5000, name: '무너진 다리 수리' })
     expect(UNLOCKS.cave).toEqual({ price: 15000, name: '동굴 장비' })
     expect(UNLOCKS.island).toEqual({ price: 50000, name: '배' })
@@ -218,7 +222,8 @@ describe('찌', () => {
 
 describe('도전과제', () => {
   it('6개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
-    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    // 갯벌·늪지 과제는 M2 Task 5에서 더한다
+    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id).filter((id) => id !== 'tideflat' && id !== 'swamp'))
     expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
     expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big'])
     for (const c of CHALLENGES) {
@@ -252,8 +257,13 @@ describe('도전과제', () => {
 })
 
 describe('물때 자리·지역 최소 낚싯대', () => {
-  it('spotOpen: tideSpots 없는 자리는 늘 열림, 모르는 지역·자리는 false', () => {
-    for (const a of AREAS) for (const spot of a.spots) for (let m = 0; m < 1440; m += 30) expect(spotOpen(a.id, spot, m), `${a.id}/${spot}`).toBe(true)
+  it('spotOpen: tideSpots 없는 자리는 늘 열림, 갯골은 썰물(2~6시·14~18시)에만, 모르는 지역·자리는 false', () => {
+    for (const a of AREAS) for (const spot of a.spots) {
+      if (a.tideSpots?.includes(spot)) continue
+      for (let m = 0; m < 1440; m += 30) expect(spotOpen(a.id, spot, m), `${a.id}/${spot}`).toBe(true)
+    }
+    const open = Array.from({ length: 24 }, (_, h) => h).filter((h) => spotOpen('tideflat', 'creek', h * 60 + 30))
+    expect(open).toEqual([2, 3, 4, 5, 14, 15, 16, 17])
     expect(spotOpen('village', 'nowhere', 0)).toBe(false)
     expect(spotOpen('atlantis' as never, 'pier', 0)).toBe(false)
   })

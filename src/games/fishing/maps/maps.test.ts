@@ -14,12 +14,16 @@ import {
   type Exit,
   type Facing,
   type MapDef,
+  type MapDynamic,
+  nearestDryTile,
+  reachableTiles,
   type Opened,
   type TileFacing,
   type Vec,
 } from '../map.ts'
 import { feetBlocked } from '../walk.ts'
 import { MAPS, mapFor } from './index.ts'
+import { teleportFee } from '../teleport.ts'
 
 type Tile = { tx: number; ty: number }
 
@@ -71,7 +75,9 @@ function onBorder(map: MapDef, t: Tile): boolean {
 const BASE_OPEN: Opened = new Set<AreaId>(DEFAULT_AREAS)
 
 // 4방향 BFS. 시작 타일에서 각 걷기 타일까지의 걸음 수. opened를 주지 않으면 모든 지역이 열린 것으로 본다.
-function bfs(map: MapDef, from: Tile, opened: Opened = ALL_AREAS_OPEN): Map<string, number> {
+const LOW: MapDynamic = { tide: 'low', holes: new Set() }
+
+function bfs(map: MapDef, from: Tile, opened: Opened = ALL_AREAS_OPEN, dyn?: MapDynamic): Map<string, number> {
   const dist = new Map<string, number>([[key(from), 0]])
   const queue = [from]
   for (let i = 0; i < queue.length; i++) {
@@ -79,7 +85,7 @@ function bfs(map: MapDef, from: Tile, opened: Opened = ALL_AREAS_OPEN): Map<stri
     const d = dist.get(`${tx},${ty}`)!
     for (const { dx, dy } of Object.values(DIRS)) {
       const n = { tx: tx + dx, ty: ty + dy }
-      if (!isWalkable(map, n.tx, n.ty, opened) || dist.has(key(n))) continue
+      if (!isWalkable(map, n.tx, n.ty, opened, dyn) || dist.has(key(n))) continue
       dist.set(key(n), d + 1)
       queue.push(n)
     }
@@ -103,8 +109,8 @@ function baseStarts(map: MapDef): Tile[] {
 }
 
 describe('맵 등록부', () => {
-  it('여섯 지역 모두 맵이 있고 mapFor가 같은 값을 준다', () => {
-    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'island', 'lake', 'river', 'village'])
+  it('모든 지역에 맵이 있고 mapFor가 같은 값을 준다', () => {
+    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'island', 'lake', 'river', 'swamp', 'tideflat', 'village'])
     for (const { id } of AREAS) {
       expect(mapFor(id)).toBe(MAPS[id])
       expect(mapFor(id)!.id).toBe(id)
@@ -189,10 +195,12 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
       const dist = bfs(map, start)
       for (const e of map.exits) for (const t of exitTiles(map, e)) expect(dist.has(key(t)), `출구 칸 (${t.tx},${t.ty})`).toBe(true)
       for (const d of map.docks) expect(dist.has(key(d.front)), `선착장 front (${d.front.tx},${d.front.ty})`).toBe(true)
+      // 물때 맵의 자리는 썰물에 걸어 닿으면 된다(갯골은 썰물에만 열린다)
+      const spotDist = map.tidal ? bfs(map, start, ALL_AREAS_OPEN, LOW) : dist
       for (const spot of spots) {
         const reach = allTiles(map).some(
           (t) =>
-            dist.has(key(t)) &&
+            spotDist.has(key(t)) &&
             FACINGS.some((f) => spotFor(map, tileAt(map, t.tx, t.ty), tileAt(map, t.tx + DIRS[f].dx, t.ty + DIRS[f].dy)) === spot),
         )
         expect(reach, `${map.id} 자리 ${spot}`).toBe(true)
@@ -235,8 +243,8 @@ describe('마을', () => {
     expect(bfs(village, shopSpot(village)!).get(key(end))).toBe(37)
   })
 
-  it('북쪽 출구는 강으로 간다', () => {
-    expect(village.exits.map((e) => [exitSide(e), e.target])).toEqual([['n', 'river']])
+  it('북쪽 출구는 강, 서쪽 끝 출구는 갯벌로 간다', () => {
+    expect(village.exits.map((e) => [exitSide(e), e.target])).toEqual([['n', 'river'], ['w', 'tideflat']])
   })
 
   it('선착장 하나(→ 섬): 잠긴 상태에서 걸어서 front에 닿고 그 자리·방향이 dock, front는 부두 끝이 아니다', () => {
@@ -273,7 +281,7 @@ describe('강·숲 출구', () => {
 
   it('숲: 동쪽 → 강, 안쪽(동굴 입구) → 동굴, 연못·폭포·웅덩이·절벽이 있다', () => {
     const forest = MAPS.forest!
-    expect(forest.exits.map((e) => [exitSide(e), e.target])).toEqual([['e', 'river'], ['at', 'cave']])
+    expect(forest.exits.map((e) => [exitSide(e), e.target])).toEqual([['e', 'river'], ['at', 'cave'], ['w', 'swamp']])
     const cave = forest.exits.find((e) => e.target === 'cave')!
     for (const t of exitTiles(forest, cave)) expect(tileAt(forest, t.tx, t.ty)).toBe('cave-mouth')
     const kinds = new Set(allTiles(forest).map((t) => tileAt(forest, t.tx, t.ty)))
@@ -286,15 +294,22 @@ describe('잠긴 문', () => {
   const CASES = [
     ['river', 'lake', 'broken-bridge'],
     ['forest', 'cave', 'rubble'],
+    ['village', 'tideflat', 'driftwood'],
+    ['forest', 'swamp', 'vines'],
   ] as const
 
   it.each(CASES)('%s: %s 문(%s)이 하나 있다', (id, area, look) => {
     const map = MAPS[id]!
-    expect(map.gates.map((g) => [g.area, g.look])).toEqual([[area, look]])
+    expect(map.gates.filter((g) => g.area === area).map((g) => g.look)).toEqual([look])
+  })
+
+  it('문이 있는 맵은 강(산 호수)·숲(동굴·늪지)·마을(갯벌)뿐', () => {
+    const gated = ALL.filter((m) => m.gates.length > 0).map((m) => [m.id, m.gates.map((g) => g.area)])
+    expect(gated).toEqual([['village', ['tideflat']], ['river', ['lake']], ['forest', ['cave', 'swamp']]])
   })
 
   it('강의 무너진 다리 칸은 rows에서 다리(H)다(열리면 그대로 건넌다)', () => {
-    const { tiles } = MAPS.river!.gates[0]
+    const { tiles } = MAPS.river!.gates.find((g) => g.area === 'lake')!
     for (let ty = tiles.ty; ty < tiles.ty + tiles.h; ty++) for (let tx = tiles.tx; tx < tiles.tx + tiles.w; tx++) {
       expect(tileAt(MAPS.river!, tx, ty), `(${tx},${ty})`).toBe('bridge')
     }
@@ -317,7 +332,7 @@ describe('잠긴 문', () => {
 
   it.each(CASES)('문 front: 잠긴 %s에서 걸어서 닿고, 그 자리·방향의 interactionAt이 gate(%s), 열면 gate가 아니다', (id, area) => {
     const map = MAPS[id]!
-    const { front } = map.gates[0]
+    const { front } = map.gates.find((g) => g.area === area)!
     for (const start of baseStarts(map)) expect(bfs(map, start, BASE_OPEN).has(key(front))).toBe(true)
     const pos = center(front.tx, front.ty)
     expect(interactionAt(map, pos, front.facing, BASE_OPEN)).toEqual({ kind: 'gate', area })
@@ -439,5 +454,117 @@ describe('순간이동기', () => {
     expect(MAPS.village!.world).toEqual({ tx: 0, ty: 0 })
     const island = MAPS.island!.world
     expect(Math.hypot(island.tx, island.ty)).toBeGreaterThan(500)
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M2: 갯벌·늪지
+describe('갯벌·늪지 맵', () => {
+  const flat = MAPS.tideflat!
+  const swamp = MAPS.swamp!
+  const HIGH: MapDynamic = { tide: 'high', holes: new Set() }
+  const kindsOf = (map: MapDef) => new Set(allTiles(map).map((t) => tileAt(map, t.tx, t.ty)))
+  const fromVillage = MAPS.village!.exits.find((e) => e.target === 'tideflat')!.entry
+  const fromForest = MAPS.forest!.exits.find((e) => e.target === 'swamp')!.entry
+
+  it('마을 서쪽 끝 문: (1,19)~(1,21) 통나무 더미, 앞 (2,20) 왼쪽', () => {
+    const g = MAPS.village!.gates.find((x) => x.area === 'tideflat')!
+    expect(g).toEqual({ area: 'tideflat', tiles: { tx: 1, ty: 19, w: 1, h: 3 }, look: 'driftwood', front: { tx: 2, ty: 20, facing: 'left' } })
+  })
+
+  it('숲 서쪽 문: 덩굴, 기존 동쪽·동굴 출구와 동굴 문은 그대로', () => {
+    const forest = MAPS.forest!
+    expect(forest.gates.find((g) => g.area === 'swamp')!.look).toBe('vines')
+    expect(forest.gates.find((g) => g.area === 'cave')).toEqual({ area: 'cave', tiles: { tx: 35, ty: 5, w: 1, h: 1 }, look: 'rubble', front: { tx: 35, ty: 6, facing: 'up' } })
+    expect(forest.exits[0]).toEqual({ edge: 'e', from: 18, to: 19, target: 'river', entry: { tx: 2, ty: 6, facing: 'right' } })
+  })
+
+  it('갯벌: 물때 맵, 동쪽 → 마을, 진흙·갯골·갈대·강·바다가 있고 자리는 estuary·creek', () => {
+    expect([flat.tidal, flat.fog, flat.indoor]).toEqual([true, false, false])
+    expect(flat.exits.map((e) => [exitSide(e), e.target])).toEqual([['e', 'village']])
+    expect(flat.spots).toEqual({ river: 'estuary', water: 'estuary', mud: 'estuary', creek: 'creek' })
+    for (const k of ['mud', 'creek', 'reed', 'river', 'water', 'sand'] as const) expect(kindsOf(flat).has(k), k).toBe(true)
+  })
+
+  it('갯벌: 갯골 칸에 상하좌우로 붙은 늘 걷는 칸이 없다', () => {
+    for (const t of allTiles(flat)) {
+      if (tileAt(flat, t.tx, t.ty) !== 'creek') continue
+      for (const { dx, dy } of Object.values(DIRS)) expect(isWalkable(flat, t.tx + dx, t.ty + dy, ALL_AREAS_OPEN, HIGH), `(${t.tx},${t.ty})+(${dx},${dy})`).toBe(false)
+    }
+  })
+
+  it('갯벌: 밀물이면 도착점에서 닿는 어느 칸·방향에서도 갯골 낚시가 없고, 썰물이면 닿는다', () => {
+    const high = reachableTiles(flat, [fromVillage], ALL_AREAS_OPEN, HIGH)
+    const low = reachableTiles(flat, [fromVillage], ALL_AREAS_OPEN, LOW)
+    const creekAt = (keys: ReadonlySet<string>, dyn: MapDynamic) =>
+      [...keys].some((k) => {
+        const [tx, ty] = k.split(',').map(Number)
+        return FACINGS.some((f) => {
+          const it = interactionAt(flat, center(tx, ty), f, ALL_AREAS_OPEN, dyn)
+          return it?.kind === 'fish' && it.spot === 'creek'
+        })
+      })
+    expect(creekAt(high, HIGH)).toBe(false)
+    expect(creekAt(low, LOW)).toBe(true)
+    // 밀물에도 하구 낚시는 된다
+    expect([...high].some((k) => {
+      const [tx, ty] = k.split(',').map(Number)
+      return FACINGS.some((f) => interactionAt(flat, center(tx, ty), f, ALL_AREAS_OPEN, HIGH)?.kind === 'fish')
+    })).toBe(true)
+  })
+
+  it('갯벌: 모든 진흙 칸에서 nearestDryTile이 있고 그 칸은 도착점에서 밀물에도 걸어 닿는다', () => {
+    const high = reachableTiles(flat, [fromVillage], ALL_AREAS_OPEN, HIGH)
+    for (const t of allTiles(flat)) {
+      if (tileAt(flat, t.tx, t.ty) !== 'mud') continue
+      const dry = nearestDryTile(flat, t, ALL_AREAS_OPEN)
+      expect(dry, `(${t.tx},${t.ty})`).not.toBeNull()
+      expect(high.has(key(dry!)), `(${t.tx},${t.ty}) → (${dry!.tx},${dry!.ty})`).toBe(true)
+    }
+  })
+
+  it('늪지: 안개 맵, 동쪽 → 숲, 늪·수렁·데크·고사목·갈대가 있고 자리는 marsh·bog', () => {
+    expect([swamp.fog, swamp.tidal, swamp.indoor, swamp.snowy]).toEqual([true, false, false, false])
+    expect(swamp.exits.map((e) => [exitSide(e), e.target])).toEqual([['e', 'forest']])
+    expect(swamp.spots).toEqual({ marsh: 'marsh', bog: 'bog' })
+    for (const k of ['marsh', 'bog', 'boardwalk', 'deadtree', 'reed', 'grass'] as const) expect(kindsOf(swamp).has(k), k).toBe(true)
+  })
+
+  it('늪지: 수렁 옆 걷는 칸은 모두 나무 데크다(데크 끝에서만 보인다), 수렁 웅덩이는 둘', () => {
+    const bogTiles = allTiles(swamp).filter((t) => tileAt(swamp, t.tx, t.ty) === 'bog')
+    for (const t of bogTiles) {
+      for (const { dx, dy } of Object.values(DIRS)) {
+        const n = { tx: t.tx + dx, ty: t.ty + dy }
+        if (isWalkable(swamp, n.tx, n.ty, ALL_AREAS_OPEN)) expect(tileAt(swamp, n.tx, n.ty), `(${n.tx},${n.ty})`).toBe('boardwalk')
+      }
+    }
+    // 4방향으로 이어진 수렁 덩어리 수
+    const seen = new Set<string>()
+    let pools = 0
+    for (const t of bogTiles) {
+      if (seen.has(key(t))) continue
+      pools++
+      const q = [t]
+      seen.add(key(t))
+      while (q.length) {
+        const c = q.pop()!
+        for (const { dx, dy } of Object.values(DIRS)) {
+          const n = { tx: c.tx + dx, ty: c.ty + dy }
+          if (tileAt(swamp, n.tx, n.ty) === 'bog' && !seen.has(key(n))) {
+            seen.add(key(n))
+            q.push(n)
+          }
+        }
+      }
+    }
+    expect(pools).toBe(2)
+    expect(bfs(swamp, fromForest).size).toBeGreaterThan(100)
+  })
+
+  it('세계 원점: 갯벌 (−48, 4), 늪지 (−96, −34); 요금 마을↔갯벌·숲↔늪지 36 안팎(±3)', () => {
+    expect(flat.world).toEqual({ tx: -48, ty: 4 })
+    expect(swamp.world).toEqual({ tx: -96, ty: -34 })
+    expect(Math.abs(teleportFee('village', 'tideflat') - 36)).toBeLessThanOrEqual(3)
+    expect(Math.abs(teleportFee('forest', 'swamp') - 36)).toBeLessThanOrEqual(3)
+    expect(teleportFee('tideflat', 'village')).toBe(teleportFee('village', 'tideflat'))
   })
 })

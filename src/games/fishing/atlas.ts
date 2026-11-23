@@ -77,11 +77,15 @@ export function fixedCells(map: MapDef): Cell[] {
   return out
 }
 
-/** 지도가 설 자리를 셀 때의 맵 상태: 썰물(진흙으로 걸어 들어가는 갯골도 자리), 구멍 없음(얼음은 drill로 센다) */
+/**
+ * 지도가 설 자리를 셀 때의 맵 상태. 물때 맵에서 밀물에도 설 자리가 있는 자리(하구 등)는 밀물 기준(늘 걷는 칸 —
+ * 진흙 위 칸이 대표점이 되지 않게), 썰물에만 닿는 자리(갯골)는 썰물 기준. 구멍은 없다(얼음은 drill로 센다)
+ */
 const ATLAS_DYN: MapDynamic = { tide: 'low', holes: new Set<string>() }
+const ATLAS_STATIC: MapDynamic = { tide: 'high', holes: new Set<string>() }
 
-/** 걸어서 닿는 칸(모두 열린 기준, 썰물): 시작 위치·출구 칸·선착장·이동기 앞에서 */
-function walkableReach(map: MapDef): ReadonlySet<string> {
+/** 걸어서 닿는 칸(모두 열린 기준): 시작 위치·출구 칸·선착장·이동기 앞에서 */
+function walkableReach(map: MapDef, dyn: MapDynamic): ReadonlySet<string> {
   const starts: Cell[] = [{ tx: Math.floor(map.spawn.pos.x / TILE), ty: Math.floor(map.spawn.pos.y / TILE) }]
   for (const e of map.exits) {
     if ('at' in e) starts.push({ tx: e.at.tx, ty: e.at.ty })
@@ -89,7 +93,7 @@ function walkableReach(map: MapDef): ReadonlySet<string> {
   }
   for (const d of map.docks) starts.push(d.front)
   if (map.teleporter) starts.push(map.teleporter.front)
-  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN, ATLAS_DYN)
+  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN, dyn)
 }
 
 type StandInfo = { stands: Map<string, Cell[]>; waters: Map<string, Cell[]> }
@@ -97,12 +101,32 @@ const standCache = new WeakMap<MapDef, StandInfo>()
 
 /**
  * 자리별 설 자리(걸어서 닿고, 네 방향 중 하나에서 그 자리 낚시)와 그 칸에서 보는 물 칸.
- * 썰물 기준이고, 뚫을 수 있는 얼음을 보는 칸은 얼음 구멍 자리(map.spots.hole)의 설 자리로 친다.
+ * 물때 자리는 썰물, 나머지는 밀물 기준(ATLAS_DYN 주석). 뚫을 수 있는 얼음을 보는 칸은 얼음 구멍 자리(map.spots.hole)의 설 자리로 친다.
  */
 function standInfo(map: MapDef): StandInfo {
   const hit = standCache.get(map)
   if (hit) return hit
-  const reach = walkableReach(map)
+  const info = map.tidal ? mergeInfo(scanStands(map, ATLAS_STATIC), scanStands(map, ATLAS_DYN)) : scanStands(map, ATLAS_DYN)
+  standCache.set(map, info)
+  return info
+}
+
+/** 물때 맵: 밀물에 설 자리가 있는 자리는 밀물 계산에서, 썰물에만 있는 자리는 썰물 계산에서 가져온다 */
+function mergeInfo(high: StandInfo, low: StandInfo): StandInfo {
+  const pick = (spot: string) => (high.stands.has(spot) ? high : low)
+  const spots = new Set([...high.stands.keys(), ...low.stands.keys()])
+  const stands = new Map<string, Cell[]>()
+  const waters = new Map<string, Cell[]>()
+  for (const s of spots) {
+    const src = pick(s)
+    if (src.stands.has(s)) stands.set(s, src.stands.get(s)!)
+    if (src.waters.has(s)) waters.set(s, src.waters.get(s)!)
+  }
+  return { stands, waters }
+}
+
+function scanStands(map: MapDef, dyn: MapDynamic): StandInfo {
+  const reach = walkableReach(map, dyn)
   const stands = new Map<string, Cell[]>()
   const waters = new Map<string, Cell[]>()
   const seenWater = new Map<string, Set<string>>()
@@ -111,7 +135,7 @@ function standInfo(map: MapDef): StandInfo {
       if (!reach.has(`${tx},${ty}`)) continue
       const spots = new Set<string>()
       for (const f of FACINGS) {
-        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN, ATLAS_DYN)
+        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN, dyn)
         const spot = it?.kind === 'fish' ? it.spot : it?.kind === 'drill' ? map.spots.hole : undefined
         if (spot === undefined) continue
         spots.add(spot)
@@ -126,9 +150,7 @@ function standInfo(map: MapDef): StandInfo {
       for (const s of spots) stands.set(s, [...(stands.get(s) ?? []), { tx, ty }])
     }
   }
-  const info = { stands, waters }
-  standCache.set(map, info)
-  return info
+  return { stands, waters }
 }
 
 export type SpotAnchor = { spot: string; tx: number; ty: number }

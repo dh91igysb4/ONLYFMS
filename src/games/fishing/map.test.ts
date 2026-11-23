@@ -112,14 +112,14 @@ describe('map grid', () => {
     }
   })
 
-  it('border tiles are not walkable except the north exit', () => {
+  it('border tiles are not walkable except the north exit and the west (tideflat) exit', () => {
     for (let tx = 0; tx < MAP_W; tx++) {
       const isExit = exitAt(VILLAGE, center(tx, 0)) !== null
       expect(isWalkable(VILLAGE, tx, 0, ALL_AREAS_OPEN), `(${tx},0)`).toBe(isExit)
       expect(isWalkable(VILLAGE, tx, MAP_H - 1, ALL_AREAS_OPEN), `(${tx},${MAP_H - 1})`).toBe(false)
     }
     for (let ty = 0; ty < MAP_H; ty++) {
-      expect(isWalkable(VILLAGE, 0, ty, ALL_AREAS_OPEN), `(0,${ty})`).toBe(false)
+      expect(isWalkable(VILLAGE, 0, ty, ALL_AREAS_OPEN), `(0,${ty})`).toBe(exitAt(VILLAGE, center(0, ty))?.target === 'tideflat')
       expect(isWalkable(VILLAGE, MAP_W - 1, ty, ALL_AREAS_OPEN), `(${MAP_W - 1},${ty})`).toBe(false)
     }
   })

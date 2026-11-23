@@ -30,7 +30,7 @@ export const SIM = {
   recastSec: 3,
 } as const
 /** 가방이 찼을 때 상점(마을)까지 다녀오는 시간(초). 마을 물가 30초는 REF 계산과 같다. 먼 곳은 걷거나 배·순간이동 */
-export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75 }
+export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75, tideflat: 45, swamp: 90 }
 
 const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
 type NormalRarity = keyof Rod['weights']
@@ -194,6 +194,9 @@ export const BUY_ORDER: readonly Purchase[] = [
   { kind: 'tackle', id: 'cork' },
   { kind: 'tackle', id: 'trap' },
   { kind: 'tackle', id: 'barbed' },
+  // 낚시 5부: 새 지역 해금은 기존 품목 뒤(기존 품목 구매 시각 불변)
+  { kind: 'unlock', area: 'tideflat' },
+  { kind: 'unlock', area: 'swamp' },
   { kind: 'rod', tier: 5 },
   { kind: 'bag', tier: 4 },
   { kind: 'rod', tier: 6 },

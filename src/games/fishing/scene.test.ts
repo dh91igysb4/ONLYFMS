@@ -1253,3 +1253,18 @@ describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
     expect(ctx.sprites.filter((c) => c.name === 'gate-vines')).toHaveLength(2)
   })
 })
+
+describe('낚시 5부 M2: 늪 속 갈대·고사목', () => {
+  test('늪물에 둘러싸인 갈대·고사목 칸은 늪물 위에, 풀밭이면 풀 위에 그린다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const size = { w: 195, h: 280 }
+    const m = defineMap('forest', ['zzz,,,', 'zRz,X,', 'zzz,,,', ',,,,,,', ',,,,,,'], { spots: { marsh: 'marsh' } })
+    const p = player(tileCentre(3, 3))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    const at = (tx: number, ty: number) => ctx.sprites.filter((c) => c.x === tx * 16 - cam.x && c.y === ty * 16 - cam.y).map((c) => c.name)
+    expect(at(1, 1)).toContainEqual(expect.stringMatching(/^marsh-[01]$/))
+    expect(at(4, 1).some((n) => n.startsWith('tile-grass'))).toBe(true)
+  })
+})

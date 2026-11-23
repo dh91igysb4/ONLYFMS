@@ -178,3 +178,28 @@ describe('startPosition (첫 서버 상태를 받은 뒤 시작 자리)', () => 
     expect(startPosition(null, opened()).pos).toEqual(VILLAGE.spawn.pos)
   })
 })
+
+describe('position: 갯벌·늪지 (낚시 5부 M2)', () => {
+  test('저장 위치가 갯벌인데 아직 안 열었으면 마을 시작 위치', () => {
+    savePosition('u1', { area: 'tideflat', pos: center(45, 16), facing: 'left' })
+    const saved = loadPosition('u1')
+    expect(saved).toEqual({ area: 'tideflat', pos: center(45, 16), facing: 'left' })
+    expect(startPosition(saved, new Set<AreaId>(DEFAULT_AREAS))).toEqual({ area: 'village', pos: SPAWN.pos, facing: SPAWN.facing })
+    expect(startPosition(saved, new Set<AreaId>([...DEFAULT_AREAS, 'tideflat']))).toEqual(saved)
+  })
+
+  test('진흙 위 저장 위치는 가장 가까운 늘 걷는 칸(nearestDryTile)으로 복원한다', () => {
+    // (39,14)는 진흙, 오른쪽 (41,14)가 모래사장
+    savePosition('u1', { area: 'tideflat', pos: center(39, 14), facing: 'down' })
+    const saved = loadPosition('u1')
+    expect(saved).toEqual({ area: 'tideflat', pos: center(41, 14), facing: 'down' })
+    expect(startPosition(saved, new Set<AreaId>([...DEFAULT_AREAS, 'tideflat']))).toEqual(saved)
+  })
+
+  test('늪지 데크 위 위치는 그대로, 늪물 위는 null', () => {
+    savePosition('u1', { area: 'swamp', pos: center(20, 11), facing: 'up' })
+    expect(loadPosition('u1')).toEqual({ area: 'swamp', pos: center(20, 11), facing: 'up' })
+    savePosition('u1', { area: 'swamp', pos: center(20, 5), facing: 'up' })
+    expect(loadPosition('u1')).toBeNull()
+  })
+})

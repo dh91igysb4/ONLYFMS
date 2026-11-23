@@ -230,7 +230,7 @@ const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
 
 function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
   const kind = tileAt(map, tx, ty)
-  if (kind === null || kind === 'rock' || kind === 'cliff' || kind === 'cave-wall') return null
+  if (kind === null || kind === 'rock' || kind === 'reed' || kind === 'deadtree' || kind === 'cliff' || kind === 'cave-wall') return null
   // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품). 얼음은 가장자리를 주고받지 않는다
   if (kind === 'mud') return tide === 'high' ? 'water' : 'sand'
   if (kind === 'ice') return 'cave'
@@ -240,7 +240,10 @@ function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): G
   return 'grass'
 }
 
-/** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
+/** 이웃 땅 위에 놓이는 타일: 바위, 갈대·고사목(늪 속 갈대는 늪물 위에) */
+const ON_NEIGHBOUR_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['rock', 'reed', 'deadtree'])
+
+/** 바위(갈대·고사목도)는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
 function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
   const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
@@ -257,7 +260,7 @@ function computeGround(map: MapDef, tide: Tide): (Ground | null)[] {
   const ground: (Ground | null)[] = []
   for (let ty = 0; ty < map.h; ty++) {
     for (let tx = 0; tx < map.w; tx++) {
-      ground.push(tileAt(map, tx, ty) === 'rock' ? rockGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
+      ground.push(ON_NEIGHBOUR_GROUND.has(tileAt(map, tx, ty)!) ? rockGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
     }
   }
   return ground
@@ -390,7 +393,7 @@ const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = {
 /** 물 칸 그림 이름 앞부분. 바위는 이웃(상하좌우) 물 칸 그림 중 가장 많은 것(같으면 위·아래·왼쪽·오른쪽 순서로 먼저 센 것) */
 function waterSpriteAt(map: MapDef, tx: number, ty: number): string {
   const kind = tileAt(map, tx, ty)
-  if (kind !== 'rock') return (kind && WATER_SPRITE[kind]) ?? 'water'
+  if (kind === null || !ON_NEIGHBOUR_GROUND.has(kind)) return (kind && WATER_SPRITE[kind]) ?? 'water'
   const count = new Map<string, number>()
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const k = tileAt(map, tx + dx, ty + dy)
