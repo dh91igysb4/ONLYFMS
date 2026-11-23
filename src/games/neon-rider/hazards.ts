@@ -16,7 +16,7 @@ export type HazardDef = { shape: HazardShape; motion: Motion; look: HazardLook }
 export type Hazard = HazardDef & { id: number } // 월드 좌표
 export type Probe = {
   circles: readonly { x: number; y: number; r: number }[] // 바퀴 둘 + 차체 판정원
-  capsule: { x0: number; y0: number; x1: number; y1: number; r: number } // 차대(두 바퀴 중심, BODY_R)
+  capsule: { x0: number; y0: number; x1: number; y1: number; r: number } // 차대(두 바퀴 중심 선분을 윗방향으로 BODY_DY 올린 선분, BODY_R)
 }
 type Blades = Extract<HazardShape, { s: 'blades' }>
 type Capsule = Probe['capsule']
@@ -149,7 +149,7 @@ function circleSectorNear(px: number, py: number, c: number, sh: Blades, a: numb
 
 /**
  * 캡슐–부채꼴 고리: 선분을 간격 r 이하로 나눈 점들의 반지름 r 원으로 근사한다(설계 §5.3).
- * 원 사이 오목한 곳 때문에 판정이 안쪽으로 최대 r·(1 − √3/2) ≈ 0.134·r 줄어든다(BODY_R 110 mm → 15 mm).
+ * 원 사이 오목한 곳 때문에 판정이 안쪽으로 최대 r·(1 − √3/2) ≈ 0.134·r 줄어든다(BODY_R 190 mm → 25 mm).
  */
 function capsuleSectorNear(cap: Capsule, sh: Blades, angles: readonly number[]): boolean {
   const r = cap.r

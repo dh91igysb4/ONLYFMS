@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CAR_LEN, HEAD_OFFSET, HEAD_R, MM, REST_LEN, START_LEN, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { BODY_DY, BODY_R, CAR_LEN, HEAD_OFFSET, HEAD_R, MM, REST_LEN, START_LEN, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { chassisOf } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { MoverDef } from './movers.ts'
 import type { HazardDef } from './hazards.ts'
@@ -21,17 +22,31 @@ function moved(s: SimState, dx: number, dy = 0): SimState {
 }
 
 describe('차 그림', () => {
-  it('차체 다각형의 모든 꼭짓점이 판정원(두 바퀴·지붕)에서 40 mm 안에 있다(그림과 판정이 어긋나지 않게)', () => {
-    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, HEAD_OFFSET).
+  it('차체 다각형의 가장자리(꼭짓점 사이 표본 포함) 모든 점이 판정 도형(두 바퀴·지붕 원·올린 차대 캡슐)에서 40 mm 안에 있다', () => {
+    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, HEAD_OFFSET), 차대 캡슐 = 선분 (0, BODY_DY)–(WHEELBASE, BODY_DY), 반지름 BODY_R.
     const circles = [
       { x: 0, y: 0, r: WHEEL_R / MM },
       { x: WHEELBASE / MM, y: 0, r: WHEEL_R / MM },
       { x: WHEELBASE / MM / 2, y: HEAD_OFFSET / MM, r: HEAD_R / MM },
     ]
-    for (const [a, b] of BODY) {
-      const out = Math.min(...circles.map((c) => Math.hypot(a - c.x, b - c.y) - c.r))
-      expect(out, `(${a}, ${b})`).toBeLessThanOrEqual(40)
+    const outside = (a: number, b: number): number => {
+      const cx = Math.min(Math.max(a, 0), WHEELBASE / MM)
+      const cap = Math.hypot(a - cx, b - BODY_DY / MM) - BODY_R / MM
+      return Math.min(cap, ...circles.map((c) => Math.hypot(a - c.x, b - c.y) - c.r))
     }
+    for (let i = 0; i < BODY.length; i++) {
+      const [x0, y0] = BODY[i]
+      const [x1, y1] = BODY[(i + 1) % BODY.length]
+      for (let k = 0; k <= 50; k++) {
+        const a = x0 + ((x1 - x0) * k) / 50
+        const b = y0 + ((y1 - y0) * k) / 50
+        expect(outside(a, b), `변 ${i} (${a.toFixed(0)}, ${b.toFixed(0)})`).toBeLessThanOrEqual(40)
+      }
+    }
+  })
+
+  it('판정 캡슐의 아래 끝은 축선 아래 바퀴 바닥보다 위다(바퀴 사이 길 아래로 처지지 않는다)', () => {
+    expect(BODY_R - BODY_DY).toBeLessThan(WHEEL_R)
   })
 })
 
@@ -374,7 +389,12 @@ describe('위험물·움직이는 길·블록 그리기', () => {
       { ...px(cur.front.x, cur.front.y), r: WHEEL_R * view.scale },
       { ...px(mid.x, mid.y + HEAD_OFFSET), r: HEAD_R * view.scale },
     ]
-    expect(circles.some((q) => Math.hypot(q.x - ox, q.y - oy) < q.r + rad)).toBe(true)
+    const cap = chassisOf(cur.rear, cur.front)
+    const A = px(cap.x0, cap.y0)
+    const B = px(cap.x1, cap.y1)
+    const t = Math.min(1, Math.max(0, ((ox - A.x) * (B.x - A.x) + (oy - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2)))
+    const capHit = Math.hypot(A.x + (B.x - A.x) * t - ox, A.y + (B.y - A.y) * t - oy) < BODY_R * view.scale + rad
+    expect(capHit || circles.some((q) => Math.hypot(q.x - ox, q.y - oy) < q.r + rad)).toBe(true)
     // 그린 톱니의 크기는 판정 반지름과 같은 축척이다(가장 바깥 꼭짓점 = r).
     expect(rad / (mm(300) * view.scale)).toBeGreaterThan(0.99)
     expect(rad / (mm(300) * view.scale)).toBeLessThan(1.01)

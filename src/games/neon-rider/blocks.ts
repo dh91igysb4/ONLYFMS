@@ -3,7 +3,7 @@
 // 보정은 위치 기반(PBD)이다: 이동 단계에서 꼭짓점이 예측 위치에서 옮겨진 양 × SUBSTEPS를 그 꼭짓점 속도(u/틱)에 더한다.
 // 그래서 밀린 만큼 속도를 얻고, 땅에 막힌 만큼 속도를 잃는다.
 import { BLOCK_CORNER_R, BLOCK_FRICTION_PCT, BLOCK_MASS, BLOCK_WAKE, BODY_R, G, GROUND_TOL, HEAD_R, SUBSTEPS, V_TERMINAL, WHEEL_R } from './constants.ts'
-import { candOf, candVel, collideWheel, divRound, divTrunc, type Body, type Box, type Cand } from './collide.ts'
+import { candOf, candVel, chassisOf, collideWheel, divRound, divTrunc, type Body, type Box, type Cand } from './collide.ts'
 import type { Course } from './course.ts'
 import type { Seg } from './pieces.ts'
 import { TRIG_ONE, cosT, isqrt, sinT } from './trig.ts'
@@ -383,15 +383,16 @@ export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: num
     const hd = headAt(r, f)
     const h = circleQuad(hd.x, hd.y, HEAD_R, bw)
     if (h) hitCar(h, [{ b: r, w: D / 2 }, { b: f, w: D / 2 }])
-    // 차대 캡슐(두 바퀴 중심 선분, BODY_R) 안에 들어온 꼭짓점.
+    // 차대 캡슐(두 바퀴 중심 선분을 윗방향으로 BODY_DY 올린 선분, BODY_R) 안에 들어온 꼭짓점.
+    const cap = chassisOf(r, f)
     for (let i = 0; i < 4; i++) {
       const ax = f.x - r.x
       const ay = f.y - r.y
       const len = Math.max(1, isqrt(ax * ax + ay * ay))
       const v = q[i]
-      const along = Math.min(len, Math.max(0, divRound(ax * (v.x - r.x) + ay * (v.y - r.y), len)))
-      const px = r.x + divRound(ax * along, len)
-      const py = r.y + divRound(ay * along, len)
+      const along = Math.min(len, Math.max(0, divRound(ax * (v.x - cap.x0) + ay * (v.y - cap.y0), len)))
+      const px = cap.x0 + divRound(ax * along, len)
+      const py = cap.y0 + divRound(ay * along, len)
       const d2 = (px - v.x) * (px - v.x) + (py - v.y) * (py - v.y)
       if (d2 >= BODY_R * BODY_R) continue
       const dist = isqrt(d2)

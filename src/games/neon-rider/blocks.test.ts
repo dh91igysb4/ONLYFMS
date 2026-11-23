@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLOCK_MASS, BODY_R, MM, SUBSTEPS, WHEEL_R } from './constants.ts'
+import { BLOCK_MASS, BODY_DY, BODY_R, MM, SUBSTEPS, WHEEL_R } from './constants.ts'
 import { blockBox, blockCands, blockSegs, blockWork, isBlockCand, pushCar, wakeBlock } from './blocks.ts'
 import type { Block } from './blocks.ts'
 import type { Body } from './collide.ts'
@@ -117,7 +117,7 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
     const bw = blockWork(wakeBlock(D), D, [])
     const k = [0, 1, 2, 3].reduce((m, i) => (bw.c[i].y > bw.c[m].y ? i : m), 0)
     const { x: vx, y: vy } = { ...bw.c[k] }
-    const y = vy + BODY_R - 300 // 꼭짓점이 두 바퀴 한가운데 축선 아래 BODY_R − 300에 있다
+    const y = vy + BODY_R - BODY_DY - 300 // 꼭짓점이 (윗방향으로 BODY_DY 올린) 캡슐 선분 아래 BODY_R − 300에 있다
     const r = body(vx - mm(700), y)
     const f = body(vx + mm(700), y)
     pushCar(r, f, noHead, [bw])

@@ -32,7 +32,8 @@ export const FALL_DEPTH = 6000 * MM // 측정 대상 아님
 export const LAND_GRACE = 12 // 측정 대상 아님
 export const PERFECT_TOL = 170 // ≈ 15°. 측정 대상 아님
 export const GEM_R = 250 * MM // 보석 줍기 반지름. 바퀴·차체 판정원과 GEM_R + 그 반지름 안이면 줍는다
-export const BODY_R = 110 * MM // 차대 캡슐 반지름(두 바퀴 중심 선분). 차 그림 차체 높이에 맞춰 Task 7에서 확인
+export const BODY_R = 190 * MM // 차대 캡슐 반지름. 캡슐은 두 바퀴 중심 선분을 차의 윗방향으로 BODY_DY 올린 선분이다. 아래 끝은 축선 아래 40 mm(바퀴 바닥 180 mm보다 위), 위 끝은 축선 위 340 mm로 차 그림(render.ts BODY)의 등·보닛 가장자리를 덮는다(render.test)
+export const BODY_DY = 150 * MM // 차대 캡슐을 차의 윗방향으로 올리는 양
 export const MOVER_MEMORY = 64 // 상태에 남기는 끝난 움직이는 길 id 수 상한. 넘치면 가장 오래된 것부터 버린다
 export const BLOCK_MASS = 1 // 블록 꼭짓점 하나의 질량(바퀴 하나 대비 정수 배). 블록 = 바퀴 4개 = 차 둘. 마찰(BLOCK_FRICTION_PCT 30%: 0.3 × 4G = 90)이 차 구동력(2 × DRIVE_ACC = 270)보다 작아 차가 블록을 밀고 갈 수 있다
 export const BLOCK_CORNER_R = 60 * MM // 블록 꼭짓점 판정 반지름(지형과는 이 반지름으로 둥글린 모서리로 닿는다)

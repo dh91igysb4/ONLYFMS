@@ -1,6 +1,6 @@
 // 원-선분 충돌. 순수 정수 TS (설계 §5.2, §5.5).
 // 선분은 양면의 얇은 장애물로 다룬다: 원 중심이 이동 전에 있던 쪽으로 법선을 따라 밀어낸다.
-import { SUBSTEPS } from './constants.ts'
+import { BODY_DY, SUBSTEPS } from './constants.ts'
 import type { Course } from './course.ts'
 import type { Seg } from './pieces.ts'
 import { isqrt } from './trig.ts'
@@ -13,6 +13,16 @@ export type Cand = { i: number; seg: Seg; sx: number; sy: number; len: number; l
 /** 움직이는 원(바퀴). 속도는 u/틱. */
 export type Body = { x: number; y: number; vx: number; vy: number }
 export type Box = { x0: number; y0: number; x1: number; y1: number }
+
+/** 차대 캡슐의 선분: 두 바퀴 중심 선분을 차의 윗방향(뒷바퀴→앞바퀴 방향을 왼쪽으로 90° 돌린 쪽)으로 BODY_DY 올린 것. */
+export function chassisOf(r: { x: number; y: number }, f: { x: number; y: number }): Box {
+  const dx = f.x - r.x
+  const dy = f.y - r.y
+  const len = Math.max(1, isqrt(dx * dx + dy * dy))
+  const lx = divRound(-dy * BODY_DY, len)
+  const ly = divRound(dx * BODY_DY, len)
+  return { x0: r.x + lx, y0: r.y + ly, x1: f.x + lx, y1: f.y + ly }
+}
 
 /** 0으로 가는 반올림이 아닌 반올림(가장 가까운 정수, 0.5는 올림). b > 0. */
 export function divRound(a: number, b: number): number {

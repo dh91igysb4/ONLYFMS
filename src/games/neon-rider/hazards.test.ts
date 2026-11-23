@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BODY_R, HEAD_OFFSET, HEAD_R, MM, SUBSTEPS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { BODY_DY, BODY_R, HEAD_OFFSET, HEAD_R, MM, SUBSTEPS, WHEELBASE, WHEEL_R } from './constants.ts'
 import { bladeAngles, hazardBox, hazardHit, shapeAt, type Hazard, type HazardShape, type Probe } from './hazards.ts'
 import { subtick, type Motion } from './motion.ts'
 import { TRIG_ONE, TURN, cosT, sinT } from './trig.ts'
@@ -254,12 +254,22 @@ describe('차대 캡슐 (설계 §5.1)', () => {
     { x: WHEELBASE, y: 0, r: WHEEL_R },
     { x: WHEELBASE / 2, y: HEAD_OFFSET, r: HEAD_R },
   ]
-  const car: Probe = { circles, capsule: { x0: 0, y0: 0, x1: WHEELBASE, y1: 0, r: BODY_R } }
+  const car: Probe = { circles, capsule: { x0: 0, y0: BODY_DY, x1: WHEELBASE, y1: BODY_DY, r: BODY_R } } // 차대 캡슐은 윗방향으로 BODY_DY 올라 있다
   const circlesOnly: Probe = { circles, capsule: FAR }
   it('두 바퀴 사이로 지나가는 가는 세로 막대: 원은 안 겹치고 캡슐이 겹친다', () => {
     const spear = hz({ s: 'bar', x0: WHEELBASE / 2, y0: -500 * MM, x1: WHEELBASE / 2, y1: 5 * MM, r: MM })
     expect(hitAt(spear, circlesOnly)).toBe(false)
     expect(hitAt(spear, car)).toBe(true)
+  })
+  it('차 그림의 등(뒤 데크)·보닛 높이도 캡슐이 잡는다', () => {
+    for (const [x, y] of [[356, 284], [1090, 245]]) {
+      const dot = hz({ s: 'disc', x: x * MM, y: y * MM, r: MM })
+      expect(hitAt(dot, circlesOnly), `(${x}, ${y})`).toBe(false)
+      expect(hitAt(dot, car), `(${x}, ${y})`).toBe(true)
+    }
+  })
+  it('캡슐 아래 끝은 바퀴 바닥(−WHEEL_R)보다 위다', () => {
+    expect(BODY_DY - BODY_R).toBeGreaterThan(-WHEEL_R)
   })
   it('바퀴 사이 가로 레이저도 캡슐로 잡는다', () => {
     const laser = hz({ s: 'bar', x0: WHEELBASE / 2 - 100 * MM, y0: 0, x1: WHEELBASE / 2 + 100 * MM, y1: 0, r: MM })

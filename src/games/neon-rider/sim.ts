@@ -17,6 +17,7 @@ import {
   GROUND_TOL,
   GEM_R,
   HEAD_OFFSET,
+  BODY_DY,
   BODY_R,
   HEAD_R,
   LAND_GRACE,
@@ -35,7 +36,7 @@ import {
   WHEELIE_ACC,
   WHEEL_R,
 } from './constants.ts'
-import { candVel, collideWheel, depthIn, divRound, divTrunc, far, hitsCircle, nearestCand, windowCands } from './collide.ts'
+import { candVel, chassisOf, collideWheel, depthIn, divRound, divTrunc, far, hitsCircle, nearestCand, windowCands } from './collide.ts'
 import type { Body, Box, Cand } from './collide.ts'
 import {
   blockBox,
@@ -473,7 +474,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     for (let it = 0; it < CONSTRAINT_ITERS; it++) {
       rod(r, f)
       if (bws.length > 0) {
-        pushCar(r, f, headOf, blocksNearCar(bws, [r, f, headOf(r, f)], WHEEL_R)) // 판정원·캡슐 반지름 ≤ WHEEL_R
+        pushCar(r, f, headOf, blocksNearCar(bws, [r, f, headOf(r, f)], BODY_DY + BODY_R)) // 캡슐은 바퀴 중심에서 BODY_DY + BODY_R 안(판정원·바퀴는 그보다 가깝다)
         solveBlocks(bws)
         bc = blockWorkCands(blocksNearCar(bws, [r, f], WHEEL_R + GROUND_TOL + V_TERMINAL)) // 이번 반복에 바퀴가 더 움직여도 닿을 수 있는 것
       }
@@ -499,7 +500,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
           { x: f.x, y: f.y, r: WHEEL_R },
           { x: h.x, y: h.y, r: HEAD_R },
         ],
-        capsule: { x0: r.x, y0: r.y, x1: f.x, y1: f.y, r: BODY_R },
+        capsule: { ...chassisOf(r, f), r: BODY_R },
       }
       for (const z of hazards) {
         if (hazardHit(z, T, probe)) {
