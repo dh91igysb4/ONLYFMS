@@ -3330,6 +3330,93 @@ const TACKLE_CURIOUS = sprite(
   ],
 )
 
+// ── 큰 지도 표시(9×9): 축소 그림 위에서 눈에 띄게 어두운 외곽선 1px. 전부 자체 디자인 ──
+const MAP_INK = '#2a2135'
+// 현재 위치: 위에서 본 비니(청록)와 산호색 방울, 흰 테두리
+const MAP_YOU = sprite({ k: MAP_INK, w: '#fbf7ee', h: '#2f6b7c', p: '#f27d5e', P: '#ffb199' }, [
+  '..kkkkk..',
+  '.kwwwwwk.',
+  'kwwhhhwwk',
+  'kwhhphhwk',
+  'kwhpPphwk',
+  'kwhhphhwk',
+  'kwwhhhwwk',
+  '.kwwwwwk.',
+  '..kkkkk..',
+])
+// 낚시 자리: 빨강·흰 찌
+const MAP_SPOT = sprite({ k: MAP_INK, r: '#e2483b', R: '#ff9a8a', w: '#fbf7ee', s: '#c9d1d8' }, [
+  '...kkk...',
+  '..krrrk..',
+  '.krrRrrk.',
+  '.krrrrrk.',
+  '.kkkkkkk.',
+  '.kwwwwsk.',
+  '.kwwwwsk.',
+  '..kwwsk..',
+  '...kkk...',
+])
+// 출구: 화살 모양 나무 표지판
+const MAP_EXIT = sprite({ k: MAP_INK, u: '#e9c58e', U: '#a2703f', b: '#7a4e30' }, [
+  '.kkkkkk..',
+  'kuuuuuuk.',
+  'kuUUUUuuk',
+  'kuuuuuuk.',
+  '.kkkkkk..',
+  '...kbk...',
+  '...kbk...',
+  '...kbk...',
+  '..kkkkk..',
+])
+// 잠긴 문: 금빛 자물쇠
+const MAP_GATE = sprite({ k: MAP_INK, y: '#f4c542', Y: '#c8962a', s: '#c9d1d8' }, [
+  '...kkk...',
+  '..ksssk..',
+  '.ks...sk.',
+  'kkkkkkkkk',
+  'kyyyyyyyk',
+  'kyyykyyyk',
+  'kyyykyyyk',
+  'kYYYYYYYk',
+  'kkkkkkkkk',
+])
+// 선착장: 흰 돛 단 작은 배
+const MAP_DOCK = sprite({ k: MAP_INK, w: '#fbf7ee', W: '#d9dfe6', b: '#b97d4c', B: '#7c4b2b' }, [
+  '....k....',
+  '...kwk...',
+  '..kwwWk..',
+  '.kwwwwWk.',
+  '....k....',
+  'kkkkkkkkk',
+  'kbbbbbbbk',
+  '.kBBBBBk.',
+  '..kkkkk..',
+])
+// 상점: 붉은 지붕 집
+const MAP_SHOP = sprite({ k: MAP_INK, r: '#d9654b', R: '#ef8f6c', w: '#e9f2f5', d: '#6b4430' }, [
+  '....k....',
+  '...kRk...',
+  '..kRrrk..',
+  '.kRrrrrk.',
+  'kkkkkkkkk',
+  '.kwwwwwk.',
+  '.kwwdwwk.',
+  '.kwwdwwk.',
+  '.kkkkkkk.',
+])
+// 순간이동기: 흰·붉은 줄무늬 등대 신호기(게임 속 구조물을 줄인 모양), 금빛 등롱
+const MAP_TELEPORTER = sprite({ k: MAP_INK, y: '#ffd23f', r: '#d9483b', w: '#fbf7ee', g: '#9eabb3' }, [
+  '...kyk...',
+  '..krrrk..',
+  '..kyyyk..',
+  '..kkkkk..',
+  '..kwwwk..',
+  '..krrrk..',
+  '..kwwwk..',
+  '.kgggggk.',
+  '.kkkkkkk.',
+])
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
@@ -3474,6 +3561,13 @@ export const SPRITES: Record<string, Sprite> = {
   'tile-fence-v': TILE_FENCE_V,
   'tile-tree': TILE_TREE,
   shop: SHOP,
+  'map-you': MAP_YOU,
+  'map-spot': MAP_SPOT,
+  'map-exit': MAP_EXIT,
+  'map-gate': MAP_GATE,
+  'map-dock': MAP_DOCK,
+  'map-shop': MAP_SHOP,
+  'map-teleporter': MAP_TELEPORTER,
 }
 
 const SILHOUETTE = '#1b1f2a'
