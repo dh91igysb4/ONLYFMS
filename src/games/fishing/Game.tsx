@@ -52,6 +52,17 @@ export function fitScene(availW: number, availH: number): SceneFit {
   }
 }
 
+/**
+ * 터치 안내 줄(.fish-hint-top)이 캔버스 위쪽에 차지하는 띠(CSS px): 위 여백 8 + 한 줄 높이 32(줄 20 + 위아래 6) + 틈 4.
+ * 안내 줄은 한 줄로 고정한다(white-space: nowrap).
+ */
+export const TOUCH_HINT_BAND = 44
+
+/** HUD 시계를 둘 맨 위 y(논리 px). 터치는 낚시 내내 위쪽에 뜨는 안내 줄 아래, 데스크톱은 0. */
+export function hudTopFor(touch: boolean, scale: number): number {
+  return touch ? Math.ceil(TOUCH_HINT_BAND / Math.max(1, scale)) : 0
+}
+
 /** 캔버스에 쓸 수 있는 높이: 창 높이 - 문서 맨 위에서 무대까지 - 무대 아래 요소 - 여유. 음수일 수 있다. */
 export function availableHeight(innerH: number, stageTop: number, belowH: number): number {
   return innerH - stageTop - belowH - FIT_MARGIN
@@ -497,6 +508,7 @@ export function Game({ gameId }: WorldGameProps) {
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
       cond: conditionsAt(Date.now() + rt.offset),
+      hudTop: hudTopFor(touch, fit.scale),
     }, size)
   }
 

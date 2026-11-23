@@ -20,6 +20,9 @@ const PLAYER_POSES = [
 ]
 const TILES = ['tile-grass', 'tile-grass-alt', 'tile-path', 'tile-sand', 'tile-flower', 'tile-rock', 'tile-fence', 'tile-fence-v']
 
+const DIGITS = [...'0123456789'].map((d) => `digit-${d}`)
+const SEASON_ICONS = ['season-spring', 'season-summer', 'season-autumn', 'season-winter']
+
 const REQUIRED = [
   'player-idle',
   'player-cast',
@@ -35,6 +38,9 @@ const REQUIRED = [
   ...TILES,
   'tile-tree',
   'shop',
+  ...DIGITS,
+  'digit-colon',
+  ...SEASON_ICONS,
 ]
 
 describe('SPRITES', () => {
@@ -71,6 +77,28 @@ describe('SPRITES', () => {
       expect(SPRITES[name].w, name).toBeLessThanOrEqual(10)
       expect(SPRITES[name].h, name).toBeLessThanOrEqual(10)
     }
+  })
+
+  it('HUD 시계 글자: 숫자는 4×6이고 모두 다르며, 콜론은 1×6', () => {
+    for (const d of DIGITS) expect([SPRITES[d].w, SPRITES[d].h], d).toEqual([4, 6])
+    expect(new Set(DIGITS.map((d) => SPRITES[d].rows.join('\n'))).size).toBe(10)
+    expect([SPRITES['digit-colon'].w, SPRITES['digit-colon'].h]).toEqual([1, 6])
+  })
+
+  it('계절 아이콘 4종은 7×7이고 서로 다르다', () => {
+    for (const name of SEASON_ICONS) expect([SPRITES[name].w, SPRITES[name].h], name).toEqual([7, 7])
+    expect(new Set(SEASON_ICONS.map((n) => SPRITES[n].rows.join('\n'))).size).toBe(4)
+  })
+
+  it('붕장어 몸통은 머리에서 꼬리까지 이어지고, 문어 두 눈은 좌우 대칭', () => {
+    // 머리부터 꼬리까지 모든 열에 외곽선(k)이 아닌 몸통 칸이 있다(외곽선만 있는 잘록한 목이 없다)
+    const rows = SPRITES['fish-conger'].rows
+    const painted = (x: number) => rows.some((r) => r[x] !== '.')
+    const body = (x: number) => rows.some((r) => r[x] !== '.' && r[x] !== 'k')
+    const cols = Array.from({ length: 16 }, (_, x) => x).filter(painted)
+    for (let x = cols[0] + 1; x < cols[cols.length - 1]; x++) expect(body(x), `col ${x}`).toBe(true)
+    const eyes = SPRITES['fish-octopus'].rows.find((r) => r.includes('e'))!
+    expect(eyes).toBe([...eyes].reverse().join(''))
   })
 
   it('all fish are drawn differently', () => {

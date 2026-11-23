@@ -907,13 +907,13 @@ const FISH_CONGER = sprite(
     '................',
     '................',
     '................',
-    '.kkkkk....kkkk..',
-    'kBWebbkk.kbbbbk.',
-    'kmmbbbbbkbbddbbk',
-    '.kkkkkkkkbbbddk.',
-    '.........kkkkk..',
     '................',
-    '................',
+    '.kkkk...........',
+    'kBWebkkkkkkkk...',
+    'kmbbbBBBBBBBbkk.',
+    'kmmbbbbbbbbbbddk',
+    '.kkbbddddddbbdk.',
+    '...kkkkkkkkkkk..',
     '................',
     '................',
     '................',
@@ -953,7 +953,7 @@ const FISH_OCTOPUS = sprite(
     '..kBBBbbbbbbbk..',
     '.kBBbbbbbbbbbbk.',
     '.kbbbbbbbdbbbbk.',
-    '.kbWebbbbbbWebk.',
+    '.kbWebbbbbbeWbk.',
     '.kbbbbbbbbbbbbk.',
     '..kbbbddbbddbk..',
     '.kbkbbkbbkbbkbk.',
@@ -998,6 +998,66 @@ const ICON_SNOW = sprite({ g: '#8f9cab', G: '#dfe6ee', W: '#ffffff' }, [
   '..W..W..',
   '.W..W...',
   '..W..W..',
+])
+
+// ── HUD 시계 글자(4×6, 콜론 1×6): 캔버스 정수 좌표에 찍어 확대해도 또렷하다 ──
+const DIGIT_INK = { w: '#f4f1ff' }
+const DIGIT_ROWS: Record<string, string[]> = {
+  '0': ['.ww.', 'w..w', 'w..w', 'w..w', 'w..w', '.ww.'],
+  '1': ['.w..', 'ww..', '.w..', '.w..', '.w..', 'www.'],
+  '2': ['.ww.', 'w..w', '...w', '..w.', '.w..', 'wwww'],
+  '3': ['www.', '...w', '.ww.', '...w', '...w', 'www.'],
+  '4': ['..w.', '.ww.', 'w.w.', 'wwww', '..w.', '..w.'],
+  '5': ['wwww', 'w...', 'www.', '...w', '...w', 'www.'],
+  '6': ['.ww.', 'w...', 'www.', 'w..w', 'w..w', '.ww.'],
+  '7': ['wwww', '...w', '..w.', '..w.', '.w..', '.w..'],
+  '8': ['.ww.', 'w..w', '.ww.', 'w..w', 'w..w', '.ww.'],
+  '9': ['.ww.', 'w..w', 'w..w', '.www', '...w', '.ww.'],
+}
+const DIGITS: Record<string, Sprite> = Object.fromEntries(
+  Object.entries(DIGIT_ROWS).map(([d, rows]) => [`digit-${d}`, sprite(DIGIT_INK, rows)]),
+)
+const DIGIT_COLON = sprite(DIGIT_INK, ['.', 'w', '.', '.', 'w', '.'])
+
+// ── 계절 아이콘(7×7, HUD용): 봄 꽃, 여름 수박, 가을 단풍잎, 겨울 눈송이 ──
+const SEASON_SPRING = sprite({ p: '#f59ab8', P: '#ffd3e2', y: '#ffd23f', o: '#f29b38' }, [
+  '.pp.pp.',
+  'pPPpPPp',
+  'pPPyPPp',
+  '.pyoyp.',
+  'pPPyPPp',
+  'pPPpPPp',
+  '.pp.pp.',
+])
+
+const SEASON_SUMMER = sprite({ r: '#f0525a', R: '#ff8a8f', k: '#2a2135', g: '#3f9e4d', G: '#8fd36b' }, [
+  '.......',
+  'RRRRRRR',
+  'rkrrrkr',
+  'GrrkrrG',
+  'gGrrrGg',
+  '.ggGgg.',
+  '..ggg..',
+])
+
+const SEASON_AUTUMN = sprite({ o: '#ef7d2d', O: '#c4501f', y: '#ffb547', b: '#7a4a2a' }, [
+  '...o...',
+  '.o.o.o.',
+  '.oyOyo.',
+  'ooyOyoo',
+  '.ooOoo.',
+  '...b...',
+  '..b....',
+])
+
+const SEASON_WINTER = sprite({ w: '#cfeeff', W: '#ffffff' }, [
+  '...w...',
+  '.w.w.w.',
+  '..wWw..',
+  'wwWWWww',
+  '..wWw..',
+  '.w.w.w.',
+  '...w...',
 ])
 
 // ── 낚싯대 4종: 왼쪽 아래 손잡이 → 오른쪽 위 끝 ──
@@ -1487,6 +1547,12 @@ export const SPRITES: Record<string, Sprite> = {
   'icon-sun': ICON_SUN,
   'icon-rain': ICON_RAIN,
   'icon-snow': ICON_SNOW,
+  ...DIGITS,
+  'digit-colon': DIGIT_COLON,
+  'season-spring': SEASON_SPRING,
+  'season-summer': SEASON_SUMMER,
+  'season-autumn': SEASON_AUTUMN,
+  'season-winter': SEASON_WINTER,
   'rod-1': ROD_1,
   'rod-2': ROD_2,
   'rod-3': ROD_3,

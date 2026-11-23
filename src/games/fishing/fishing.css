@@ -31,7 +31,15 @@
   text-align: center;
   pointer-events: none;
 }
-.fish-hint-top { top: 8px; bottom: auto; }
+/* 터치: 캔버스 위쪽 한 줄. 높이(위 8 + 32)는 Game.tsx TOUCH_HINT_BAND와 맞추고, HUD 시계는 그 아래에 그린다 */
+.fish-hint-top {
+  top: 8px;
+  bottom: auto;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fish-toast {
   position: absolute;
   left: 50%;

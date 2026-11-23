@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
-import { drawWorld, hudSide, releaseSceneCache, type Phase, type WorldScene } from './scene.ts'
+import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
 import { MAP_W, PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
 import { cameraFor, type Player } from './walk.ts'
@@ -26,8 +26,6 @@ class RecordingCtx {
   rects: Rect[] = []
   images: unknown[][] = []
   sprites: SpriteCall[] = []
-  font = ''
-  textBaseline = ''
   texts: { text: string; x: number; y: number }[] = []
   fillText(text: string, x: number, y: number) {
     this.texts.push({ text, x: x + this.tx, y: y + this.ty })
@@ -78,6 +76,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     barParams: phase === 'fighting' ? barParams : null,
     caughtSpecies: phase === 'caught' ? 'mackerel' : null,
     cond: NOON_SUN,
+    hudTop: 0,
     ...extra,
   }
 }
@@ -398,10 +397,38 @@ describe('시계·밤·날씨', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
   })
 
-  test('HUD 텍스트는 계절과 10분 단위로 내린 시각을 그린다', () => {
+  const clockSprites = (c: RecordingCtx) =>
+    c.sprites.filter((sp) => sp.name.startsWith('digit-') || sp.name.startsWith('season-') || sp.name.startsWith('icon-'))
+  const digits = (c: RecordingCtx) => c.sprites.filter((sp) => sp.name.startsWith('digit-')).sort((a, b) => a.x - b.x).map((sp) => sp.name)
+
+  test('HUD 시계는 픽셀 숫자·계절 아이콘·날씨 아이콘 스프라이트로 그리고 fillText는 쓰지 않는다', () => {
     const ctx = draw('idle', idle, SPRING_14_37)
-    expect(ctx.texts.some((t) => t.text.includes('봄') && t.text.includes('14:30'))).toBe(true)
+    expect(digits(ctx)).toEqual(['digit-1', 'digit-4', 'digit-colon', 'digit-3', 'digit-0'])
+    expect(ctx.sprites.some((s) => s.name === 'season-spring')).toBe(true)
     expect(ctx.sprites.some((s) => s.name === 'icon-sun')).toBe(true)
+    expect(ctx.texts).toHaveLength(0)
+    // 정수 좌표에 찍어야 확대해도 번지지 않는다
+    for (const sp of clockSprites(ctx)) {
+      expect(Number.isInteger(sp.x), sp.name).toBe(true)
+      expect(Number.isInteger(sp.y), sp.name).toBe(true)
+    }
+  })
+
+  test('계절 아이콘은 계절마다 다르다', () => {
+    for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
+      const names = draw('idle', idle, { ...SPRING_14_37, season }).sprites.map((s) => s.name).filter((n) => n.startsWith('season-'))
+      expect(names).toEqual([`season-${season}`])
+    }
+  })
+
+  test('시계는 낚시의 모든 단계에서 그려지고, hudTop 아래(안내 줄 밑)에 놓인다', () => {
+    for (const phase of PHASES) {
+      const ctx = draw(phase, player(PIER_SPOT, 'down'), SPRING_14_37, { hudTop: 22 })
+      expect(digits(ctx), phase).toEqual(['digit-1', 'digit-4', 'digit-colon', 'digit-3', 'digit-0'])
+      for (const sp of clockSprites(ctx)) expect(sp.y, `${phase} ${sp.name}`).toBeGreaterThanOrEqual(22)
+    }
+    const top = draw('idle', idle, SPRING_14_37)
+    for (const sp of clockSprites(top)) expect(sp.y).toBeLessThan(22)
   })
 
   test('날씨 아이콘: 비는 icon-rain, 겨울 비는 icon-snow', () => {
@@ -445,5 +472,51 @@ describe('시계·밤·날씨', () => {
       else expect(icon.x).toBeGreaterThan(W / 2)
     }
     expect(seen.size).toBe(2)
+  })
+})
+
+describe('hudLayout', () => {
+  const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  const inside = (a: Box, w: number, h: number) => a.x >= 0 && a.y >= 0 && a.x + a.w <= w && a.y + a.h <= h
+
+  test('시계 판은 낚시 트랙(외곽선 포함)과 겹치지 않고 캔버스 안에 있다 (160×240, 320×480)', () => {
+    for (const [w, h] of [[160, 240], [195, 280], [320, 480]]) {
+      // hudTop: 데스크톱 0, 터치 배율 4·2·1 (안내 줄 44 CSS px)
+      for (const hudTop of [0, 11, 22, 44]) {
+        for (const screenX of [8, w / 2 - 1, w / 2, w - 8]) {
+          const { track, clock } = hudLayout(screenX, w, h, hudTop)
+          const at = `${w}×${h} top ${hudTop} x ${screenX}`
+          expect(overlaps(track, clock), at).toBe(false)
+          expect(inside(track, w, h), at).toBe(true)
+          expect(inside(clock, w, h), at).toBe(true)
+          expect(clock.y, at).toBeGreaterThanOrEqual(hudTop)
+        }
+      }
+    }
+  })
+
+  test('그려진 트랙과 시계가 hudLayout 상자 안에 있다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const [w, h] = [160, 240]
+    for (const pos of [tileCentre(2, 24), tileCentre(MAP_W - 3, 24)]) {
+      const p = player(pos)
+      const s = scene('fighting', p, { w, h }, { hudTop: 44 })
+      const ctx = new RecordingCtx()
+      drawWorld(asCtx(ctx), s, { w, h })
+      const { track, clock } = hudLayout(p.pos.x - s.camera.x, w, h, 44)
+      const fish = ctx.sprites.find((sp) => sp.name === 'track-fish')!
+      expect(fish.x).toBeGreaterThanOrEqual(track.x)
+      expect(fish.x).toBeLessThan(track.x + track.w)
+      for (const sp of ctx.sprites.filter((x) => x.name.startsWith('digit-') || x.name.startsWith('season-'))) {
+        expect(sp.x).toBeGreaterThanOrEqual(clock.x)
+        expect(sp.x).toBeLessThan(clock.x + clock.w)
+        expect(sp.y).toBeGreaterThanOrEqual(clock.y)
+        expect(sp.y).toBeLessThan(clock.y + clock.h)
+      }
+      // 트랙 틀의 외곽선은 상자 왼쪽 끝에서, 진행 게이지의 외곽선은 상자 오른쪽 끝에서 끝난다
+      const frames = ctx.rects.filter((r) => r.y === track.y && r.h === track.h)
+      expect(frames.some((r) => r.x === track.x)).toBe(true)
+      expect(frames.some((r) => r.x + r.w === track.x + track.w)).toBe(true)
+    }
   })
 })

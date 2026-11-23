@@ -82,14 +82,14 @@ describe('rollCatch', () => {
     }
     expect(mean(1)).toBeGreaterThan(mean(0))
   })
-  it('rng를 항상 5번 부른다 (전설 후보 있음/없음, 등급 대체 발생 시)', () => {
+  it('rng를 항상 5번 부른다 (전설 후보 있음/없음/이미 잡음, rod 1 겨울 밤)', () => {
     const winter = { cond: cond('winter', 12), rodTier: 3 as const, spot: 'pier', power: 0.95 }
     const cases: [string, CastCtx][] = [
       ['전설 후보 있음', ctxOf(winter)],
       ['전설 후보 없음', ctxOf({ ...winter, spot: 'shore' })],
       ['이미 잡음', ctxOf({ ...winter, legends: ['grouper'] })],
-      // rod 1 겨울 밤엔 rare가 없다. r1=0.999 → rare → uncommon으로 대체
-      ['등급 대체', ctxOf({ cond: cond('winter', 22) })],
+      // rod 1 겨울 밤: 전설 후보 없이 common·uncommon만 뽑히는 경우(r1=0.999 → uncommon)
+      ['rod 1 겨울 밤', ctxOf({ cond: cond('winter', 22) })],
     ]
     for (const [, c] of cases) {
       for (const r0 of [0.01, 0.5]) {

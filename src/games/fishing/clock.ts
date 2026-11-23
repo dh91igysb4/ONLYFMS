@@ -43,6 +43,11 @@ export function conditionsAt(nowMs: number): Conditions {
   return { gameMinute, gameDay, season, weather: weatherOf(gameDay) }
 }
 
+// 겨울에 오는 비는 눈으로 보인다(HUD 아이콘·내리는 입자). 출현 조건에서는 그대로 'rain'이다.
+export function isSnow(cond: Conditions): boolean {
+  return cond.weather === 'rain' && cond.season === 'winter'
+}
+
 // [시작시, 끝시) 구간 안인가. 끝이 시작보다 작으면 자정을 넘는 구간.
 export function inHours(gameMinute: number, hours: readonly [number, number]): boolean {
   const [from, to] = hours

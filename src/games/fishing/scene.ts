@@ -1,13 +1,13 @@
 // 낚시 마을 장면 그리기(설계 §4.5, §6.1). 타일맵을 카메라로 잘라 그리고, 그 위에 찌·캐릭터·나무 윗부분·HUD를 얹는다.
 // 좌표: 월드 픽셀(맵 왼쪽 위 = 0,0), 화면 = 월드 - camera. 캐릭터 pos는 발 중앙.
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
-// 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage, HUD 시계 글자만 fillText).
+// 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
 import { MAP_H, MAP_W, SHOP, TILE, tileAt, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
-import { formatClock, nightLevel, SEASON_NAMES, type Conditions } from './clock.ts'
+import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
 
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
 /** tMs: 애니메이션 시계(ms). 계속 늘어나기만 하면 된다. gauge는 0~1. camera는 화면 왼쪽 위의 월드 좌표. */
@@ -24,7 +24,12 @@ export type WorldScene = {
   caughtSpecies: string | null
   /** 게임 시계·날씨(HUD 시계, 밤 색조, 비·눈) */
   cond: Conditions
+  /** HUD 시계를 이 y(논리 px) 아래에 둔다. 터치에서 캔버스 위에 겹치는 안내 줄을 피한다. 데스크톱은 0 */
+  hudTop: number
 }
+
+/** 화면 좌표 사각형 */
+export type Box = { x: number; y: number; w: number; h: number }
 
 /** 가장 작은 화면(논리 크기). 화면 쪽 fitScene이 이보다 작게 만들지 않는다. */
 export const SCENE_W = 160
@@ -90,8 +95,7 @@ const C = {
   progMid: '#ffd23f',
   progHigh: '#6fdc7e',
   night: '10, 16, 40',
-  clockPlate: 'rgba(20, 16, 40, 0.55)',
-  clockText: '#f4f1ff',
+  clockPlate: 'rgba(20, 16, 40, 0.65)',
   rain: '#bfe6f7',
   snow: '#ffffff',
 }
@@ -101,10 +105,17 @@ const RAIN_COUNT = 60
 const SNOW_COUNT = 40
 const RAIN_SPEED = 0.3 // px/ms
 const SNOW_SPEED = 0.035
-// 시계 판
-const CLOCK_W = 62
+// 시계 판: [여백][계절 아이콘][틈][날씨 아이콘][틈][HH:MM][여백], 높이 12
+const CLOCK_PAD = 2
+const CLOCK_ICON_GAP = 2
+const CLOCK_TEXT_GAP = 3
+const DIGIT_GAP = 1
 const CLOCK_H = 12
 const CLOCK_MARGIN = 3
+const SEASON_ICON_W = SPRITES['season-spring'].w
+const WEATHER_ICON_W = SPRITES['icon-sun'].w
+const CLOCK_TEXT_W = 4 * SPRITES['digit-0'].w + SPRITES['digit-colon'].w + 4 * DIGIT_GAP
+const CLOCK_W = CLOCK_PAD + SEASON_ICON_W + CLOCK_ICON_GAP + WEATHER_ICON_W + CLOCK_TEXT_GAP + CLOCK_TEXT_W + CLOCK_PAD
 
 function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string): void {
   ctx.fillStyle = color
@@ -440,6 +451,23 @@ export function hudSide(playerScreenX: number, w: number): 'left' | 'right' {
   return playerScreenX < w / 2 ? 'right' : 'left'
 }
 
+/**
+ * HUD 자리(화면 좌표). track은 싸움 트랙 + 진행 게이지의 바깥 상자(외곽선 포함)로 hudSide 쪽 가장자리,
+ * clock은 시계 판으로 트랙 반대쪽 위, hudTop 아래. 둘은 좌우로 갈라 놓아 겹치지 않는다.
+ */
+export function hudLayout(playerScreenX: number, w: number, h: number, hudTop: number): { track: Box; clock: Box } {
+  const side = hudSide(playerScreenX, w)
+  const trackH = Math.min(TRACK_MAX_H, h - 2 * HUD_MARGIN)
+  const tx = side === 'right' ? w - HUD_MARGIN - HUD_W : HUD_MARGIN
+  const ty = Math.round((h - trackH) / 2)
+  const cx = side === 'right' ? CLOCK_MARGIN : w - CLOCK_MARGIN - CLOCK_W
+  const cy = Math.min(h - CLOCK_H, Math.max(0, Math.round(hudTop)) + CLOCK_MARGIN)
+  return {
+    track: { x: tx - 1, y: ty - 1, w: HUD_W + 2, h: trackH + 2 },
+    clock: { x: cx, y: cy, w: CLOCK_W, h: CLOCK_H },
+  }
+}
+
 type Pose = { name: string; flipX: boolean }
 
 function poseFor(phase: Phase, p: Player): Pose {
@@ -476,10 +504,11 @@ function drawGauge(ctx: CanvasRenderingContext2D, gauge: number, cx: number, top
   for (let i = 1; i < 4; i++) rect(ctx, x + Math.round((GAUGE_W * i) / 4), y + 3, 1, 2, C.outline)
 }
 
-function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, tMs: number, side: 'left' | 'right', w: number, h: number): void {
-  const trackH = Math.min(TRACK_MAX_H, h - 2 * HUD_MARGIN)
-  const tx = side === 'right' ? w - HUD_MARGIN - HUD_W : HUD_MARGIN
-  const ty = Math.round((h - trackH) / 2)
+/** box: hudLayout의 track(외곽선 포함 바깥 상자) */
+function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, tMs: number, box: Box): void {
+  const tx = box.x + 1
+  const ty = box.y + 1
+  const trackH = box.h - 2
   const inner = { x: tx + 3, y: ty + 3, w: TRACK_W - 6, h: trackH - 6 }
   const meterX = tx + TRACK_W + METER_GAP
 
@@ -549,7 +578,7 @@ function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, cx: number, t
 /** 비·눈: tMs로만 정해지는 위치라 같은 시각이면 같은 그림. 겨울이면 눈, 아니면 비. */
 function drawPrecipitation(ctx: CanvasRenderingContext2D, cond: Conditions, tMs: number, w: number, h: number): void {
   if (cond.weather !== 'rain') return
-  const snow = cond.season === 'winter'
+  const snow = isSnow(cond)
   const count = snow ? SNOW_COUNT : RAIN_COUNT
   const speed = snow ? SNOW_SPEED : RAIN_SPEED
   ctx.fillStyle = snow ? C.snow : C.rain
@@ -575,17 +604,19 @@ function drawNightTint(ctx: CanvasRenderingContext2D, cond: Conditions, w: numbe
   ctx.fillRect(0, 0, w, h)
 }
 
-/** HUD 시계: 위쪽 가장자리의 작은 판 위에 날씨 아이콘과 `봄 14:30`. side는 판을 둘 쪽. */
-function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, side: 'left' | 'right', w: number): void {
-  const x = side === 'left' ? CLOCK_MARGIN : w - CLOCK_MARGIN - CLOCK_W
-  const y = CLOCK_MARGIN
-  rect(ctx, x, y, CLOCK_W, CLOCK_H, C.clockPlate)
-  const icon = cond.weather === 'sun' ? 'icon-sun' : cond.season === 'winter' ? 'icon-snow' : 'icon-rain'
-  drawSprite(ctx, icon, x + 2, y + 2, 1)
-  ctx.fillStyle = C.clockText
-  ctx.font = '8px sans-serif'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(`${SEASON_NAMES[cond.season]} ${formatClock(cond.gameMinute)}`, x + 12, y + CLOCK_H / 2 + 0.5, CLOCK_W - 14)
+/** HUD 시계: 반투명 판 위에 계절 아이콘, 날씨 아이콘, 픽셀 숫자 `14:30`(10분 단위). box는 hudLayout의 clock. */
+function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, box: Box): void {
+  rect(ctx, box.x, box.y, box.w, box.h, C.clockPlate)
+  let x = box.x + CLOCK_PAD
+  drawSprite(ctx, `season-${cond.season}`, x, box.y + 2, 1)
+  x += SEASON_ICON_W + CLOCK_ICON_GAP
+  drawSprite(ctx, cond.weather === 'sun' ? 'icon-sun' : isSnow(cond) ? 'icon-snow' : 'icon-rain', x, box.y + 2, 1)
+  x += WEATHER_ICON_W + CLOCK_TEXT_GAP
+  for (const ch of formatClock(cond.gameMinute)) {
+    const name = ch === ':' ? 'digit-colon' : `digit-${ch}`
+    drawSprite(ctx, name, x, box.y + 3, 1)
+    x += SPRITES[name].w + DIGIT_GAP
+  }
 }
 
 // ── 한 프레임 ───────────────────────────────────────────────────
@@ -631,11 +662,12 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
 
   // HUD (화면 좌표)
   const screenX = Math.round(s.player.pos.x) - cam.x
+  const hud = hudLayout(screenX, w, h, s.hudTop)
   if (s.phase === 'charging') drawGauge(ctx, s.gauge, screenX, py - cam.y, w, h)
-  if (s.phase === 'fighting' && s.bar && s.barParams) drawTrack(ctx, s.bar, s.barParams, s.tMs, hudSide(screenX, w), w, h)
+  if (s.phase === 'fighting' && s.bar && s.barParams) drawTrack(ctx, s.bar, s.barParams, s.tMs, hud.track)
   drawOutcome(ctx, s, screenX, py - cam.y, w)
-  // 시계는 낚시 트랙의 반대쪽
-  drawClock(ctx, s.cond, hudSide(screenX, w) === 'right' ? 'left' : 'right', w)
+  // 시계는 낚시 트랙의 반대쪽 위, 모든 단계에서
+  drawClock(ctx, s.cond, hud.clock)
 }
 
 /** 월드 좌표로 그리는 움직이는 것들 */

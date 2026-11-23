@@ -29,6 +29,13 @@ describe('fishing data', () => {
       expect(AREAS.map((a) => a.id)).toContain(s.area)
     }
   })
+  it('전설 등급과 legend 설정은 함께 다닌다', () => {
+    for (const s of SPECIES) expect(s.rarity === 'legend', s.id).toBe(Boolean(s.legend))
+  })
+  it('초보 상시 물고기: 전갱이는 mixed, 멸치는 dart', () => {
+    expect(byId('horse-mackerel').behavior).toBe('mixed')
+    expect(byId('anchovy').behavior).toBe('dart')
+  })
   it('areas and defaults', () => {
     expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])

@@ -7,6 +7,7 @@ import {
   formatClock,
   inHours,
   isNight,
+  isSnow,
   nightLevel,
   weatherOf,
 } from './clock.ts'
@@ -50,6 +51,20 @@ describe('clock', () => {
       expect(a.gameDay).toBe(b.gameDay)
       expect(a.weather).toBe(b.weather)
       expect(a.weather).toBe(weatherOf(a.gameDay))
+    }
+  })
+
+  it('날씨 골든 값: 해시가 바뀌면 지난 날짜의 날씨가 달라지므로 고정한다', () => {
+    const golden: [number, string][] = [[-2, 'rain'], [0, 'sun'], [1, 'rain'], [2, 'sun'], [20_005, 'rain'], [20_006, 'sun']]
+    for (const [d, w] of golden) expect(weatherOf(d), String(d)).toBe(w)
+  })
+
+  it('isSnow: 겨울 비만 눈, 겨울 맑음·다른 계절 비는 아니다', () => {
+    const c = { gameMinute: 0, gameDay: 0 }
+    expect(isSnow({ ...c, season: 'winter', weather: 'rain' })).toBe(true)
+    expect(isSnow({ ...c, season: 'winter', weather: 'sun' })).toBe(false)
+    for (const season of ['spring', 'summer', 'autumn'] as const) {
+      expect(isSnow({ ...c, season, weather: 'rain' }), season).toBe(false)
     }
   })
 

@@ -133,7 +133,7 @@ it("formatClock: 0 → '00:00', 14*60+37 → '14:30', 1439 → '23:50'", () => {
 |---|---|---|---|---|---|---|---|---|---|---|
 | anchovy | 멸치 | common | 20 | 8–15 | .15 | 1 | dart | 봄·가을 | – | – |
 | goby | 망둥어 | common | 25 | 8–20 | .2 | 1 | mixed | – | – | – |
-| horse-mackerel | 전갱이 | common | 30 | 15–35 | .2 | 1 | dart | – | – | – |
+| horse-mackerel | 전갱이 | common | 30 | 15–35 | .2 | 1 | mixed | – | – | – |
 | mackerel | 고등어 | common | 50 | 25–45 | .3 | 1 | mixed | 여름·가을·겨울 | 6–19 | – |
 | mullet | 숭어 | uncommon | 80 | 30–70 | .4 | 1 | smooth | 봄·겨울 | 6–19 | – |
 | rockfish | 우럭 | uncommon | 110 | 20–50 | .45 | 1 | sinker | – | – | – |
