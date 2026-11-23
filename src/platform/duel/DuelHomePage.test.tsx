@@ -15,10 +15,19 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
 
+let walletOn = false
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => walletOn }))
+const refreshMock = vi.fn(async () => {})
+vi.mock('../wallet/useWallet.ts', async (orig) => ({
+  ...(await orig<typeof import('../wallet/useWallet.ts')>()),
+  refreshWallet: () => refreshMock(),
+}))
+
 vi.mock('../../games/index.ts', async (orig) =>
   (await import('../../test-fixtures/duel.ts')).withHiddenDuel(await orig<typeof import('../../games/index.ts')>()))
 
 import { DuelHomePage } from './DuelHomePage.tsx'
+import { resetWallet, setWallet } from '../../lib/walletStore.ts'
 
 function Where() {
   const l = useLocation()
@@ -53,6 +62,9 @@ beforeEach(() => {
   duelMock.mockReset()
   rpcMock.mockReset()
   admin = true
+  walletOn = false
+  refreshMock.mockClear()
+  resetWallet()
   rpcMock.mockResolvedValue(empty)
 })
 afterEach(() => { vi.useRealTimers() })
@@ -76,8 +88,10 @@ test('home_create_form', async () => {
   fireEvent.click(screen.getByRole('button', { name: '대국 만들기' }))
   await flush()
   expect(calls('create')).toEqual([[{
-    action: 'create', game_id: 'yacht', options: {}, rated: false, visibility: 'invite', turn_seconds: 90,
+    action: 'create', game_id: 'yacht', options: {}, rated: false, visibility: 'invite', turn_seconds: 90, stake: 0,
   }]])
+  // 지갑 게임이 없으면 판돈 입력이 없다(서버도 0만 받는다)
+  expect(screen.queryByLabelText('판돈')).toBeNull()
   expect(screen.getByTestId('where')).toHaveTextContent('/duel/m9')
 })
 
@@ -172,7 +186,7 @@ test('home_lists: lobby join goes to the match', async () => {
   await flush()
   fireEvent.click(screen.getByRole('button', { name: '참가' }))
   await flush()
-  expect(calls('join')).toEqual([[{ action: 'join', match_id: 'l1' }]])
+  expect(calls('join')).toEqual([[{ action: 'join', match_id: 'l1', stake: 0 }]])
   expect(screen.getByTestId('where')).toHaveTextContent('/duel/l1')
 })
 
@@ -188,4 +202,87 @@ test('home_lists: slow duel_list does not stack overlapping calls', async () => 
   await act(async () => { resolve(empty); await vi.advanceTimersByTimeAsync(0) })
   await flush()
   expect(rpcMock.mock.calls.filter((c) => c[0] === 'duel_list')).toHaveLength(2)
+})
+
+// ---------------------------------------------------------------- 판돈 (지갑 4단계)
+test('home_stake_picker: presets capped by balance, sends stake, refreshes wallet', async () => {
+  walletOn = true
+  setWallet({ balance: 1200, today: {}, earnedToday: 0 })
+  duelMock.mockResolvedValue({ match_id: 'm9', invite_code: 'abcde12345', stake: 500 })
+  renderHome()
+  await flush()
+  expect(screen.getByText(/내 골드 1,200 G/)).toBeInTheDocument()
+  expect(screen.getByText(/이기면 상대 판돈까지 가져가요/)).toBeInTheDocument()
+  const presets = screen.getByRole('group', { name: '판돈 빠른 선택' })
+  expect(within(presets).getAllByRole('button').map((b) => b.textContent)).toEqual(['0 G', '100 G', '500 G', '1,000 G'])
+  fireEvent.click(within(presets).getByRole('button', { name: '500 G' }))
+  expect((screen.getByLabelText('판돈') as HTMLInputElement).value).toBe('500')
+  fireEvent.click(screen.getByRole('button', { name: '대국 만들기' }))
+  await flush()
+  expect((calls('create')[0][0] as { stake: number }).stake).toBe(500)
+  expect(refreshMock).toHaveBeenCalled()
+})
+
+test('home_stake_picker: more than balance is blocked, max 41,000', async () => {
+  walletOn = true
+  setWallet({ balance: 1200, today: {}, earnedToday: 0 })
+  renderHome()
+  await flush()
+  const input = screen.getByLabelText('판돈')
+  fireEvent.change(input, { target: { value: '2000' } })
+  expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '대국 만들기' })).toBeDisabled()
+  fireEvent.change(input, { target: { value: '1.5' } })
+  expect(screen.getByText('판돈을 다시 적어 주세요')).toBeInTheDocument()
+  setWallet({ balance: 100000, today: {}, earnedToday: 0 })
+  await flush()
+  fireEvent.change(input, { target: { value: '50000' } })
+  expect(screen.getByText('판돈은 41,000 G까지예요')).toBeInTheDocument()
+  fireEvent.change(input, { target: { value: '41000' } })
+  expect(screen.getByRole('button', { name: '대국 만들기' })).toBeEnabled()
+})
+
+test('home_stake_picker: hidden game has no stake', async () => {
+  walletOn = true
+  setWallet({ balance: 1200, today: {}, earnedToday: 0 })
+  duelMock.mockResolvedValue({ match_id: 'm9', invite_code: 'abcde12345' })
+  renderHome()
+  await flush()
+  fireEvent.change(screen.getByLabelText('판돈'), { target: { value: '500' } })
+  const game = screen.getByLabelText('게임') as HTMLSelectElement
+  const hiddenId = Array.from(game.options).find((o) => o.textContent === '숨김 대전')!.value
+  fireEvent.change(game, { target: { value: hiddenId } })
+  expect(screen.queryByLabelText('판돈')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '대국 만들기' }))
+  await flush()
+  expect((calls('create')[0][0] as { stake: number }).stake).toBe(0)
+})
+
+test('home_lobby_stake: shown and sent on join', async () => {
+  duelMock.mockResolvedValue({ match_id: 'l1' })
+  rpcMock.mockResolvedValue({
+    ...empty,
+    lobby: [item({ id: 'l1', stake: 1000 })],
+    mine: [item({ id: 'w1', created_by_handle: 'kane', players: [{ id: 'u1', handle: 'kane', rating: 1000 }], stake: 300 })],
+  })
+  renderHome()
+  await flush()
+  const lobby = screen.getByRole('region', { name: '대기실' })
+  expect(within(lobby).getByText(/판돈 1,000 G/)).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: '내 대국' })).getByText(/판돈 300 G/)).toBeInTheDocument()
+  fireEvent.click(within(lobby).getByRole('button', { name: '1,000 G 걸고 참가' }))
+  await flush()
+  expect(calls('join')).toEqual([[{ action: 'join', match_id: 'l1', stake: 1000 }]])
+  expect(refreshMock).toHaveBeenCalled()
+})
+
+test('home_lobby_stake: not enough gold message', async () => {
+  const { ApiError } = await import('../../lib/api.ts')
+  duelMock.mockRejectedValue(new ApiError('not_enough_gold', 409))
+  rpcMock.mockResolvedValue({ ...empty, lobby: [item({ id: 'l1', stake: 1000 })] })
+  renderHome()
+  await flush()
+  fireEvent.click(screen.getByRole('button', { name: '1,000 G 걸고 참가' }))
+  await flush()
+  expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
 })

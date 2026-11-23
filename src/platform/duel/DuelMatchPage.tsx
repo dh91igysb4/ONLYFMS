@@ -7,6 +7,10 @@ import { useAuth } from '../auth/AuthProvider.tsx'
 import { useGameScreen } from '../games/useGameScreen.ts'
 import { InviteLink } from '../contests/InviteLink.tsx'
 import { formatClock, remainingMs, useDuelMatch } from './data.ts'
+import { stakeOf, stakeOutcome } from './stake.ts'
+import { formatGold, signedGold } from '../wallet/format.ts'
+import { refreshWallet } from '../wallet/useWallet.ts'
+import '../wallet/wallet.css'
 
 const RESIGN_CONFIRM_MS = 3000
 
@@ -78,6 +82,15 @@ function WaitingInvite({ matchId, initialCode }: { matchId: string; initialCode?
   return <p className="muted">초대 링크를 불러오는 중…</p>
 }
 
+/** 끝난 대국의 내 판돈 결과 (지갑 설계 §9) */
+function StakeLine({ v }: { v: DuelView }) {
+  const o = stakeOutcome(v)
+  if (!o) return null
+  if (o.kind === 'refund') return <p className="card-status">판돈을 돌려받았어요</p>
+  const n = o.kind === 'won' ? o.amount : -o.amount
+  return <p className={`stake-amount ${o.kind === 'won' ? 'stake-won' : 'stake-lost'}`}>{`${signedGold(n)} G`}</p>
+}
+
 function Result({ v, onRematch, rematchBusy, rematchError }: {
   v: DuelView
   onRematch(): void
@@ -89,6 +102,7 @@ function Result({ v, onRematch, rematchBusy, rematchError }: {
       <section className="card" aria-label="결과">
         <p className="card-title">무효가 된 대국이에요</p>
         <p className="muted">레이팅과 전적에 들어가지 않아요</p>
+        <StakeLine v={v} />
         <Link className="btn btn-ghost btn-link" to="/duel">대전 탭으로</Link>
       </section>
     )
@@ -103,6 +117,7 @@ function Result({ v, onRematch, rematchBusy, rematchError }: {
     <section className="card" aria-label="결과">
       <p className="duel-headline">{headline}</p>
       {reason && <p className="muted">{reason}</p>}
+      <StakeLine v={v} />
       {v.final_scores && (
         <p className="duel-score">{`${v.final_scores[0]} : ${v.final_scores[1]}`}</p>
       )}
@@ -115,7 +130,9 @@ function Result({ v, onRematch, rematchBusy, rematchError }: {
       {rematchError && <p className="form-error" role="alert">{rematchError}</p>}
       <div className="card-actions">
         {v.my_seat !== null && (
-          <button type="button" className="btn btn-primary" disabled={rematchBusy} onClick={onRematch}>재대결</button>
+          <button type="button" className="btn btn-primary" disabled={rematchBusy} onClick={onRematch}>
+            {stakeOf(v) > 0 ? `재대결 (판돈 ${formatGold(stakeOf(v))})` : '재대결'}
+          </button>
         )}
         <Link className="btn btn-ghost btn-link" to="/duel">대전 탭으로</Link>
       </div>
@@ -136,6 +153,15 @@ export function DuelMatchPage() {
 
   useEffect(() => { setRematchError(null) }, [id])
 
+  // 판돈 대국이 끝나면(지급·환불은 서버 트리거가 이미 했다) 헤더 잔액을 다시 읽는다. 대국마다 한 번
+  const refreshed = useRef<string | null>(null)
+  const settled = !!v && (v.status === 'finished' || v.status === 'void') && stakeOf(v) > 0
+  useEffect(() => {
+    if (!settled || !v || refreshed.current === v.match_id) return
+    refreshed.current = v.match_id
+    void refreshWallet()
+  }, [settled, v])
+
   const boardShown = !fatal && !!v && v.status !== 'waiting' && v.status !== 'void'
     && !!getDuelComponent(v.game_id) && v.view !== null && v.view !== undefined
   // 게임 화면이 떠 있을 때만 글자 선택을 막는다(대기 중 초대 링크는 고를 수 있게)
@@ -150,8 +176,9 @@ export function DuelMatchPage() {
       // 같은 설정의 새 초대 대국. 상대는 링크로 들어온다 (자동 수락 없음, 설계 §4.10)
       const r = await duel<DuelCreated>({
         action: 'create', game_id: v.game_id, options: v.options, rated: v.rated,
-        visibility: 'invite', turn_seconds: v.turn_seconds,
+        visibility: 'invite', turn_seconds: v.turn_seconds, stake: stakeOf(v),
       })
+      if (stakeOf(v) > 0) void refreshWallet()
       navigate(`/duel/${r.match_id}`, { state: { inviteCode: r.invite_code } })
     } catch (e) {
       setRematchError(duelErrorMessage(e instanceof ApiError ? e.code : 'network'))
@@ -205,6 +232,7 @@ export function DuelMatchPage() {
         <div className="row">
           <span className="badge">{v.rated ? '랭크' : '친선'}</span>
           <span className="badge">턴 {v.turn_seconds}초</span>
+          {stakeOf(v) > 0 && <span className="badge">판돈 {formatGold(stakeOf(v))}</span>}
         </div>
       </div>
       {!boardShown && head}
@@ -215,6 +243,9 @@ export function DuelMatchPage() {
         <section className="card" aria-label="대기">
           <p className="card-title">상대를 기다리는 중</p>
           <p className="muted">10분 안에 아무도 들어오지 않으면 자동으로 취소돼요</p>
+          {stakeOf(v) > 0 && (
+            <p className="muted">판돈 {formatGold(stakeOf(v))}를 맡겼어요 · 취소되면 돌려받아요</p>
+          )}
           {iCreated && <WaitingInvite matchId={v.match_id} initialCode={navCode} />}
           {iCreated && (
             <button type="button" className="btn btn-ghost" disabled={busy} onClick={cancel}>대국 취소</button>

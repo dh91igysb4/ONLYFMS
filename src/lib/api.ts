@@ -24,6 +24,8 @@ export type DuelView = {
   visibility: 'public' | 'invite'
   status: 'waiting' | 'active' | 'finished' | 'void'
   turn_seconds: number
+  /** 판돈(한 사람이 맡긴 금액, 지갑 설계 §9). 옛 함수면 없음 = 0 */
+  stake?: number
   players: { id: string; handle: string | null; rating: number }[]
   my_seat: 0 | 1 | null
   to_move: 0 | 1 | null
@@ -38,7 +40,7 @@ export type DuelView = {
 }
 
 /** duel({action:'create'})의 응답 */
-export type DuelCreated = { match_id: string; invite_code: string }
+export type DuelCreated = { match_id: string; invite_code: string; stake?: number }
 
 export class ApiError extends Error {
   code: string
@@ -107,6 +109,8 @@ const DUEL_MESSAGES: Record<string, string> = {
   version_changed: '규칙이 바뀌어 이 대국은 무효가 됐어요',
   finished: '이미 끝난 대국이에요',
   not_due: '',
+  stake_mismatch: '판돈이 바뀌었어요. 다시 확인해 주세요',
+  invalid_stake: '판돈을 다시 적어 주세요',
 }
 
 export function duelErrorMessage(code: string): string {
