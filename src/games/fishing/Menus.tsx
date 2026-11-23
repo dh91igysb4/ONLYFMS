@@ -1,5 +1,6 @@
 // 낚시 메뉴(가방·상점·도감). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
-import { BAGS, bagSize, RODS, SPECIES } from './data.ts'
+import { BAGS, bagSize, RODS, SPECIES, type Species } from './data.ts'
+import { SEASON_NAMES } from './clock.ts'
 import { price, type View } from './logic.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -116,6 +117,19 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
   )
 }
 
+/** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
+const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안' }
+
+/** 도감에 보일 출현 조건: 자리(전설만) · 계절 · 시간 · 날씨 */
+export function conditionLabel(s: Species): string {
+  const parts: string[] = []
+  if (s.legend && s.spots) parts.push(s.spots.map((x) => SPOT_NAMES[x] ?? x).join(' · '))
+  parts.push(s.seasons ? s.seasons.map((x) => SEASON_NAMES[x]).join(' · ') : '사계절')
+  if (s.hours) parts.push(`${s.hours[0]}~${s.hours[1]}시`)
+  if (s.weather) parts.push(s.weather === 'rain' ? '비' : '맑음')
+  return parts.join(' · ')
+}
+
 export function DexPanel({ view }: { view: View }) {
   const found = SPECIES.filter((s) => view.dex[s.id]).length
   return (
@@ -134,9 +148,15 @@ export function DexPanel({ view }: { view: View }) {
               />
               {entry ? (
                 <>
-                  <strong>{s.name}</strong>
-                  <span className="muted">
-                    {entry.count}마리 · 최대 {entry.maxCm}cm
+                  <span className="fish-dex-info">
+                    <strong>
+                      {s.name}
+                      {s.legend && <span className="fish-dex-legend">전설</span>}
+                    </strong>
+                    <span className="muted">
+                      {entry.count}마리 · 최대 {entry.maxCm}cm
+                    </span>
+                    <span className="muted">{conditionLabel(s)}</span>
                   </span>
                 </>
               ) : (

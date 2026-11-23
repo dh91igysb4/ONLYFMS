@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
+import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
 import { castTarget, interactionAt, SHOP_SPOT, SPAWN, tileOf, type Interaction, type Vec } from './map.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
@@ -15,7 +16,7 @@ import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
-const AREA = AREAS[0].id
+const AREA = 'village'
 const OUTCOME_MS = 1200
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
@@ -49,6 +50,17 @@ export function fitScene(availW: number, availH: number): SceneFit {
     w: clamp(Math.floor(aw / scale), SCENE_W, MAX_SCENE_W),
     h: clamp(Math.floor(ah / scale), SCENE_H, MAX_SCENE_H),
   }
+}
+
+/**
+ * 터치 안내 줄(.fish-hint-top)이 캔버스 위쪽에 차지하는 띠(CSS px): 위 여백 8 + 한 줄 높이 32(줄 20 + 위아래 6) + 틈 4.
+ * 안내 줄은 한 줄로 고정한다(white-space: nowrap).
+ */
+export const TOUCH_HINT_BAND = 44
+
+/** HUD 시계를 둘 맨 위 y(논리 px). 터치는 낚시 내내 위쪽에 뜨는 안내 줄 아래, 데스크톱은 0. */
+export function hudTopFor(touch: boolean, scale: number): number {
+  return touch ? Math.ceil(TOUCH_HINT_BAND / Math.max(1, scale)) : 0
 }
 
 /** 캔버스에 쓸 수 있는 높이: 창 높이 - 문서 맨 위에서 무대까지 - 무대 아래 요소 - 여유. 음수일 수 있다. */
@@ -495,6 +507,8 @@ export function Game({ gameId }: WorldGameProps) {
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
+      cond: conditionsAt(Date.now() + rt.offset),
+      hudTop: hudTopFor(touch, fit.scale),
     }, size)
   }
 

@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
+import { availableHeight, canvasScale, fitScene, Game, hudTopFor, TOUCH_HINT_BAND } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { conditionsAt } from './clock.ts'
+import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
 import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
 import fishingCss from './fishing.css?raw'
@@ -46,7 +48,7 @@ const worldMock = vi.mocked(world)
 const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village'], bag: [], dex: {}, legends: [], pending: null, ...over }
 }
 
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
@@ -239,7 +241,7 @@ describe('fishing Game', () => {
     const sent = calls('cast')
     expect(sent).toHaveLength(1)
     const payload = (sent[0] as unknown as { payload: { area: string; power: number; spot: string } }).payload
-    expect(payload.area).toBe('pier')
+    expect(payload.area).toBe('village')
     expect(payload.spot).toBe('pier') // 부두 위에서 던졌다
     expect(payload.power).toBeGreaterThanOrEqual(0)
     expect(payload.power).toBeLessThanOrEqual(1)
@@ -747,6 +749,50 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('hook')).toHaveLength(1)
   })
+  test('dex shows spawn conditions only for caught species, legend mark, and n/16', async () => {
+    await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('2/16종')).toBeInTheDocument()
+    expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
+    expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
+    expect(within(dex).getByText('전설')).toBeInTheDocument()
+    expect(within(dex).queryByText('봄 · 가을')).not.toBeInTheDocument() // 못 잡은 멸치
+    expect(within(dex).getAllByText('???')).toHaveLength(14)
+  })
+
+  test('server_now가 기기 시각과 같으면 cond는 conditionsAt(Date.now())', async () => {
+    await mount()
+    await advance(100)
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].cond).toEqual(conditionsAt(Date.now()))
+  })
+
+  test('cond follows server_now: 3h-ahead response gives conditionsAt(Date.now() + 3h)', async () => {
+    const H3 = 3 * 3_600_000
+    localStorage.setItem(POS_KEY, JSON.stringify(PIER))
+    worldMock.mockImplementation((() =>
+      Promise.resolve({ view: makeView(), result: null, server_now: Date.now() + H3 })) as unknown as typeof world)
+    render(<Game gameId="fishing" />)
+    await flush()
+    await advance(100)
+    const call = vi.mocked(drawWorld).mock.calls.at(-1)
+    expect(call?.[1].cond).toEqual(conditionsAt(Date.now() + H3))
+  })
+})
+
+describe('conditionLabel', () => {
+  const sp = (id: string) => SPECIES.find((s) => s.id === id)!
+  test('formats season, hours, weather and legend spot', () => {
+    expect(conditionLabel(sp('pufferfish'))).toBe('여름 · 12~16시 · 맑음')
+    expect(conditionLabel(sp('conger'))).toBe('봄 · 가을 · 16~2시 · 비')
+    expect(conditionLabel(sp('goby'))).toBe('사계절')
+    expect(conditionLabel(sp('grouper'))).toBe('부두 · 겨울')
+  })
+  test('legend spot comes from spots: shore → 해안, unknown id stays as is', () => {
+    const grouper = sp('grouper')
+    expect(conditionLabel({ ...grouper, spots: ['shore'] })).toBe('해안 · 겨울')
+    expect(conditionLabel({ ...grouper, spots: ['river'] })).toBe('river · 겨울')
+  })
 })
 
 describe('fishing Game: walking and interaction', () => {
@@ -923,6 +969,20 @@ describe('fishing Game: walking and interaction', () => {
     await mount(makeView(), null)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     expect(screen.queryByText('상점에서 팔 수 있어요')).not.toBeInTheDocument()
+  })
+
+  test('터치에서는 시계를 안내 줄 아래(hudTopFor)에, 데스크톱은 맨 위(0)에 그린다', async () => {
+    const { unmount } = await mount()
+    await advance(50)
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].hudTop).toBe(0)
+    unmount()
+    stubTouch()
+    await mount()
+    await advance(50)
+    const call = vi.mocked(drawWorld).mock.calls.at(-1)
+    const scale = parseInt((canvas() as HTMLCanvasElement).style.width) / (canvas() as HTMLCanvasElement).width
+    expect(call?.[1].hudTop).toBe(hudTopFor(true, scale))
+    expect(call?.[1].hudTop).toBeGreaterThan(0)
   })
 
   test('desktop hides the touch controls and shows the keyboard hint', async () => {
@@ -1399,6 +1459,28 @@ describe('fitScene', () => {
     expect(fitScene(0, 0)).toEqual({ scale: 1, w: 160, h: 240 })
     expect(fitScene(NaN, -5)).toEqual({ scale: 1, w: 160, h: 240 })
     expect(fitScene(Infinity, 600)).toEqual({ scale: 1, w: 160, h: 480 })
+  })
+})
+
+describe('hudTopFor', () => {
+  test('데스크톱은 0, 터치는 안내 줄 띠(CSS px)를 배율로 나눠 올림한 논리 px', () => {
+    expect(hudTopFor(false, 1)).toBe(0)
+    expect(hudTopFor(false, 2)).toBe(0)
+    expect(hudTopFor(true, 1)).toBe(44)
+    expect(hudTopFor(true, 2)).toBe(22)
+    expect(hudTopFor(true, 3)).toBe(15)
+    expect(hudTopFor(true, 4)).toBe(11)
+  })
+
+  test('안내 줄 띠는 .fish-hint-top의 위 여백 + 한 줄 높이 + 틈 4px', () => {
+    const rule = (sel: string) => fishingCss.match(new RegExp(`(^|\\n)${sel.replace(/[.*]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? ''
+    const px = (css: string, prop: string) => Number(css.match(new RegExp(`${prop}:\\s*(\\d+)px`))?.[1])
+    const top = px(rule('.fish-hint-top'), 'top')
+    const lineHeight = px(rule('.fish-hint-top'), 'line-height')
+    const padY = px(rule('.fish-hint'), 'padding')
+    const nowrap = rule('.fish-hint-top')
+    expect(nowrap).toMatch(/white-space:\s*nowrap/)
+    expect(TOUCH_HINT_BAND).toBe(top + padY * 2 + lineHeight + 4)
   })
 })
 
