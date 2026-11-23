@@ -36,7 +36,11 @@ export const GEM_MEMORY = 64 // 상태에 남기는 주운 보석 id 수 상한(
 export const PERFECT_MULT = 2 // 나무위키·녹화 "+2" (설계 §5.6)
 export const SCORE_MAX = 9999
 export const SEG_LEN = 250 * MM // 호를 선분화하는 목표 길이
-export const REST_LEN = 9000 * MM
+// 장애물 사이 평지. 녹화에서는 장애물 사이 평지가 차 0~3대(0~6 m)라(영상 장애물 목록 "순서와 리듬"), 구간 사이 쉼 평지를 1 m로 줄이고
+// 템플릿 앞뒤의 맨 평지도 아래 상한으로 잘라 이어 붙인다(buildTemplate). 장애물 사이 평지는 많아야 1 + 2 + 4 = 7 m. 사용자 결정 2026-11-23
+export const REST_LEN = 1000 * MM
+export const LEAD_FLAT_MAX = 2000 * MM // 템플릿 앞쪽 맨 평지(부스터 제외) 상한
+export const TAIL_FLAT_MAX = 4000 * MM // 템플릿 뒤쪽 맨 평지 상한. 낙하·점프 뒤 착지할 자리라 앞쪽보다 길게 둔다
 export const START_LEN = 12000 * MM
 // 시작 평지가 코스 시작점(x = 0) 뒤로 이어지는 길이. 첫 구간(tier 1)에서 되굴러 나오는 속력은 많아야 약 3500 u/틱이고
 // ROLL_DRAG(1 u/틱²)로 멈추기까지 v²/2 ≈ 380 m를 간다(hill 오르막에서 떼면 실측 약 195 m). 그보다 넉넉히 둔다. 측정 대상 아님
