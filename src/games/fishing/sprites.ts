@@ -2202,6 +2202,395 @@ const BOAT = sprite(BOAT_PALETTE, [
   '....cc......cc.......cc.........',
 ])
 
+// ── 3단계 지역 타일: 산 호수·동굴·섬 ──
+// 물 다섯 종은 2프레임, 칸을 꽉 채우고 가장자리끼리 이어진다
+const LAKE: Record<string, string> = {
+  a: '#1f6f78', // 바탕: 차갑고 짙은 청록
+  d: '#185c66', // 깊은 결
+  b: '#3a8f96', // 잔잔한 물결
+  c: '#a6dede', // 차가운 반짝임
+}
+// 동굴 웅덩이: 검푸른 물에 천장에서 떨어진 물방울 고리
+const CAVE_POOL: Record<string, string> = {
+  a: '#14243a', // 바탕
+  d: '#0d1829', // 깊은 결
+  b: '#2a4a70', // 물방울 고리
+  c: '#6f9cc8', // 물방울
+}
+// 수정 웅덩이: 물속에서 솟은 보랏빛 수정과 그 둘레의 빛
+const CRYSTAL: Record<string, string> = {
+  a: '#2e4f96', // 바탕
+  d: '#243f7c', // 깊은 결
+  b: '#5f9fe0', // 수정 둘레 빛
+  c: '#a8f0ff', // 수정 밝은 모서리
+  m: '#c09cff', // 수정
+  M: '#7c55d6', // 수정 그늘
+  w: '#ffffff', // 반짝임
+}
+// 용암: 붉게 일렁이는 바탕 위로 식은 껍질이 떠다니고 뜨거운 줄기가 비친다
+const LAVA: Record<string, string> = {
+  a: '#c8371f', // 바탕
+  d: '#7e1d14', // 식은 껍질
+  b: '#f27a2c', // 뜨거운 줄기
+  c: '#ffd25a', // 가장 뜨거운 곳
+  w: '#fff3b8', // 터지는 거품
+}
+// 석호: 얕고 밝은 옥빛, 바닥에 일렁이는 빛 그물
+const LAGOON: Record<string, string> = {
+  a: '#3cc4b4', // 바탕
+  b: '#86e6d8', // 빛 그물
+  c: '#e6fffa', // 반짝임
+  s: '#5fd3b0', // 비치는 모래 바닥
+}
+
+const LAKE_0 = sprite(LAKE, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaabbbbaaaaaaaaa',
+  'aaaaaaaaaaaddaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaacaaaaaa',
+  'addaaaabbbbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaabbbba',
+  'aaaaaaaaaaaaacaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const LAKE_1 = sprite(LAKE, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbbaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaddaaaaabbbbaaa',
+  'aaaaaaaaaaacaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaabbb',
+  'baaaaaaaaaaaaaaa',
+  'aaaaddaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaacaaabbbaaaaaa',
+  'aaaaaaaaaaaaddda',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CAVE_POOL_0 = sprite(CAVE_POOL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaddaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaabaaaa',
+  'aaaaaaaaaabcbaaa',
+  'aaaaaaaaaaabaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+  'adaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CAVE_POOL_1 = sprite(CAVE_POOL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaabaaabaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaabbbaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aadaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CRYSTAL_0 = sprite(CRYSTAL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaadaaa',
+  'aaaawaaaaaaaaaaa',
+  'aaaacaaaaaaaaaaa',
+  'aaacmcaaaaaaaaaa',
+  'aaacmMaaaaaaabaa',
+  'aabcmMMbaaaaaaaa',
+  'aaabbbbaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaacaaaa',
+  'adaaaaaaaacmcaaa',
+  'aaaaaaaaabcmMbaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaabaaaaaaaaaaa',
+  'aaaaaaaaaaaaadaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const CRYSTAL_1 = sprite(CRYSTAL, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaacaaaaaaaadaa',
+  'aaacmcaaaaaaaaaa',
+  'aaacmMaaaaaaaaaa',
+  'abbcmMMbbaaaaaaa',
+  'aaabbbbaaaaaaaba',
+  'aaaaaaaaaaawaaaa',
+  'aaaaaaaaaaacaaaa',
+  'aaaaaaaaaacmcaaa',
+  'adaaaaaabbcmMbba',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const LAVA_0 = sprite(LAVA, [
+  'aaaaaaaaaaaaaaaa',
+  'aaddddaaaaaabbaa',
+  'adddddaaaabbcbaa',
+  'aaddaaaaaaabbaaa',
+  'aaaaaabbaaaaaaaa',
+  'aaaaabccbaaaddda',
+  'aaaaaabbaaadddda',
+  'abbaaaaaaaaaddaa',
+  'bccbaaaaaaaaaaaa',
+  'abbaaaddaaaaaaaa',
+  'aaaaadddddaaabaa',
+  'aaaaaaddddaabwba',
+  'aaaaaaaaaaaaabaa',
+  'aabbbaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaddaaa',
+])
+
+const LAVA_1 = sprite(LAVA, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaddddaaaaaaaaa',
+  'aadddddaaaaabbaa',
+  'aaaddaaaaaabccba',
+  'aaaaaaaaaaaabbaa',
+  'aaaaaabbaaaaddda',
+  'aaaaabccbaadddda',
+  'aaaaaabbaaaaddaa',
+  'abbaaaaaaaaaaaaa',
+  'bccbaaddaaaaaaaa',
+  'abbaadddddaaaaaa',
+  'aaaaaaddddaaaaaa',
+  'aaaaaaaaaaaaawaa',
+  'aaabbbaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaddaa',
+])
+
+const LAGOON_0 = sprite(LAGOON, [
+  'aaaaabaaaaaaabaa',
+  'aaaabaaaaaaaabaa',
+  'bbbbaaaaaaaabaab',
+  'aaaaabaaaabbaaaa',
+  'aaaaaabbbbaaaaaa',
+  'aaaaaaaabaaaaaaa',
+  'aasaaaaabaaaaaaa',
+  'aaaaaaaaabbbaaaa',
+  'baaaaaabaaaabbbb',
+  'abbbbbbaaaaaaaaa',
+  'aaaaaaabaaaaacaa',
+  'aaaaaaaabaaaaaaa',
+  'aacaaaabaaaasaaa',
+  'aaaaaabaaaaaaaaa',
+  'aaaaaabaaaaaaaba',
+  'aaaaabaaaaaaabaa',
+])
+
+const LAGOON_1 = sprite(LAGOON, [
+  'aaaaaabaaaaaaaba',
+  'aaaaaabaaaaaaaba',
+  'aaaaabaaaaaaaaba',
+  'bbbbbaaaacaaabaa',
+  'aaaaaabaaaabbaaa',
+  'aaaaaaabbbbaaaaa',
+  'aaaaaaaaabaaaaaa',
+  'aaasaaaaabaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'bbaaaaaabaaaabbb',
+  'aabbbbbbaaaaaaaa',
+  'aaaaaaaabaaaaaaa',
+  'aaaaaaaaabaaaaaa',
+  'aaaacaaabaaaasaa',
+  'aaaaaaabaaaaaaaa',
+  'aaaaaaabaaaaaaab',
+])
+
+// 동굴 바닥: 어두운 돌바닥, 갈라진 금과 자갈. 칸을 꽉 채운다
+const CAVE_FLOOR: Record<string, string> = {
+  f: '#4a4553', // 바닥
+  d: '#3c3845', // 얼룩
+  l: '#625c6e', // 자갈 윗면
+  k: '#2c2933', // 갈라진 금
+}
+const TILE_CAVE_FLOOR = sprite(CAVE_FLOOR, [
+  'ffffffffffffffff',
+  'fffffflfffffffff',
+  'ffdffffffffkffff',
+  'fffffffffffkffff',
+  'ffffffffffkdffff',
+  'ffffkkkfffkfffff',
+  'fffkdfffffffffff',
+  'fflkffffffffflff',
+  'ffkfffffffffffdf',
+  'ffffffffddffffff',
+  'fffffffffffffkkf',
+  'ffdfffffffffkdff',
+  'fffffflffffkffff',
+  'fffffffffffkffff',
+  'fffffffffffffffd',
+  'ffffffffffffffff',
+])
+
+// 동굴 벽: 어긋나게 쌓인 큰 바윗덩이, 윗면은 밝고 아래는 어둡다
+const CAVE_WALL: Record<string, string> = {
+  k: '#1e1b24', // 틈
+  h: '#7a7288', // 윗면
+  r: '#5a5366', // 바위
+  m: '#463f52', // 그늘
+  d: '#332e3d', // 아래 어둠
+}
+const TILE_CAVE_WALL = sprite(CAVE_WALL, [
+  'hhhhhrrkhhhhhhrk',
+  'rrrrrrmkrrrrrrmk',
+  'rrrrrmmkrrrrrmmk',
+  'mmrrmmmkmrrrmmmk',
+  'dmmmmmdkmmmmmmdk',
+  'kkkkkkkkkkkkkkkk',
+  'hhhkhhhhhhhhkhhh',
+  'rrrkrrrrrrrmkrrr',
+  'rrmkrrrrrrmmkrrr',
+  'mmmkmmrrrmmmkmmr',
+  'ddmkmmmmmmmdkmmm',
+  'kkkkkkkkkkkkkkkk',
+  'hhhhhhkhhhhhhhkh',
+  'rrrrrmkrrrrrrmkr',
+  'mmrmmmkmmrrmmmkm',
+  'kkkkkkkkkkkkkkkk',
+])
+
+// 동굴 입구: 절벽(tile-cliff와 같은 바위색)에 뚫린 아치형 어둠, 아래는 동굴 바닥
+const CAVE_MOUTH: Record<string, string> = {
+  k: '#3d3a44', // 틈·아치 테두리
+  h: '#b8b2ba', // 윗면 밝은 모서리
+  r: '#8f8993', // 바위
+  m: '#756f7b', // 바위 그늘
+  d: '#5a5560', // 아래 어둠
+  O: '#2a2433', // 입구 안 희미한 벽
+  o: '#141119', // 깊은 어둠
+  f: '#4a4553', // 동굴 바닥
+}
+const TILE_CAVE_MOUTH = sprite(CAVE_MOUTH, [
+  'hhhhhhhhhhhhhhhh',
+  'hrrrrkkkkkkrrrrh',
+  'rrrkkOOOOOOkkrrr',
+  'rrkOOooooooOOkrr',
+  'rmkOooooooooOkmr',
+  'mmkOooooooooOkmm',
+  'mkOooooooooooOkm',
+  'mkOooooooooooOkm',
+  'rkOooooooooooOkr',
+  'rkOooooooooooOkr',
+  'mkOooooooooooOkm',
+  'mkOooooooooooOkm',
+  'dkOOooooooooOOkd',
+  'dkfOOooooooOOfkd',
+  'dkffffOOOOffffkd',
+  'dkffffffffffffkd',
+])
+
+// 선착장 판자: 볕에 바랜 세로 판자, 판자 틈('.')으로 아래 바다가 보인다. 가로 장선 두 줄과 못
+const DOCK: Record<string, string> = {
+  U: '#e6d4ae', // 판자 밝은 모서리
+  u: '#c9b08a', // 판자
+  g: '#a68c66', // 나뭇결
+  G: '#7d6648', // 장선
+  k: '#5a4a38', // 못
+}
+const DOCK_PLANK = sprite(DOCK, [
+  'Uuu.Uuu.Uuu.Uuu.',
+  'Uku.Uuk.Uku.Uuk.',
+  'Uuu.Uuu.Uuu.Uuu.',
+  'Uuu.Ugu.Uuu.Uuu.',
+  'Ugu.Ugu.Uuu.Uug.',
+  'Ugu.Uuu.Uug.Uug.',
+  'Uuu.Uuu.Uug.Uuu.',
+  'UuuGUuuGUuuGUuuG',
+  'Uuu.Uug.Uuu.Uuu.',
+  'Uug.Uug.Uuu.Uuu.',
+  'Uug.Uuu.Ugu.Uuu.',
+  'Uuu.Uuu.Ugu.Ugu.',
+  'Uuu.Uuu.Uuu.Ugu.',
+  'Uku.Uuk.Uku.Uuk.',
+  'Uuu.Uuu.Uuu.Uuu.',
+  'UuuGUuuGUuuGUuuG',
+])
+
+// 야자수: 나무처럼 아래 16px가 자기 칸(줄기 밑동), 위 16px는 윗칸에 겹친다. 늘어진 잎 여섯 갈래와 열매
+const PALM: Record<string, string> = {
+  k: '#1d3b2a', // 외곽선
+  L: '#3fa65f', // 잎
+  l: '#82d47c', // 잎 밝은 쪽
+  D: '#2a7a49', // 잎 그늘
+  c: '#6b4a2a', // 열매
+  C: '#9a6c3c', // 열매 밝은 쪽
+  t: '#b08850', // 줄기
+  h: '#d2ad74', // 줄기 밝은 쪽
+  T: '#86603a', // 줄기 마디
+  x: GROUND_SHADOW,
+}
+const TILE_PALM = sprite(PALM, [
+  '................',
+  '..kkk......kkk..',
+  '.kLlLk....kLlLk.',
+  'kLlLLLkkkkLLLlLk',
+  'kLLDDLLlLLLDDLLk',
+  'kLDkkDLLlLDkkDLk',
+  'kDk.kLDLLDLk.kDk',
+  'kk.kLLDcCDLLk.kk',
+  '..kLLDkcCckDLLk.',
+  '.kLDDk.cckckDDLk',
+  '.kDk..kthTk.kkDk',
+  '.kk...kthTk...k.',
+  '......kthTk.....',
+  '.......kthTk....',
+  '.......kTthk....',
+  '.......kthTk....',
+  '.......kthTk....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '......kthTk.....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '......kthTk.....',
+  '......kTthk.....',
+  '.....kthhTTk....',
+  '....xkkkkkkkx...',
+  '....xxxxxxxxxx..',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+
 // ── 찌 5종(상점·가방 아이콘, 16×16): 코르크 / 함정 / 가시 바늘 / 회전 / 호기심 ──
 const TACKLE_CORK = sprite(
   { k: '#2b2118', R: '#e0483c', r: '#a82e2a', w: '#ff9a8a', C: '#c8935a', c: '#e6b87c', d: '#8f6238' },
@@ -2344,6 +2733,21 @@ export const SPRITES: Record<string, Sprite> = {
   'falls-1': FALLS_1,
   'bridge-plank': BRIDGE_PLANK,
   'tile-cliff': TILE_CLIFF,
+  'lake-0': LAKE_0,
+  'lake-1': LAKE_1,
+  'cave-pool-0': CAVE_POOL_0,
+  'cave-pool-1': CAVE_POOL_1,
+  'crystal-0': CRYSTAL_0,
+  'crystal-1': CRYSTAL_1,
+  'lava-0': LAVA_0,
+  'lava-1': LAVA_1,
+  'lagoon-0': LAGOON_0,
+  'lagoon-1': LAGOON_1,
+  'tile-cave-floor': TILE_CAVE_FLOOR,
+  'tile-cave-wall': TILE_CAVE_WALL,
+  'tile-cave-mouth': TILE_CAVE_MOUTH,
+  'dock-plank': DOCK_PLANK,
+  'tile-palm': TILE_PALM,
   'gate-broken-bridge': GATE_BROKEN_BRIDGE,
   'gate-rubble': GATE_RUBBLE,
   boat: BOAT,

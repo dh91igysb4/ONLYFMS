@@ -8,6 +8,7 @@ export const TILE = 16
 
 export type TileKind = 'water' | 'sand' | 'grass' | 'path' | 'pier' | 'tree' | 'flower' | 'fence' | 'rock' | 'building' | 'door'
   | 'river' | 'pond' | 'basin' | 'falls' | 'bridge' | 'cliff'
+  | 'lake' | 'cave-floor' | 'cave-wall' | 'cave-pool' | 'crystal' | 'lava' | 'cave-mouth' | 'palm' | 'lagoon' | 'dock'
 export type Facing = 'up' | 'down' | 'left' | 'right'
 export type Vec = { x: number; y: number } // 월드 픽셀. 캐릭터 pos는 발 중앙
 
@@ -29,14 +30,24 @@ export const TILE_CHARS: Readonly<Record<string, TileKind>> = {
   w: 'falls', // 폭포
   H: 'bridge', // 다리
   c: 'cliff', // 절벽
+  k: 'lake', // 산 호수
+  _: 'cave-floor', // 동굴 바닥
+  W: 'cave-wall', // 동굴 벽
+  u: 'cave-pool', // 동굴 웅덩이
+  q: 'crystal', // 수정 웅덩이
+  L: 'lava', // 용암
+  E: 'cave-mouth', // 동굴 입구
+  P: 'palm', // 야자수
+  l: 'lagoon', // 석호
+  K: 'dock', // 선착장
 }
 
-const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge'])
+const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock'])
 
-/** 낚시를 던질 수 있는 물 종류(바다·강·연못·웅덩이). 폭포는 포함하지 않는다. */
-export const WATER_KINDS: ReadonlySet<TileKind> = new Set<TileKind>(['water', 'river', 'pond', 'basin'])
-
-type WaterKind = 'water' | 'river' | 'pond' | 'basin'
+/** 낚시를 던질 수 있는 물 종류. 용암도 낚시하는 물로 친다(동굴 가장 깊은 곳). 폭포는 포함하지 않는다. */
+type WaterKind = 'water' | 'river' | 'pond' | 'basin' | 'lake' | 'cave-pool' | 'crystal' | 'lava' | 'lagoon'
+const WATER_LIST: readonly WaterKind[] = ['water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon']
+export const WATER_KINDS: ReadonlySet<TileKind> = new Set<TileKind>(WATER_LIST)
 
 const STEP: Readonly<Record<Facing, { dx: number; dy: number }>> = {
   up: { dx: 0, dy: -1 },
@@ -224,7 +235,7 @@ export type Interaction =
   | { kind: 'dock'; target: AreaId }
   | null
 
-/** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'. */
+/** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'(선착장 dock은 부두가 아니라 그 물의 자리 그대로). */
 export function spotFor(map: MapDef, standing: TileKind | null, front: TileKind | null): string | null {
   if (front === null || !WATER_KINDS.has(front)) return null
   const spot = map.spots[front as WaterKind]

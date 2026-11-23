@@ -246,3 +246,41 @@ describe('3단계 문·배 스프라이트', () => {
     expect(SPRITES['gate-broken-bridge'].rows.join('\n')).not.toBe(SPRITES['gate-rubble'].rows.join('\n'))
   })
 })
+
+describe('산 호수·동굴·섬 타일 스프라이트', () => {
+  const WATERS = ['lake', 'cave-pool', 'crystal', 'lava', 'lagoon']
+  const GROUNDS = ['tile-cave-floor', 'tile-cave-wall', 'tile-cave-mouth', 'dock-plank']
+  const art = (name: string) => JSON.stringify([SPRITES[name].rows, SPRITES[name].palette])
+
+  it('물 다섯 종은 0/1 두 장이 16×16이고 두 장이 서로 다르다', () => {
+    for (const kind of WATERS) {
+      for (const f of [0, 1]) {
+        const sp = SPRITES[`${kind}-${f}`]
+        expect(sp, `${kind}-${f}`).toBeDefined()
+        expect([sp.w, sp.h], `${kind}-${f}`).toEqual([16, 16])
+        // 땅 타일처럼 칸을 꽉 채운다(투명 칸 없음)
+        expect(sp.rows.join('').includes('.'), `${kind}-${f}`).toBe(false)
+      }
+      expect(SPRITES[`${kind}-0`].rows.join('\n'), kind).not.toBe(SPRITES[`${kind}-1`].rows.join('\n'))
+    }
+  })
+
+  it('동굴 바닥·벽·입구, 선착장 판자는 16×16, 야자수는 나무처럼 16×32', () => {
+    for (const name of GROUNDS) {
+      expect(SPRITES[name], name).toBeDefined()
+      expect([SPRITES[name].w, SPRITES[name].h], name).toEqual([16, 16])
+    }
+    expect([SPRITES['tile-palm']?.w, SPRITES['tile-palm']?.h]).toEqual([16, 32])
+  })
+
+  it('새 타일은 서로 다르고, 기존 물·땅 타일과도 다르다', () => {
+    const fresh = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), ...GROUNDS, 'tile-palm']
+    expect(new Set(fresh.map(art)).size).toBe(fresh.length)
+    const old = ['water-0', 'water-1', 'river-0', 'river-1', 'pond-0', 'pond-1', 'basin-0', 'basin-1', 'pier-plank', 'tile-cliff', 'tile-tree', 'tile-sand']
+    for (const name of fresh) expect(old.map(art), name).not.toContain(art(name))
+    // 물 다섯 종의 바탕색('a')은 서로, 그리고 기존 물과 달라 한눈에 구별된다
+    const base = (name: string) => SPRITES[name].palette.a
+    const bases = [...WATERS.map((k) => base(`${k}-0`)), ...['water-0', 'river-0', 'pond-0', 'basin-0'].map(base)]
+    expect(new Set(bases).size).toBe(bases.length)
+  })
+})

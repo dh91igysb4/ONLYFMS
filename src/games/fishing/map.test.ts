@@ -308,8 +308,8 @@ describe('new tile kinds', () => {
     for (const [tx, ty] of [[0, 4], [1, 1], [2, 2], [0, 5], [1, 5]]) expect(isWalkable(REGION, tx, ty, ALL_AREAS_OPEN), `${tx},${ty}`).toBe(false)
   })
 
-  it('WATER_KINDS holds the four water kinds only', () => {
-    expect([...WATER_KINDS].sort()).toEqual(['basin', 'pond', 'river', 'water'])
+  it('WATER_KINDS holds the fishable water kinds only (falls excluded)', () => {
+    expect([...WATER_KINDS].sort()).toEqual(['basin', 'cave-pool', 'crystal', 'lagoon', 'lake', 'lava', 'pond', 'river', 'water'])
   })
 })
 
@@ -488,5 +488,74 @@ describe('문·선착장·안쪽 출구', () => {
     expect(() => make({ gates: [{ ...RUBBLE_GATE, tiles: { tx: 8, ty: -1, w: 1, h: 2 } }] })).toThrow(/gate/)
     expect(() => make({ docks: [{ ...DOCK, front: { tx: 7, ty: 7, facing: 'left' } }] })).toThrow(/dock/)
     expect(() => make({ docks: [{ ...DOCK, front: { tx: 0, ty: 3, facing: 'left' } }] })).toThrow(/dock/)
+  })
+})
+
+// ── 3단계: 산 호수·동굴·섬 타일 ─────────────────────────────────────
+describe('산 호수·동굴·섬 타일', () => {
+  // 글자 열 개를 한 줄에. 첫 걸을 수 있는 칸('_')이 시작 위치가 된다
+  const ROW = defineMap('island', ['k_WuqLEPlK'])
+  const KINDS: [string, TileKind, boolean][] = [
+    ['k', 'lake', false],
+    ['_', 'cave-floor', true],
+    ['W', 'cave-wall', false],
+    ['u', 'cave-pool', false],
+    ['q', 'crystal', false],
+    ['L', 'lava', false],
+    ['E', 'cave-mouth', true],
+    ['P', 'palm', false],
+    ['l', 'lagoon', false],
+    ['K', 'dock', true],
+  ]
+
+  it('글자 → kind, 걷기는 표대로(동굴 바닥·입구·선착장만 걷는다)', () => {
+    KINDS.forEach(([ch, kind, walk], tx) => {
+      expect(TILE_CHARS[ch], ch).toBe(kind)
+      expect(tileAt(ROW, tx, 0), ch).toBe(kind)
+      expect(isWalkable(ROW, tx, 0, ALL_AREAS_OPEN), kind).toBe(walk)
+    })
+  })
+
+  it('물 종류: 호수·동굴 웅덩이·수정·용암·석호. 동굴 바닥·벽·입구·야자수·선착장은 물이 아니다', () => {
+    for (const kind of ['lake', 'cave-pool', 'crystal', 'lava', 'lagoon'] as const) expect(WATER_KINDS.has(kind), kind).toBe(true)
+    for (const kind of ['cave-floor', 'cave-wall', 'cave-mouth', 'palm', 'dock'] as const) expect(WATER_KINDS.has(kind), kind).toBe(false)
+  })
+
+  it('spotFor: 산 호수는 lake 자리', () => {
+    const lake = defineMap('lake', [',k'], { spots: { lake: 'lake' } })
+    expect(spotFor(lake, 'grass', 'lake')).toBe('lake')
+    expect(spotFor(lake, 'grass', 'water')).toBeNull()
+  })
+
+  it('spotFor: 동굴은 웅덩이 cave1, 수정 cave2, 용암 cave3. 벽·입구 앞은 null', () => {
+    const cave = defineMap('cave', ['_uqL'], { spots: { 'cave-pool': 'cave1', crystal: 'cave2', lava: 'cave3' }, indoor: true })
+    expect(spotFor(cave, 'cave-floor', 'cave-pool')).toBe('cave1')
+    expect(spotFor(cave, 'cave-floor', 'crystal')).toBe('cave2')
+    expect(spotFor(cave, 'cave-floor', 'lava')).toBe('cave3')
+    expect(spotFor(cave, 'cave-floor', 'cave-wall')).toBeNull()
+    expect(spotFor(cave, 'cave-floor', 'cave-mouth')).toBeNull()
+    expect(spotFor(cave, 'cave-floor', 'lake')).toBeNull()
+  })
+
+  it('spotFor: 섬은 바다 sea, 석호 lagoon. 선착장 위에서 바다를 봐도 부두(pier) 보너스가 아니다', () => {
+    const island = defineMap('island', ['.l', 'K~'], { spots: { water: 'sea', lagoon: 'lagoon' } })
+    expect(spotFor(island, 'sand', 'lagoon')).toBe('lagoon')
+    expect(spotFor(island, 'sand', 'water')).toBe('sea')
+    expect(spotFor(island, 'dock', 'water')).toBe('sea')
+    expect(spotFor(island, 'dock', 'lagoon')).toBe('lagoon')
+    expect(spotFor(island, 'sand', 'palm')).toBeNull()
+  })
+
+  it('interactionAt: 동굴 바닥에서 용암을 보면 cave3 낚시, 벽을 보면 null', () => {
+    const cave = defineMap('cave', ['WWW', 'W_L', 'WWW'], { spots: { 'cave-pool': 'cave1', crystal: 'cave2', lava: 'cave3' }, indoor: true })
+    expect(interactionAt(cave, center(1, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'cave3' })
+    expect(interactionAt(cave, center(1, 1), 'up', ALL_AREAS_OPEN)).toBeNull()
+  })
+
+  it('castTarget: 수정 웅덩이에서 용암으로 이어 날아가고 동굴 바닥 앞에서 멈춘다', () => {
+    const cave = defineMap('cave', ['_qqLL_'], { spots: { crystal: 'cave2', lava: 'cave3' } })
+    expect(castTarget(cave, center(0, 0), 'right', 1)).toEqual(center(4, 0))
+    const lavaOnly = defineMap('cave', ['_LLLLLLL'], { spots: { lava: 'cave3' } })
+    expect(castTarget(lavaOnly, center(0, 0), 'right', 1)).toEqual({ x: center(0, 0).x + 5 * TILE, y: center(0, 0).y })
   })
 })
