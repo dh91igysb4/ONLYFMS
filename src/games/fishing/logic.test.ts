@@ -820,14 +820,14 @@ describe('fishing WorldLogic', () => {
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
       { key: 'dex', value: 0, detail: '0/75' },
-      { key: 'challenges', value: 0, detail: '0/6' },
+      { key: 'challenges', value: 0, detail: '0/8' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
       { key: 'dex', value: 2, detail: '2/75' },
-      { key: 'challenges', value: 0, detail: '0/6' },
+      { key: 'challenges', value: 0, detail: '0/8' },
     ])
   })
 
@@ -1198,9 +1198,9 @@ describe('도전과제', () => {
   })
 
   it('records: 도전과제 n/6', () => {
-    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/6' })
+    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/8' })
     const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
-    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/6' })
+    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/8' })
   })
 })
 
@@ -1650,3 +1650,30 @@ describe('갯벌·늪지 (logic.version 12)', () => {
     expect(m.bag).toEqual(v12.bag)
   })
 })
+
+describe('갯벌·늪지 도전과제·순간이동기 (낚시 5부 M2)', () => {
+  const castAt = (s: State, area: string, spot: string, now: number) =>
+    logic.apply(s, { type: 'cast', area, power: 0.5, spot } as unknown as Action, { now, rng: () => 0.5 })
+  it('갯골에서 잡으면 tideflat-creek 진행, 하구는 세지 않는다', () => {
+    const s = fresh({ areas: [...DEFAULT_AREAS, 'tideflat'] })
+    const catchAt = (st: State, spot: string, now: number) => {
+      const cast = ok(castAt(st, 'tideflat', spot, now)).state
+      const hooked = ok(logic.apply(cast, { type: 'hook' }, ctx(now + cast.pending!.biteDelayMs))).state
+      return ok(logic.apply(hooked, { type: 'resolve', success: true, perfect: false }, ctx(now + cast.pending!.biteDelayMs + MIN_FIGHT_MS))).state
+    }
+    const a = catchAt(s, 'creek', nowAt(0, 3))
+    expect(a.challenges['tideflat-creek']).toEqual({ progress: 1, done: false })
+    const b = catchAt(a, 'estuary', nowAt(0, 10))
+    expect(b.challenges['tideflat-creek']).toEqual({ progress: 1, done: false })
+  })
+  it('과제를 깨면 갯벌·늪지 이동기가 켜지고 요금은 거리대로', () => {
+    const done = { 'pier-perfect': { progress: 3, done: true }, 'tideflat-creek': { progress: 5, done: true } }
+    const s = fresh({ gold: 100, areas: [...DEFAULT_AREAS, 'tideflat'], challenges: done })
+    expect(teleporterOpen(s, 'tideflat')).toBe(true)
+    expect(teleporterOpen({ ...s, challenges: { 'pier-perfect': done['pier-perfect'] } }, 'tideflat')).toBe(false)
+    const r = ok(logic.apply(s, { type: 'teleport', from: 'village', to: 'tideflat' } as unknown as Action, ctx()))
+    expect(r.result).toEqual({ from: 'village', to: 'tideflat', fee: teleportFee('village', 'tideflat') })
+    expect(teleporterOpen(fresh({ areas: [...DEFAULT_AREAS, 'swamp'], challenges: { 'swamp-rain-night': { progress: 3, done: true } } }), 'swamp')).toBe(true)
+  })
+})
+

@@ -2400,18 +2400,20 @@ describe('도전과제·순간이동기', () => {
     await advance(300)
   }
 
-  test('과제 버튼 → 도전과제 6개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/6', async () => {
+  test('과제 버튼 → 도전과제 8개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/8', async () => {
     await mount(makeView({ challenges: { 'pier-perfect': { progress: 1, done: false }, 'river-rain': { progress: 5, done: true } } }), SAND)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
     const panel = screen.getByRole('region', { name: '도전과제' })
     const items = within(panel).getAllByRole('listitem')
-    expect(items).toHaveLength(6)
+    expect(items).toHaveLength(8)
+    expect(items[6]).toHaveTextContent('갯벌 · 물때를 아는 사람')
+    expect(items[7]).toHaveTextContent('늪지 · 안개 속의 밤낚시')
     expect(items[0]).toHaveTextContent('바닷가 마을 · 부두의 명수')
     expect(items[0]).toHaveTextContent('부두에서 완벽하게 3마리 낚기')
     expect(items[0]).toHaveTextContent('1/3')
     expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
     expect(items[2]).toHaveTextContent('0/3')
-    expect(within(panel).getByText('깬 과제 1/6')).toBeInTheDocument()
+    expect(within(panel).getByText('깬 과제 1/8')).toBeInTheDocument()
   })
 
   test('잡은 결과에 completed가 있으면 완료 알림', async () => {
@@ -2531,14 +2533,14 @@ describe('도전과제·순간이동기', () => {
     expect(actionButton()).toHaveTextContent('살펴보기')
   })
 
-  test('challenges가 없는 옛 서버 응답: 그려지고 이동기는 꺼짐, 과제 목록은 0/6', async () => {
+  test('challenges가 없는 옛 서버 응답: 그려지고 이동기는 꺼짐, 과제 목록은 0/8', async () => {
     const old = makeView() as Partial<View>
     delete old.challenges
     await mount(old as View, AT_VILLAGE_TP)
     await advance(50)
     expect(lastScene().teleporterOn).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
-    expect(screen.getByText('깬 과제 0/6')).toBeInTheDocument()
+    expect(screen.getByText('깬 과제 0/8')).toBeInTheDocument()
   })
 })
 

@@ -260,11 +260,12 @@ describe('찌', () => {
 })
 
 describe('도전과제', () => {
-  it('6개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
-    // 갯벌·늪지 과제는 M2 Task 5에서 더한다
-    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id).filter((id) => id !== 'tideflat' && id !== 'swamp'))
+  it('8개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
+    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
     expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
-    expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big'])
+    expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big', 'tideflat-creek', 'swamp-rain-night'])
+    expect(CHALLENGES.at(-2)).toEqual({ id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } })
+    expect(CHALLENGES.at(-1)).toEqual({ id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } })
     for (const c of CHALLENGES) {
       expect(c.title.length, c.id).toBeGreaterThan(0)
       expect(c.desc.length, c.id).toBeGreaterThan(0)
@@ -274,7 +275,7 @@ describe('도전과제', () => {
     }
   })
 
-  it('어떤 계절에도 깰 수 있다: 계절마다 rod 1로 조건(자리·날씨·밤)을 만족하는 어종이 있고, distinct면 count종 이상', () => {
+  it('어떤 계절에도 깰 수 있다: 계절마다 지역 최소 낚싯대로 조건(자리·날씨·밤)을 만족하는 어종이 있고(자리가 열린 시각만), distinct면 count종 이상', () => {
     for (const c of CHALLENGES) {
       const area = AREAS.find((a) => a.id === c.area)!
       const spots = c.filter.spot ? [c.filter.spot] : area.spots
@@ -283,7 +284,8 @@ describe('도전과제', () => {
       for (const season of SEASONS) {
         const found = new Set<string>()
         for (const spot of spots) for (const weather of weathers) for (const h of hours) {
-          for (const s of SPECIES) if (!s.legend && speciesAvailable(s, c.area, spot, cond(season, h, weather), 1)) found.add(s.id)
+          if (!spotOpen(c.area, spot, h * 60)) continue
+          for (const s of SPECIES) if (!s.legend && speciesAvailable(s, c.area, spot, cond(season, h, weather), areaMinRod(c.area))) found.add(s.id)
         }
         expect(found.size, `${c.id} ${season}`).toBeGreaterThanOrEqual(c.filter.distinct ? c.count : 1)
       }

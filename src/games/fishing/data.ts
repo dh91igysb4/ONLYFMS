@@ -109,6 +109,9 @@ export const CHALLENGES: readonly Challenge[] = [
   { id: 'lake-night', area: 'lake', title: '호수의 밤', desc: '밤(20~5시)에 산 호수에서 5마리 낚기', count: 5, filter: { night: true } },
   { id: 'cave-deep', area: 'cave', title: '용암 낚시꾼', desc: '동굴 가장 깊은 용암에서 5마리 낚기', count: 5, filter: { spot: 'cave3' } },
   { id: 'island-big', area: 'island', title: '섬의 대물', desc: '섬에서 크기 상위 30% 물고기 3마리 낚기', count: 3, filter: { minSizePct: 0.7 } },
+  // 낚시 5부 M2: 갯골은 하루 두 번 열리고 짱뚱어·낙지가 사계절, 늪지는 동사리가 사계절·밤낮
+  { id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } },
+  { id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } },
 ]
 /** 순간이동 요금 = TP_BASE + ceil(두 이동기 세계 거리(칸) / 10) * TP_PER_10 */
 export const TP_BASE = 30
