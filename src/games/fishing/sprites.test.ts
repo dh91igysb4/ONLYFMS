@@ -531,3 +531,28 @@ describe('늪지 그림 다듬기: 세로 데크·연잎 늪', () => {
     expect(new Set(['marsh-0', 'marsh-1', 'marsh-lily-0', 'marsh-lily-1'].map(art)).size).toBe(4)
   })
 })
+
+describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
+  const WATERS = ['hotspring', 'deep']
+  const key = (n: string) => SPRITES[n].rows.join('|') + JSON.stringify(SPRITES[n].palette)
+  it('물 두 종은 0/1 두 장이 16×16, 칸을 꽉 채우고 두 장이 다르며 바탕색이 기존 물과 다르다', () => {
+    for (const k of WATERS) {
+      for (const f of [0, 1]) {
+        const sp = SPRITES[`${k}-${f}`]
+        expect([sp?.w, sp?.h], `${k}-${f}`).toEqual([16, 16])
+        expect(sp.rows.join('').includes('.'), `${k}-${f}`).toBe(false)
+      }
+      expect(SPRITES[`${k}-0`].rows.join('|'), k).not.toBe(SPRITES[`${k}-1`].rows.join('|'))
+    }
+    const bases = [...WATERS, 'creek', 'marsh', 'bog', 'water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon'].map((k) => SPRITES[`${k}-0`].palette.a)
+    expect(new Set(bases).size).toBe(bases.length)
+  })
+  it('눈 소나무·돛대는 16×32, 눈·갑판 판자·선체·문 16×16(눈·갑판·선체는 칸을 꽉 채운다), 모두 서로 다르다', () => {
+    for (const n of ['tile-snowpine', 'tile-mast']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 32])
+    for (const n of ['tile-snow', 'deck-plank', 'tile-hull', 'gate-snowdrift']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    for (const n of ['tile-snow', 'deck-plank', 'tile-hull']) expect(SPRITES[n].rows.join('').includes('.'), n).toBe(false)
+    const all = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), 'tile-snow', 'tile-snowpine', 'tile-mast', 'deck-plank', 'tile-hull', 'gate-snowdrift']
+    expect(new Set(all.map(key)).size).toBe(all.length)
+    for (const old of ['tile-tree', 'tile-palm', 'tile-ice', 'dock-plank', 'pier-plank', 'boardwalk-plank', 'gate-rubble', 'gate-vines']) for (const n of all) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
+  })
+})

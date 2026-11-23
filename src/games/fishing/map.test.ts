@@ -323,7 +323,7 @@ describe('new tile kinds', () => {
   })
 
   it('WATER_KINDS holds the fishable water kinds only (falls excluded)', () => {
-    expect([...WATER_KINDS].sort()).toEqual(['basin', 'bog', 'cave-pool', 'creek', 'crystal', 'lagoon', 'lake', 'lava', 'marsh', 'pond', 'river', 'water'])
+    expect([...WATER_KINDS].sort()).toEqual(['basin', 'bog', 'cave-pool', 'creek', 'crystal', 'deep', 'hotspring', 'lagoon', 'lake', 'lava', 'marsh', 'pond', 'river', 'water'])
   })
 })
 
@@ -809,6 +809,47 @@ describe('갯벌·늪지 타일', () => {
   })
   it('castTarget: 늪·수렁이 섞여도 물로 계속 날아간다, 갈대 앞에서 멈춘다', () => {
     const m = defineMap('forest', ['dzzQQR'], { spots: { marsh: 'marsh', bog: 'bog' } })
+    expect(castTarget(m, center(0, 0), 'right', 1)).toEqual(center(4, 0))
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M3: 산정 호수·난파선 타일
+
+describe('산정 호수·난파선 타일', () => {
+  const ROW = defineMap('lake', ['shAenMv'])
+  const KINDS: [string, TileKind, boolean, boolean][] = [
+    ['s', 'snow', true, false],
+    ['h', 'hotspring', false, true],
+    ['A', 'snowpine', false, false],
+    ['e', 'deck', true, false],
+    ['n', 'hull', false, false],
+    ['M', 'mast', false, false],
+    ['v', 'deep', false, true],
+  ]
+  it('글자 → kind, 걷기(눈·갑판만), 물 종류(온천·심해)', () => {
+    KINDS.forEach(([ch, kind, walk, water], tx) => {
+      expect(TILE_CHARS[ch], ch).toBe(kind)
+      expect(tileAt(ROW, tx, 0), ch).toBe(kind)
+      expect(isWalkable(ROW, tx, 0, ALL_AREAS_OPEN), kind).toBe(walk)
+      expect(WATER_KINDS.has(kind), kind).toBe(water)
+    })
+  })
+  it('interactionAt: 눈에서 온천은 hotspring, 갑판에서 심해는 abyss·바다는 wreck, 선체·돛대는 null', () => {
+    const m = defineMap('lake', ['hsn', '~ev', '.M.'], { spots: { hotspring: 'hotspring', water: 'wreck', deep: 'abyss' } })
+    expect(interactionAt(m, center(1, 0), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'hotspring' })
+    expect(interactionAt(m, center(1, 0), 'right', ALL_AREAS_OPEN)).toBeNull()
+    expect(interactionAt(m, center(1, 1), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'wreck' })
+    expect(interactionAt(m, center(1, 1), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'abyss' })
+    expect(interactionAt(m, center(1, 1), 'down', ALL_AREAS_OPEN)).toBeNull()
+  })
+  it('눈 위 얼음판: 얼음을 보면 drill, 구멍을 뚫으면 ice 자리', () => {
+    const m = defineMap('lake', ['sii'], { spots: { hole: 'ice' } })
+    expect(interactionAt(m, center(0, 0), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'drill' })
+    const dyn: MapDynamic = { tide: 'high', holes: new Set(['1,0']) }
+    expect(interactionAt(m, center(0, 0), 'right', ALL_AREAS_OPEN, dyn)).toEqual({ kind: 'fish', spot: 'ice' })
+  })
+  it('castTarget: 바다·심해가 섞여도 계속 날아가고 선체 앞에서 멈춘다', () => {
+    const m = defineMap('lake', ['e~vvvn'], { spots: { water: 'wreck', deep: 'abyss' } })
     expect(castTarget(m, center(0, 0), 'right', 1)).toEqual(center(4, 0))
   })
 })

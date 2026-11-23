@@ -51,6 +51,14 @@ export const MINIMAP_LOOK: Readonly<Record<TileKind, Look>> = {
   boardwalk: look('#a8936c', '#6e5a40', PLANK_GLYPH),
   reed: look('#8fa452', '#7a4a2a', ['mbm', 'bmb', 'bmb']),
   deadtree: look('#6f8a4a', '#4e4439', TREE_GLYPH),
+  // 낚시 5부 M3: 온천·심해는 물(바탕색만), 눈은 흰 바탕, 눈 소나무는 나무처럼, 갑판은 판자, 선체·돛대는 짙은 나무
+  hotspring: look('#7cc8c0', '#7cc8c0'),
+  deep: look('#173f6b', '#173f6b'),
+  snow: look('#f4f8fb', '#f4f8fb'),
+  snowpine: look('#e8f0f4', '#2f5a48', TREE_GLYPH),
+  deck: look('#9c7a52', '#6a4e32', PLANK_GLYPH),
+  hull: look('#5a3e2a', '#3a2818', ['bbb', 'mmm', 'bbb']),
+  mast: look('#9c7a52', '#3a2818', ['bmb', 'bmb', 'bmb']),
 }
 
 /** 고른 낚시 자리 칸에 겹칠 밝은 색(반투명) */
