@@ -168,7 +168,7 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
 ## 낚시(숨김, 지속형 world 게임) 배포
-`feat/fishing-ui` 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `hidden: true`로 들어간다.
+낚시 마을 변경(`feat/fishing-walk`, `logic.version` 2) 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `hidden: true` 그대로다.
 
 순서: DB push → `world` 함수 배포 → Vercel.
 
@@ -178,6 +178,8 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
 npx supabase@2 functions deploy world --no-verify-jwt
 ```
   - 번들 오류면 출력 전문을 보고.
+  - world를 v2로 배포한 뒤에는 v1으로 되돌리지 않는다 — 되돌리면 옛 migrate가 가방 업그레이드와 21번째 이후 물고기를 지운다. 문제가 생기면 고쳐서 다시 배포한다
+  - 배포 직후 첫 요청에서 진행 중이던 캐스트가 사라진다(설계상 허용) — 플레이어가 적은 새벽(KST)에 배포한다
 - [ ] 그다음 Vercel 배포(머지)
 
 ### 낚시 미리보기 확인

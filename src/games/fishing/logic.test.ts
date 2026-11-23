@@ -203,6 +203,14 @@ describe('fishing WorldLogic', () => {
     expect(logic.migrate({ bagTier: 3 }, 2).bagTier).toBe(3)
   })
 
+  it('migrate keeps every fish the bag can hold: a v1 save with 20 fish keeps 20, a bagTier 3 save with 40 keeps 40', () => {
+    const fish = (n: number): Fish[] => Array.from({ length: n }, (_, i) => ({ species: 'anchovy', sizeCm: 10 + (i % 5), perfect: i % 2 === 0 }))
+    const v1 = fish(20)
+    expect(logic.migrate({ gold: 5, bag: v1 }, 1).bag).toEqual(v1)
+    const full = fish(40)
+    expect(logic.migrate({ bagTier: 3, bag: full }, 2).bag).toEqual(full)
+  })
+
   it('view exposes bagTier', () => {
     expect(logic.view(fresh({ bagTier: 2 }), { now: T0 }).bagTier).toBe(2)
   })
