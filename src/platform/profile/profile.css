@@ -54,3 +54,8 @@
 }
 
 .rec-value { font-variant-numeric: tabular-nums; }
+
+/* 게임 캐릭터(요약 탭) */
+.pf-avatars { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 16px; }
+.pf-avatar-item { display: flex; align-items: center; gap: 12px; }
+.pf-avatar-label { display: flex; flex-direction: column; gap: 2px; }

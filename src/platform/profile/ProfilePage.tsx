@@ -6,6 +6,7 @@ import { kstDate } from '../../shared/kst.ts'
 import { normalizeHandle } from '../../shared/handle.ts'
 import { DuelSection } from './DuelSection.tsx'
 import { RecordsSection } from './RecordsSection.tsx'
+import { AvatarSection } from './AvatarSection.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { Avatar } from './Avatar.tsx'
@@ -185,6 +186,7 @@ export function ProfilePage() {
       </div>
 
       <div className="stack" role="tabpanel" id={panelId} aria-labelledby={tabId(tab)}>
+        {tab === 'summary' && <AvatarSection key={handle} handle={handle} />}
         {tab === 'summary' && (
           <div className="lb-panel">
             <h3 className="lb-caption">최근 기록</h3>
