@@ -4,7 +4,7 @@
 
 **Goal:** 돈으로 여는 지역 세 곳을 넣는다. 강 북쪽 무너진 다리(산 호수), 숲 동굴 입구 돌무더기(동굴), 마을 선착장의 배(섬). 지역마다 맵과 어종(일반 20 + 전설 3)을 더해 전체 56종을 채운다.
 
-**Architecture:** 맵에 `gates`(잠긴 동안 막히는 칸과 그 앞 상호작용)와 `docks`(배 타는 자리)를 더하고, 걸을 수 있는지는 "열린 지역 집합"을 함께 보고 정한다. 잠긴 문 그림은 정적 캐시가 아니라 매 프레임 월드 레이어에 그려서, 해금해도 캐시를 다시 만들지 않는다. 서버는 `unlockArea` 행동으로 골드를 받고 `areas`에 지역을 더한다(`logic.version` 5). 동굴은 실내라 비·눈과 밤 색조를 그리지 않는다.
+**Architecture:** 맵에 `gates`(잠긴 동안 막히는 칸과 그 앞 상호작용)와 `docks`(배 타는 자리)를 더하고, 걸을 수 있는지는 "열린 지역 집합"을 함께 보고 정한다. 잠긴 문 그림은 정적 캐시가 아니라 매 프레임 월드 레이어에 그려서, 해금해도 캐시를 다시 만들지 않는다. 서버는 `unlockArea` 행동으로 골드를 받고 `areas`에 지역을 더한다(`logic.version` 7). 동굴은 실내라 비·눈과 밤 색조를 그리지 않는다.
 
 **Tech Stack:** TypeScript, React 18, Canvas 2D, vitest, Deno(`world` 함수 테스트). 새 의존성 없음.
 
@@ -19,7 +19,7 @@
 - 자리 id는 `data.ts` `AREAS`: lake `lake`, cave `cave1`/`cave2`/`cave3`(얕은 곳→깊은 곳), island `sea`/`lagoon`.
 - 마을 상점·부두·`SPAWN`·부두 끝→문 앞 37칸 불변. 부두 끝의 낚시(부두 보너스)를 선착장이 빼앗지 않는다.
 - 맵 크기 40×30 ~ 56×40칸. 정적 캐시는 현재 맵 하나만.
-- `logic.version` 5 (이번 단계에서 한 번만 올림). 기존 33종의 값은 바꾸지 않는다.
+- `logic.version` 7 (이번 단계에서 한 번만 올림. 5 = 잠금, 6 = 장비라 main은 지금 6). 기존 33종의 값은 바꾸지 않는다.
 - 커밋 `type: 내용`, 마지막 두 줄 트레일러(Co-Authored-By: <작성 모델 이름> <noreply@anthropic.com> / Claude-Session: https://claude.ai/code/session_01T7oyVpQAuQkbAiCkNHahWh). 경로 지정 스테이징, 푸시 금지.
 
 ## Review Focus
@@ -142,7 +142,7 @@
 
 ---
 
-### Task 4: 서버 `unlockArea`와 로직 버전 5
+### Task 4: 서버 `unlockArea`와 로직 버전 7
 
 **Files:**
 - Modify: `src/games/fishing/data.ts`, `src/games/fishing/logic.ts`
@@ -159,17 +159,17 @@
   //   오류: bad_area(UNLOCKS에 없는 지역·모르는 id), already_open, not_enough_gold, busy(pending 있음)
   //   성공: gold -= price, areas에 area 추가. totalEarned는 그대로
   ```
-- `logic.version` 5. `migrate`: v4 → 그대로(areas에 해금 지역이 들어 있으면 유지), v2·v3도 지금처럼.
+- `logic.version` 7. `migrate`: v6 → 그대로(areas에 해금 지역이 들어 있으면 유지), v2~v5도 지금처럼(잠금 v5 미만 전설 자동 잠금, 장비 필드 기본값 포함).
 - `cast`는 지금 규칙 그대로(열린 지역 + 어종 있음).
 
 - [ ] **Step 1: 실패하는 테스트 작성**
   - `unlockArea lake: 골드 6000 → 1000, areas에 lake; 다시 → already_open; 골드 4999 → not_enough_gold(상태 불변); 'village' → bad_area; 'zzz' → bad_area; '__proto__' → bad_area; pending 있으면 busy` (Review Focus 3)
-  - `version 5; v4 세이브(areas에 lake 포함) 그대로; v2 세이브 지금처럼`
+  - `version 7; v6 세이브(장비·잠금 포함, areas에 lake 포함) 그대로; v2·v4 세이브 지금처럼`
   - `UNLOCKS 키는 lake·cave·island, 가격 5000/15000/50000`
 - [ ] **Step 2: 실패 확인** — Run: `npx vitest run src/games/fishing/logic.test.ts` / Expected: FAIL
 - [ ] **Step 3: 구현**
 - [ ] **Step 4: 통과 확인** — Run: `npx vitest run src/games/fishing && npm run typecheck && npm run fn:test` / Expected: PASS
-- [ ] **Step 5: 커밋** — `… && git commit -m "feat: 낚시 지역 해금 행동과 로직 버전 5"`
+- [ ] **Step 5: 커밋** — `… && git commit -m "feat: 낚시 지역 해금 행동과 로직 버전 7"`
 
 ---
 
@@ -177,6 +177,7 @@
 
 **Files:**
 - Modify: `src/games/fishing/Game.tsx`, `src/games/fishing/Menus.tsx`, `src/games/fishing/position.ts`, `src/games/fishing/fishing.css`
+- 주의: main의 `BagPanel`은 이미 `onEquip`(장비)·`onLock`(잠금) props를 받는다. 해금 창은 별도 컴포넌트로 두고 가방 props는 건드리지 않는다. `Game.test`의 기존 BagPanel 사용도 그대로 둔다.
 - Test: `src/games/fishing/Game.test.tsx`, `src/games/fishing/position.test.ts`
 
 **Interfaces:**
@@ -286,6 +287,6 @@
 **Files:**
 - Modify: `docs/deploy-checklist.md`
 
-- [ ] **Step 1: 체크리스트 추가** — 낚시 절 2단계 항목 뒤에 3단계: `logic.version` 5, `world` 재배포 직후 머지·Vercel(main 기준 한 번 더 배포), 새로고침 안내, v4로 되돌리지 않기(옛 migrate·화면은 새 23종과 해금 지역을 모름). 수동 확인: 강 북쪽 다리 앞 해금 창·가격, 골드 부족 문구, 해금 뒤 바로 건너기, 산 호수 낚시, 숲 동굴 입구 해금·동굴 안 비·밤 효과 없음·용암에서 낚시, 마을 선착장 배 구매·섬 왕복, 섬 석호·바다 낚시, 다른 기기에서 안 연 지역 위치면 마을에서 시작, 도감 탭 6개, 동굴 전환 시 폰에서 끊김 없음.
+- [ ] **Step 1: 체크리스트 추가** — 낚시 절 2단계 항목 뒤에 3단계: `logic.version` 7, `world` 재배포 직후 머지·Vercel(main 기준 한 번 더 배포), 새로고침 안내, v6으로 되돌리지 않기(옛 migrate·화면은 새 23종과 해금 지역을 모름). 수동 확인: 강 북쪽 다리 앞 해금 창·가격, 골드 부족 문구, 해금 뒤 바로 건너기, 산 호수 낚시, 숲 동굴 입구 해금·동굴 안 비·밤 효과 없음·용암에서 낚시, 마을 선착장 배 구매·섬 왕복, 섬 석호·바다 낚시, 다른 기기에서 안 연 지역 위치면 마을에서 시작, 도감 탭 6개, 동굴 전환 시 폰에서 끊김 없음.
 - [ ] **Step 2: 전체 검증** — Run: `npm test && npm run typecheck && npm run build && npm run fn:test` / Expected: 모두 PASS
 - [ ] **Step 3: 커밋** — `git add docs/deploy-checklist.md && git commit -m "docs: 낚시 3단계 배포 안내"`
