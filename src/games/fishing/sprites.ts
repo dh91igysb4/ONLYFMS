@@ -3723,6 +3723,444 @@ const MYTHIC_BADGE = sprite({ k: '#2a2135', y: '#ffc94a', Y: '#fff1a8', w: '#fff
   'kk.....kk',
 ])
 
+// ── 낚시 5부 M2: 갯벌 물고기 9종·늪지 물고기 10종(전설 둘, 신화 이무기) ──
+// 짱뚱어: 툭 튀어나온 두 눈, 푸른 점 박힌 갈색 몸, 가슴지느러미로 선다
+const FISH_MUDSKIPPER = sprite(
+  { k: '#2a2016', b: '#8a7350', B: '#a88f68', d: '#5e4c32', s: '#5ab0d8', e: '#111111', W: '#ffffff', f: '#c9a774', w: '#d8c8a2' },
+  [
+    '................',
+    '..kk.kk.........',
+    '.kWekWek........',
+    '.kbkkbbkkkk.kk..',
+    'kbbbbbsbbbbkffk.',
+    'kbsbbbbbsbbbbffk',
+    'kbbbdbsbbbdbbbfk',
+    '.kwwwbbbbdbbbbk.',
+    '..kwkkwwwwkkkk..',
+    '..kfk.kffk......',
+    '...k...kk.......',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 낙지: 가늘고 긴 다리, 붉은 갈색 머리
+const FISH_SMALL_OCTOPUS = sprite(
+  { k: '#3a1410', r: '#c45a44', R: '#e08a6e', d: '#8e3a2a', e: '#111111', W: '#ffffff', s: '#f0c0a8' },
+  [
+    '................',
+    '.........kkkk...',
+    '........kRRrrk..',
+    '.......kRrrrrrk.',
+    '.......krRrrdrk.',
+    '.......kWerrrdk.',
+    '........krrrdk..',
+    '...kkkkkkrrrkk..',
+    '..krrrrsrrsrrrk.',
+    '.krdkkrrkrrkkrrk',
+    'krdk.krk.krk.krk',
+    'kdk.krk...krk.kk',
+    '.k..kk.....kk...',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 풀망둑: 길쭉한 연갈색 몸에 짙은 얼룩, 큰 입
+const FISH_GRASS_GOBY = sprite(
+  { k: '#2a2418', b: '#b0a070', d: '#6e6040', w: '#e8e0c0', e: '#111111', W: '#ffffff', t: '#c8b888', m: '#4a3e28' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..kkkk.kkkkkk...',
+    '.kWebbkbtttttkk.',
+    'kbbbbddbbddbbbtk',
+    'kmmbbbbddbbbddtk',
+    'kwwwbdbbbbddbbtk',
+    '.kwwwwwwwwwbbkk.',
+    '..kkkkkkkkkkk...',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 꽃게: 푸른 집게와 넓적한 등딱지, 뾰족한 양 끝
+const FISH_BLUE_CRAB = sprite(
+  { k: '#1a2238', b: '#4a6ab0', B: '#7a9ad8', d: '#2e4680', o: '#d88a50', w: '#e8eef8', e: '#111111' },
+  [
+    '................',
+    '................',
+    '.kk..........kk.',
+    'kBBk........kBBk',
+    'kbkBk..ee..kBkbk',
+    '.kbbk.kkkk.kbbk.',
+    '..kbkkBBBBkkbk..',
+    'kkkbBBbbbbBBbkkk',
+    'kbbbbbbddbbbbbbk',
+    '.kkbbdbbbbdbbkk.',
+    '...kwwwwwwwwk...',
+    '..kokkkkkkkkok..',
+    '.kok.kok.kok.kok',
+    '.kk..kk..kk...kk',
+    '................',
+    '................',
+  ],
+)
+
+// 개불: 통통한 분홍 소시지 모양, 주름
+const FISH_SPOON_WORM = sprite(
+  { k: '#4a1a24', p: '#e88a9a', P: '#f8b8c4', d: '#c0607a', w: '#ffe0e8' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '...kkkkkkkkkk...',
+    '..kPPwPPPwPPPk..',
+    '.kppppppppppppk.',
+    'kpdpppdpppdpppdk',
+    'kppppppppppppppk',
+    '.kdppdpppdpppdk.',
+    '..kkkkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 웅어: 칼처럼 가늘고 은빛, 꼬리로 갈수록 좁아진다
+const FISH_GRENADIER_ANCHOVY = sprite(
+  { k: '#262c34', s: '#c8d4dc', S: '#eef4f8', b: '#7a8aa0', e: '#111111', W: '#ffffff', y: '#e0c860' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkkkkkk.......',
+    'kWebbbbbbkkkkk..',
+    'kyssSSSSsssssbkk',
+    '.kssssssssssssbk',
+    '..kkkkkkkkkksskk',
+    '............kk..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 참게: 털 난 집게(벙어리장갑), 진한 녹갈색 등딱지
+const FISH_MITTEN_CRAB = sprite(
+  { k: '#1e1a10', g: '#5e6a36', G: '#7e8a4e', d: '#3e4622', h: '#b8a070', e: '#111111' },
+  [
+    '................',
+    '................',
+    '................',
+    '.kkk........kkk.',
+    'khhhk......khhhk',
+    'khhgk.e..e.kghhk',
+    '.kgk.kkkkkk.kgk.',
+    '..kgkGGGGGGkgk..',
+    '...kgggddgggk...',
+    '..kggdggggdggk..',
+    '.kgk.kggggk.kgk.',
+    'kgk.kgk..kgk.kgk',
+    'kk..kk....kk..kk',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 황복: 노란 배와 검은 등 무늬의 통통한 복어
+const FISH_RIVER_PUFFER = sprite(
+  { k: '#1e1a10', b: '#4a4a3a', B: '#6a6a50', y: '#f0c838', Y: '#f8e070', w: '#f8f4e0', e: '#111111', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '....kkkkkkk.....',
+    '...kbBbbBbbk..k.',
+    '..kbbbbbbbbbk.kk',
+    '.kWebbBbbbBbbkyk',
+    '.kbbbbbbbbbbbbyk',
+    'kyyYYyyyyyyyyykk',
+    '.kyyyyyyyyyyykyk',
+    '..kwwwwwwwwwk.kk',
+    '...kkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 왕민어(전설): 금빛 비늘의 큰 민어, 붉은 지느러미와 빛 점
+const FISH_KING_CROAKER = sprite(
+  { k: '#3a2408', g: '#d8a848', G: '#f8d878', d: '#a87828', r: '#c84a30', w: '#fff4d0', e: '#111111', W: '#ffffff', y: '#fff8a0' },
+  [
+    '..y.............',
+    '.....kkkrrk..y..',
+    '...kkGGGGGrrk...',
+    '..kGGgggdgggkk..',
+    '.kWegggdgggdggkr',
+    'kggggdgggdgggggr',
+    'kgggdgggdgggdgrr',
+    'kwwggggdgggggkrr',
+    '.kwwwwwwwwwwgkkr',
+    '..kkrrkkkrrkkk..',
+    '...krk...krk....',
+    '....k.....k...y.',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 납자루: 납작한 마름모 몸, 무지갯빛 옆줄
+const FISH_BITTERLING = sprite(
+  { k: '#262030', b: '#9aa0c0', B: '#c8cce0', p: '#d86aa0', v: '#6a5ab0', e: '#111111', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.....kkkk.......',
+    '...kkBBBBkk.....',
+    '..kWeBBbbbbk.kk.',
+    '.kbbbbbbbbbbkbbk',
+    'kbvvvvvvvvvvvbk.',
+    '.kpppbbbbbbbbbbk',
+    '..kkbbbbbbbbkkbk',
+    '....kkkkkkkk..k.',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 동사리: 짙은 얼룩무늬, 넓적한 머리
+const FISH_DARK_SLEEPER = sprite(
+  { k: '#14120c', b: '#5a5038', B: '#7a6e50', d: '#2e2818', w: '#b0a080', e: '#e0d070', E: '#111111' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..kkkkk.kkkkk...',
+    '.kBBBBBkBBBBBkk.',
+    'kbeEbddbbbddbbbk',
+    'kbbbbddbbbddbbdk',
+    'kddbbbbddbbbbddk',
+    '.kwwwwbbbbddbbk.',
+    '..kkkkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 버들붕어: 붉고 푸른 띠, 길게 늘어진 지느러미
+const FISH_PARADISE_FISH = sprite(
+  { k: '#201418', r: '#d04a3a', b: '#3a7ac0', B: '#6aa0e0', o: '#f08a50', e: '#111111', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '....kooobbbkk...',
+    '...kWerbrbrbbk.k',
+    '..krrrbrbrbrbbkk',
+    '..kbrbrbrbrbrbbk',
+    '...kkrbrbrbrbkbk',
+    '....kooookkkkkk.',
+    '.....kook.......',
+    '......kk........',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 황소개구리: 쪼그려 앉은 초록 개구리, 큰 고막
+const FISH_BULLFROG = sprite(
+  { k: '#16200c', g: '#5a8a30', G: '#80b050', d: '#3a6020', y: '#e8e0a0', e: '#e8c030', E: '#111111', t: '#8a6a30' },
+  [
+    '................',
+    '................',
+    '..kkk....kkk....',
+    '.keEek..keEek...',
+    '.kGGGkkkkGGGk...',
+    'kGGGGGGGGGGGGk..',
+    'kgtggdgggdgggk..',
+    'kyyyggggggggggk.',
+    '.kyyygdgggdgggk.',
+    '..kkygggggggggk.',
+    '.kggkkyyyyyykggk',
+    'kgkkgk.kkkk.kgkk',
+    'kk..kk......kk..',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 동자개: 노란 바탕에 갈색 얼룩, 수염 네 가닥
+const FISH_BULLHEAD = sprite(
+  { k: '#2a1e08', y: '#d8a838', Y: '#f0c860', b: '#7a5a20', w: '#f0e0b0', e: '#111111', W: '#ffffff', m: '#4a3a18' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.....kk..kkk....',
+    '..kkkYYkkYYYkk..',
+    '.kWeyybbyyybbyk.',
+    'mkyyyybbyyybbyyk',
+    'm.kyyyyyyyyyyyyk',
+    'mmkwwwyybbyyybk.',
+    '.m.kkkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 드렁허리: 지느러미 없는 누런 뱀 같은 몸, 짙은 점
+const FISH_SWAMP_EEL = sprite(
+  { k: '#241a08', y: '#b08a3a', Y: '#d0aa5a', d: '#6a4e1a', e: '#111111', W: '#f0e090' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..........kkkk..',
+    '.kkkk....kyyyyk.',
+    'kWeyYk..kyydyyk.',
+    'kyyyyYkkyyk.kyyk',
+    '.kyydyyyydk..kyk',
+    '..kkyyydyk...kyk',
+    '....kkkkk...kyk.',
+    '...........kyk..',
+    '............k...',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 자라: 납작하고 말랑한 등딱지, 뾰족한 코
+const FISH_SOFTSHELL_TURTLE = sprite(
+  { k: '#1a2010', g: '#6a7a4a', G: '#8a9a68', d: '#4a5630', s: '#c0b890', e: '#111111' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.....kkkkkkk....',
+    '...kkGGGGGGGkk..',
+    'kk.kGGgggggGGk..',
+    'skkggdgggdgggk.k',
+    'kekggggdggggdgkk',
+    '.kkgggdgggdggk..',
+    '..kkggggggggkk..',
+    '..ksk.kkkkk.ksk.',
+    '..kk........kk..',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 칠성장어: 옆에 일곱 아가미 구멍, 둥근 빨판 입
+const FISH_LAMPREY = sprite(
+  { k: '#1a1a22', b: '#5a5a70', B: '#7a7a94', d: '#2e2e40', w: '#c0c0d0', o: '#d07a70', e: '#e0e080' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkkkkkkkkkk...',
+    'koBeBBBBBBBBBkkk',
+    'kobkbkbkbkbkbbBk',
+    'koowwwwwwwwwwbbk',
+    '.kkkkkkkkkkkkkk.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 천년 자라(전설): 이끼 낀 오래된 등딱지, 금빛 무늬와 빛 점
+const FISH_THOUSAND_TURTLE = sprite(
+  { k: '#1a1408', g: '#5a6a3a', m: '#7a9a4a', y: '#d8b040', Y: '#f8e080', s: '#c8b880', e: '#111111', w: '#fffbd0' },
+  [
+    '.w..........w...',
+    '.....kkkkkkk....',
+    '...kkmYmmYmmkk..',
+    '..kmyggmmggymmk.',
+    'kkkgggyyyyygggk.',
+    'skkmgyggmggygmkk',
+    'kekgygmggmgygggk',
+    '.kkmgyyyyyyygmk.',
+    '..kkmmgggggmmkk.',
+    '..ksk.kkkkk.ksk.',
+    '..kk..........kk',
+    '.....w..........',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+// 이무기(신화): 물빛 비늘이 번들거리는 뱀 모양 용, 작은 뿔 둘, 지느러미 장식·빛 점(여의주 없음)
+const FISH_IMUGI = sprite(
+  { k: '#0c1a1e', b: '#2a6a74', B: '#4aa0a8', h: '#a8f0e8', d: '#16444c', f: '#7ad0c0', y: '#e8d870', e: '#f8e060', E: '#0c0c0c', w: '#ffffff' },
+  [
+    '.y..........w...',
+    '..kk.kk....y....',
+    '..kykyk..kkkk...',
+    '.kkBBBkk.kffk...',
+    'kBeEBBBbkkbhbk..',
+    'kBBBBbbhbbbdbk.y',
+    '.kkkbbdbhbdbbbk.',
+    '..kfk.kbbhbkbbk.',
+    '..kk...kkbbkbbk.',
+    '...w....kbhbbk..',
+    '...kkk.kbbbbk...',
+    '..kfhfkkbdbk.w..',
+    '..kffbbhbkk.....',
+    '...kkkkkk.......',
+    '....y...........',
+    '................',
+  ],
+)
+
 // ── 낚시 5부 M2: 갯벌·늪지 타일 ──
 const CREEK: Record<string, string> = { a: '#5e8e8c', d: '#4c7978', b: '#86b2ab', c: '#d2e8e1' } // 갯골: 흙빛이 도는 청록 물길
 const MARSH: Record<string, string> = { a: '#5d7b48', d: '#4b6739', b: '#7f9e57', c: '#b3cc7c' } // 늪: 개구리밥이 뜬 탁한 초록
@@ -4105,6 +4543,25 @@ export const SPRITES: Record<string, Sprite> = {
   'fish-stingray': FISH_STINGRAY,
   'fish-mahi': FISH_MAHI,
   'fish-rainbow-marlin': FISH_RAINBOW_MARLIN,
+  'fish-mudskipper': FISH_MUDSKIPPER,
+  'fish-small-octopus': FISH_SMALL_OCTOPUS,
+  'fish-grass-goby': FISH_GRASS_GOBY,
+  'fish-blue-crab': FISH_BLUE_CRAB,
+  'fish-spoon-worm': FISH_SPOON_WORM,
+  'fish-grenadier-anchovy': FISH_GRENADIER_ANCHOVY,
+  'fish-mitten-crab': FISH_MITTEN_CRAB,
+  'fish-river-puffer': FISH_RIVER_PUFFER,
+  'fish-king-croaker': FISH_KING_CROAKER,
+  'fish-bitterling': FISH_BITTERLING,
+  'fish-dark-sleeper': FISH_DARK_SLEEPER,
+  'fish-paradise-fish': FISH_PARADISE_FISH,
+  'fish-bullfrog': FISH_BULLFROG,
+  'fish-bullhead': FISH_BULLHEAD,
+  'fish-swamp-eel': FISH_SWAMP_EEL,
+  'fish-softshell-turtle': FISH_SOFTSHELL_TURTLE,
+  'fish-lamprey': FISH_LAMPREY,
+  'fish-thousand-turtle': FISH_THOUSAND_TURTLE,
+  'fish-imugi': FISH_IMUGI,
   'icon-sun': ICON_SUN,
   'icon-rain': ICON_RAIN,
   'icon-snow': ICON_SNOW,

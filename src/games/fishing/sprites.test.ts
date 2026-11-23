@@ -497,3 +497,23 @@ describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
     for (const old of ['tile-tree', 'tile-palm', 'dock-plank', 'pier-plank', 'gate-rubble', 'gate-broken-bridge']) for (const n of all) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
   })
 })
+
+describe('낚시 5부 M2 물고기 그림 19종', () => {
+  const IDS = [
+    'mudskipper', 'small-octopus', 'grass-goby', 'blue-crab', 'spoon-worm', 'grenadier-anchovy', 'mitten-crab', 'river-puffer', 'king-croaker',
+    'bitterling', 'dark-sleeper', 'paradise-fish', 'bullfrog', 'bullhead', 'swamp-eel', 'softshell-turtle', 'lamprey', 'thousand-turtle', 'imugi',
+  ]
+  const art = (n: string) => SPRITES[n].rows.join('|')
+  it('16×16, 쓰는 글자가 모두 팔레트에 있고, 서로·기존 물고기 그림과 다르다', () => {
+    for (const id of IDS) {
+      const sp = SPRITES[`fish-${id}`]
+      expect([sp?.w, sp?.h], id).toEqual([16, 16])
+      for (const ch of sp.rows.join('')) if (ch !== '.') expect(sp.palette[ch], `${id} ${ch}`).toBeDefined()
+    }
+    const all = Object.keys(SPRITES).filter((n) => n.startsWith('fish-') && n !== 'fish-shadow')
+    expect(new Set(all.map(art)).size).toBe(all.length)
+  })
+  it('전설·신화 그림은 빛 점이 있어 다른 칸보다 화려하다(색 6가지 이상)', () => {
+    for (const id of ['king-croaker', 'thousand-turtle', 'imugi']) expect(new Set(SPRITES[`fish-${id}`].rows.join('').replace(/\./g, '')).size, id).toBeGreaterThanOrEqual(6)
+  })
+})
