@@ -2,7 +2,7 @@
 // 맵 정의·어종·서버 view·조건에서 표시(마커) 자리, 낚시 자리 대표점, 물고기 목록·필터, 지역 경로를 만든다.
 // 좌표는 칸 단위. 표시 자리는 칸 가운데를 정수로 두고, 여러 칸에 걸친 것(가장자리 출구·문·순간이동기)은 .5가 될 수 있다.
 
-import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, type AreaId, type Rarity, type Species } from './data.ts'
+import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId, type Rarity, type Species } from './data.ts'
 import { inHours, type Conditions } from './clock.ts'
 import {
   ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, shopSpot, tileAt,
@@ -180,15 +180,20 @@ export function spotAtTile(map: MapDef, tx: number, ty: number): string | null {
 }
 
 // ---------------------------------------------------------------- 물고기 목록
-export type NotNow = 'legend-done' | 'rod' | 'season' | 'hours' | 'weather'
+/** needs: 신화인데 먼저 잡을 전설이 남았다 */
+export type NotNow = 'legend-done' | 'needs' | 'rod' | 'season' | 'hours' | 'weather'
 export type FishRow = { species: Species; found: boolean; now: boolean; legendDone: boolean; reason: NotNow | null }
 export type FishView = Pick<View, 'dex' | 'legends' | 'rodTier'>
 
 const RARITY_ORDER: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, legend: 3, mythic: 4 }
 
-/** 지금 안 나오는 첫 이유(자리는 보지 않는다): 이미 잡은 전설 → 낚싯대 → 계절 → 시간 → 날씨 */
-function notNow(s: Species, legendDone: boolean, cond: Conditions, rodTier: number): NotNow | null {
+/** 신화인데 먼저 잡을 전설(needs)이 남았는가 */
+const needsLeft = (s: Species, legends: readonly string[]) => s.rarity === 'mythic' && !(s.legend?.needs ?? []).every((id) => legends.includes(id))
+
+/** 지금 안 나오는 첫 이유(자리는 보지 않는다): 이미 잡은 전설·신화 → 먼저 잡을 전설 → 낚싯대 → 계절 → 시간 → 날씨 */
+function notNow(s: Species, legendDone: boolean, needs: boolean, cond: Conditions, rodTier: number): NotNow | null {
   if (legendDone) return 'legend-done'
+  if (needs) return 'needs'
   if (s.minRod > rodTier) return 'rod'
   if (s.seasons && !s.seasons.includes(cond.season)) return 'season'
   if (s.hours && !inHours(cond.gameMinute, s.hours)) return 'hours'
@@ -200,24 +205,28 @@ function rowsFor(list: readonly Species[], view: FishView, nowOf: (s: Species) =
   const legends = view.legends ?? []
   const rows = list.map((s) => {
     const legendDone = !!s.legend && legends.includes(s.id)
-    const now = !legendDone && nowOf(s)
-    return { species: s, found: !!view.dex[s.id], now, legendDone, reason: now ? null : notNow(s, legendDone, cond, view.rodTier) }
+    const needs = needsLeft(s, legends)
+    const now = !legendDone && !needs && nowOf(s)
+    return { species: s, found: !!view.dex[s.id], now, legendDone, reason: now ? null : notNow(s, legendDone, needs, cond, view.rodTier) }
   })
   const idx = (s: Species) => SPECIES.indexOf(s)
   return rows.sort((a, b) => Number(b.now) - Number(a.now) || RARITY_ORDER[a.species.rarity] - RARITY_ORDER[b.species.rarity] || idx(a.species) - idx(b.species))
 }
 
-/** 그 지역·자리 물고기. now = 서버와 같은 speciesAvailable이고 이미 잡은 전설이 아니다. 정렬: now 먼저 → 등급 → SPECIES 순 */
+/**
+ * 그 지역·자리 물고기. now = 서버와 같은 speciesAvailable이고, 그 자리가 지금 열려 있고(물때 spotOpen),
+ * 이미 잡은 전설·신화가 아니고, 신화면 먼저 잡을 전설을 다 잡았다. 정렬: now 먼저 → 등급 → SPECIES 순
+ */
 export function spotFish(area: AreaId, spot: string, view: FishView, cond: Conditions): FishRow[] {
   const list = SPECIES.filter((s) => s.area === area && (!s.spots || s.spots.includes(spot)))
-  return rowsFor(list, view, (s) => speciesAvailable(s, area, spot, cond, view.rodTier), cond)
+  return rowsFor(list, view, (s) => speciesAvailable(s, area, spot, cond, view.rodTier) && spotOpen(area, spot, cond.gameMinute), cond)
 }
 
 /** 지역 전체 물고기. now = 그 지역 자리 중 하나라도 now */
 export function areaFish(area: AreaId, view: FishView, cond: Conditions): FishRow[] {
   const spots = AREAS.find((a) => a.id === area)?.spots ?? []
   const list = SPECIES.filter((s) => s.area === area)
-  return rowsFor(list, view, (s) => spots.some((spot) => speciesAvailable(s, area, spot, cond, view.rodTier)), cond)
+  return rowsFor(list, view, (s) => spots.some((spot) => speciesAvailable(s, area, spot, cond, view.rodTier) && spotOpen(area, spot, cond.gameMinute)), cond)
 }
 
 export type FishFilter = { now: boolean; undiscovered: boolean }

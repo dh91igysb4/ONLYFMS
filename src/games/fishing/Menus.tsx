@@ -1,8 +1,8 @@
 // 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, CHALLENGES, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { price, teleporterOpen, type View } from './logic.ts'
+import { sellPrice, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -13,13 +13,63 @@ const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
 const knownSpecies = (id: string) => SPECIES.some((s) => s.id === id)
-const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
-/** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
-const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }): number | null =>
-  knownSpecies(f.species) ? price(f.species, f.sizeCm, f.perfect) : null
-const priceLabel = (f: { species: string; sizeCm: number; perfect: boolean }): string => {
-  const v = fishPrice(f)
+const rarityOf = (id: string) => SPECIES.find((s) => s.id === id)?.rarity
+/** 전설(신화 아님)·신화. 모르는 어종(더 새 서버)은 둘 다 아니다 */
+const isLegend = (id: string) => rarityOf(id) === 'legend'
+const isMythic = (id: string) => rarityOf(id) === 'mythic'
+/** 옛 서버 응답(buffs 없음)은 빈 목록으로 읽는다 */
+export const buffsOf = (view: Pick<View, 'buffs'>): BuffId[] => view.buffs ?? []
+/** 화면용 가격(실제로 팔리는 값, 용왕의 여의주 포함): 모르는 어종이면 null(price는 모르는 id에 throw한다) */
+const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): number | null =>
+  knownSpecies(f.species) ? sellPrice(f, buffs) : null
+const priceLabel = (f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): string => {
+  const v = fishPrice(f, buffs)
   return v === null ? '—' : gold(v)
+}
+
+/** 도감·지도 칸 테두리: 전설은 한 겹, 신화는 두 겹 */
+export const dexItemClass = (s: Species) =>
+  `fish-dex-item${s.rarity === 'mythic' ? ' fish-dex-item-mythic' : s.legend ? ' fish-dex-item-legend' : ''}`
+/** 이름 옆 등급 배지(전설·신화). 신화는 전설과 색을 뒤집는다 */
+export function RarityBadge({ s }: { s: Species }) {
+  if (s.rarity === 'mythic') return <span className="fish-dex-mythic">신화</span>
+  return s.legend ? <span className="fish-dex-legend">전설</span> : null
+}
+/** 잡은 신화가 준 힘 한 줄. 신화가 아니면 null */
+export function buffLine(s: Species): string | null {
+  const b = s.rarity === 'mythic' ? BUFFS.find((x) => x.id === s.legend?.buff) : undefined
+  return b ? `신화의 힘: ${b.name} — ${b.desc}` : null
+}
+
+/** 가방 창 "신화의 힘": 얻은 버프는 그림·이름·설명, 못 얻은 칸은 자물쇠 + "???"(이름·효과 숨김) */
+function BuffList({ buffs }: { buffs: readonly BuffId[] }) {
+  const owned = BUFFS.filter((b) => buffs.includes(b.id)).length
+  return (
+    <div className="fish-buffs" role="group" aria-label="신화의 힘">
+      <h3 className="fish-panel-sub">{`신화의 힘 ${owned}/${BUFFS.length}`}</h3>
+      <ul className="fish-rods">
+        {BUFFS.map((b, i) =>
+          buffs.includes(b.id) ? (
+            <li key={b.id} className="fish-rod fish-rod-owned">
+              <img className="fish-buff-icon" src={spriteDataUrl(`buff-${b.id}`, ICON_SCALE)} alt="" />
+              <div className="fish-rod-info">
+                <strong>{b.name}</strong>
+                <span className="muted">{b.desc}</span>
+              </div>
+            </li>
+          ) : (
+            <li key={`locked-${i}`} className="fish-rod fish-buff-locked">
+              <span className="fish-buff-lock" aria-hidden="true" />
+              <div className="fish-rod-info">
+                <strong className="muted">???</strong>
+                <span className="muted">신화를 잡으면 얻어요</span>
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+    </div>
+  )
 }
 
 type BagProps = {
@@ -91,6 +141,7 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: Ba
           </ul>
         </div>
       )}
+      <BuffList buffs={buffsOf(view)} />
       <p className="muted">
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
@@ -102,16 +153,16 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: Ba
             <li key={i} className="fish-cell-slot">
               <button
                 type="button"
-                className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}${isLegend(f.species) ? ' fish-cell-legend' : ''}`}
+                className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}${isLegend(f.species) ? ' fish-cell-legend' : ''}${isMythic(f.species) ? ' fish-cell-mythic' : ''}`}
                 aria-pressed={!!f.locked}
-                aria-label={`${isLegend(f.species) ? '전설 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
+                aria-label={`${isLegend(f.species) ? '전설 ' : isMythic(f.species) ? '신화 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
                 disabled={busy}
                 onClick={() => onLock(i, !f.locked)}
               >
                 {f.locked && <span className="fish-cell-lock" aria-hidden="true" />}
                 {knownSpecies(f.species) && <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt="" />}
                 <span className="fish-cell-size">{f.sizeCm}cm</span>
-                <span className="fish-cell-price">{priceLabel(f)}</span>
+                <span className="fish-cell-price">{priceLabel(f, buffsOf(view))}</span>
               </button>
             </li>
           ) : (
@@ -130,7 +181,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
   // 모르는 어종은 예상 금액에서 뺀다(서버가 팔 때 값을 정한다)
-  const bagValue = selling.reduce((sum, f) => sum + (fishPrice(f) ?? 0), 0)
+  const bagValue = selling.reduce((sum, f) => sum + (fishPrice(f, buffsOf(view)) ?? 0), 0)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
   const slots = tackleSlots(view.rodTier)
@@ -422,8 +473,10 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
       <ul className="fish-dex">
         {inArea(active.id).map((s) => {
           const entry = view.dex[s.id]
+          const needs = s.rarity === 'mythic' ? s.legend?.needs ?? [] : []
+          const line = buffLine(s)
           return (
-            <li key={s.id} className={`fish-dex-item${s.legend ? ' fish-dex-item-legend' : ''}`}>
+            <li key={s.id} className={dexItemClass(s)}>
               <img
                 src={spriteDataUrl(`fish-${s.id}`, ICON_SCALE, { silhouette: !entry })}
                 alt={entry ? s.name : '미발견 물고기'}
@@ -433,15 +486,23 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
                   <span className="fish-dex-info">
                     <strong>
                       {s.name}
-                      {s.legend && <span className="fish-dex-legend">전설</span>}
+                      <RarityBadge s={s} />
                     </strong>
                     <span className="muted">
                       {entry.count}마리 · 최대 {entry.maxCm}cm
                     </span>
                     <span className="muted">{conditionLabel(s)}</span>
                     {s.legend && <span className="muted">세이브당 한 마리 · 잡았어요</span>}
+                    {line && <span className="fish-dex-buff">{line}</span>}
                   </span>
                 </>
+              ) : s.rarity === 'mythic' ? (
+                // 안 잡은 신화: 이름·조건·버프와 먼저 잡을 전설 이름은 숨기고 수만 보인다
+                <span className="fish-dex-info">
+                  <strong className="muted">???</strong>
+                  <span className="muted">신화 · 세이브당 한 마리</span>
+                  <span className="muted">{`먼저 잡을 전설 ${needs.filter((id) => (view.legends ?? []).includes(id)).length}/${needs.length}`}</span>
+                </span>
               ) : s.legend ? (
                 <span className="fish-dex-info">
                   <strong className="muted">???</strong>

@@ -11,7 +11,7 @@ import {
 import type { Facing } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { MINIMAP_PX, minimapScale, minimapUrl, spotHighlightUrl } from './minimap.ts'
-import { conditionLabel, SPOT_NAMES } from './Menus.tsx'
+import { buffLine, conditionLabel, dexItemClass, RarityBadge, SPOT_NAMES } from './Menus.tsx'
 import { spriteDataUrl } from './sprites.ts'
 import type { View } from './logic.ts'
 
@@ -42,7 +42,7 @@ const ro = (w: string) => `${w}${batchim(w) === 'other' ? '으로' : '로'}`
 const eun = (w: string) => `${w}${batchim(w) === 'none' ? '는' : '은'}`
 
 const DIR_NAMES: Record<string, string> = { n: '북쪽', s: '남쪽', e: '동쪽', w: '서쪽', in: '입구' }
-const REASONS: Record<Exclude<NotNow, 'legend-done'>, string> = { rod: '낚싯대', season: '계절', hours: '시간', weather: '날씨' }
+const REASONS: Record<Exclude<NotNow, 'legend-done'>, string> = { needs: '먼저 잡을 전설', rod: '낚싯대', season: '계절', hours: '시간', weather: '날씨' }
 
 type Pick = { kind: 'spot'; spot: string } | { kind: 'mark'; key: string }
 const markKey = (m: PlaceMarker): string =>
@@ -361,7 +361,7 @@ function AreaSummary({ rows, route, tpFee }: { rows: FishRow[]; route: ReturnTyp
   )
 }
 
-function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
+export function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
   if (rows.length === 0) return <p className="muted">조건에 맞는 물고기가 없어요</p>
   return (
     <ul className="fish-dex" aria-label="물고기 목록">
@@ -369,13 +369,13 @@ function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
         const s = r.species
         const entry = r.found ? view.dex[s.id] : undefined
         return (
-          <li key={s.id} className={`fish-dex-item${s.legend ? ' fish-dex-item-legend' : ''}`}>
+          <li key={s.id} className={dexItemClass(s)}>
             <img src={spriteDataUrl(`fish-${s.id}`, ICON_SCALE, { silhouette: !r.found })} alt={r.found ? s.name : '미발견 물고기'} />
             <span className="fish-dex-info">
               {r.found ? (
                 <strong>
                   {s.name}
-                  {s.legend && <span className="fish-dex-legend">전설</span>}
+                  <RarityBadge s={s} />
                 </strong>
               ) : (
                 <strong className="muted">???</strong>
@@ -385,6 +385,7 @@ function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
                 {entry ? ` · 최대 ${entry.maxCm}cm` : ''}
               </span>
               {r.found && <span className="muted">{conditionLabel(s)}</span>}
+              {r.found && buffLine(s) && <span className="fish-dex-buff">{buffLine(s)}</span>}
               {r.now ? (
                 <span className="fish-map-now-chip">지금</span>
               ) : r.found && r.legendDone ? (

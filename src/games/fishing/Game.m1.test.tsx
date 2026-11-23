@@ -12,6 +12,8 @@ import { VILLAGE } from './maps/village.ts'
 import type { AreaId } from './data.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import type { PendingView, View } from './logic.ts'
+import { barParams, barResult } from './minigame.ts'
+import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 
 const ROWS = Array.from({ length: 34 }, (_, ty) =>
   Array.from({ length: 30 }, (_, tx) => {
@@ -44,6 +46,10 @@ vi.mock('./minimap.ts', async (importOriginal) => {
   return { ...orig, minimapUrl: vi.fn(() => 'data:mini'), spotHighlightUrl: vi.fn(() => 'data:hl'), releaseMinimapCache: vi.fn() }
 })
 vi.mock('./sprites.ts', () => ({ spriteDataUrl: vi.fn((name: string) => `data:${name}`) }))
+vi.mock('./minigame.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./minigame.ts')>()
+  return { ...orig, barResult: vi.fn(orig.barResult), barParams: vi.fn(orig.barParams) }
+})
 
 const worldMock = vi.mocked(world)
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
@@ -87,8 +93,11 @@ async function mount(at: { area: AreaId; pos: Vec; facing: Facing }, view = make
   localStorage.setItem('fishing-pos:u1', JSON.stringify(at))
   route({ load: () => ok(view) })
   render(<Game gameId="fishing" />)
-  await flush()
-  await advance(20)
+  // 첫 view를 받고 첫 프레임을 그릴 때까지(첫 테스트는 모듈 준비로 늦을 수 있다)
+  for (let i = 0; i < 20 && vi.mocked(drawWorld).mock.calls.length === 0; i++) {
+    await flush()
+    await advance(20)
+  }
 }
 
 beforeEach(() => {
@@ -97,6 +106,8 @@ beforeEach(() => {
   worldMock.mockReset()
   localStorage.clear()
   vi.mocked(drawWorld).mockClear()
+  vi.mocked(barResult).mockClear()
+  vi.mocked(barParams).mockClear()
 })
 afterEach(() => {
   cleanup()
@@ -231,5 +242,45 @@ describe('새 오류 문구', () => {
     release()
     await flush()
     expect(screen.getByText(text)).toBeInTheDocument()
+  })
+})
+
+describe('신화 잡기 알림', () => {
+  withTempData(M1_FIXTURE)
+  const PIER_END = pierEnd(VILLAGE)!
+  test('"신화의 물고기!"와 새 힘 줄을 3.5초 보이고, 장면에 빛고리 시간을 넘긴다; 미니게임 바에 버프를 넘긴다', async () => {
+    vi.setSystemTime(atMinute(12 * 60))
+    const view = makeView({ rodTier: 5, buffs: ['dragon-breath'] })
+    await mount({ area: 'village', pos: tileCenter(PIER_END.tx, PIER_END.ty), facing: 'down' }, view)
+    const fish = { species: 'tmp-mythic', sizeCm: 420, perfect: false, locked: true as const }
+    route({
+      load: () => ok(view),
+      cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
+      hook: () => ok(view, { species: 'tmp-mythic', sizeCm: 420 }),
+      resolve: () => ok({ ...view, buffs: ['imugi-scale', 'dragon-breath'], bag: [fish] }, { caught: fish, buff: 'imugi-scale' }),
+    })
+    press()
+    await advance(200)
+    release()
+    await flush()
+    await advance(3050)
+    press() // 챔
+    release()
+    await flush()
+    expect(vi.mocked(barParams)).toHaveBeenLastCalledWith('tmp-mythic', 5, [], ['dragon-breath'])
+    vi.mocked(barResult).mockReturnValue('caught')
+    await advance(2200)
+    await flush()
+    expect(screen.getByText('신화의 물고기!')).toBeInTheDocument()
+    expect(screen.getByText('새 힘: 이무기의 비늘 — 입질이 15% 빨라져요')).toBeInTheDocument()
+    await advance(100)
+    const ms = lastScene().mythicFlashMs
+    expect(ms).not.toBeNull()
+    expect(ms!).toBeGreaterThanOrEqual(0)
+    expect(ms!).toBeLessThan(1500)
+    await advance(3000)
+    expect(screen.getByText('신화의 물고기!')).toBeInTheDocument()
+    await advance(600)
+    expect(screen.queryByText('신화의 물고기!')).toBeNull()
   })
 })

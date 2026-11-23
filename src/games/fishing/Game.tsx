@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
-import { price, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
+import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { spriteDataUrl } from './sprites.ts'
 import {
   addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, shopSpot, STATIC_DYNAMIC, TILE, tileOf,
   type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
@@ -29,6 +30,8 @@ import './fishing.css'
 const OUTCOME_MS = 1200
 /** 전설은 세이브당 한 번뿐이라 알림을 더 오래 보여 준다 */
 const LEGEND_OUTCOME_MS = 2500
+/** 신화는 새 힘 줄까지 있어 더 오래 */
+const MYTHIC_OUTCOME_MS = 3500
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
 const MAX_SCENE_W = 320
@@ -97,7 +100,7 @@ const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
 type Outcome =
-  | { kind: 'caught'; fish: Fish; isNew: boolean }
+  | { kind: 'caught'; fish: Fish; isNew: boolean; buff?: BuffId }
   | { kind: 'lost'; early: boolean }
 type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: 'info'; text: string }
 type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
@@ -154,6 +157,8 @@ type Runtime = {
   drill: { tx: number; ty: number; ms: number } | null
   /** "곧 밀물이에요"를 이미 알린 썰물(게임 날짜-끝 분) */
   tideWarnKey: string | null
+  /** 신화를 잡은 시각(performance.now). 장면이 캐릭터 둘레에 빛고리를 그린다 */
+  mythicAt: number | null
 }
 /** 지역 전환 페이드 한 방향의 길이 */
 const FADE_MS = 150
@@ -181,10 +186,11 @@ function ignoreRejection(fn: () => Promise<void> | void): void {
 
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
-/** 전설 어종인가. 모르는 어종(더 새 서버)은 아니다 */
+/** 전설·신화 어종인가(legend 필드). 모르는 어종(더 새 서버)은 아니다 */
 const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
-/** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
-const safePrice = (f: Fish): number | null => (SPECIES.some((s) => s.id === f.species) ? price(f.species, f.sizeCm, f.perfect) : null)
+const isMythic = (id: string) => SPECIES.find((s) => s.id === id)?.rarity === 'mythic'
+/** 화면용 가격(실제로 팔리는 값, 버프 포함): 모르는 어종이면 null(price는 모르는 id에 throw한다) */
+const safePrice = (f: Fish, buffs: readonly BuffId[] = []): number | null => (SPECIES.some((s) => s.id === f.species) ? sellPrice(f, buffs) : null)
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 // 결과를 모르는 실패: 오류 화면 없이 view를 다시 불러와 맞춘다.
 const SILENT_CODES = new Set(['network', 'no_pending'])
@@ -329,7 +335,7 @@ export function Game({ gameId }: WorldGameProps) {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, openPress: null, chargeStart: 0, gauge: 0, castPower: 0,
       player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player, openedOf(null))), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0, map, trans: null, fade: 0,
-      holes: [], holeSet: new Set(), drill: null, tideWarnKey: null,
+      holes: [], holeSet: new Set(), drill: null, tideWarnKey: null, mythicAt: null,
     }
   })
   const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
@@ -464,13 +470,15 @@ export function Game({ gameId }: WorldGameProps) {
   function showOutcome(o: Outcome) {
     resetFight()
     rt.caughtSpecies = o.kind === 'caught' ? o.fish.species : null
+    const mythic = o.kind === 'caught' && isMythic(o.fish.species)
+    if (mythic) rt.mythicAt = performance.now()
     setOutcome(o)
     setPhase(o.kind)
     later(() => {
       rt.caughtSpecies = null
       setOutcome(null)
       setPhase('idle')
-    }, o.kind === 'caught' && isLegend(o.fish.species) ? LEGEND_OUTCOME_MS : OUTCOME_MS)
+    }, mythic ? MYTHIC_OUTCOME_MS : o.kind === 'caught' && isLegend(o.fish.species) ? LEGEND_OUTCOME_MS : OUTCOME_MS)
   }
 
   // ------------------------------------------------------------ 단계
@@ -532,7 +540,7 @@ export function Game({ gameId }: WorldGameProps) {
     }
     rt.hookServerNow = res.server_now
     rt.bar = initBar()
-    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [])
+    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [], res.view.buffs ?? [])
     rt.settling = false
     setPhase('fighting')
   }
@@ -546,16 +554,17 @@ export function Game({ gameId }: WorldGameProps) {
 
   async function finishFight(success: boolean, perfect: boolean) {
     const before = viewRef.current
-    let res: WorldView<View, { caught: Fish | null; completed?: string[] }>
+    let res: WorldView<View, { caught: Fish | null; completed?: string[]; buff?: BuffId }>
     try {
-      res = await act<{ caught: Fish | null; completed?: string[] }>({ type: 'resolve', success, perfect })
+      res = await act<{ caught: Fish | null; completed?: string[]; buff?: BuffId }>({ type: 'resolve', success, perfect })
     } catch (e) {
       if (alive.current) await recover(codeOf(e))
       return
     }
     if (!alive.current) return
     const fish = res.result?.caught ?? null
-    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species] })
+    const buff = BUFFS.find((b) => b.id === res.result?.buff)?.id
+    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species], ...(buff ? { buff } : {}) })
     else showOutcome({ kind: 'lost', early: false })
     // 이번 잡이로 깬 과제(서버가 정한다): 첫 과제를 알린다. 나머지는 과제 목록에서 보인다
     const done = CHALLENGES.find((c) => res.result?.completed?.includes(c.id))
@@ -805,6 +814,7 @@ export function Game({ gameId }: WorldGameProps) {
       outfit: outfitOf(viewRef.current),
       dyn: dynAt(cond),
       drill: rt.drill,
+      mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
     }, size)
   }
 
@@ -1305,7 +1315,12 @@ export function Game({ gameId }: WorldGameProps) {
             <div className={`fish-toast${outcome.kind === 'caught' && isLegend(outcome.fish.species) ? ' fish-toast-wrap' : ''}`} aria-live="polite">
               {outcome.kind === 'caught' ? (
                 <>
-                  {isLegend(outcome.fish.species) ? (
+                  {isMythic(outcome.fish.species) ? (
+                    <strong className="fish-new fish-toast-mythic">
+                      <img src={spriteDataUrl('mythic-badge', 2)} alt="" />
+                      신화의 물고기!
+                    </strong>
+                  ) : isLegend(outcome.fish.species) ? (
                     <strong className="fish-new fish-toast-legend">전설의 물고기!</strong>
                   ) : (
                     outcome.isNew && <strong className="fish-new">새로운 물고기!</strong>
@@ -1315,7 +1330,11 @@ export function Game({ gameId }: WorldGameProps) {
                     {outcome.fish.perfect ? ' · 완벽!' : ''}
                   </span>
                   {isLegend(outcome.fish.species) && <span className="muted">세이브당 한 마리 · 가방에 잠가 뒀어요</span>}
-                  {safePrice(outcome.fish) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish)!)}</span>}
+                  {outcome.buff && (() => {
+                    const b = BUFFS.find((x) => x.id === outcome.buff)!
+                    return <span className="fish-toast-buff">{`새 힘: ${b.name} — ${b.desc}`}</span>
+                  })()}
+                  {safePrice(outcome.fish, view.buffs ?? []) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish, view.buffs ?? [])!)}</span>}
                 </>
               ) : (
                 <span>{outcome.early ? '너무 일찍 챘어요' : '놓쳤어요'}</span>

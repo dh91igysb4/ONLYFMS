@@ -386,3 +386,30 @@
 .fish-wear-lock { white-space: nowrap; }
 .fish-wear-open { align-self: flex-start; }
 .fish-wear-confirm { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+/* ── 낚시 5부 M1: 신화 등급과 신화의 힘 ── */
+/* 신화: 강조색 테두리 안쪽에 한 겹 더(이중 테두리). 배지는 전설과 색을 뒤집는다(--ink 바탕, --bg 글자) */
+.fish-dex-item-mythic { box-shadow: inset 0 0 0 2px var(--accent-strong), inset 0 0 0 4px var(--accent-edge); }
+.fish-dex-mythic { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--bg); background: var(--ink); }
+.fish-dex-buff { color: var(--accent-strong); font-size: 13px; }
+.fish-cell-mythic { box-shadow: inset 0 0 0 2px var(--accent-strong), inset 0 0 0 4px var(--accent-edge); }
+.fish-cell-mythic.fish-cell-locked { box-shadow: inset 0 0 0 2px var(--accent-strong), inset 0 0 0 4px var(--accent-edge), inset 0 0 0 5px var(--ink); }
+.fish-buffs { display: flex; flex-direction: column; gap: 6px; }
+.fish-buff-icon { width: 36px; height: 36px; image-rendering: pixelated; }
+.fish-buff-locked { opacity: 0.7; }
+/* 못 얻은 힘의 자물쇠: 가방 칸 자물쇠와 같은 모양을 크게 */
+.fish-buff-lock { position: relative; width: 18px; height: 14px; margin: 14px 9px 4px; border-radius: 3px; background: var(--muted); flex: none; }
+.fish-buff-lock::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -9px;
+  width: 8px;
+  height: 9px;
+  border: 2px solid var(--muted);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+}
+.fish-toast-mythic { font-size: 16px; color: var(--ink); }
+.fish-toast-mythic img { width: 18px; height: 18px; image-rendering: pixelated; vertical-align: -3px; margin-right: 4px; }
+.fish-toast-buff { color: var(--accent-strong); font-weight: 700; }

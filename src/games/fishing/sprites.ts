@@ -3677,7 +3677,57 @@ const ICON_TIDE_HIGH = sprite(TIDE_ICON, [
   'bbbbbbb',
 ])
 
+// ── 낚시 5부 M1: 신화의 힘(버프) 그림 9×9 — 비늘 방패, 숨결 소용돌이, 불꽃 이는 여의주 — 와 신화 표시(별 문장) ──
+const BUFF_IMUGI_SCALE = sprite({ k: '#1d3b36', g: '#3f9e86', G: '#8fe0c4', w: '#e8fff6' }, [
+  '...kkk...',
+  '..kgGgk..',
+  '.kgGwGgk.',
+  'kgGgkgGgk',
+  'kGgkgkgGk',
+  'kgkgGgkgk',
+  '.kgGwGgk.',
+  '..kgGgk..',
+  '...kkk...',
+])
+const BUFF_DRAGON_BREATH = sprite({ k: '#2a3b5c', b: '#7cc4ff', B: '#cfeeff', w: '#ffffff' }, [
+  '..kkk....',
+  '.kBBBk...',
+  'kBwwwBk..',
+  'kwBBBwBk.',
+  'kwBkBwbBk',
+  '.kwwBwbbk',
+  '..kBwbbk.',
+  '...kbbk..',
+  '....kk...',
+])
+const BUFF_DRAGON_PEARL = sprite({ k: '#5a3a10', y: '#ffd23f', Y: '#fff3b0', w: '#ffffff', o: '#ff9f43', r: '#e2483b' }, [
+  '...r.r...',
+  '..rorr...',
+  '...kkk...',
+  '..kyYYk..',
+  '.kyYwYyk.',
+  '.kyyYyyk.',
+  '.kyyyyyk.',
+  '..kyyyk..',
+  '...kkk...',
+])
+const MYTHIC_BADGE = sprite({ k: '#2a2135', y: '#ffc94a', Y: '#fff1a8', w: '#ffffff' }, [
+  '....k....',
+  '...kyk...',
+  'kkkyYykkk',
+  'kyyYwYyyk',
+  '.kyYYYyk.',
+  '.kyykyyk.',
+  'kyyk.kyyk',
+  'kyk...kyk',
+  'kk.....kk',
+])
+
 export const SPRITES: Record<string, Sprite> = {
+  'buff-imugi-scale': BUFF_IMUGI_SCALE,
+  'buff-dragon-breath': BUFF_DRAGON_BREATH,
+  'buff-dragon-pearl': BUFF_DRAGON_PEARL,
+  'mythic-badge': MYTHIC_BADGE,
   'drill-0': DRILL_0,
   'drill-1': DRILL_1,
   'drill-2': DRILL_2,
