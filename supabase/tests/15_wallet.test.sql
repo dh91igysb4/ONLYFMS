@@ -46,7 +46,8 @@ select has_function('public', 'my_wallet', 'has my_wallet');
 select has_function('public', 'user_wallet', array['text'], 'has user_wallet');
 select has_function('public', 'admin_gold_adjust', array['text', 'bigint', 'text'], 'has admin_gold_adjust');
 select has_function('public', 'admin_gold_ledger', array['integer'], 'has admin_gold_ledger');
-select is(public._economy(), '{"daily_soft_cap":30750,"soft_cap_rate":0.2}'::jsonb, '_economy: economy.ts 사본');
+select is(public._economy(), '{"daily_soft_cap":30750,"soft_cap_rate":0.2,"daily_soft_cap_2":41000,"soft_cap_rate_2":0.04}'::jsonb,
+  '_economy: economy.ts 사본 (2단 상한은 16_soft_cap_tier2)');
 
 -- ---------------------------------------------------------------- _gold_move 기본 (Review Focus 2)
 select is(public._gold_move(:'ua', 100, 'admin', 'r1', 'g-x', '메모'), 100::bigint, 'move: 지갑 없던 사람 +100 → 100');
