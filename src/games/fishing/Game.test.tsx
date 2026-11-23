@@ -8,7 +8,7 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type PendingView, type View } from './logic.ts'
 import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
 import fishingCss from './fishing.css?raw'
-import type { Player } from './walk.ts'
+import { WALK_SPEED, type Player } from './walk.ts'
 
 vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
@@ -1213,7 +1213,7 @@ describe('fishing Game: walking and interaction', () => {
     press() // 상점 행동을 눌렀지만 뗀 알림을 잃었다 (창 초점은 그대로)
     // (13, 6)으로 한 칸 옮긴 뒤 아래로 곧장 내려가 (13, 25) 물가에서 바다를 본다
     key('ArrowRight', true)
-    await advance(340)
+    await advance(Math.round((TILE * 1000) / WALK_SPEED) + 20) // 한 칸 남짓
     key('ArrowRight', false)
     key('ArrowDown', true)
     await advance(7500)

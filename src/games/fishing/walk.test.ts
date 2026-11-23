@@ -53,7 +53,7 @@ describe('stepWalk', () => {
     expect(open).not.toBeNull()
   })
 
-  it('대각선 입력 1초 이동 거리는 48', () => {
+  it('대각선 입력 1초 이동 거리는 WALK_SPEED', () => {
     let p = player(center(open!.tx, open!.ty))
     const start = { ...p.pos }
     const s = Math.SQRT1_2
@@ -69,7 +69,7 @@ describe('stepWalk', () => {
     for (let i = 0; i < 40; i++) p = stepWalk(p, { x: 0, y: 1 }, 50)
     expect(feetOverlapsBlocked(p.pos)).toBe(false)
     expect(p.pos.y + FEET.h / 2).toBeLessThanOrEqual((shore!.ty + 1) * TILE + 1e-6)
-    expect(p.pos.y + FEET.h / 2).toBeGreaterThan((shore!.ty + 1) * TILE - 1)
+    expect(p.pos.y + FEET.h / 2).toBeGreaterThan((shore!.ty + 1) * TILE - (WALK_SPEED * 50) / 1000) // 한 걸음 안쪽에서 멈춘다
   })
 
   it('물 쪽 대각선 입력이면 x는 계속 움직인다 (벽 따라 미끄러짐)', () => {

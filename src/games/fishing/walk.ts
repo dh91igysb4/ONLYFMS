@@ -2,7 +2,7 @@
 import { MAP_H, MAP_W, TILE, isWalkable, type Facing, type Vec } from './map.ts'
 import { MAX_DT_MS } from './minigame.ts'
 
-export const WALK_SPEED = 48 // px/s
+export const WALK_SPEED = 72 // px/s (초당 4.5타일)
 export const FEET = { w: 10, h: 6 } // pos 중심의 발 사각형
 
 export type Player = { pos: Vec; facing: Facing; moving: boolean; walkMs: number }
