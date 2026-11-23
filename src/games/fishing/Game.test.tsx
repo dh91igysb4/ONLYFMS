@@ -1781,7 +1781,7 @@ describe('찌 상점·장비', () => {
     const list = screen.getByRole('list', { name: '찌 목록' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(5)
     expect(within(list).getByText('희귀·전설 물고기가 더 잘 나와요')).toBeInTheDocument()
-    expect(within(list).getByText('보유 중')).toBeInTheDocument()
+    expect(within(list).getByText('보유 중 · 가방에서 낄 수 있어요')).toBeInTheDocument()
     expect(within(list).getByRole('button', { name: '가시 바늘 사기' })).toBeDisabled()
     expect(screen.queryByText('카본 낚싯대부터 낄 수 있어요')).not.toBeInTheDocument()
     fireEvent.click(within(list).getByRole('button', { name: '코르크 찌 사기' }))
@@ -1792,7 +1792,41 @@ describe('찌 상점·장비', () => {
 
   test('상점: 낚싯대 단계 2면 카본 낚싯대부터 낄 수 있다는 안내', async () => {
     await mountAtShop(makeView({ rodTier: 2 }))
+    expect(screen.getByText('사 둘 수 있고, 카본 낚싯대부터 낄 수 있어요')).toBeInTheDocument()
+  })
+
+  test('상점: 낀 찌는 "장착 중", 안 낀 보유 찌는 가방 안내', async () => {
+    await mountAtShop(makeView({ rodTier: 3, tackles: ['trap', 'cork'], equipped: ['trap'] }))
+    const list = screen.getByRole('list', { name: '찌 목록' })
+    expect(within(list).getByText('장착 중')).toBeInTheDocument()
+    expect(within(list).getAllByText('보유 중 · 가방에서 낄 수 있어요')).toHaveLength(1)
+  })
+
+  test('찌 필드 없는 옛 응답에도 상점과 가방이 그려진다', async () => {
+    const old = makeView({ rodTier: 3 }) as Partial<View>
+    delete old.tackles
+    delete old.equipped
+    await mountAtShop(old as View)
+    expect(within(screen.getByRole('list', { name: '찌 목록' })).getAllByRole('listitem')).toHaveLength(5)
+    cleanup()
+    render(<BagPanel view={old as View} atShop={false} busy={false} onEquip={() => {}} />)
+    expect(within(screen.getByRole('group', { name: '장비' })).getAllByTestId('fish-slot')).toHaveLength(1)
+  })
+
+  test('가방: 장비 구역이 가방 칸보다 위, 찌를 사기 전에도 칸과 안내가 보인다', () => {
+    const view = makeView({ rodTier: 2, tackles: ['cork'] })
+    const { container } = render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} />)
+    const gear = screen.getByRole('group', { name: '장비' })
+    const grid = container.querySelector('.fish-bag') as Element
+    expect(gear.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByText('카본 낚싯대부터 낄 수 있어요')).toBeInTheDocument()
+    cleanup()
+    render(<BagPanel view={makeView({ rodTier: 3 })} atShop={false} busy={false} onEquip={() => {}} />)
+    expect(screen.getByRole('group', { name: '장비' })).toBeInTheDocument()
+    expect(screen.getAllByTestId('fish-slot')).toHaveLength(1)
+    cleanup()
+    render(<BagPanel view={makeView({ rodTier: 2 })} atShop={false} busy={false} onEquip={() => {}} />)
+    expect(screen.queryByRole('group', { name: '장비' })).not.toBeInTheDocument()
   })
 
   test('상점: 찌 구매 실패는 상점 오류 표시로', async () => {

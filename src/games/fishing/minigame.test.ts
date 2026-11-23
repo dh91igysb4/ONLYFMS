@@ -41,7 +41,7 @@ describe('barParams 찌', () => {
     expect(barParams('anchovy', 2, []).barSize).toBe(base.barSize)
     expect(base.barSize).toBeCloseTo(0.22 * (1 + RODS[1].barBonus))
   })
-  it('cork → barSize ×1.2, trap → drain 0.5, barbed → pull > 0', () => {
+  it('cork → barSize ×1.2, trap → drain TACKLE_FX.trapDrain, barbed → pull > 0', () => {
     const base = barParams('anchovy', 2)
     const cork = barParams('anchovy', 2, ['cork'])
     expect(cork.barSize).toBeCloseTo(base.barSize * TACKLE_FX.corkBar)
@@ -57,14 +57,14 @@ describe('barParams 찌', () => {
   it('세 개 조합은 각각 반영', () => {
     const p = barParams('anchovy', 2, ['cork', 'trap', 'barbed'])
     expect(p.barSize).toBeCloseTo(barParams('anchovy', 2).barSize * 1.2)
-    expect(p.drain).toBe(0.5)
+    expect(p.drain).toBe(TACKLE_FX.trapDrain)
     expect(p.pull).toBeGreaterThan(0)
   })
 })
 
 describe('찌 효과 stepBar', () => {
   const calm = () => 0.99 // 목표 변경 없음
-  it('trap: 바 밖 1초 진행도 감소량이 절반', () => {
+  it('trap: 바 밖 1초 진행도 감소량이 trapDrain 배', () => {
     const base = { ...barParams('anchovy', 1), behavior: 'mixed' as const }
     const trap = { ...base, drain: TACKLE_FX.trapDrain }
     const start = { ...initBar(), barPos: 0.8, fishPos: 0.1, fishTarget: 0.1, progress: 0.8 }
@@ -73,7 +73,7 @@ describe('찌 효과 stepBar', () => {
       for (let i = 0; i < 50; i++) bar = stepBar(bar, true, 20, params, calm)
       return 0.8 - bar.progress
     }
-    expect(run(trap)).toBeCloseTo(run(base) * 0.5, 9)
+    expect(run(trap)).toBeCloseTo(run(base) * TACKLE_FX.trapDrain, 9)
     expect(run(base)).toBeGreaterThan(0)
   })
   it('barbed: 바 안 위쪽 끝 근처 물고기가 있으면 안 눌러도 바가 그쪽으로 끌린다, 바 밖이면 효과 없음', () => {

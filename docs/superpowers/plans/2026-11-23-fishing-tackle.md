@@ -15,7 +15,7 @@
 - `data.ts`·`logic.ts`·`minigame.ts`는 순수 모듈: React·DOM·`Date.now()`·`Math.random` 없음, 상대 import에 `.ts`.
 - 플랫폼 코드(`src/platform/`, `src/app/`)와 DB는 바꾸지 않는다.
 - 화면 문구 한국어, 모바일 우선. 캔버스 밖 색은 `theme.css` 토큰만. 그림은 새로 그린 픽셀 아트(`sprites.ts` 형식).
-- 찌 5종과 값(설계 §7 그대로): `cork` 코르크 찌 1,000G 바 길이 ×1.2 / `trap` 함정 찌 1,500G 물고기가 바 밖일 때 진행도 감소 ×0.5 / `barbed` 가시 바늘 2,000G 바 안의 물고기 쪽으로 바가 끌림 / `spinner` 회전 찌 1,500G 입질 지연 ×0.7 / `curious` 호기심 찌 5,000G rare 가중치 ×1.5·전설 확률 ×1.5.
+- 찌 5종과 값(설계 §7 그대로): `cork` 코르크 찌 1,000G 바 길이 ×1.2 / `trap` 함정 찌 1,500G 물고기가 바 밖일 때 진행도 감소 ×0.75 / `barbed` 가시 바늘 2,000G 바 안의 물고기 쪽으로 바가 끌림 / `spinner` 회전 찌 1,500G 입질 지연 ×0.7 / `curious` 호기심 찌 5,000G rare 가중치 ×1.5·전설 확률 ×1.5.
 - 칸: 낚싯대 1·2단계 0칸, 3단계 1칸, 4단계 2칸. 같은 찌 중복 장착 불가. 한 번 사면 영구.
 - `rollCatch`의 rng 호출 수(항상 5번)와 순서는 그대로. 찌가 없으면 추첨 결과는 지금과 같다.
 - `logic.version` 5. 기존 33종·낚싯대·가방 값 불변.
@@ -45,7 +45,7 @@
   export type Tackle = { id: TackleId; name: string; price: number; desc: string }
   export const TACKLES: readonly Tackle[] // 위 표 순서. desc는 한 줄 효과 설명(한국어)
   export function tackleSlots(rodTier: number): number // 1·2 → 0, 3 → 1, 4 → 2
-  export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.5, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const
+  export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const
   // logic.ts
   export type State = { …; tackles: TackleId[]; equipped: TackleId[] }
   export type Action = … | { type: 'buyTackle'; id: string } | { type: 'equip'; ids: string[] }
@@ -85,7 +85,7 @@
 - Produces:
   ```ts
   export type BarParams = { barSize: number; difficulty: number; behavior: Behavior; drain: number; pull: number }
-  //   drain: 물고기가 바 밖일 때 진행도 감소 배율(기본 1, trap 0.5)
+  //   drain: 물고기가 바 밖일 때 진행도 감소 배율(기본 1, trap 0.75)
   //   pull: 물고기가 바 안에 있을 때 바 중심을 물고기 쪽으로 끄는 세기(1/s, 기본 0, barbed는 상수 BARBED_PULL)
   export function barParams(speciesId: string, rodTier: 1 | 2 | 3 | 4, equipped?: readonly TackleId[]): BarParams
   //   cork: barSize ×1.2(낚싯대 보너스와 곱). equipped 생략 = []
@@ -94,7 +94,7 @@
 - 찌가 없으면(`drain` 1, `pull` 0) 지금 동작과 같다 — 1단계에서 만든 mixed 고정값 테스트(golden)가 그대로 통과해야 한다.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
-  - `barParams: equipped 없음 → drain 1·pull 0·barSize 지금 값; cork → barSize ×1.2; trap → drain 0.5; barbed → pull > 0; 세 개 조합은 각각 반영`
+  - `barParams: equipped 없음 → drain 1·pull 0·barSize 지금 값; cork → barSize ×1.2; trap → drain 0.75; barbed → pull > 0; 세 개 조합은 각각 반영`
   - `trap: 물고기가 바 밖에 있는 같은 상황 1초에서 진행도 감소량이 절반`
   - `barbed: 물고기가 바 안 위쪽 끝 근처일 때, 버튼을 안 눌러도 바 중심이 물고기 쪽으로 움직인다(같은 상황 pull 0 대비 더 위); 물고기가 바 밖이면 효과 없음`
   - `기존 mixed golden 테스트 통과(찌 없음)`

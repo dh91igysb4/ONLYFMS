@@ -404,7 +404,7 @@ export function Game({ gameId }: WorldGameProps) {
     }
     rt.hookServerNow = res.server_now
     rt.bar = initBar()
-    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped)
+    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [])
     rt.settling = false
     setPhase('fighting')
   }

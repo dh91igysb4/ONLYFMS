@@ -126,7 +126,7 @@ export type TackleId = 'cork' | 'trap' | 'barbed' | 'spinner' | 'curious'
 export type Tackle = { id: TackleId; name: string; price: number; desc: string }
 export const TACKLES: readonly Tackle[] = [
   { id: 'cork', name: '코르크 찌', price: 1000, desc: '낚시 바가 20% 길어져요' },
-  { id: 'trap', name: '함정 찌', price: 1500, desc: '물고기가 바 밖일 때 진행도가 절반 속도로 줄어요' },
+  { id: 'trap', name: '함정 찌', price: 1500, desc: '물고기가 바 밖일 때 진행도가 25% 덜 줄어요' },
   { id: 'barbed', name: '가시 바늘', price: 2000, desc: '물고기가 바 안에 있으면 바가 물고기 쪽으로 끌려요' },
   { id: 'spinner', name: '회전 찌', price: 1500, desc: '입질이 30% 빨리 와요' },
   { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설 물고기가 더 잘 나와요' },
@@ -135,4 +135,4 @@ export const TACKLES: readonly Tackle[] = [
 export function tackleSlots(rodTier: number): number {
   return rodTier === 3 ? 1 : rodTier === 4 ? 2 : 0
 }
-export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.5, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const
+export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const

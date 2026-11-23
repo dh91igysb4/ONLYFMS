@@ -17,7 +17,7 @@ export type BarParams = {
   barSize: number
   difficulty: number
   behavior: Behavior
-  drain: number // 물고기가 바 밖일 때 진행도 감소 배율(기본 1, trap 0.5)
+  drain: number // 물고기가 바 밖일 때 진행도 감소 배율(기본 1, trap 0.75)
   pull: number // 물고기가 바 안일 때 바를 물고기 쪽으로 끄는 세기(기본 0, barbed는 BARBED_PULL)
 }
 
@@ -38,10 +38,10 @@ const DART_SPEED_SCALE = 1.5
 const DART_MIN_JUMP = 0.4 // dart: 새 목표는 현재 위치에서 이만큼 이상 떨어진 곳
 const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
 const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
-// 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 30이면 바 가장자리(거리 0.1)에서
-// 가속 약 3으로 누르기 가속(8)의 3분의 1 남짓이다. 안에 든 물고기에 "달라붙는" 느낌은 나지만,
-// 감쇠(8)와 맞물려 정상 속도가 약 0.4/s라 빠른 dart 물고기(약 1/s 이상)는 안 눌러도 빠져나간다.
-export const BARBED_PULL = 30
+// 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
+// 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
+// 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
+export const BARBED_PULL = 70
 const PROGRESS_UP = 0.35 // 초당 진행 증가
 const PROGRESS_DOWN = 0.3 // 초당 진행 감소
 const GAUGE_PERIOD_MS = 1600

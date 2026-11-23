@@ -156,6 +156,6 @@ describe('찌', () => {
     expect(tackleSlots(99)).toBe(0)
   })
   it('TACKLE_FX 값', () => {
-    expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.5, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 })
+    expect(TACKLE_FX).toEqual({ corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 })
   })
 })

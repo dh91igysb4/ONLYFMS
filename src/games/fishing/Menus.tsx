@@ -15,36 +15,21 @@ export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: 
   const slots = tackleSlots(view.rodTier)
   const fishing = view.pending !== null
   const locked = busy || fishing
-  const full = view.equipped.length >= slots
-  const toggle = (id: TackleId) =>
-    onEquip(view.equipped.includes(id) ? view.equipped.filter((x) => x !== id) : [...view.equipped, id])
+  // 옛 서버 응답(찌 필드 없음)에도 죽지 않게 빈 목록으로 읽는다
+  const owned = view.tackles ?? []
+  const equipped = view.equipped ?? []
+  const full = equipped.length >= slots
+  const toggle = (id: TackleId) => onEquip(equipped.includes(id) ? equipped.filter((x) => x !== id) : [...equipped, id])
   return (
     <section className="fish-panel-body" aria-label="가방">
-      <p className="muted">
-        {view.bag.length}/{bagSize(view.bagTier)}칸
-      </p>
-      {!atShop && <p className="fish-shop-note">상점에서 팔 수 있어요</p>}
-      <ul className="fish-bag">
-        {cells.map((f, i) =>
-          f ? (
-            <li key={i} className="fish-cell">
-              <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt={speciesName(f.species)} />
-              <span className="fish-cell-size">{f.sizeCm}cm</span>
-              <span className="fish-cell-price">{gold(price(f.species, f.sizeCm, f.perfect))}</span>
-            </li>
-          ) : (
-            <li key={i} className="fish-cell fish-cell-empty" aria-hidden="true" />
-          ),
-        )}
-      </ul>
-      {view.tackles.length > 0 && (
+      {(owned.length > 0 || slots > 0) && (
         <div className="fish-gear" role="group" aria-label="장비">
           <h3 className="fish-panel-sub">장비</h3>
           {fishing && <p className="fish-shop-note">낚시 중에는 바꿀 수 없어요</p>}
           {slots === 0 && <p className="muted">카본 낚싯대부터 낄 수 있어요</p>}
           <ul className="fish-slots" aria-label="낀 찌">
             {Array.from({ length: slots }, (_, i) => {
-              const id = view.equipped[i]
+              const id = equipped[i]
               return (
                 <li key={i} data-testid="fish-slot" className={`fish-slot${id ? '' : ' fish-slot-empty'}`}>
                   {id && <img src={spriteDataUrl(`tackle-${id}`, ICON_SCALE)} alt="" />}
@@ -53,8 +38,8 @@ export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: 
             })}
           </ul>
           <ul className="fish-rods" aria-label="보유 찌">
-            {TACKLES.filter((t) => view.tackles.includes(t.id)).map((t) => {
-              const on = view.equipped.includes(t.id)
+            {TACKLES.filter((t) => owned.includes(t.id)).map((t) => {
+              const on = equipped.includes(t.id)
               return (
                 <li key={t.id} className={`fish-rod${on ? ' fish-rod-owned' : ''}`}>
                   <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
@@ -78,6 +63,23 @@ export function BagPanel({ view, atShop, busy, onEquip }: { view: View; atShop: 
           </ul>
         </div>
       )}
+      <p className="muted">
+        {view.bag.length}/{bagSize(view.bagTier)}칸
+      </p>
+      {!atShop && <p className="fish-shop-note">상점에서 팔 수 있어요</p>}
+      <ul className="fish-bag">
+        {cells.map((f, i) =>
+          f ? (
+            <li key={i} className="fish-cell">
+              <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt={speciesName(f.species)} />
+              <span className="fish-cell-size">{f.sizeCm}cm</span>
+              <span className="fish-cell-price">{gold(price(f.species, f.sizeCm, f.perfect))}</span>
+            </li>
+          ) : (
+            <li key={i} className="fish-cell fish-cell-empty" aria-hidden="true" />
+          ),
+        )}
+      </ul>
     </section>
   )
 }
@@ -89,6 +91,8 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
   const slots = tackleSlots(view.rodTier)
+  const ownedTackles = view.tackles ?? []
+  const equippedTackles = view.equipped ?? []
   return (
     <section className="fish-panel-body" aria-label="상점">
       <div className="fish-shop-sell">
@@ -163,10 +167,11 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
         })}
       </ul>
       <h3 className="fish-panel-sub">찌</h3>
-      {slots === 0 && <p className="fish-shop-note">카본 낚싯대부터 낄 수 있어요</p>}
+      {slots === 0 && <p className="fish-shop-note">사 둘 수 있고, 카본 낚싯대부터 낄 수 있어요</p>}
       <ul className="fish-rods" aria-label="찌 목록">
         {TACKLES.map((t) => {
-          const owned = view.tackles.includes(t.id)
+          const owned = ownedTackles.includes(t.id)
+          const on = equippedTackles.includes(t.id)
           return (
             <li key={t.id} className={`fish-rod${owned ? ' fish-rod-owned' : ''}`}>
               <img src={spriteDataUrl(`tackle-${t.id}`, ICON_SCALE)} alt="" />
@@ -176,7 +181,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
                 <span className="muted">{gold(t.price)}</span>
               </div>
               {owned ? (
-                <span className="fish-rod-state">보유 중</span>
+                <span className="fish-rod-state">{on ? '장착 중' : '보유 중 · 가방에서 낄 수 있어요'}</span>
               ) : (
                 <button
                   type="button"
