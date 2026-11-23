@@ -7,6 +7,7 @@ import type { WorldGameProps } from '../ui.ts'
 import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
+import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
 import { castTarget, interactionAt, SHOP_SPOT, SPAWN, tileOf, type Interaction, type Vec } from './map.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
@@ -495,6 +496,7 @@ export function Game({ gameId }: WorldGameProps) {
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
+      cond: conditionsAt(Date.now() + rt.offset),
     }, size)
   }
 

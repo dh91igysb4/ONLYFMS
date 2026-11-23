@@ -65,7 +65,15 @@ describe('SPRITES', () => {
     }
   })
 
-  it('all 12 fish are drawn differently', () => {
+  it('weather icons exist and are small', () => {
+    for (const name of ['icon-sun', 'icon-rain', 'icon-snow']) {
+      expect(SPRITES[name], name).toBeDefined()
+      expect(SPRITES[name].w, name).toBeLessThanOrEqual(10)
+      expect(SPRITES[name].h, name).toBeLessThanOrEqual(10)
+    }
+  })
+
+  it('all fish are drawn differently', () => {
     const drawings = SPECIES.map((s) => SPRITES[`fish-${s.id}`].rows.join('\n'))
     expect(new Set(drawings).size).toBe(SPECIES.length)
   })

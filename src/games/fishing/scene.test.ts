@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudSide, releaseSceneCache, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
-import { PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
+import { MAP_W, PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
 import { cameraFor, type Player } from './walk.ts'
+import type { Conditions } from './clock.ts'
 
 // 그려진 스프라이트의 화면 좌표(이동 반영)를 기록하려고 drawSprite를 감싼다. 그리기 자체는 실제 함수가 한다.
 vi.mock('./sprites.ts', async (importOriginal) => {
@@ -25,6 +26,12 @@ class RecordingCtx {
   rects: Rect[] = []
   images: unknown[][] = []
   sprites: SpriteCall[] = []
+  font = ''
+  textBaseline = ''
+  texts: { text: string; x: number; y: number }[] = []
+  fillText(text: string, x: number, y: number) {
+    this.texts.push({ text, x: x + this.tx, y: y + this.ty })
+  }
   fillRect(x: number, y: number, w: number, h: number) {
     this.rects.push({ x: x + this.tx, y: y + this.ty, w, h, color: this.fillStyle })
   }
@@ -47,6 +54,7 @@ const asCtx = (c: RecordingCtx) => c as unknown as CanvasRenderingContext2D
 
 const bar = { barPos: 0.55, barVel: 0, fishPos: 0.62, fishTarget: 0.6, progress: 0.58, perfect: true, t: 0 }
 const barParams: BarParams = { barSize: 0.3, difficulty: 0.5, behavior: 'mixed' }
+const NOON_SUN: Conditions = { gameMinute: 12 * 60, gameDay: 1, season: 'spring', weather: 'sun' }
 const PHASES: Phase[] = ['idle', 'charging', 'waiting', 'bite', 'fighting', 'caught', 'lost']
 const SIZES: [number, number][] = [[160, 240], [195, 280], [320, 480]]
 
@@ -69,6 +77,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     bar: phase === 'fighting' ? bar : null,
     barParams: phase === 'fighting' ? barParams : null,
     caughtSpecies: phase === 'caught' ? 'mackerel' : null,
+    cond: NOON_SUN,
     ...extra,
   }
 }
@@ -370,5 +379,71 @@ describe('drawWorld with an offscreen canvas', () => {
         }
       }
     }
+  })
+})
+
+describe('시계·밤·날씨', () => {
+  const W = 195
+  const H = 280
+  const draw = (phase: Phase, p: Player, cond: Conditions, extra: Partial<WorldScene> = {}) => {
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), scene(phase, p, { w: W, h: H }, { cond, ...extra }), { w: W, h: H })
+    return ctx
+  }
+  const idle = player(SPAWN.pos)
+  const cover = (c: RecordingCtx) => c.rects.filter((r) => r.x === 0 && r.y === 0 && r.w >= W && r.h >= H && r.color.startsWith('rgba'))
+  const SPRING_14_37: Conditions = { gameMinute: 14 * 60 + 37, gameDay: 1, season: 'spring', weather: 'sun' }
+
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+
+  test('HUD 텍스트는 계절과 10분 단위로 내린 시각을 그린다', () => {
+    const ctx = draw('idle', idle, SPRING_14_37)
+    expect(ctx.texts.some((t) => t.text.includes('봄') && t.text.includes('14:30'))).toBe(true)
+    expect(ctx.sprites.some((s) => s.name === 'icon-sun')).toBe(true)
+  })
+
+  test('날씨 아이콘: 비는 icon-rain, 겨울 비는 icon-snow', () => {
+    expect(draw('idle', idle, { ...SPRING_14_37, weather: 'rain' }).sprites.some((s) => s.name === 'icon-rain')).toBe(true)
+    expect(draw('idle', idle, { ...SPRING_14_37, season: 'winter', weather: 'rain' }).sprites.some((s) => s.name === 'icon-snow')).toBe(true)
+  })
+
+  test('밤에는 화면 전체를 덮는 반투명 채우기가 한 번, 정오에는 없다', () => {
+    expect(cover(draw('idle', idle, { ...NOON_SUN, gameMinute: 0 }))).toHaveLength(1)
+    expect(cover(draw('idle', idle, NOON_SUN))).toHaveLength(0)
+  })
+
+  test('비·눈 입자: 있고 80개 이하, 맑으면 없음, 같은 시각이면 같은 자리', () => {
+    const count = (c: RecordingCtx) => c.rects.length
+    const base = count(draw('idle', idle, NOON_SUN))
+    const rain = draw('idle', idle, { ...NOON_SUN, weather: 'rain' })
+    const snow = draw('idle', idle, { ...NOON_SUN, season: 'winter', weather: 'rain' })
+    for (const c of [rain, snow]) {
+      const n = count(c) - base
+      expect(n).toBeGreaterThan(0)
+      expect(n).toBeLessThanOrEqual(80)
+    }
+    const again = draw('idle', idle, { ...NOON_SUN, weather: 'rain' })
+    expect(again.rects).toEqual(rain.rects)
+    const later = draw('idle', idle, { ...NOON_SUN, weather: 'rain' }, { tMs: 1234 + 400 })
+    expect(later.rects).not.toEqual(rain.rects)
+  })
+
+  test('HUD는 fighting 중 트랙 반대쪽에 그려진다', () => {
+    const seen = new Set<string>()
+    for (const pos of [tileCentre(2, 24), tileCentre(MAP_W - 3, 24), PIER_SPOT, SPAWN.pos]) {
+      const p = player(pos)
+      const s = scene('fighting', p, { w: W, h: H })
+      const ctx = new RecordingCtx()
+      drawWorld(asCtx(ctx), s, { w: W, h: H })
+      const side = hudSide(p.pos.x - s.camera.x, W)
+      seen.add(side)
+      const icon = ctx.sprites.find((sp) => sp.name === 'icon-sun')!
+      // 트랙이 오른쪽이면 시계는 왼쪽 절반, 트랙이 왼쪽이면 오른쪽 절반
+      if (side === 'right') expect(icon.x).toBeLessThan(W / 2)
+      else expect(icon.x).toBeGreaterThan(W / 2)
+    }
+    expect(seen.size).toBe(2)
   })
 })
