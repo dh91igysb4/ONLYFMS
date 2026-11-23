@@ -7,15 +7,18 @@ const signOut = vi.hoisted(() => vi.fn(async () => ({ error: null })))
 vi.mock('../../lib/supabase.ts', () => ({
   supabase: { from: () => ({ upsert: (...a: unknown[]) => (upsert as (...x: unknown[]) => unknown)(...a) }), auth: { signOut } },
 }))
-const auth = vi.hoisted(() => ({ isAdmin: false }))
+const auth = vi.hoisted(() => ({ isAdmin: false, status: 'approved' }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
-  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: auth.isAdmin } }),
+  useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: auth.status, is_admin: auth.isAdmin } }),
 }))
+const fetchMyWallet = vi.hoisted(() => vi.fn())
+vi.mock('../wallet/api.ts', () => ({ fetchMyWallet }))
 const pendingCount = vi.hoisted(() => vi.fn())
 vi.mock('../suggest/adminApi.ts', () => ({ suggestionPendingCount: pendingCount }))
 
 import { Layout } from './Layout.tsx'
 import { resetFreeQueue } from '../games/freeQueue.ts'
+import { resetWallet, setWallet } from '../../lib/walletStore.ts'
 
 const row = {
   client_id: 'q1', user_id: 'u1', game_id: 'test-guess', options: {},
@@ -28,6 +31,14 @@ beforeEach(() => {
   pendingCount.mockReset()
   pendingCount.mockResolvedValue(0)
   auth.isAdmin = false
+  auth.status = 'approved'
+  resetWallet()
+  fetchMyWallet.mockReset()
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 1234, today: {}, earnedToday: 0 }
+    setWallet(w)
+    return w
+  })
   localStorage.clear()
   resetFreeQueue()
   localStorage.setItem('onlyfms:freeQueue', JSON.stringify([row]))
@@ -209,4 +220,18 @@ test('경로가 바뀐 뒤 조회가 실패하면 조용히 이전 배지를 유
   fireEvent.click(screen.getByRole('link', { name: '제안' }))
   await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(2))
   expect(screen.getByLabelText('결정 대기 제안 3건')).toBeTruthy()
+})
+
+test('로드 때 my_wallet을 한 번 읽고 헤더에 잔액을 보여 준다', async () => {
+  mount()
+  expect(await screen.findByLabelText('내 골드 1,234 G')).toBeTruthy()
+  expect(fetchMyWallet).toHaveBeenCalledTimes(1)
+})
+
+test('승인되지 않은 사용자에게는 배지가 없고 my_wallet도 부르지 않는다', async () => {
+  auth.status = 'pending'
+  mount()
+  await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
+  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(fetchMyWallet).not.toHaveBeenCalled()
 })

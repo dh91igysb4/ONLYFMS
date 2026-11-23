@@ -1,5 +1,5 @@
 import { supabase, supabaseUrl, supabaseKey } from './supabase.ts'
-import { setBalance } from './walletStore.ts'
+import { notifyGoldCapped, setBalance } from './walletStore.ts'
 
 export type PlayView = {
   item_id: string
@@ -213,5 +213,7 @@ export async function world<V = unknown, R = unknown>(
   const res = (await callFunction('world', body)) as WorldView<V, R>
   // 지갑을 쓰는 게임은 최상위 gold(잔액)를 보낸다. 헤더 배지가 추가 요청 없이 갱신된다
   if (typeof res?.gold === 'number' && Number.isFinite(res.gold)) setBalance(res.gold)
+  const c = res?.gold_capped
+  if (c && typeof c.asked === 'number' && typeof c.got === 'number') notifyGoldCapped({ asked: c.asked, got: c.got })
   return res
 }

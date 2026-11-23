@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useFreeQueueFlush } from '../games/freeQueue.ts'
 import { suggestionPendingCount } from '../suggest/adminApi.ts'
+import { WalletBadge } from '../wallet/WalletBadge.tsx'
+import { refreshWallet } from '../wallet/useWallet.ts'
 import { Brand } from './Brand.tsx'
 import { UserMenu } from './UserMenu.tsx'
 
@@ -10,6 +12,12 @@ export function Layout() {
   const { profile } = useAuth()
   useFreeQueueFlush()
   const isAdmin = !!profile?.is_admin
+  const approved = profile?.status === 'approved'
+  const uid = profile?.id
+  // 앱 로드(또는 사용자가 바뀔 때) 잔액을 읽는다. 이후 갱신은 world 응답·각 화면이 맡는다(설계 §5.5)
+  useEffect(() => {
+    if (approved && uid) void refreshWallet()
+  }, [approved, uid])
   const { pathname } = useLocation()
   const [pending, setPending] = useState(0)
   useEffect(() => {
@@ -24,7 +32,10 @@ export function Layout() {
         <div className="app-header-inner">
           <div className="header-row">
             <Brand />
-            {profile?.handle && <UserMenu handle={profile.handle} />}
+            <div className="header-right">
+              {approved && <WalletBadge />}
+              {profile?.handle && <UserMenu handle={profile.handle} />}
+            </div>
           </div>
           <nav className="nav" aria-label="주 메뉴">
             <NavLink to="/" end>홈</NavLink>

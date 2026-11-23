@@ -360,3 +360,18 @@ test('profile_records_tab_direct_entry_shows_record', async () => {
   expect(screen.getByText('횟수')).toBeTruthy()
   expect(rpcMock).toHaveBeenCalledWith('user_records', { p_handle: 'kane' })
 })
+
+test('profile_gold: 다른 사람 프로필 요약에 골드', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000 })
+  renderAt('messi')
+  expect(await screen.findByLabelText('골드 5,000 G')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' })
+})
+
+test('profile_gold: null이면 줄 없음', async () => {
+  setup({ user_stats: emptyStats })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' }))
+  expect(screen.queryByLabelText(/^골드/)).toBeNull()
+})

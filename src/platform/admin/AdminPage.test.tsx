@@ -21,6 +21,7 @@ vi.mock('../../games/index.ts', () => ({
     { manifest: { id: 'players', name: '선수 맞추기', hidden: false, puzzleSource: 'bank' } },
   ],
   duels: [],
+  worlds: [],
 }))
 
 import { ApiError } from '../../lib/api.ts'
@@ -181,4 +182,10 @@ test('cancel_live_contest_requires_confirm', async () => {
   expect(rpcMock.mock.calls.some((x) => x[0] === 'cancel_contest')).toBe(false)
   fireEvent.click(within(li).getByRole('button', { name: '취소 확인' }))
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('cancel_contest', { p_id: 'c1' }))
+})
+
+test('골드 섹션: 최근 장부를 읽는다', async () => {
+  renderPage()
+  expect(await screen.findByRole('heading', { name: '골드' })).toBeTruthy()
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('admin_gold_ledger', { p_limit: 50 }))
 })

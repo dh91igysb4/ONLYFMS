@@ -42,3 +42,14 @@ test('resetWallet은 처음 상태로 되돌리고 알린다', () => {
   expect(fn).toHaveBeenCalledTimes(1)
   expect(getWallet()).toEqual({ balance: null, today: {}, earnedToday: 0 })
 })
+
+test('상한 알림 구독', async () => {
+  const { notifyGoldCapped, subscribeGoldCapped } = await import('./walletStore.ts')
+  const fn = vi.fn()
+  const off = subscribeGoldCapped(fn)
+  notifyGoldCapped({ asked: 1000, got: 800 })
+  expect(fn).toHaveBeenCalledWith({ asked: 1000, got: 800 })
+  off()
+  notifyGoldCapped({ asked: 1, got: 0 })
+  expect(fn).toHaveBeenCalledTimes(1)
+})

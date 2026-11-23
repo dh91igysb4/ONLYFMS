@@ -45,3 +45,19 @@ export function subscribeWallet(fn: () => void): () => void {
 export function resetWallet(): void {
   emit(EMPTY)
 }
+
+// ---- 사이트 하루 상한 알림 (설계 §5.5) ----
+// world 응답의 gold_capped를 플랫폼 화면(WorldPage)이 받는다. 게임 화면은 이 값을 몰라도 된다.
+export type GoldCapped = { asked: number; got: number }
+const cappedListeners = new Set<(c: GoldCapped) => void>()
+
+export function notifyGoldCapped(c: GoldCapped): void {
+  for (const fn of cappedListeners) {
+    try { fn(c) } catch { /* 알림 실패는 무시 */ }
+  }
+}
+
+export function subscribeGoldCapped(fn: (c: GoldCapped) => void): () => void {
+  cappedListeners.add(fn)
+  return () => { cappedListeners.delete(fn) }
+}
