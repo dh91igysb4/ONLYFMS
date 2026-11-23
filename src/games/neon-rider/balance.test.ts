@@ -20,7 +20,8 @@ function found(id: string, vx: number): PassResult {
   return r
 }
 
-describe('통과 게이트(빠른 부분)', () => {
+describe.skip('통과 게이트(빠른 부분)', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   it.each(TEMPLATES.map((t) => t.id))('%s: 진입 속도 0·V_MAX·BOOST_V 통과, 넘겨주는 속력 ≤ BOOST_V', (id) => {
     for (const vx of SMOKE) {
       const r = found(id, vx)
@@ -77,7 +78,8 @@ describe('통과 게이트(빠른 부분)', () => {
 const MIN_AIR = 70
 const N_MAX = 100
 const JUMPS = ['ramp', 'boostjump', 'spikes']
-describe('한 바퀴 착지가 가능한 점프', () => {
+describe.skip('한 바퀴 착지가 가능한 점프', () => {
+  // 사용자 결정(2026-11-23): 봇 통과 검증을 잠시 끈다. 영상과 같은 장애물을 먼저 넣고, 사용자가 플레이하며 불가능한 곳을 고친다. 다시 켜려면 skip을 지운다.
   // longestAir: 턱 근처에서 뜬 뒤의 가장 긴 체공.
   function attempt(id: string, vx: number, n: number): { dead: boolean; flips: number; longestAir: number } {
     const b = buildTemplate(TEMPLATES.find((t) => t.id === id)!)
