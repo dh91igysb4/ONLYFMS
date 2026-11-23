@@ -192,7 +192,17 @@ export async function duel<T = DuelView>(body: Record<string, unknown>): Promise
 }
 
 /** 지속형(world) 게임의 응답 (supabase/functions/world/handler.ts). result는 방금 행동의 결과, 불러오기에는 null. */
-export type WorldView<V = unknown, R = unknown> = { view: V; result: R | null; server_now: number }
+/**
+ * world 응답. gold(지갑 잔액)·gold_capped(사이트 하루 상한으로 줄었을 때)는 플랫폼 필드로,
+ * 지갑을 쓰는 게임(WorldLogic.wallet)만 보낸다(설계 §6).
+ */
+export type WorldView<V = unknown, R = unknown> = {
+  view: V
+  result: R | null
+  server_now: number
+  gold?: number
+  gold_capped?: { asked: number; got: number }
+}
 
 /** 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act). */
 export async function world<V = unknown, R = unknown>(

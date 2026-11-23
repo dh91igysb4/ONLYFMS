@@ -1,5 +1,9 @@
 // 지속형(world) 게임 핸들러. 사용자·게임마다 저장 행(world_saves) 하나를 읽고, 게임의 순수 WorldLogic을 적용한다.
 // 매 요청은 저장 행을 `for update`로 잠근 한 트랜잭션이다. 게임 id로 분기하지 않는다(등록부·logic이 차이를 푼다).
+// 지갑(설계 docs/superpowers/specs/2026-11-23-wallet-design.md §6): logic.wallet이 true인 게임만
+//   세이브 행 → 지갑 행 순서로 잠그고(act), 옛 세이브의 골드를 legacyGold로 한 번 옮기고(reason migrate),
+//   apply가 돌려준 gold 증감을 _gold_move(reason world)로 장부에 반영한다. 사이트 하루 상한은 _gold_move가 적용하고
+//   핸들러는 실제 들어간 양(잔액 차이)만 보고 gold_capped를 알린다. wallet이 없는 게임은 지갑을 건드리지 않는다.
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getWorld } from '../../../src/games/index.ts'
@@ -46,6 +50,11 @@ export async function handle(req: Request, deps: WorldDeps): Promise<Response> {
   }
 }
 
+/** _gold_move가 잔액 음수를 거절할 때의 postgres 오류 */
+function isNotEnoughGold(e: unknown): boolean {
+  return isPlainObject(e) && (e as { message?: unknown }).message === 'not_enough_gold'
+}
+
 async function route(req: Request, deps: WorldDeps): Promise<Out> {
   if (req.method !== 'POST') return err(405, 'method_not_allowed')
   const uid = await deps.getUserId(req)
@@ -80,7 +89,22 @@ async function route(req: Request, deps: WorldDeps): Promise<Out> {
   }
 
   const logic: Logic = mod.logic
-  return await txOn(deps.sql)((tx) => run(tx, deps, logic, uid, gameId, isAct, body.payload))
+  try {
+    return await txOn(deps.sql)((tx) => run(tx, deps, logic, uid, gameId, isAct, body.payload))
+  } catch (e) {
+    // 게임이 ctx.gold 검사를 빠뜨렸거나 다른 지출과 겹친 경우의 마지막 안전장치. 트랜잭션은 이미 롤백됐다
+    if (isNotEnoughGold(e)) return err(400, 'not_enough_gold')
+    throw e
+  }
+}
+
+/** bigint를 text로 받아 숫자로 (잔액은 2^53보다 훨씬 작다) */
+async function goldMove(
+  tx: Tx, uid: string, delta: number, reason: string, ref: string | null, gameId: string,
+): Promise<number> {
+  const [r] = await tx<{ b: string }[]>`
+    select public._gold_move(${uid}::uuid, ${delta}::bigint, ${reason}, coalesce(${ref}, gen_random_uuid()::text), ${gameId})::text as b`
+  return Number(r.b)
 }
 
 async function run(
@@ -102,28 +126,56 @@ async function run(
     select state, logic_version from public.world_saves
      where user_id = ${uid} and game_id = ${gameId} for update`
 
+  const wallet = logic.wallet === true
+  let gold = 0
+  if (wallet) {
+    if (isAct) {
+      const [w] = await tx<{ b: string }[]>`select public._wallet_lock(${uid}::uuid)::text as b`
+      gold = Number(w.b)
+    } else {
+      const [w] = await tx<{ b: string }[]>`
+        select coalesce((select balance from public.wallets where user_id = ${uid}), 0)::text as b`
+      gold = Number(w.b)
+    }
+  }
+
   let state: unknown = row.state
   let dirty = false
   if (row.logic_version !== logic.version) {
+    if (wallet && logic.legacyGold) {
+      const n = logic.legacyGold(state, row.logic_version)
+      if (!Number.isSafeInteger(n) || n < 0) throw new Error(`world: legacyGold must be a non-negative integer, got ${n}`)
+      // 중복 방지는 장부 unique (user, 'migrate', gameId)가 맡는다
+      if (n > 0) gold = await goldMove(tx, uid, n, 'migrate', gameId, gameId)
+    }
     state = logic.migrate(state, row.logic_version)
     dirty = true
   }
 
   let result: unknown = null
+  let capped: { asked: number; got: number } | null = null
   if (isAct) {
-    const r = logic.apply(state, payload, { now, rng: deps.rng })
-    if ('error' in r) return err(400, r.error)
+    const r = logic.apply(state, payload, wallet ? { now, rng: deps.rng, gold } : { now, rng: deps.rng, gold: 0 })
+    if ('error' in r) {
+      // 지갑 게임: 이전(migrate·지갑 이전)이 있었으면 그것만은 저장한다. 지갑 이전이 커밋된 채 세이브가 옛 버전으로
+      // 남지 않게(설계 §6). 지갑이 없는 게임은 지금처럼 아무것도 저장하지 않는다
+      if (dirty && wallet) await writeSave(tx, uid, gameId, state, logic.version)
+      return err(400, r.error)
+    }
+    const delta = r.gold ?? 0
+    if (delta !== 0) {
+      if (!wallet) throw new Error('world: gold returned by a game without wallet')
+      if (!Number.isSafeInteger(delta)) throw new Error(`world: gold must be an integer, got ${delta}`)
+      const before = gold
+      gold = await goldMove(tx, uid, delta, 'world', null, gameId)
+      if (delta > 0 && gold - before < delta) capped = { asked: delta, got: gold - before }
+    }
     state = r.state
     result = r.result ?? null
     dirty = true
   }
 
-  if (dirty) {
-    await tx`
-      update public.world_saves
-         set state = ${tx.json(state as never)}, logic_version = ${logic.version}, updated_at = now()
-       where user_id = ${uid} and game_id = ${gameId}`
-  }
+  if (dirty) await writeSave(tx, uid, gameId, state, logic.version)
   if (isAct) {
     for (const r of logic.records(state)) {
       await tx`
@@ -133,5 +185,15 @@ async function run(
         do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
     }
   }
-  return out(200, { view: logic.view(state, { now }), result, server_now: now })
+  if (!wallet) return out(200, { view: logic.view(state, { now, gold: 0 }), result, server_now: now })
+  const body: Record<string, unknown> = { view: logic.view(state, { now, gold }), result, server_now: now, gold }
+  if (capped) body.gold_capped = capped
+  return out(200, body)
+}
+
+async function writeSave(tx: Tx, uid: string, gameId: string, state: unknown, version: number) {
+  await tx`
+    update public.world_saves
+       set state = ${tx.json(state as never)}, logic_version = ${version}, updated_at = now()
+     where user_id = ${uid} and game_id = ${gameId}`
 }

@@ -46,8 +46,51 @@ const v2: WorldLogic<any, A, any> = {
   migrate: (state) => ({ n: (state as S).n, bonus: 0 }),
   apply: (state, a) => (a.type === 'inc' ? { state: { ...state, n: state.n + 1 } } : { error: 'nope' }),
 }
+// 지갑을 쓰는 가짜 월드 (설계 §6). 상태 n은 earn 누적(게임은 상한을 모른다)
+type GS = { n: number; earned: number }
+type GA =
+  | { type: 'earn'; n: number }
+  | { type: 'spend'; n: number }
+  | { type: 'force'; n: number }
+  | { type: 'frac' }
+  | { type: 'bad' }
+  | { type: 'inc' }
+const wbase: WorldLogic<GS, GA, GS & { gold: number }> = {
+  version: 1,
+  wallet: true,
+  init: () => ({ n: 0, earned: 0 }),
+  migrate: (state) => ({ n: (state as GS).n ?? 0, earned: (state as GS).earned ?? 0 }),
+  apply: (state, a, ctx) => {
+    if (a.type === 'earn') return { state: { ...state, earned: state.earned + a.n }, gold: a.n }
+    if (a.type === 'spend') {
+      if ((ctx.gold ?? 0) < a.n) return { error: 'not_enough_gold' }
+      return { state: { ...state, n: state.n + 1 }, gold: -a.n }
+    }
+    if (a.type === 'force') return { state: { ...state, n: state.n + 1 }, gold: a.n }
+    if (a.type === 'frac') return { state: { ...state, n: state.n + 1 }, gold: 1.5 }
+    if (a.type === 'inc') return { state: { ...state, n: state.n + 1 } }
+    return { error: 'nope' }
+  },
+  view: (state, ctx) => ({ ...state, gold: ctx.gold ?? -1 }),
+  records: () => [],
+}
+// 버전 2: v1 세이브에 들어 있던 gold를 지갑으로 옮긴다
+const wv2: WorldLogic<GS, GA, GS & { gold: number }> = {
+  ...wbase,
+  version: 2,
+  migrate: (state) => ({ n: (state as GS).n ?? 0, earned: 0 }),
+  legacyGold: (raw, from) => (from <= 1 ? ((raw as { gold?: number }).gold ?? 0) : 0),
+}
+// 지갑을 쓰지 않는데 gold를 돌려주는 게임(버그) → 500
+const nogold: WorldLogic<S, A, S> = {
+  ...base,
+  apply: (state) => ({ state: { n: state.n + 1 }, gold: 5 }),
+}
 const worlds = new Map<string, WorldModule>([
   ['test-world', { manifest: manifest('test-world', false), logic: base }],
+  ['test-wallet', { manifest: manifest('test-wallet', false), logic: wbase }],
+  ['test-wallet-v2', { manifest: manifest('test-wallet-v2', false), logic: wv2 }],
+  ['test-nogold', { manifest: manifest('test-nogold', false), logic: nogold }],
   ['test-world-v2', { manifest: manifest('test-world-v2', false), logic: v2 }],
   ['test-world-hidden', { manifest: manifest('test-world-hidden', true), logic: base }],
 ])
@@ -266,6 +309,9 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(sold.status, 200)
   const gold = (sold.body.view as { gold: number }).gold
   assert.ok(gold > 0)
+  // 낚시는 아직 지갑을 쓰지 않는다(계획 Task 4 전): 최상위 gold 없음, 지갑 행 없음
+  assert.equal('gold' in sold.body, false)
+  assert.equal((await sql`select 1 from public.wallets where user_id = ${admin}`).length, 0)
   assert.ok(gold < 800)
   const bag = await real({ game, action: 'act', payload: { type: 'buyBag', tier: 2 } })
   assert.equal(bag.status, 400)
@@ -276,6 +322,190 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
   assert.deepEqual(rows.map((r) => r.key), ['biggest', 'challenges', 'dex', 'total_earned'])
+})
+
+// ---------------------------------------------------------------- wallet (지갑 1단계 Task 3)
+const W = 'test-wallet'
+const W2 = 'test-wallet-v2'
+async function balance(uid: string): Promise<number> {
+  const [r] = await sql`select balance::text as b from public.wallets where user_id = ${uid}`
+  return r ? Number(r.b) : 0
+}
+async function ledger(uid: string) {
+  return await sql<{ delta: string; raw_delta: string | null; reason: string; ref: string; game_id: string | null }[]>`
+    select delta::text, raw_delta::text, reason, ref, game_id from public.gold_ledger where user_id = ${uid} order by id`
+}
+
+t('non-wallet game: no wallet row, no top-level gold (behaves as before)', async () => {
+  const u = await user()
+  const r = await act(u, { type: 'inc' })
+  assert.equal(r.status, 200)
+  assert.equal('gold' in r.body, false)
+  assert.equal('gold' in (await load(u)).body, false)
+  assert.equal((await sql`select 1 from public.wallets where user_id = ${u}`).length, 0)
+})
+
+t('non-wallet game returning gold → 500, rolled back', async () => {
+  const u = await user()
+  const r = await act(u, { type: 'inc' }, 'test-nogold')
+  assert.equal(r.status, 500)
+  assert.equal((await save(u, 'test-nogold')).length, 0)
+  assert.equal(await balance(u), 0)
+})
+
+t('wallet load (first): gold 0, view gets ctx.gold 0', async () => {
+  const u = await user()
+  const r = await load(u, W)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.gold, 0)
+  assert.equal((r.body.view as { gold: number }).gold, 0)
+  assert.equal('gold_capped' in r.body, false)
+})
+
+t('wallet earn: ledger world row with uuid ref, twice both count', async () => {
+  const u = await user()
+  const r = await act(u, { type: 'earn', n: 30 }, W)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.gold, 30)
+  assert.equal((r.body.view as { gold: number }).gold, 30)
+  assert.equal(await balance(u), 30)
+  const rows = await ledger(u)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].reason, 'world')
+  assert.equal(rows[0].game_id, W)
+  assert.match(rows[0].ref, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  assert.equal((await act(u, { type: 'earn', n: 30 }, W)).body.gold, 60)
+  assert.equal(await balance(u), 60)
+  assert.equal((await load(u, W)).body.gold, 60)
+})
+
+t('wallet spend more than balance: game error 400, nothing changes', async () => {
+  const u = await user()
+  await act(u, { type: 'earn', n: 60 }, W)
+  const r = await act(u, { type: 'spend', n: 100 }, W)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, 'not_enough_gold')
+  assert.equal(await balance(u), 60)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 60 })
+  const ok = await act(u, { type: 'spend', n: 40 }, W)
+  assert.equal(ok.status, 200)
+  assert.equal(ok.body.gold, 20)
+})
+
+t('wallet force −100 past balance: server guard 400 not_enough_gold, rolled back', async () => {
+  const u = await user()
+  await act(u, { type: 'earn', n: 60 }, W)
+  const r = await act(u, { type: 'force', n: -100 }, W)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, 'not_enough_gold')
+  assert.equal(await balance(u), 60)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 60 })
+  assert.equal((await ledger(u)).length, 1)
+})
+
+t('wallet fractional gold → 500, rolled back', async () => {
+  const u = await user()
+  await act(u, { type: 'earn', n: 10 }, W)
+  const r = await act(u, { type: 'frac' }, W)
+  assert.equal(r.status, 500)
+  assert.equal(await balance(u), 10)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 10 })
+})
+
+t('wallet migrate: v1 save gold moves once, save drops gold', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, ${W2}, ${sql.json({ n: 3, gold: 50 })}, 1)`
+  const r = await load(u, W2)
+  assert.equal(r.status, 200)
+  assert.equal(r.body.gold, 50)
+  assert.equal((r.body.view as { gold: number }).gold, 50)
+  const rows = await ledger(u)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].reason, 'migrate')
+  assert.equal(rows[0].ref, W2)
+  assert.equal(rows[0].game_id, W2)
+  const s = await save(u, W2)
+  assert.equal(s[0].logic_version, 2)
+  assert.deepEqual(s[0].state, { n: 3, earned: 0 })
+  assert.equal((await load(u, W2)).body.gold, 50)
+  assert.equal((await ledger(u)).length, 1)
+})
+
+t('wallet migrate + apply error: migration still committed', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, ${W2}, ${sql.json({ n: 1, gold: 50 })}, 1)`
+  const r = await act(u, { type: 'bad' }, W2)
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, 'nope')
+  assert.equal(await balance(u), 50)
+  assert.equal((await ledger(u)).filter((l) => l.reason === 'migrate').length, 1)
+  const s = await save(u, W2)
+  assert.equal(s[0].logic_version, 2)
+  assert.deepEqual(s[0].state, { n: 1, earned: 0 })
+})
+
+t('wallet migrate: concurrent loads move once', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, ${W2}, ${sql.json({ n: 1, gold: 50 })}, 1)`
+  const rs = await Promise.all([load(u, W2), load(u, W2)])
+  assert.ok(rs.every((r) => r.status === 200 && r.body.gold === 50))
+  assert.equal(await balance(u), 50)
+  assert.equal((await ledger(u)).length, 1)
+})
+
+t('wallet migrate: legacyGold 0 writes no ledger row', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, ${W2}, ${sql.json({ n: 1 })}, 1)`
+  const r = await load(u, W2)
+  assert.equal(r.body.gold, 0)
+  assert.equal((await ledger(u)).length, 0)
+  assert.equal((await save(u, W2))[0].logic_version, 2)
+})
+
+t('wallet concurrent earn 10 × 5 → 50', async () => {
+  const u = await user()
+  const rs = await Promise.all(Array.from({ length: 5 }, () => act(u, { type: 'earn', n: 10 }, W)))
+  assert.ok(rs.every((r) => r.status === 200))
+  assert.equal(await balance(u), 50)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 50 })
+})
+
+t('wallet site daily cap: gold_capped, ledger raw_delta, game state unreduced', async () => {
+  const u = await user()
+  const a = await act(u, { type: 'earn', n: 30000 }, W)
+  assert.equal('gold_capped' in a.body, false)
+  const b = await act(u, { type: 'earn', n: 1000 }, W)
+  assert.equal(b.status, 200)
+  assert.equal(b.body.gold, 30800)
+  assert.deepEqual(b.body.gold_capped, { asked: 1000, got: 800 })
+  const last = (await ledger(u)).at(-1)!
+  assert.equal(last.delta, '800')
+  assert.equal(last.raw_delta, '1000')
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 31000 })
+  const sp = await act(u, { type: 'spend', n: 500 }, W)
+  assert.equal(sp.body.gold, 30300)
+  assert.equal('gold_capped' in sp.body, false)
+})
+
+t('wallet migrate does not count toward the cap', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, ${W2}, ${sql.json({ n: 1, gold: 50000 })}, 1)`
+  const r = await act(u, { type: 'earn', n: 100 }, W2)
+  assert.equal(r.body.gold, 50100)
+  assert.equal('gold_capped' in r.body, false)
+})
+
+t('wallet concurrent earn 20,000 × 2 → 32,600', async () => {
+  const u = await user()
+  const rs = await Promise.all([act(u, { type: 'earn', n: 20000 }, W), act(u, { type: 'earn', n: 20000 }, W)])
+  assert.ok(rs.every((r) => r.status === 200))
+  assert.equal(await balance(u), 32600)
+  assert.equal(rs.filter((r) => 'gold_capped' in r.body).length, 1)
 })
 
 t('teardown', async () => {
