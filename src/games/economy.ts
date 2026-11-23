@@ -49,3 +49,48 @@ export function softCap(amount: number, earnedToday: number): number {
   // room2를 채우고 남은 원래 금액(d1 − room2 × 1000 / R1)의 R2
   return full + room2 + Math.floor(((d1 * R1 - room2 * PER_MILLE) * R2) / (PER_MILLE * R1))
 }
+
+// ---------------------------------------------------------------- 자유 플레이 (설계 §7, 지갑 2단계)
+
+/** 자유 플레이 게임별 하루 상한(설계 §7.3). 그 게임으로 하루 1시간어치, 줄기 전 금액으로 센다 */
+export const FREE_DAILY_CAP = REF * 1 // 20,500
+
+/** 기준 플레이의 판 사이 대기(초, 설계 §7.3) */
+export const FREE_GAP_SEC = 5
+
+/** 낚시 장비·해금 총액 목표(설계 §4.1). 낚시 다듬기 PR의 fishing/gold.test.ts가 검사한다 */
+export const FISHING_SINK_TARGET = REF * 40 // 820,000
+
+/** manifest `gold` = game_modes.gold_per_point·gold_play_cap·gold_daily_cap (registry.test.ts가 비교) */
+export type FreeGold = { perPoint: number; playCap: number; dailyCap: number }
+
+/**
+ * floor(score × perPoint)를 SQL numeric과 똑같이. free_plays.score는 numeric(9,2), gold_per_point는 numeric(10,4)이라
+ * 정수(점수 ×100, perPoint ×10,000)로 곱해 부동소수 오차(0.29 × 100 = 28.999…)를 피한다.
+ */
+function scoreGold(score: number, perPoint: number): number {
+  return Math.floor((Math.round(score * 100) * Math.round(perPoint * 10000)) / 1_000_000)
+}
+
+/**
+ * 서버와 같은 순서로 이번 판 골드를 미리 계산한다: 트리거(least(floor(score × perPoint), playCap) → 게임별 남은 몫)
+ * → _gold_move(softCap). gameAskedToday = 오늘 이 게임 줄기 전 합계(my_wallet today[game]),
+ * siteEarnedToday = my_wallet earned_today. asked = 사이트 상한 전 금액, got = 실제 들어갈 금액. 모두 0 이상 정수.
+ */
+export function freeGold(
+  score: number,
+  g: FreeGold | undefined,
+  gameAskedToday: number,
+  siteEarnedToday: number,
+): { asked: number; got: number } {
+  if (!g || !Number.isFinite(score) || score <= 0) return { asked: 0, got: 0 }
+  const perPlay = Math.min(scoreGold(score, g.perPoint), g.playCap)
+  const used = Number.isFinite(gameAskedToday) ? Math.max(0, gameAskedToday) : 0
+  const asked = Math.max(0, Math.min(perPlay, g.dailyCap - used))
+  return { asked, got: softCap(asked, siteEarnedToday) }
+}
+
+/** 기준 플레이의 시간당 골드(설계 §7.3): 3600 / (playSec + FREE_GAP_SEC) × floor(avgScore × perPoint) */
+export function hourlyGold(avgScore: number, playSec: number, perPoint: number): number {
+  return (3600 / (playSec + FREE_GAP_SEC)) * scoreGold(avgScore, perPoint)
+}

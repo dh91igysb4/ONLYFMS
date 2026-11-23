@@ -1,5 +1,18 @@
 import { expect, test } from 'vitest'
-import { DAILY_SOFT_CAP, DAILY_SOFT_CAP_2, REF, SOFT_CAP_RATE, SOFT_CAP_RATE_2, SOFT_CAP_TIERS, softCap } from './economy.ts'
+import {
+  DAILY_SOFT_CAP,
+  DAILY_SOFT_CAP_2,
+  FISHING_SINK_TARGET,
+  FREE_DAILY_CAP,
+  FREE_GAP_SEC,
+  freeGold,
+  hourlyGold,
+  REF,
+  SOFT_CAP_RATE,
+  SOFT_CAP_RATE_2,
+  SOFT_CAP_TIERS,
+  softCap,
+} from './economy.ts'
 
 test('경제 상수 (설계 §4)', () => {
   expect(REF).toBe(20500)
@@ -98,4 +111,36 @@ test('lastEconomy: 이름순 마지막 정의를 쓴다', () => {
   expect(lastEconomy(files)).toEqual({ a: 2 })
   expect(lastEconomy({ 'a.sql': 'select 1;' })).toBeNull()
   expect(lastEconomy({ ...files, 'c.sql': `create function public._economy() returns jsonb language sql as $$ select '{"a": 3}'::jsonb $$;` })).toEqual({ a: 3 })
+})
+
+test('자유 플레이 상수 (설계 §4, §7.3)', () => {
+  expect(FREE_DAILY_CAP).toBe(20500)
+  expect(FREE_GAP_SEC).toBe(5)
+  expect(FISHING_SINK_TARGET).toBe(820000)
+  expect(FREE_DAILY_CAP).toBeLessThan(DAILY_SOFT_CAP)
+})
+
+test('freeGold: 판당 상한 → 게임별 남은 몫 → 사이트 상한 (설계 §7.2, §7.4)', () => {
+  const g = { perPoint: 64, playCap: 1860, dailyCap: 20500 }
+  expect(freeGold(7.5, g, 0, 0)).toEqual({ asked: 480, got: 480 })
+  expect(freeGold(100, g, 0, 0)).toEqual({ asked: 1860, got: 1860 })
+  expect(freeGold(7.5, g, 20400, 0)).toEqual({ asked: 100, got: 100 })
+  expect(freeGold(7.5, g, 20500, 0)).toEqual({ asked: 0, got: 0 })
+  expect(freeGold(7.5, g, 30000, 0)).toEqual({ asked: 0, got: 0 })
+  expect(freeGold(7.5, g, 0, 30700)).toEqual({ asked: 480, got: 136 })
+  expect(freeGold(7.5, g, 0, 40000)).toEqual({ asked: 480, got: 96 })
+  expect(freeGold(7.5, g, 20400, 40000)).toEqual({ asked: 100, got: 20 })
+  expect(freeGold(7.5, g, 0, 41000)).toEqual({ asked: 480, got: 19 }) // 2단: floor(480 × 0.04)
+  expect(freeGold(-1, g, 0, 0)).toEqual({ asked: 0, got: 0 })
+  expect(freeGold(Number.NaN, g, 0, 0)).toEqual({ asked: 0, got: 0 })
+  expect(freeGold(7.5, undefined, 0, 0)).toEqual({ asked: 0, got: 0 })
+  expect(freeGold(3.75, { perPoint: 10, playCap: 50, dailyCap: 120 }, 0, 0)).toEqual({ asked: 37, got: 37 })
+  // 부동소수: 0.62 × 921 = 571.02 → 571, 0.29 × 100 = 28.999…가 아니라 29
+  expect(freeGold(921, { perPoint: 0.62, playCap: 2860, dailyCap: 20500 }, 0, 0).asked).toBe(571)
+  expect(freeGold(100, { perPoint: 0.29, playCap: 99999, dailyCap: 99999 }, 0, 0).asked).toBe(29)
+})
+
+test('hourlyGold: 3600 / (playSec + 5) × floor(avgScore × perPoint)', () => {
+  expect(Math.abs(hourlyGold(5.81, 60, 64) - 20548)).toBeLessThanOrEqual(1)
+  expect(hourlyGold(0, 60, 64)).toBe(0)
 })

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { FREE_DAILY_CAP } from './economy.ts'
 import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
@@ -108,18 +109,22 @@ test('solo modules have no duel category', () => {
 })
 
 type Modes = { daily: boolean; contest: boolean; free: boolean }
-type ModeRow = Modes & { scoreMax: number }
+type Gold = { perPoint: number; playCap: number; dailyCap: number }
+type ModeRow = Modes & { scoreMax: number; gold: Gold }
+const NO_GOLD: Gold = { perPoint: 0, playCap: 0, dailyCap: 0 }
 
 /**
  * 마이그레이션 SQL을 파일 이름순으로 적용해 game_modes 최종 내용을 구한다.
  * `insert into game_modes (game_id, daily, contest, free[, score_max]) values ('id', true, true, true[, 99999]), …`는
  * 추가(같은 id면 덮어씀), `delete from game_modes where game_id = '…'` / `in ('…', …)`는 제거.
  * 열 순서는 (game_id, daily, contest, free, score_max)로 고정하고, score_max가 없으면 열 기본값 10이다.
- * `update game_modes …`는 읽지 않는다 — 쓰게 되면 여기도 고친다(안 고치면 아래 일치 테스트가 실패한다).
+ * 자유 플레이 골드(지갑 설계 §7.1)는 고정 형식 한 문장만 읽는다:
+ * `update (public.)game_modes set gold_per_point = X, gold_play_cap = Y, gold_daily_cap = Z where game_id = 'id';`
+ * insert는 골드 0/0/0(열 기본값)으로 덮어쓴다. 그 밖의 `update game_modes …`는 읽지 않는다 — 쓰게 되면 여기도 고친다.
  */
 function gameModesFromMigrations(files: Record<string, string>): Map<string, ModeRow> {
   const stmt =
-    /insert\s+into\s+(?:public\.)?game_modes\s*(?:\(\s*game_id\s*,\s*daily\s*,\s*contest\s*,\s*free\s*(?:,\s*score_max\s*)?\))?\s*values\s*([^;]+);|delete\s+from\s+(?:public\.)?game_modes\s+where\s+game_id\s*(?:=|in)\s*([^;]+);/gi
+    /insert\s+into\s+(?:public\.)?game_modes\s*(?:\(\s*game_id\s*,\s*daily\s*,\s*contest\s*,\s*free\s*(?:,\s*score_max\s*)?\))?\s*values\s*([^;]+);|delete\s+from\s+(?:public\.)?game_modes\s+where\s+game_id\s*(?:=|in)\s*([^;]+);|update\s+(?:public\.)?game_modes\s+set\s+gold_per_point\s*=\s*([0-9.]+)\s*,\s*gold_play_cap\s*=\s*([0-9]+)\s*,\s*gold_daily_cap\s*=\s*([0-9]+)\s+where\s+game_id\s*=\s*'([^']*)'\s*;/gi
   const row =
     /\(\s*'([^']*)'\s*,\s*(true|false)\s*,\s*(true|false)\s*,\s*(true|false)\s*(?:,\s*([0-9]+(?:\.[0-9]+)?)\s*)?\)/gi
   const result = new Map<string, ModeRow>()
@@ -132,8 +137,12 @@ function gameModesFromMigrations(files: Record<string, string>): Map<string, Mod
             contest: r[3].toLowerCase() === 'true',
             free: r[4].toLowerCase() === 'true',
             scoreMax: r[5] === undefined ? 10 : Number(r[5]),
+            gold: { ...NO_GOLD },
           })
         }
+      } else if (m[6] !== undefined) {
+        const cur = result.get(m[6])
+        if (cur) cur.gold = { perPoint: Number(m[3]), playCap: Number(m[4]), dailyCap: Number(m[5]) }
       } else {
         for (const v of m[2].matchAll(/'([^']*)'/g)) result.delete(v[1])
       }
@@ -149,10 +158,13 @@ test('gameModesFromMigrations applies inserts and later deletes in filename orde
       "insert into game_modes (game_id, daily, contest, free) values ('a-game', true, false, true), ('b-game', false, true, false);",
     '../../supabase/migrations/0010_score.sql':
       "insert into game_modes (game_id, daily, contest, free, score_max) values ('c-game', false, false, true, 99999);",
+    '../../supabase/migrations/0011_gold.sql':
+      "update public.game_modes set gold_per_point = 0.62, gold_play_cap = 2860, gold_daily_cap = 20500 where game_id = 'c-game';\n" +
+      "update game_modes set gold_per_point = 9, gold_play_cap = 9, gold_daily_cap = 9 where game_id = 'zz-missing';",
   }
   expect(Object.fromEntries(gameModesFromMigrations(files))).toEqual({
-    'a-game': { daily: true, contest: false, free: true, scoreMax: 10 },
-    'c-game': { daily: false, contest: false, free: true, scoreMax: 99999 },
+    'a-game': { daily: true, contest: false, free: true, scoreMax: 10, gold: NO_GOLD },
+    'c-game': { daily: false, contest: false, free: true, scoreMax: 99999, gold: { perPoint: 0.62, playCap: 2860, dailyCap: 20500 } },
   })
 })
 
@@ -189,5 +201,24 @@ test('scoreMax other than 10 requires a free-only score game', () => {
     }
     if (m.scoreMax !== undefined) expect(Number.isFinite(m.scoreMax) && m.scoreMax > 0, m.id).toBe(true)
     if (m.scoreDecimals !== undefined) expect([0, 1, 2], m.id).toContain(m.scoreDecimals)
+  }
+})
+
+test('game_modes gold_* matches manifest gold (없으면 0/0/0, 지갑 설계 §7.1)', () => {
+  const seeded = seededGameModes()
+  for (const { manifest: m } of [...games, ...duels, ...worlds]) {
+    expect(seeded.get(m.id)?.gold, m.id).toEqual(m.gold ?? NO_GOLD)
+  }
+})
+
+test('manifest gold는 자유 플레이 게임에만, dailyCap = FREE_DAILY_CAP (설계 §7.3)', () => {
+  for (const { manifest: m } of [...games, ...duels, ...worlds]) {
+    if (!m.gold) continue
+    expect(m.modes.free, m.id).toBe(true)
+    expect(m.gold.dailyCap, m.id).toBe(FREE_DAILY_CAP)
+    expect(m.gold.perPoint, m.id).toBeGreaterThan(0)
+    expect(Number.isInteger(m.gold.playCap) && m.gold.playCap > 0, m.id).toBe(true)
+    // numeric(10,4)에 그대로 들어가는 값
+    expect(Math.round(m.gold.perPoint * 10000) / 10000, m.id).toBe(m.gold.perPoint)
   }
 })

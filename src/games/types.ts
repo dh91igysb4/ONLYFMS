@@ -1,4 +1,5 @@
 // 게임 약속 타입 (설계 §4.1, §4.2). 외부 의존 없음 (Deno 호환).
+import type { FreeGold } from './economy.ts'
 
 /** 서버가 넘기는 시각 정보(밀리초). 자유 플레이에서는 브라우저 시각을 쓴다. */
 export type Ctx = { now: number; startedAt: number; deadline: number | null }
@@ -72,6 +73,11 @@ export type Manifest = {
   scoreMax?: number
   /** 자유 플레이 점수를 화면에 보일 소수 자릿수(기본 2). 거리처럼 정수 점수면 0 */
   scoreDecimals?: 0 | 1 | 2
+  /**
+   * 자유 플레이 골드(지갑 설계 §7). 판당 floor(점수 × perPoint)를 playCap까지, 하루 dailyCap(= FREE_DAILY_CAP)까지.
+   * DB game_modes.gold_*와 같아야 한다(registry.test.ts). 없으면 지급 없음. 수치는 게임별 gold.test.ts가 REF ±20%로 지킨다
+   */
+  gold?: FreeGold
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
