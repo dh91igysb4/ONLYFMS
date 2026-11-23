@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, BAG_SIZE, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { drawScene, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
@@ -647,7 +647,7 @@ export function Game({ gameId }: WorldGameProps) {
 
       <div className="fish-bottom" ref={bottomRef}>
         <span className="fish-bag-count">
-          가방 <strong>{view.bag.length}/{BAG_SIZE}</strong>
+          가방 <strong>{view.bag.length}/{bagSize(view.bagTier)}</strong>
         </span>
         <div className="fish-menu">
           {(['bag', 'shop', 'dex'] as const).map((m) => (

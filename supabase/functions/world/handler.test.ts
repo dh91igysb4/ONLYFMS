@@ -253,7 +253,7 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   }
   const game = 'fishing'
   assert.equal((await real({ game, action: 'load' })).status, 200)
-  const cast = await real({ game, action: 'act', payload: { type: 'cast', area: 'pier', power: 0.5 } })
+  const cast = await real({ game, action: 'act', payload: { type: 'cast', area: 'pier', power: 0.5, spot: 'pier' } })
   assert.equal(cast.status, 200)
   const pending = cast.body.result as { biteDelayMs: number }
   now += pending.biteDelayMs
@@ -264,7 +264,12 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(res.status, 200)
   const sold = await real({ game, action: 'act', payload: { type: 'sell' } })
   assert.equal(sold.status, 200)
-  assert.ok((sold.body.view as { gold: number }).gold > 0)
+  const gold = (sold.body.view as { gold: number }).gold
+  assert.ok(gold > 0)
+  assert.ok(gold < 800)
+  const bag = await real({ game, action: 'act', payload: { type: 'buyBag', tier: 2 } })
+  assert.equal(bag.status, 400)
+  assert.equal(bag.body.error, 'not_enough_gold')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
   assert.deepEqual(rows.map((r) => r.key), ['biggest', 'dex', 'total_earned'])
 })
