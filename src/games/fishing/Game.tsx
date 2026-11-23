@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
@@ -16,7 +16,7 @@ import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
-const AREA = AREAS[0].id
+const AREA = 'village'
 const OUTCOME_MS = 1200
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */

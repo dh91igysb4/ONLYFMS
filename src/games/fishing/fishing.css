@@ -104,6 +104,8 @@
 .fish-rod-state { color: var(--win-text); }
 .fish-rod-owned { opacity: 0.85; }
 .fish-dex-item { font-size: 14px; }
+.fish-dex-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fish-dex-legend { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--on-accent); background: var(--accent-strong); }
 
 .fish-info { margin: 0; color: var(--win-text); }
 

@@ -5,6 +5,8 @@ import { ApiError, world } from '../../lib/api.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { conditionsAt } from './clock.ts'
+import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
 import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
 import fishingCss from './fishing.css?raw'
@@ -239,7 +241,7 @@ describe('fishing Game', () => {
     const sent = calls('cast')
     expect(sent).toHaveLength(1)
     const payload = (sent[0] as unknown as { payload: { area: string; power: number; spot: string } }).payload
-    expect(payload.area).toBe('pier')
+    expect(payload.area).toBe('village')
     expect(payload.spot).toBe('pier') // 부두 위에서 던졌다
     expect(payload.power).toBeGreaterThanOrEqual(0)
     expect(payload.power).toBeLessThanOrEqual(1)
@@ -746,6 +748,53 @@ describe('fishing Game', () => {
     tapCanvas()
     await flush()
     expect(calls('hook')).toHaveLength(1)
+  })
+  test('dex shows spawn conditions only for caught species, legend mark, and n/16', async () => {
+    await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('2/16종')).toBeInTheDocument()
+    expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
+    expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
+    expect(within(dex).getByText('전설')).toBeInTheDocument()
+    expect(within(dex).getByText('잡음')).toBeInTheDocument()
+    expect(within(dex).queryByText('봄 · 가을')).not.toBeInTheDocument() // 못 잡은 멸치
+    expect(within(dex).getAllByText('???')).toHaveLength(14)
+  })
+
+  test('dex legend not yet caught shows no 잡음 mark', async () => {
+    await mount(makeView({ dex: { anchovy: { count: 1, maxCm: 10 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).queryByText('잡음')).not.toBeInTheDocument()
+  })
+
+  test('cond uses offset 0 until a response says otherwise (server_now = Date.now())', async () => {
+    await mount()
+    await advance(100)
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].cond).toEqual(conditionsAt(Date.now()))
+  })
+
+  test('cond follows server_now: 3h-ahead response gives conditionsAt(Date.now() + 3h)', async () => {
+    const H3 = 3 * 3_600_000
+    localStorage.setItem(POS_KEY, JSON.stringify(PIER))
+    worldMock.mockImplementation((() =>
+      Promise.resolve({ view: makeView(), result: null, server_now: Date.now() + H3 })) as unknown as typeof world)
+    render(<Game gameId="fishing" />)
+    await flush()
+    await advance(100)
+    const call = vi.mocked(drawWorld).mock.calls.at(-1)
+    expect(call?.[1].cond).toEqual(conditionsAt(Date.now() + H3))
+  })
+})
+
+describe('conditionLabel', () => {
+  const sp = (id: string) => SPECIES.find((s) => s.id === id)!
+  test('formats season, hours, weather and legend spot', () => {
+    expect(conditionLabel(sp('pufferfish'))).toBe('여름 · 12~16시 · 맑음')
+    expect(conditionLabel(sp('conger'))).toBe('봄 · 가을 · 16~2시 · 비')
+    expect(conditionLabel(sp('goby'))).toBe('사계절')
+    expect(conditionLabel(sp('grouper'))).toBe('부두 · 겨울')
   })
 })
 
