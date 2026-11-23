@@ -8,9 +8,17 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
+import { TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
+import { RIVER } from './maps/river.ts'
+import { FOREST } from './maps/forest.ts'
+import { feetBlocked } from './walk.ts'
+import type { AreaId } from './data.ts'
 import fishingCss from './fishing.css?raw'
 import { WALK_SPEED, type Player } from './walk.ts'
+
+const SPAWN = VILLAGE.spawn
+const PIER_END = pierEnd(VILLAGE)!
 
 vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
@@ -18,6 +26,12 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
 })
 vi.mock('../../platform/auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
 vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+/** 지역 전환 테스트가 강 맵을 없는 것처럼 만들 때 쓴다 */
+const mapGate = vi.hoisted(() => ({ hideRiver: false }))
+vi.mock('./maps/index.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./maps/index.ts')>()
+  return { ...orig, mapFor: (area: AreaId) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area)) }
+})
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -126,7 +140,7 @@ const key = (code: string, down: boolean) =>
 
 const POS_KEY = 'fishing-pos:u1'
 const tileCenter = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
-type At = { pos: Vec; facing: Facing }
+type At = { pos: Vec; facing: Facing; area?: AreaId }
 /** 부두 끝에서 바다를 본다 → 낚시(pier) */
 const PIER: At = { pos: tileCenter(PIER_END.tx, PIER_END.ty), facing: 'down' }
 /** 모래사장 맨 아래 줄(10, 25)에서 바다를 본다 → 낚시(shore) */
@@ -354,12 +368,52 @@ describe('fishing Game', () => {
     await mount(makeView({ dex: { anchovy: { count: 3, maxCm: 14 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
+    const village = SPECIES.filter((s) => s.area === 'village').length
     expect(within(dex).getByText('멸치')).toBeInTheDocument()
     expect(within(dex).queryByText('망둥어')).not.toBeInTheDocument()
-    expect(within(dex).getAllByText('???')).toHaveLength(SPECIES.length - 1)
+    expect(within(dex).getAllByText('???')).toHaveLength(village - 1)
     const imgs = within(dex).getAllByRole('img') as HTMLImageElement[]
-    expect(imgs.filter((i) => i.src.endsWith(':silhouette'))).toHaveLength(SPECIES.length - 1)
+    expect(imgs.filter((i) => i.src.endsWith(':silhouette'))).toHaveLength(village - 1)
     expect(imgs.some((i) => i.src === 'data:fish-anchovy')).toBe(true)
+  })
+
+  test('dex has a tab per area with species, opens on the current area, and filters by tab', async () => {
+    const entry = VILLAGE.exits[0].entry
+    await mount(makeView(), { area: 'river', pos: tileCenter(entry.tx, entry.ty), facing: 'up' })
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    const tabs = within(dex).getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8'])
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dex).getAllByText('???')).toHaveLength(9)
+    fireEvent.click(within(dex).getByRole('tab', { name: /숲/ }))
+    expect(within(dex).getByRole('tab', { name: /숲/ })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'false')
+    expect(within(dex).getAllByText('???')).toHaveLength(8)
+  })
+
+  test('dex shows per-area counts and the overall n/33 on top; caught names only on their tab', async () => {
+    await mount(makeView({ dex: { anchovy: { count: 1, maxCm: 10 }, 'pale-chub': { count: 2, maxCm: 12 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
+    expect(within(dex).getByRole('tab', { name: /바닷가 마을/ })).toHaveTextContent('1/16')
+    expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveTextContent('1/9')
+    expect(within(dex).getByText('멸치')).toBeInTheDocument()
+    expect(within(dex).queryByText('피라미')).not.toBeInTheDocument()
+    fireEvent.click(within(dex).getByRole('tab', { name: /마을 강/ }))
+    expect(within(dex).getByText('피라미')).toBeInTheDocument()
+    expect(within(dex).queryByText('멸치')).not.toBeInTheDocument()
+  })
+
+  test('dex marks an uncaught legend slot with a border but keeps its name hidden', async () => {
+    await mount(makeView())
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).queryByText('다금바리')).not.toBeInTheDocument()
+    expect(within(dex).queryByText('전설')).not.toBeInTheDocument()
+    expect(dex.querySelectorAll('.fish-dex-item-legend')).toHaveLength(1)
+    expect(dex.querySelectorAll('.fish-dex-item-legend')[0]).toHaveTextContent('???')
   })
 
   test('bag_full on cast tells the player to go and sell at the shop, with no open-shop button', async () => {
@@ -749,11 +803,11 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('hook')).toHaveLength(1)
   })
-  test('dex shows spawn conditions only for caught species, legend mark, and n/16', async () => {
+  test('dex shows spawn conditions only for caught species, legend mark, and n/33', async () => {
     await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/16종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/33종')).toBeInTheDocument()
     expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
     expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
     expect(within(dex).getByText('전설')).toBeInTheDocument()
@@ -788,10 +842,16 @@ describe('conditionLabel', () => {
     expect(conditionLabel(sp('goby'))).toBe('사계절')
     expect(conditionLabel(sp('grouper'))).toBe('부두 · 겨울')
   })
+  test('spots가 있는 어종은 전설이 아니어도 자리를 앞에 붙이고, 없으면 붙이지 않는다', () => {
+    expect(conditionLabel(sp('stream-minnow'))).toBe('폭포 · 사계절')
+    expect(conditionLabel(sp('snakehead'))).toBe('연못 · 여름 · 가을 · 20~5시')
+    expect(conditionLabel(sp('catfish'))).toBe('봄 · 여름 · 가을 · 비')
+    expect(conditionLabel(sp('pale-chub'))).toBe('사계절')
+  })
   test('legend spot comes from spots: shore → 해안, unknown id stays as is', () => {
     const grouper = sp('grouper')
     expect(conditionLabel({ ...grouper, spots: ['shore'] })).toBe('해안 · 겨울')
-    expect(conditionLabel({ ...grouper, spots: ['river'] })).toBe('river · 겨울')
+    expect(conditionLabel({ ...grouper, spots: ['zzz'] })).toBe('zzz · 겨울')
   })
 })
 
@@ -1508,5 +1568,207 @@ describe('availableHeight', () => {
     const h = availableHeight(200, 191, 80)
     expect(h).toBeLessThan(0)
     expect(canvasScale(688, h)).toBe(1)
+  })
+})
+
+
+describe('fishing Game: 지역 전환', () => {
+  const lastScene = () => {
+    const call = vi.mocked(drawWorld).mock.calls.at(-1)
+    if (!call) throw new Error('drawWorld was not called')
+    return call[1]
+  }
+  /** 맵에서 낚시 자리 id가 spot인 걸을 수 있는 자리와 방향 */
+  function fishingAt(map: MapDef, spot: string): At {
+    for (let ty = 0; ty < map.h; ty++)
+      for (let tx = 0; tx < map.w; tx++)
+        for (const facing of ['up', 'down', 'left', 'right'] as const) {
+          const pos = tileCenter(tx, ty)
+          if (feetBlocked(map, pos.x, pos.y)) continue
+          const at = interactionAt(map, pos, facing)
+          if (at?.kind === 'fish' && at.spot === spot) return { area: map.id, pos, facing }
+        }
+    throw new Error(`no ${spot} spot in ${map.id}`)
+  }
+  /** 마을 북쪽 출구 바로 아래 칸에서 위를 보고 시작 */
+  const NEAR_EXIT: At = { area: 'village', pos: tileCenter(24, 1), facing: 'up' }
+  const ENTRY = VILLAGE.exits[0].entry
+
+  /** 마을 북쪽 출구를 걸어 나가 페이드가 끝날 때까지 기다린다 */
+  async function walkToRiver() {
+    await mount(makeView(), NEAR_EXIT)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0) // 전환 중
+    await advance(400)
+  }
+
+  test('북쪽 출구로 걸어가면 페이드 뒤 강 맵의 entry 자리에 서고, 위치가 {area:river}로 저장된다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    expect(lastScene().map.id).toBe('village')
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    // 페이드 아웃 중에는 아직 마을
+    expect(lastScene().map.id).toBe('village')
+    expect(lastScene().fade).toBeGreaterThan(0)
+    await advance(400)
+    const scene = lastScene()
+    expect(scene.map.id).toBe('river')
+    expect(scene.fade).toBe(0)
+    expect(scene.player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+    expect(scene.player.facing).toBe(ENTRY.facing)
+    expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')).toEqual({
+      area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: ENTRY.facing,
+    })
+  })
+
+  test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(130)
+    key('ArrowUp', false)
+    const before = { ...lastScene().player.pos }
+    expect(lastScene().fade).toBeGreaterThan(0)
+    key('ArrowLeft', true)
+    await advance(15)
+    expect(lastScene().player.pos).toEqual(before) // 페이드 아웃 중
+    await advance(160)
+    expect(lastScene().map.id).toBe('river') // 페이드 인 중
+    expect(lastScene().fade).toBeGreaterThan(0)
+    expect(lastScene().player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+    key('ArrowLeft', false)
+    await advance(400)
+    expect(lastScene().player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+  })
+
+  test('도착 직후 0.5초 동안 입력이 없거나 반대 방향으로 한 걸음 걸어도 다시 마을로 가지 않는다', async () => {
+    await walkToRiver()
+    await advance(500)
+    expect(lastScene().map.id).toBe('river')
+    key('ArrowDown', true) // 들어온 출구 쪽(entry는 출구 두 칸 안쪽)
+    await advance(150)
+    key('ArrowDown', false)
+    await advance(500)
+    expect(lastScene().map.id).toBe('river')
+    expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null').area).toBe('river')
+  })
+
+  test('지역에 들어가면 지역 이름 알림이 1.5초 보인다', async () => {
+    await walkToRiver()
+    expect(screen.getByText('마을 강')).toBeInTheDocument()
+    await advance(1600)
+    expect(screen.queryByText('마을 강')).not.toBeInTheDocument()
+  })
+
+  test('저장된 {area:river}에서 시작하면 강 맵으로 시작한다', async () => {
+    await mount(makeView(), { area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: 'up' })
+    await advance(100)
+    expect(lastScene().map.id).toBe('river')
+  })
+
+  test('강에서 물을 보고 던지면 cast 페이로드가 {area:river, spot:river}', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, fishingAt(RIVER, 'river'))
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
+    expect(payload.area).toBe('river')
+    expect(payload.spot).toBe('river')
+  })
+
+  test('숲 연못에서 던지면 {area:forest, spot:pond}', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, fishingAt(FOREST, 'pond'))
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
+    expect(payload.area).toBe('forest')
+    expect(payload.spot).toBe('pond')
+  })
+
+  test('조이스틱을 누른 채 출구를 지나면 새 pointermove 없이도 페이드 뒤에 이어서 걷는다', async () => {
+    stubTouch()
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 100, 40) // 위로 끝까지, 이후 움직이지 않는다
+    await advance(200)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    await advance(400)
+    expect(lastScene().map.id).toBe('river')
+    expect(lastScene().fade).toBe(0)
+    const arrived = { ...lastScene().player.pos }
+    await advance(300)
+    expect(lastScene().player.pos.y).toBeLessThan(arrived.y)
+    expect(lastScene().player.moving).toBe(true)
+  })
+
+  test('출구 칸의 위치는 저장하지 않고 도착 위치만 저장한다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    const saved: { area: string; pos: Vec }[] = []
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === POS_KEY) saved.push(JSON.parse(v))
+      return setItem.call(this, k, v)
+    })
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('river')
+    expect(saved.length).toBeGreaterThan(0)
+    expect(saved.at(-1)).toMatchObject({ area: 'river' })
+    for (const s of saved) expect(exitAt(s.area === 'river' ? RIVER : VILLAGE, s.pos)).toBeNull()
+  })
+
+  test('맵이 없는 지역으로 가는 출구는 무시한다: 페이드를 시작하지 않고 한 번만 로그한다', async () => {
+    mapGate.hideRiver = true
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await mount(makeView(), NEAR_EXIT)
+      await advance(50)
+      key('ArrowUp', true)
+      await advance(600)
+      key('ArrowUp', false)
+      expect(lastScene().map.id).toBe('village')
+      expect(lastScene().fade).toBe(0)
+      expect(err).toHaveBeenCalledTimes(1)
+      const stuck = lastScene().player.pos.y
+      key('ArrowDown', true) // 갇히지 않는다
+      await advance(200)
+      key('ArrowDown', false)
+      expect(lastScene().player.pos.y).toBeGreaterThan(stuck)
+    } finally {
+      mapGate.hideRiver = false
+    }
+  })
+
+  test('큰 dt 한 번(맵 캐시를 만드는 프레임의 멈칫)이 와도 페이드 인이 건너뛰어지지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    const tr = lastScene().fade
+    expect(tr).toBeGreaterThan(0)
+    // 한 프레임이 500ms 걸린 것처럼 시간을 뛰어도 한 번에 끝나지 않는다
+    const raf = vi.spyOn(performance, 'now')
+    raf.mockReturnValue(performance.now() + 500)
+    await advance(16)
+    raf.mockRestore()
+    expect(lastScene().fade).toBeGreaterThan(0)
   })
 })

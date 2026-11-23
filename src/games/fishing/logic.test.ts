@@ -134,6 +134,25 @@ describe('rollCatch', () => {
       expect(roll({ rodTier: 2 }, 0.01)).not.toBe('grouper')
       expect(roll({ cond: cond('summer', 12) }, 0.01)).not.toBe('grouper')
     })
+    it('황금 쏘가리: 여름·비·rod 3·power 0.95·r0 작음에서만', () => {
+      const r = { area: 'river' as const, spot: 'river', cond: cond('summer', 12, 'rain'), rodTier: 3 as const, power: 0.95 }
+      expect(roll(r, 0.01)).toBe('golden-mandarin')
+      expect(roll({ ...r, power: 0.94 }, 0.01)).not.toBe('golden-mandarin')
+      expect(roll({ ...r, cond: cond('summer', 12) }, 0.01)).not.toBe('golden-mandarin')
+      expect(roll({ ...r, cond: cond('spring', 12, 'rain') }, 0.01)).not.toBe('golden-mandarin')
+      expect(roll({ ...r, rodTier: 2 }, 0.01)).not.toBe('golden-mandarin')
+      expect(roll({ ...r, legends: ['golden-mandarin'] }, 0.01)).not.toBe('golden-mandarin')
+      expect(roll(r, 0.5)).not.toBe('golden-mandarin')
+    })
+    it('백년 가물치: power 0.1에서도 봄 밤 연못 rod 3이면 후보(power 0), 그 외 조건은 아님', () => {
+      const f = { area: 'forest' as const, spot: 'pond', cond: cond('spring', 22), rodTier: 3 as const, power: 0.1 }
+      expect(roll(f, 0.01)).toBe('century-snakehead')
+      expect(roll({ ...f, power: 0 }, 0.01)).toBe('century-snakehead')
+      expect(roll({ ...f, spot: 'waterfall' }, 0.01)).not.toBe('century-snakehead')
+      expect(roll({ ...f, cond: cond('spring', 12) }, 0.01)).not.toBe('century-snakehead')
+      expect(roll({ ...f, cond: cond('summer', 22) }, 0.01)).not.toBe('century-snakehead')
+      expect(roll({ ...f, rodTier: 2 }, 0.01)).not.toBe('century-snakehead')
+    })
     it('전설 크기는 sizeBonus·power 식을 따른다', () => {
       const g = byId('grouper')
       const c = rollCatch(sequence(0.01, 0.5, 0.5, 0, 0.5), ctxOf({ ...base }))
@@ -192,7 +211,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(3)
+    expect(logic.version).toBe(4)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], pending: null,
     })
@@ -237,10 +256,9 @@ describe('fishing WorldLogic', () => {
     expect(pct('pier')).toBeGreaterThan(pct('shore'))
   })
 
-  it("cast area 'river'(열린 지역, 어종 없음)·'lake'(안 열림) → bad_area; spot 'zzz' → bad_spot; 오류 시 상태 불변", () => {
+  it("cast area 'lake'(안 열림, 어종 없음) → bad_area; spot 'zzz' → bad_spot; 오류 시 상태 불변", () => {
     const s = deepFreeze(fresh())
     const before = JSON.stringify(s)
-    expect(err(logic.apply(s, { type: 'cast', area: 'river', power: 0.5 }, ctx()))).toBe('bad_area')
     expect(err(logic.apply(s, { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
     for (const spot of ['zzz', 'river', 1, null]) {
       expect(err(logic.apply(s, { type: 'cast', area: 'village', power: 0.5, spot } as unknown as Action, ctx()))).toBe('bad_spot')
@@ -330,6 +348,33 @@ describe('fishing WorldLogic', () => {
     expect(bagSize(99)).toBe(20)
   })
 
+  describe('강·숲 던지기', () => {
+    const castAt = (area: string, spot: string | undefined, seed: number, rodTier: State['rodTier'] = 3) => {
+      const action = { type: 'cast', area, power: 0.5, ...(spot === undefined ? {} : { spot }) } as unknown as Action
+      return ok(logic.apply(fresh({ rodTier }), action, { now: nowAt(seed % 4, seed % 24), rng: rngFromSeed(seedBytes(seed)) })).state.pending!
+    }
+    it("{area:'river', spot:'river'} 정상: 조건에 맞는 강 어종만", () => {
+      for (let seed = 0; seed < 300; seed++) {
+        const p = castAt('river', 'river', seed)
+        const s = byId(p.species)
+        expect(s.area).toBe('river')
+        expect(speciesAvailable(s, 'river', 'river', p.cond, 3)).toBe(true)
+      }
+    })
+    it("{area:'forest', spot:'waterfall'} → 버들치·열목어만", () => {
+      const seen = new Set<string>()
+      for (let seed = 0; seed < 400; seed++) seen.add(castAt('forest', 'waterfall', seed).species)
+      expect([...seen].every((id) => ['stream-minnow', 'lenok'].includes(id))).toBe(true)
+      expect(seen.has('stream-minnow')).toBe(true)
+    })
+    it("{area:'forest'} 자리 생략 → pond, {area:'forest', spot:'river'} → bad_spot, {area:'lake'} → bad_area", () => {
+      expect(castAt('forest', undefined, 1).spot).toBe('pond')
+      const s = fresh()
+      expect(err(logic.apply(s, { type: 'cast', area: 'forest', power: 0.5, spot: 'river' } as unknown as Action, ctx()))).toBe('bad_spot')
+      expect(err(logic.apply(s, { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
+    })
+  })
+
   it('migrate v1 save without bagTier -> bagTier 1, gold/dex/rodTier kept; bad bagTier -> 1', () => {
     const m = logic.migrate({ gold: 70, rodTier: 2, dex: { goby: { count: 1, maxCm: 10 } } }, 1)
     expect(m).toMatchObject({ bagTier: 1, gold: 70, rodTier: 2, dex: { goby: { count: 1, maxCm: 10 } } })
@@ -354,7 +399,7 @@ describe('fishing WorldLogic', () => {
     for (const power of [NaN, -0.1, 2, '1', Infinity, null, undefined]) {
       expect(err(logic.apply(s, { type: 'cast', area: 'pier', power } as unknown as Action, ctx()))).toBe('bad_power')
     }
-    for (const area of ['ocean', 1, null, undefined, 'lake', 'river']) {
+    for (const area of ['ocean', 1, null, undefined, 'lake']) {
       expect(err(logic.apply(s, { type: 'cast', area, power: 0.5 } as unknown as Action, ctx()))).toBe('bad_area')
     }
     // 경계값 0과 1은 허용
@@ -553,6 +598,15 @@ describe('fishing WorldLogic', () => {
     expect(logic.migrate({ dex: { goby: { count: 1, maxCm: 10 } }, areas: ['pier'] }, 2).legends).toEqual([])
   })
 
+  it('migrate v3 세이브 → v4 그대로(골드·가방·도감·areas·legends), v2 세이브도 지금 규칙 그대로', () => {
+    const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
+    const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
+    const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
+    expect(logic.migrate(v3, 3)).toEqual(v3)
+    const v2 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }
+    expect(logic.migrate(v2, 2)).toEqual({ ...v3, areas: [...DEFAULT_AREAS] })
+  })
+
   it('migrate legends: 모르는 id·비전설 id는 버리고, 기본 지역은 항상 포함, 알려진 추가 지역은 유지', () => {
     const m = logic.migrate({ legends: ['grouper', 'kraken', 'goby', 3], areas: ['lake', 'zzz', 'village'] }, 3)
     expect(m.legends).toEqual(['grouper'])
@@ -579,17 +633,17 @@ describe('fishing WorldLogic', () => {
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/16'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/33'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/16' },
+      { key: 'dex', value: 0, detail: '0/33' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/16' },
+      { key: 'dex', value: 2, detail: '2/33' },
     ])
   })
 

@@ -1,5 +1,5 @@
 // 낚시 마을 이동·충돌·카메라. 순수 함수만 (React·DOM 없음).
-import { MAP_H, MAP_W, TILE, isWalkable, type Facing, type Vec } from './map.ts'
+import { TILE, isWalkable, type Facing, type MapDef, type Vec } from './map.ts'
 import { MAX_DT_MS } from './minigame.ts'
 
 export const WALK_SPEED = 72 // px/s (초당 4.5타일)
@@ -30,16 +30,16 @@ export function keysVector(k: { up: boolean; down: boolean; left: boolean; right
 }
 
 /** 발 사각형(pos 중심의 FEET)이 걸을 수 없는 타일(맵 밖 포함)과 겹치는가 */
-export function feetBlocked(x: number, y: number): boolean {
+export function feetBlocked(map: MapDef, x: number, y: number): boolean {
   const tx0 = Math.floor((x - FEET.w / 2 + EDGE_EPS) / TILE)
   const tx1 = Math.floor((x + FEET.w / 2 - EDGE_EPS) / TILE)
   const ty0 = Math.floor((y - FEET.h / 2 + EDGE_EPS) / TILE)
   const ty1 = Math.floor((y + FEET.h / 2 - EDGE_EPS) / TILE)
-  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(tx, ty)) return true
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(map, tx, ty)) return true
   return false
 }
 
-export function stepWalk(p: Player, input: MoveInput, dtMs: number): Player {
+export function stepWalk(map: MapDef, p: Player, input: MoveInput, dtMs: number): Player {
   const dt = Math.min(Math.max(dtMs, 0), MAX_DT_MS)
   if (input.x === 0 && input.y === 0) return { pos: { ...p.pos }, facing: p.facing, moving: false, walkMs: 0 }
 
@@ -47,9 +47,9 @@ export function stepWalk(p: Player, input: MoveInput, dtMs: number): Player {
   let x = p.pos.x
   let y = p.pos.y
   const nx = x + input.x * dist
-  if (!feetBlocked(nx, y)) x = nx
+  if (!feetBlocked(map, nx, y)) x = nx
   const ny = y + input.y * dist
-  if (!feetBlocked(x, ny)) y = ny
+  if (!feetBlocked(map, x, ny)) y = ny
 
   const facing: Facing =
     Math.abs(input.x) >= Math.abs(input.y) ? (input.x < 0 ? 'left' : 'right') : input.y < 0 ? 'up' : 'down'
@@ -62,6 +62,6 @@ function cameraAxis(target: number, view: number, map: number): number {
   return Math.min(Math.max(v, 0), map - view)
 }
 
-export function cameraFor(target: Vec, view: { w: number; h: number }): Vec {
-  return { x: cameraAxis(target.x, view.w, MAP_W * TILE), y: cameraAxis(target.y, view.h, MAP_H * TILE) }
+export function cameraFor(map: MapDef, target: Vec, view: { w: number; h: number }): Vec {
+  return { x: cameraAxis(target.x, view.w, map.w * TILE), y: cameraAxis(target.y, view.h, map.h * TILE) }
 }

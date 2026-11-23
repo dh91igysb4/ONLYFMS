@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { inHours, isNight, type Conditions, type Season, type Weather } from './clock.ts'
+import { SPRITES } from './sprites.ts'
 import { AREAS, areaHasSpecies, DEFAULT_AREAS, RODS, SPECIES, speciesAvailable } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
@@ -18,9 +19,9 @@ const OLD_IDS = [
 const BEHAVIORS = ['mixed', 'smooth', 'dart', 'floater', 'sinker']
 
 describe('fishing data', () => {
-  it('16 species, ids unique, old 12 ids kept, sizes and prices sane', () => {
-    expect(SPECIES).toHaveLength(16)
-    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(16)
+  it('33 species, ids unique, old 12 ids kept, sizes and prices sane', () => {
+    expect(SPECIES).toHaveLength(33)
+    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(33)
     for (const id of OLD_IDS) expect(SPECIES.some((s) => s.id === id)).toBe(true)
     for (const s of SPECIES) {
       expect(s.minCm).toBeLessThan(s.maxCm)
@@ -28,6 +29,14 @@ describe('fishing data', () => {
       expect(BEHAVIORS).toContain(s.behavior)
       expect(AREAS.map((a) => a.id)).toContain(s.area)
     }
+  })
+  it('1단계 마을 16종 값은 그대로다(스냅숏)', () => {
+    const village = SPECIES.filter((s) => s.area === 'village')
+    expect(village).toHaveLength(16)
+    expect(village).toMatchSnapshot()
+  })
+  it('모든 어종에 fish-<id> 스프라이트가 있다', () => {
+    for (const s of SPECIES) expect(SPRITES[`fish-${s.id}`], s.id).toBeDefined()
   })
   it('전설 등급과 legend 설정은 함께 다닌다', () => {
     for (const s of SPECIES) expect(s.rarity === 'legend', s.id).toBe(Boolean(s.legend))
@@ -62,30 +71,43 @@ describe('fishing data', () => {
   })
 })
 
-describe('village rules', () => {
-  it('guarantee: every spot x season x hour x weather has a common candidate at rod 1', () => {
-    const village = AREAS.find((a) => a.id === 'village')!
-    for (const spot of village.spots) {
-      for (const season of SEASONS) {
-        for (let h = 0; h < 24; h++) {
-          for (const weather of WEATHERS) {
-            const c = cond(season, h, weather)
-            const ok = SPECIES.some((s) => s.rarity === 'common' && speciesAvailable(s, 'village', spot, c, 1))
-            expect(ok, `${spot} ${season} ${h}h ${weather}`).toBe(true)
+const SPECIES_AREAS = AREAS.filter((a) => areaHasSpecies(a.id))
+const nightOnly = (s: (typeof SPECIES)[number]) =>
+  Boolean(s.hours) &&
+  Array.from({ length: 24 * 4 }, (_, i) => i * 15).filter((m) => inHours(m, s.hours!)).every((m) => isNight(m))
+
+describe('area guarantee', () => {
+  it('어종이 있는 모든 지역 x 자리 x 계절 x 정각 x 날씨에서 rod 1 common이 하나 이상', () => {
+    expect(SPECIES_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest'])
+    for (const area of SPECIES_AREAS) {
+      for (const spot of area.spots) {
+        for (const season of SEASONS) {
+          for (let h = 0; h < 24; h++) {
+            for (const weather of WEATHERS) {
+              const c = cond(season, h, weather)
+              const ok = SPECIES.some((s) => s.rarity === 'common' && speciesAvailable(s, area.id, spot, c, 1))
+              expect(ok, `${area.id}/${spot} ${season} ${h}h ${weather}`).toBe(true)
+            }
           }
         }
       }
     }
   })
-  it('has night-only, rain, varied behaviors, unconditional commons', () => {
-    const village = SPECIES.filter((s) => s.area === 'village')
-    const nightOnly = village.filter((s) => s.hours &&
-      Array.from({ length: 24 * 4 }, (_, i) => i * 15).filter((m) => inHours(m, s.hours!)).every((m) => isNight(m)))
-    expect(nightOnly.length).toBeGreaterThanOrEqual(1)
-    expect(village.filter((s) => s.weather === 'rain').length).toBeGreaterThanOrEqual(1)
-    expect(new Set(village.map((s) => s.behavior)).size).toBeGreaterThanOrEqual(3)
-    const free = village.filter((s) => s.rarity === 'common' && !s.seasons && !s.hours && !s.weather)
+})
+
+describe('area rules', () => {
+  it.each(['village', 'river', 'forest'] as const)('%s: 상시 common 2종 이상, 밤 전용·비 전용 1종 이상, 행동 유형 3가지 이상, 전설 정확히 1종', (id) => {
+    const list = SPECIES.filter((s) => s.area === id)
+    const free = list.filter((s) => s.rarity === 'common' && !s.seasons && !s.hours && !s.weather)
     expect(free.length).toBeGreaterThanOrEqual(2)
+    expect(list.filter(nightOnly).length).toBeGreaterThanOrEqual(1)
+    expect(list.filter((s) => s.weather === 'rain').length).toBeGreaterThanOrEqual(1)
+    expect(new Set(list.map((s) => s.behavior)).size).toBeGreaterThanOrEqual(3)
+    expect(list.filter((s) => s.rarity === 'legend')).toHaveLength(1)
+  })
+  it('지역별 어종 수: 마을 16, 강 9, 숲 8', () => {
+    const n = (id: string) => SPECIES.filter((s) => s.area === id).length
+    expect([n('village'), n('river'), n('forest')]).toEqual([16, 9, 8])
   })
 })
 
@@ -113,8 +135,10 @@ describe('speciesAvailable', () => {
 })
 
 describe('areaHasSpecies', () => {
-  it('village has species, river has none yet', () => {
+  it('village·river·forest true, lake false', () => {
     expect(areaHasSpecies('village')).toBe(true)
-    expect(areaHasSpecies('river')).toBe(false)
+    expect(areaHasSpecies('river')).toBe(true)
+    expect(areaHasSpecies('forest')).toBe(true)
+    expect(areaHasSpecies('lake')).toBe(false)
   })
 })

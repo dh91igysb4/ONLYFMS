@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
-import { MAP_W, PIER_END, SPAWN, TILE, castTarget, type Facing, type Vec } from './map.ts'
+import { TILE, castTarget, defineMap, pierEnd, type Facing, type Vec } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import { cameraFor, type Player } from './walk.ts'
 import type { Conditions } from './clock.ts'
 
@@ -57,6 +58,9 @@ const PHASES: Phase[] = ['idle', 'charging', 'waiting', 'bite', 'fighting', 'cau
 const SIZES: [number, number][] = [[160, 240], [195, 280], [320, 480]]
 
 const tileCentre = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
+const MAP_W = VILLAGE.w
+const SPAWN = VILLAGE.spawn
+const PIER_END = pierEnd(VILLAGE)!
 const PIER_SPOT = tileCentre(PIER_END.tx, PIER_END.ty)
 
 function player(pos: Vec, facing: Facing = 'down', moving = false, walkMs = 0): Player {
@@ -66,17 +70,19 @@ function player(pos: Vec, facing: Facing = 'down', moving = false, walkMs = 0): 
 function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: Partial<WorldScene> = {}): WorldScene {
   const fishing = phase === 'waiting' || phase === 'bite' || phase === 'fighting' || phase === 'lost'
   return {
+    map: VILLAGE,
     phase,
     tMs: 1234,
     gauge: phase === 'charging' ? 0.7 : 0,
     player: p,
-    camera: cameraFor(p.pos, size),
-    bobber: fishing ? castTarget(p.pos, p.facing, 0.6) : null,
+    camera: cameraFor(VILLAGE, p.pos, size),
+    bobber: fishing ? castTarget(VILLAGE, p.pos, p.facing, 0.6) : null,
     bar: phase === 'fighting' ? bar : null,
     barParams: phase === 'fighting' ? barParams : null,
     caughtSpecies: phase === 'caught' ? 'mackerel' : null,
     cond: NOON_SUN,
     hudTop: 0,
+    fade: 0,
     ...extra,
   }
 }
@@ -101,6 +107,33 @@ describe('hudSide', () => {
     expect(hudSide(150, 195)).toBe('left')
     expect(hudSide(0, 160)).toBe('right')
     expect(hudSide(159, 160)).toBe('left')
+  })
+})
+
+describe('new tile kinds', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+
+  test('each new tile is drawn with its own sprite', () => {
+    const region = defineMap('river', ['TTTTTTT', 'T,pb,,T', 'T,rHr,T', 'T,wc..T', 'TTTTTTT'], {
+      spots: { river: 'river', pond: 'pond', basin: 'waterfall' },
+    })
+    const size = { w: 195, h: 280 }
+    const p = player(tileCentre(1, 1))
+    const cam = cameraFor(region, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: region, camera: cam }, size)
+    const at = (tx: number, ty: number) =>
+      ctx.sprites.filter((s) => s.x === tx * 16 - cam.x && s.y === ty * 16 - cam.y).map((s) => s.name)
+    expect(at(2, 1)).toContainEqual(expect.stringMatching(/^pond-[01]$/))
+    expect(at(3, 1)).toContainEqual(expect.stringMatching(/^basin-[01]$/))
+    expect(at(2, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/))
+    expect(at(4, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/))
+    expect(at(3, 2)).toEqual(expect.arrayContaining(['bridge-plank']))
+    expect(at(3, 2)).toContainEqual(expect.stringMatching(/^river-[01]$/)) // 다리 아래 강물
+    expect(at(2, 3)).toContainEqual(expect.stringMatching(/^falls-[01]$/))
+    expect(at(3, 3)).toEqual(['tile-cliff'])
   })
 })
 
@@ -298,25 +331,27 @@ describe('drawWorld with an offscreen canvas', () => {
     })
   })
 
-  test('the static map is cached in two canvases once; each frame blits the camera view with one drawImage', () => {
+  test('the static map is cached in two canvases once (built over two frames); each frame blits the camera view with one drawImage', () => {
     const size = { w: 195, h: 280 }
     const main = new RecordingCtx()
     const s = scene('idle', player(SPAWN.pos), size)
     drawWorld(asCtx(main), { ...s, tMs: 0 }, size)
     drawWorld(asCtx(main), { ...s, tMs: 100 }, size)
     drawWorld(asCtx(main), { ...s, tMs: 600 }, size)
+    drawWorld(asCtx(main), { ...s, tMs: 700 }, size)
     expect(made).toHaveLength(2)
     expect(made.every((c) => c.rects.length > 0 && c.sprites.some((t) => t.name === 'shop'))).toBe(true)
-    expect(main.images).toHaveLength(3)
+    expect(main.images).toHaveLength(4)
     const [img, sx, sy, sw, sh, dx, dy, dw, dh] = main.images[0]
     expect([sx, sy, sw, sh, dx, dy, dw, dh]).toEqual([s.camera.x, s.camera.y, 195, 280, 0, 0, 195, 280])
     expect((img as HTMLCanvasElement).width).toBe(48 * 16)
     expect((img as HTMLCanvasElement).height).toBe(36 * 16)
     expect(main.images[1][0]).toBe(img)
     expect(main.images[2][0]).not.toBe(img)
+    expect(main.images[3][0]).toBe(main.images[2][0])
     // 타일은 캐시에만 그리고 화면에는 그리지 않는다
     expect(main.sprites.some((c) => c.name.startsWith('water-') || c.name === 'shop' || c.name === 'tile-grass')).toBe(false)
-    expect(players(main)).toHaveLength(3) // 프레임마다 하나
+    expect(players(main)).toHaveLength(4) // 프레임마다 하나
 
     // 크기가 바뀌어도 맵 캐시는 그대로
     drawWorld(asCtx(main), scene('idle', player(SPAWN.pos), { w: 320, h: 480 }), { w: 320, h: 480 })
@@ -324,8 +359,88 @@ describe('drawWorld with an offscreen canvas', () => {
 
     releaseSceneCache()
     drawWorld(asCtx(main), s, size)
+    drawWorld(asCtx(main), s, size)
     expect(made).toHaveLength(4)
     expect(main.images.at(-1)?.[0]).not.toBe(img)
+  })
+
+  test('same map reuses the cache; drawing another map.id drops the old cache and builds a new one', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(2)
+    const villageImg = main.images[0][0] as HTMLCanvasElement
+
+    drawWorld(asCtx(main), inOther, size)
+    drawWorld(asCtx(main), inOther, size)
+    expect(made).toHaveLength(4)
+    const otherImg = main.images.at(-1)?.[0] as HTMLCanvasElement
+    expect(otherImg).not.toBe(villageImg)
+    expect([otherImg.width, otherImg.height]).toEqual([6 * 16, 5 * 16])
+
+    drawWorld(asCtx(main), inOther, size)
+    expect(made).toHaveLength(4)
+    expect(main.images.at(-1)?.[0]).toBe(otherImg)
+
+    // 되돌아오면 마을 캐시는 이미 버려졌으므로 새로 만든다
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(6)
+    expect(main.images.at(-1)?.[0]).not.toBe(villageImg)
+  })
+
+  test('switching maps builds one frame on the swap draw and the other on the next; drawing never throws between', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), inVillage, size)
+    expect(made).toHaveLength(2)
+
+    // 바꾼 프레임: 한 장만 만들고, 물 모양 1번 때도 그 장으로 그린다
+    expect(() => drawWorld(asCtx(main), { ...inOther, tMs: 600 }, size)).not.toThrow()
+    expect(made).toHaveLength(3)
+    const first = main.images.at(-1)?.[0] as HTMLCanvasElement
+    expect([first.width, first.height]).toEqual([6 * 16, 5 * 16])
+    // 다음 프레임: 나머지 한 장
+    expect(() => drawWorld(asCtx(main), { ...inOther, tMs: 600 }, size)).not.toThrow()
+    expect(made).toHaveLength(4)
+    expect(main.images.at(-1)?.[0]).not.toBe(first)
+    drawWorld(asCtx(main), { ...inOther, tMs: 0 }, size)
+    expect(main.images.at(-1)?.[0]).toBe(first)
+    expect(made).toHaveLength(4)
+  })
+
+  test('replaced or released frames are shrunk to zero size to free canvas memory', () => {
+    const size = { w: 195, h: 280 }
+    const main = new RecordingCtx()
+    const other = defineMap('river', ['TTTTTT', 'T,,,,T', 'T,,,,T', 'T~~~~T', 'TTTTTT'])
+    const inVillage = scene('idle', player(SPAWN.pos), size)
+    const inOther = { ...scene('idle', player(tileCentre(2, 1)), size), map: other }
+    const frames = new Set<HTMLCanvasElement>()
+    const spy = vi.spyOn(document, 'createElement')
+    drawWorld(asCtx(main), inVillage, size)
+    drawWorld(asCtx(main), { ...inVillage, tMs: 600 }, size)
+    for (const r of spy.mock.results) if ((r.value as HTMLElement).tagName === 'CANVAS') frames.add(r.value as HTMLCanvasElement)
+    expect(frames.size).toBe(2)
+    expect([...frames].every((c) => c.width > 0 && c.height > 0)).toBe(true)
+
+    drawWorld(asCtx(main), inOther, size) // 맵 교체
+    expect([...frames].every((c) => c.width === 0 && c.height === 0)).toBe(true)
+
+    drawWorld(asCtx(main), inOther, size)
+    const second = [...spy.mock.results].map((r) => r.value as HTMLElement).filter((e) => e.tagName === 'CANVAS' && !frames.has(e as HTMLCanvasElement)) as HTMLCanvasElement[]
+    expect(second).toHaveLength(2)
+    expect(second.every((c) => c.width > 0)).toBe(true)
+    releaseSceneCache()
+    expect(second.every((c) => c.width === 0 && c.height === 0)).toBe(true)
   })
 
   test('tree tops cover the player standing above the trunk, not the player below it', () => {
@@ -400,6 +515,17 @@ describe('시계·밤·날씨', () => {
   const clockSprites = (c: RecordingCtx) =>
     c.sprites.filter((sp) => sp.name.startsWith('digit-') || sp.name.startsWith('season-') || sp.name.startsWith('icon-'))
   const digits = (c: RecordingCtx) => c.sprites.filter((sp) => sp.name.startsWith('digit-')).sort((a, b) => a.x - b.x).map((sp) => sp.name)
+
+  test('fade 0.5면 마지막에 화면 전체 채우기 한 번, 0이면 없다', () => {
+    const none = draw('idle', idle, NOON_SUN, { fade: 0 })
+    expect(cover(none)).toHaveLength(0)
+    const faded = draw('idle', idle, NOON_SUN, { fade: 0.5 })
+    const full = cover(faded)
+    expect(full).toHaveLength(1)
+    expect(full[0].color).toBe('rgba(0, 0, 0, 0.5)')
+    // 시계 판(HUD)까지 덮도록 가장 마지막 채우기다
+    expect(faded.rects.at(-1)).toBe(full[0])
+  })
 
   test('HUD 시계는 픽셀 숫자·계절 아이콘·날씨 아이콘 스프라이트로 그리고 fillText는 쓰지 않는다', () => {
     const ctx = draw('idle', idle, SPRING_14_37)

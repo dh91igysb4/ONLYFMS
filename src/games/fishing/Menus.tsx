@@ -1,5 +1,6 @@
 // 낚시 메뉴(가방·상점·도감). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
-import { BAGS, bagSize, RODS, SPECIES, type Species } from './data.ts'
+import { useState } from 'react'
+import { AREAS, areaHasSpecies, BAGS, bagSize, RODS, SPECIES, type AreaId, type Species } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { price, type View } from './logic.ts'
 import { spriteDataUrl } from './sprites.ts'
@@ -118,30 +119,53 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag }: ShopProps) {
 }
 
 /** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
-const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안' }
+const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포' }
 
-/** 도감에 보일 출현 조건: 자리(전설만) · 계절 · 시간 · 날씨 */
+/** 도감에 보일 출현 조건: 자리(spots가 있는 어종) · 계절 · 시간 · 날씨 */
 export function conditionLabel(s: Species): string {
   const parts: string[] = []
-  if (s.legend && s.spots) parts.push(s.spots.map((x) => SPOT_NAMES[x] ?? x).join(' · '))
+  if (s.spots) parts.push(s.spots.map((x) => SPOT_NAMES[x] ?? x).join(' · '))
   parts.push(s.seasons ? s.seasons.map((x) => SEASON_NAMES[x]).join(' · ') : '사계절')
   if (s.hours) parts.push(`${s.hours[0]}~${s.hours[1]}시`)
   if (s.weather) parts.push(s.weather === 'rain' ? '비' : '맑음')
   return parts.join(' · ')
 }
 
-export function DexPanel({ view }: { view: View }) {
+/** currentArea: 처음 열 탭. 어종이 없는 지역이면 첫 탭으로 연다. */
+export function DexPanel({ view, currentArea }: { view: View; currentArea?: AreaId }) {
+  const tabs = AREAS.filter((a) => areaHasSpecies(a.id))
+  const [picked, setPicked] = useState<AreaId | undefined>(currentArea)
+  const active = tabs.find((a) => a.id === picked) ?? tabs[0]
   const found = SPECIES.filter((s) => view.dex[s.id]).length
+  const inArea = (id: AreaId) => SPECIES.filter((s) => s.area === id)
   return (
     <section className="fish-panel-body" aria-label="도감">
       <p className="muted">
         {found}/{SPECIES.length}종
       </p>
+      <div className="fish-dex-tabs" role="tablist" aria-label="지역">
+        {tabs.map((a) => {
+          const list = inArea(a.id)
+          const on = a.id === active.id
+          return (
+            <button
+              key={a.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              className={`fish-dex-tab${on ? ' fish-dex-tab-on' : ''}`}
+              onClick={() => setPicked(a.id)}
+            >
+              {a.name} {list.filter((s) => view.dex[s.id]).length}/{list.length}
+            </button>
+          )
+        })}
+      </div>
       <ul className="fish-dex">
-        {SPECIES.map((s) => {
+        {inArea(active.id).map((s) => {
           const entry = view.dex[s.id]
           return (
-            <li key={s.id} className="fish-dex-item">
+            <li key={s.id} className={`fish-dex-item${s.legend && !entry ? ' fish-dex-item-legend' : ''}`}>
               <img
                 src={spriteDataUrl(`fish-${s.id}`, ICON_SCALE, { silhouette: !entry })}
                 alt={entry ? s.name : '미발견 물고기'}

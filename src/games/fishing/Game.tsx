@@ -4,19 +4,20 @@ import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
+import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, interactionAt, SHOP_SPOT, SPAWN, tileOf, type Interaction, type Vec } from './map.ts'
+import { castTarget, exitAt, interactionAt, shopSpot, TILE, tileOf, type Exit, type Interaction, type MapDef, type Vec } from './map.ts'
+import { mapFor } from './maps/index.ts'
+import { VILLAGE } from './maps/village.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
-import { loadPosition, savePosition, type SavedPosition } from './position.ts'
+import { loadPosition, savePosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
-const AREA = 'village'
 const OUTCOME_MS = 1200
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
@@ -97,7 +98,7 @@ type Runtime = {
   keys: Keys
   /** 지금 서 있는 자리의 상호작용 (화면 상태와 비교해 바뀔 때만 다시 그린다) */
   hereKey: string
-  castSpot: 'pier' | 'shore'
+  castSpot: string
   /** 던진 찌의 월드 위치 */
   bobber: Vec | null
   /** 서버 시각 - 로컬 시각 (마지막 응답 기준) */
@@ -108,7 +109,19 @@ type Runtime = {
   settling: boolean
   caughtSpecies: string | null
   lastFrame: number
+  /** 지금 걷는 지역의 맵 (출구를 지나면 바뀐다) */
+  map: MapDef
+  /** 지역 전환 중: 페이드 아웃 → 맵 교체 → 페이드 인. 끝나면 null */
+  trans: { exit: Exit; ms: number; swapped: boolean } | null
+  /** 지역 전환 페이드 알파(0~1) */
+  fade: number
 }
+/** 지역 전환 페이드 한 방향의 길이 */
+const FADE_MS = 150
+/** 전환 한 프레임이 더할 수 있는 최대 시간(약 30fps 한 프레임) */
+const TRANSITION_STEP_MAX_MS = 34
+/** 도착한 지역 이름을 보이는 시간 */
+const AREA_NOTICE_MS = 1500
 
 /** 전체화면 요청·해제는 실패해도(거절·미지원) 조용히 넘긴다. */
 function ignoreRejection(fn: () => Promise<void> | void): void {
@@ -166,11 +179,12 @@ const coarseQuery = (): MediaQueryList | null =>
  * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
  * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
  */
-function interactionFor(p: SavedPosition): Interaction {
-  const front = interactionAt(p.pos, p.facing)
+function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): Interaction {
+  const front = interactionAt(map, p.pos, p.facing)
   if (front) return front
   const t = tileOf(p.pos)
-  return t.tx === SHOP_SPOT.tx && t.ty === SHOP_SPOT.ty ? { kind: 'shop' } : null
+  const door = shopSpot(map)
+  return door && t.tx === door.tx && t.ty === door.ty ? { kind: 'shop' } : null
 }
 const interactionKey = (i: Interaction): string => (i ? (i.kind === 'fish' ? `fish-${i.spot}` : 'shop') : '')
 
@@ -185,6 +199,7 @@ export function Game({ gameId }: WorldGameProps) {
   const [phase, setPhaseState] = useState<Phase>('idle')
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const badExits = useRef(new Set<string>())
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
@@ -203,15 +218,17 @@ export function Game({ gameId }: WorldGameProps) {
   const timers = useRef(new Set<number>())
   const [rt] = useState<Runtime>(() => {
     // 마지막 위치(못 쓰는 값이면 상점 문 앞)에서 시작한다
-    const start = (userId !== null ? loadPosition(userId) : null) ?? SPAWN
+    const saved = userId !== null ? loadPosition(userId) : null
+    const map = (saved && mapFor(saved.area)) ?? VILLAGE
+    const start = saved ?? VILLAGE.spawn
     const player: Player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
     return {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, shopKey: null, chargeStart: 0, gauge: 0, castPower: 0,
-      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(player)), castSpot: 'shore', bobber: null,
-      offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0,
+      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player)), castSpot: 'shore', bobber: null,
+      offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0, map, trans: null, fade: 0,
     }
   })
-  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.player))
+  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player))
   const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
@@ -239,7 +256,7 @@ export function Game({ gameId }: WorldGameProps) {
   const focusGame = () => rootRef.current?.focus({ preventScroll: true })
   const savePlayer = () => {
     const id = userIdRef.current
-    if (id !== null) savePosition(id, { pos: rt.player.pos, facing: rt.player.facing })
+    if (id !== null) savePosition(id, { area: rt.map.id, pos: rt.player.pos, facing: rt.player.facing })
   }
   const setMenu = (m: Menu | null) => {
     if (m) {
@@ -326,10 +343,10 @@ export function Game({ gameId }: WorldGameProps) {
   // ------------------------------------------------------------ 단계
   async function cast(power: number) {
     rt.castPower = power
-    rt.bobber = castTarget(rt.player.pos, rt.player.facing, power)
+    rt.bobber = castTarget(rt.map, rt.player.pos, rt.player.facing, power)
     let res: WorldView<View, PendingView>
     try {
-      res = await act<PendingView>({ type: 'cast', area: AREA, power, spot: rt.castSpot })
+      res = await act<PendingView>({ type: 'cast', area: rt.map.id, power, spot: rt.castSpot })
     } catch (e) {
       if (!alive.current) return
       const code = codeOf(e)
@@ -412,11 +429,11 @@ export function Game({ gameId }: WorldGameProps) {
   // ------------------------------------------------------------ 입력
   function press(source: Source, key: string) {
     rt.held.add(key)
-    if (rt.busy || menuRef.current || !viewRef.current) return
+    if (rt.busy || rt.trans || menuRef.current || !viewRef.current) return
     switch (rt.phase) {
       case 'idle': {
         if (source !== 'action') break
-        const at = interactionFor(rt.player)
+        const at = interactionFor(rt.map, rt.player)
         if (!at) break
         if (at.kind === 'shop') {
           // 상점은 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 상점 버튼에 떨어진다
@@ -450,7 +467,7 @@ export function Game({ gameId }: WorldGameProps) {
     if (key === rt.shopKey) {
       rt.shopKey = null
       // 아직 대기 중이고 여전히 상점 문 앞일 때만
-      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.player)?.kind === 'shop') {
+      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.map, rt.player)?.kind === 'shop') {
         setNotice(null)
         setMenu('shop')
       }
@@ -464,9 +481,52 @@ export function Game({ gameId }: WorldGameProps) {
     void cast(power)
   }
 
+  /** 출구에 닿았다: 입력을 잠그고 페이드 아웃을 시작한다 */
+  function startTransition(exit: Exit) {
+    // 조이스틱·방향키는 놓지 않는다: 누른 채 도착하면 페이드 뒤에 이어서 걷는다(걷기는 전환 중 막혀 있다)
+    rt.held.clear()
+    rt.shopKey = null
+    rt.player = { ...rt.player, moving: false, walkMs: 0 }
+    rt.trans = { exit, ms: 0, swapped: false }
+  }
+
+  /** 페이드 아웃 → 맵·위치·방향 교체와 저장 → 페이드 인. 끝나는 프레임에는 출구를 다시 보지 않는다. */
+  function stepTransition(dt: number) {
+    const tr = rt.trans
+    if (!tr) return
+    // 맵을 바꾸는 프레임의 멈칫이 다음 dt에 실려 와도 페이드 인이 통째로 건너뛰어지지 않게 한 걸음을 줄인다
+    tr.ms += Math.min(dt, TRANSITION_STEP_MAX_MS)
+    if (!tr.swapped && tr.ms >= FADE_MS) {
+      const next = mapFor(tr.exit.target)
+      if (!next) {
+        // 맵이 없는 지역으로 가는 출구는 만들지 않지만, 있다면 전환을 접는다
+        rt.trans = null
+        rt.fade = 0
+        return
+      }
+      tr.swapped = true
+      const { tx, ty, facing } = tr.exit.entry
+      rt.map = next
+      rt.player = { pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing, moving: false, walkMs: 0 }
+      savePlayer()
+      const name = AREAS.find((a) => a.id === next.id)?.name
+      if (name) {
+        // 오류 알림이 떠 있으면 덮지 않는다
+        setNotice((n) => (n && n.kind !== 'info' ? n : { kind: 'info', text: name }))
+        later(() => setNotice((n) => (n?.kind === 'info' && n.text === name ? null : n)), AREA_NOTICE_MS)
+      }
+    }
+    if (tr.ms >= FADE_MS * 2) {
+      rt.trans = null
+      rt.fade = 0
+      return
+    }
+    rt.fade = tr.ms < FADE_MS ? tr.ms / FADE_MS : 1 - (tr.ms - FADE_MS) / FADE_MS
+  }
+
   /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
   function syncHere() {
-    const at = interactionFor(rt.player)
+    const at = interactionFor(rt.map, rt.player)
     const k = interactionKey(at)
     if (k === rt.hereKey) return
     rt.hereKey = k
@@ -478,13 +538,27 @@ export function Game({ gameId }: WorldGameProps) {
     rt.lastFrame = now
     // 걷기는 대기 중이고 메뉴가 닫혀 있을 때만. 충전부터 결과 표시까지는 자리·방향이 고정된다.
     const wasMoving = rt.player.moving
-    if (rt.phase === 'idle' && !menuRef.current) {
+    let started = false
+    if (rt.trans) {
+      stepTransition(dt)
+    } else if (rt.phase === 'idle' && !menuRef.current) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
-      rt.player = stepWalk(rt.player, input, dt)
+      rt.player = stepWalk(rt.map, rt.player, input, dt)
+      // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다)
+      const exit = exitAt(rt.map, rt.player.pos)
+      if (exit && mapFor(exit.target)) {
+        startTransition(exit)
+        started = true
+      } else if (exit && !badExits.current.has(exit.target)) {
+        // 맵이 없는 지역으로 가는 출구는 무시한다(전환을 시작하면 페이드만 하고 제자리라 갇힌 것처럼 보인다)
+        badExits.current.add(exit.target)
+        console.error(`fishing: exit to unmapped area "${exit.target}" ignored`)
+      }
     } else if (rt.player.moving) {
       rt.player = { ...rt.player, moving: false, walkMs: 0 }
     }
-    if (wasMoving && !rt.player.moving) savePlayer()
+    // 전환을 시작한 프레임의 출구 칸 위치는 저장하지 않는다(도착 위치만 저장)
+    if (wasMoving && !rt.player.moving && !started) savePlayer()
     syncHere()
 
     if (rt.phase === 'charging' && !rt.busy) rt.gauge = gaugeAt(now - rt.chargeStart)
@@ -497,18 +571,20 @@ export function Game({ gameId }: WorldGameProps) {
     const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
     const { pos } = rt.player
     drawWorld(ctx, {
+      map: rt.map,
       phase: rt.phase,
       tMs: now,
       gauge: rt.gauge,
       player: rt.player,
       // 캐릭터는 반올림한 자리에 그려지므로 카메라도 반올림한 자리를 따라간다(홀수 폭에서 1px 흔들림 방지)
-      camera: cameraFor({ x: Math.round(pos.x), y: Math.round(pos.y) }, size),
+      camera: cameraFor(rt.map, { x: Math.round(pos.x), y: Math.round(pos.y) }, size),
       bobber: fishing ? rt.bobber : null,
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
       cond: conditionsAt(Date.now() + rt.offset),
       hudTop: hudTopFor(touch, fit.scale),
+      fade: rt.fade,
     }, size)
   }
 
@@ -894,7 +970,7 @@ export function Game({ gameId }: WorldGameProps) {
                   onBuyBag={(t) => void buyBag(t)}
                 />
               )}
-              {menu === 'dex' && <DexPanel view={view} />}
+              {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
             </div>
           )}
           {fullscreen && notices && <div className={touch ? 'fish-notices fish-notices-top' : 'fish-notices'}>{notices}</div>}

@@ -966,6 +966,381 @@ const FISH_OCTOPUS = sprite(
   ],
 )
 
+// ── 강·숲 물고기 17종 ──
+const FISH_PALE_CHUB = sprite(
+  { k: '#1f2b3a', b: '#6f8fa8', s: '#b9ccd8', S: '#e6eef3', p: '#ee7f9a', f: '#e3a4b3', w: '#f3f6f8', e: '#0d1620', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.............k..',
+    '...kkkkkkk..kfk.',
+    '..kbbbbbbbkkffk.',
+    '.kWebbbbbbbbffk.',
+    'kSsppppppppppk..',
+    '.kwwwwwwwwkkffk.',
+    '..kkkkkkkk..kfk.',
+    '.............k..',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_DARK_CHUB = sprite(
+  { k: '#262a1c', b: '#8a8a5a', d: '#23251a', s: '#c4c9ba', w: '#e6e8d6', f: '#c9b27a', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '...kkkkkkkk..k..',
+    '..kbbbdbbdbkkfk.',
+    '.kWebbbdbbdbbffk',
+    'kssbbbdbbdbbkfk.',
+    '.kwwwwdwwdwwkfk.',
+    '..kkkkkkkkkk.k..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SKIN_CARP = sprite(
+  { k: '#2a3038', g: '#8f9aa6', G: '#b8c2cc', d: '#5f6b78', w: '#dfe5ea', f: '#9aa6b3', m: '#d9a98a', e: '#0d1117', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '...kkkkkkkkk..k.',
+    '..kGGgggggggkkfk',
+    '.kGWegggdgggdffk',
+    'kGGGggggggggkkfk',
+    'kmkwwwwwwwwwk.k.',
+    '.kkkkkkkkkkk..k.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_AUCHA_PERCH = sprite(
+  { k: '#2a1d14', b: '#7a5a3a', B: '#9c7a52', d: '#4d3822', w: '#f4ecd8', n: '#4a7fd0', f: '#9a7a52', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '....k.k.k.k.....',
+    '...kdkdkdkdk..k.',
+    '..kbbbBBbbbbkkfk',
+    '.kbWebwbbwbbbffk',
+    'kbbbnnbbbwbbbkfk',
+    'kbbbnbwbbbwbbkfk',
+    '.kwwwwwwwwwwk.k.',
+    '..kkkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SWEETFISH = sprite(
+  { k: '#2b3a2a', b: '#7da06a', B: '#a8c48c', s: '#d6e3cc', y: '#f2c43a', Y: '#ffe27a', w: '#f4f6ec', e: '#0d160d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..........yy....',
+    '..kkkkkkkkkkk.k.',
+    '.kbbbbbbbbbbkkyk',
+    'kWebBBBbbbbbbkYk',
+    'kssyysssssssykk.',
+    '.kwwwwwwwwwwkyk.',
+    '..kkkkkkkkkk..k.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CATFISH = sprite(
+  { k: '#1e1e22', b: '#5a5a62', B: '#7a7a84', d: '#3a3a42', w: '#c9c9c0', f: '#4a4a52', m: '#e0d6b0', e: '#e8e8e8', E: '#0a0a0a' },
+  [
+    '................',
+    '................',
+    '................',
+    '.......kkkkk....',
+    '..kkkkkkbbbbkk..',
+    '.kbbbbbbbbbbbbkk',
+    'mmkEebbbBBbbbbfk',
+    'mkbbbbbbbbbbbbfk',
+    'mmkbbbbbbbbbkkfk',
+    'mkkwwwwwwwwwk.k.',
+    '..kkkkkkkkkkk...',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_MANDARIN_FISH = sprite(
+  { k: '#2a2010', b: '#c9a04a', B: '#e0bd6a', d: '#4a3418', w: '#efe0b0', f: '#b88a3a', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '....k.k.k.k.....',
+    '...kfkfkfkfk..k.',
+    '.kkbbbdbbdbbkkfk',
+    'kBWebdbbdbbdbffk',
+    'kBBbbbdbbdbbbkfk',
+    'kkwwwbbbbbbbkkfk',
+    '.kwwwwwwwwwkk.k.',
+    '..kkkkkkkkk..k..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_EEL = sprite(
+  { k: '#1a1d1c', b: '#4d5a52', B: '#6f7f74', w: '#d8d9b8', m: '#cfae8a', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '.kkkkkbbBBbkkkk.',
+    'kWebbbbBbbbbbbbk',
+    'kmwwwwkkkkkwwwbk',
+    '.kkkkk.....kkkk.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_GOLDEN_MANDARIN = sprite(
+  { k: '#3a2a08', b: '#ffc933', B: '#ffe27a', d: '#d9981a', w: '#fff3b0', f: '#ffb000', Y: '#fffbe0', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '..Y.............',
+    '.YWY............',
+    '..Y.k.k.k.k.....',
+    '...kfkfkfkfk..k.',
+    '.kkbbBdbbdbbkkfk',
+    'kBWebdbbdbbdbffk',
+    'kBBbbBdbbdbbbkfk',
+    'kkwwwbbbbbBbkkfk',
+    '.kwwwwwwwwwkk.k.',
+    '..kkkkkkkkk..k..',
+    '.............Y..',
+    '............YWY.',
+    '.............Y..',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CRUCIAN = sprite(
+  { k: '#2e2512', b: '#a88a4a', B: '#c4a862', d: '#6f5a2c', w: '#e0d3a0', f: '#8f7438', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '....kkkkkk......',
+    '..kkbbBBbbkk.k..',
+    '.kbbBBBBbbbbkkfk',
+    'kWebbBBbdbbdbffk',
+    'kbbbdbbbbdbbbffk',
+    'kbbbbbdbbbbbkkfk',
+    '.kwwwwwwwwwwk.k.',
+    '..kkwwwwwwkk....',
+    '....kkkkkk......',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CARP = sprite(
+  { k: '#3a2410', b: '#b8873a', B: '#d9a850', d: '#8a5a24', w: '#ecd8a8', f: '#c4622a', m: '#f0d070', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '....kkkkkkkk....',
+    '..kkBBBBBBBBk.k.',
+    '.kbbdbbdbbdbkkfk',
+    'kWebbdbbdbbdbffk',
+    'kbbdbbdbbdbbbffk',
+    'mmkbbdbbdbbdbkfk',
+    'm.kbdbbdbbdbbkkk',
+    '..kkwwwwwwwwk.k.',
+    '....kkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_BLUEGILL = sprite(
+  { k: '#243020', b: '#6e8f5a', d: '#3f5a3a', y: '#e8a23c', n: '#1f2a6e', f: '#9aa060', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '....k.k.k.k.....',
+    '...kfkfkfkfk....',
+    '..kbbbbbbbbbk.k.',
+    '.kbbdbbdbbdbkkfk',
+    'kbWebbdbbdbbbffk',
+    'kbbbbbdbbdbbbkfk',
+    'kbbnnbbbbbbbbkfk',
+    'kyynnbbbbbbbkkfk',
+    '.kyyyyyyyybbk.k.',
+    '..kkyyyyyykk....',
+    '....kkkkkk......',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_LOACH = sprite(
+  { k: '#2e2214', b: '#8a6a40', d: '#4f3a20', w: '#d9c9a0', m: '#e0c690', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkkkkkkkkkk...',
+    'kWebbdbbdbbbbkk.',
+    'kkbbbbbbbbbdbbkk',
+    'mkwwwwwwwwwwwbbk',
+    'm.kkkkkkkkkkkkk.',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_SNAKEHEAD = sprite(
+  { k: '#1e2412', b: '#5f6b3a', B: '#7d8a4a', d: '#2c3318', w: '#c9c79a', f: '#4a5230', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '...fffffffffff..',
+    '.kkkkkkkkkkkkkk.',
+    'kBBbbddbbddbbbkf',
+    'kWebbbddbbddbbkf',
+    'kbbbbbbddbbddbkf',
+    'kkwwbddbbddbbkkf',
+    '.kkwwwwwwwwwwkk.',
+    '..kkkkkkkkkkk...',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_STREAM_MINNOW = sprite(
+  { k: '#2e2416', b: '#8a7050', d: '#4a3820', w: '#d9cba8', f: '#9a7e58', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '...kkkkkkkk.k...',
+    '..kbbdbbdbbkfk..',
+    '.kWebbbdbbbbffk.',
+    '.kbbbdbbbdbbkfk.',
+    '..kwwwwwwwwkkk..',
+    '...kkkkkkkk.....',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_LENOK = sprite(
+  { k: '#2a2e22', b: '#8a9a78', B: '#aab896', r: '#d63a3a', R: '#ef6a5a', w: '#e8ecd8', f: '#c9604a', e: '#0d0d0d', W: '#ffffff' },
+  [
+    '................',
+    '................',
+    '................',
+    '....kkkkkkkk..k.',
+    '..kkbbbbrbbrkkfk',
+    '.kbbbBBbbbbbbffk',
+    'kbRWeRbbrbbrbffk',
+    'kbbRRbbbbbbbbkfk',
+    'kkwwbbrbbrbbkkfk',
+    '.kwwwwwwwwwwk.k.',
+    '..kkkkkkkkkk....',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
+const FISH_CENTURY_SNAKEHEAD = sprite(
+  { k: '#10140a', b: '#343c26', B: '#4a5532', d: '#1a1f10', w: '#8f9470', f: '#2a3020', g: '#6fae4a', S: '#c9c4a8', e: '#0d0d0d', W: '#d8d8c0' },
+  [
+    '................',
+    '................',
+    '...fffffffffff..',
+    '..kkkkkkkkkkkk..',
+    '.kBBbbddbbddbkkf',
+    'kBWebbgddbbddgkf',
+    'kbbbbbbddbSbddkf',
+    'kbbSbbgbddbbbkff',
+    'kkbbbddbSbddbkkf',
+    '.kwwbbbbbSbbbkkf',
+    '..kwwwwwwwwwkk..',
+    '...kkkkkkkkkk...',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+)
+
 // ── 날씨 아이콘(8×8, HUD용) ──
 const ICON_SUN = sprite({ y: '#ffd23f', Y: '#fff3b0', o: '#ff9f43' }, [
   '...oo...',
@@ -1499,6 +1874,237 @@ const SHOP = sprite(SHOP_PALETTE, [
   'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
 ])
 
+// ── 강·연못·웅덩이·폭포·다리·절벽(2단계 지역 타일). 16×16, 0/1 쌍은 물결이 다르다 ──
+const RIVER: Record<string, string> = {
+  a: '#4fa6d6', // 바탕: 바다보다 밝다
+  d: '#3f95c8', // 깊은 결
+  b: '#7cc4e6', // 흐름 줄무늬
+  c: '#d4f0fa', // 줄무늬 끝 반짝임
+}
+const POND: Record<string, string> = {
+  a: '#245f8c', // 바탕: 짙고 잔잔하다
+  d: '#1f5480', // 깊은 결
+  b: '#2f7099', // 잔물결
+  c: '#6fb0cf', // 아주 작은 반짝임
+}
+const BASIN: Record<string, string> = {
+  a: '#3a8fc4', // 바탕
+  b: '#8fd0ea', // 작은 거품
+  c: '#f2fbff', // 흰 거품
+}
+const FALLS: Record<string, string> = {
+  a: '#5aa9d8', // 바탕
+  d: '#3b8abf', // 그늘 줄
+  b: '#7cc4e6', // 물줄기
+  c: '#e4f6fc', // 흰 물보라 줄
+}
+
+const RIVER_0 = sprite(RIVER, [
+  'aaaaaaaaaaaaaaaa',
+  'aabbbbbaaaaaaaaa',
+  'aaaabbbbcaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbbbaa',
+  'adddaaaaaaabccba',
+  'aaaaaaaaaaaaaaaa',
+  'abbbbaaaaaaaaaaa',
+  'aabccbaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaabbbbbbaa',
+  'aaaaaaaaaaabccaa',
+  'aaaddaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaabbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const RIVER_1 = sprite(RIVER, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaabbbbbaaaa',
+  'aaaaaaaaabbbbcaa',
+  'aaaaaaaaaaaaaaaa',
+  'bbbaaaaaaaaaaaab',
+  'bccbaadddaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaabbbbaaaaaa',
+  'aaaaaaabccbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'bbbaaaaaaaaaabbb',
+  'bccaaaaaaaaaaaaa',
+  'aaaaaaaaddaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbbaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const POND_0 = sprite(POND, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaadd',
+  'aaaacccaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'adaaaaaaaaaaaaaa',
+  'aaaaaaaabbbaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aacccaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaddd',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const POND_1 = sprite(POND, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaddaaaaaaaaaa',
+  'aaaaaaaaaacccaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaadaaaaaaaa',
+  'baaaaaaaaaaaaabb',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaacccaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaadddaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+
+const BASIN_0 = sprite(BASIN, [
+  'aabcaaaabaaacbaa',
+  'baaaacaaaaaaaaab',
+  'aaacbaaaabcaaaaa',
+  'caaaaaaabaaaacaa',
+  'aabaaacaaaaaaaba',
+  'aaaaabaaacbaaaaa',
+  'bcaaaaaaaaaaabca',
+  'aaaaacbaaabaaaaa',
+  'aaabaaaaaaaaaaca',
+  'caaaaaaacbaaabaa',
+  'aaaaabaaaaaaaaaa',
+  'abcaaaaaabaaacba',
+  'aaaaaaacaaaaaaaa',
+  'aacbaaaaaaaabaaa',
+  'baaaaabaacaaaaca',
+  'aaaacaaaaaaabaaa',
+])
+
+const BASIN_1 = sprite(BASIN, [
+  'acabaaaaabaacaaa',
+  'aaaaaaacaaaaaaab',
+  'baaaabcaaaabaaac',
+  'aabbaaaacaaaaaaa',
+  'aaaaaacbaaaabcaa',
+  'caacaaaaaaabaaaa',
+  'abaaabaaacaaaaaa',
+  'aaaaaaaabaaacbaa',
+  'bcabcaaaaaaaaaaa',
+  'aaaaaaaacbaaabaa',
+  'acaaaabaaaaaaaaa',
+  'baacaaaaaaacbaaa',
+  'aaaaaaaabaaaaaaa',
+  'cbaabcaaaaaabaaa',
+  'aaaaaaaaaacaaaaa',
+  'aaaaacbaaaaaaaab',
+])
+
+const FALLS_0 = sprite(FALLS, [
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'adbcaabcdabbcaab',
+  'adbcaabccabbdaab',
+  'abbcaadccabbcaab',
+  'abbdaabccabbcaab',
+  'abbcaabcdabbcaad',
+  'abbcaabccabbcaab',
+  'dbbcaabccadbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabcdabbcaab',
+  'abbcdabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccdbbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+])
+
+const FALLS_1 = sprite(FALLS, [
+  'abbcaabccdbbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabccabbcaab',
+  'adbcaabcdabbcaab',
+  'adbcaabccabbdaab',
+  'abbcaadccabbcaab',
+  'abbdaabccabbcaab',
+  'abbcaabcdabbcaad',
+  'abbcaabccabbcaab',
+  'dbbcaabccadbcaab',
+  'abbcaabccabbcaab',
+  'abbcaabcdabbcaab',
+  'abbcdabccabbcaab',
+  'abbcaabccabbcaab',
+])
+
+// 다리: 아래 강물 위에 얹는다. 가로 판자 줄, 양옆에 난간(바깥 한 칸은 투명해 물이 보인다)
+const BRIDGE: Record<string, string> = {
+  n: '#3b2a22', // 난간·틈
+  U: '#e2b07a', // 판자 윗면 밝은 줄
+  u: '#c8925a', // 판자
+  g: '#a8723f', // 나뭇결
+  G: '#86562f', // 판자 아래 그늘
+}
+const BRIDGE_PLANK = sprite(BRIDGE, [
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuuguun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuguuuuuguuuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuuguun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuguuuuguuuuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nUUUUUUUUUUUUn.',
+  '.nuuuguuuuguuun.',
+  '.nGGGGGGGGGGGGn.',
+  '.nnnnnnnnnnnnnn.',
+])
+
+// 절벽: 바위 벽면. 가로 지층 띠와 갈라진 틈, 위쪽 모서리는 밝고 아래는 어둡다
+const CLIFF: Record<string, string> = {
+  k: '#3d3a44', // 틈
+  h: '#b8b2ba', // 윗면 밝은 모서리
+  r: '#8f8993', // 바위
+  m: '#756f7b', // 바위 그늘
+  d: '#5a5560', // 아래 어둠
+}
+const TILE_CLIFF = sprite(CLIFF, [
+  'hhhhhhhhhhhhhhhh',
+  'hrrrrrrrhrrrrrrh',
+  'rrrmrrrrrrrrmrrr',
+  'rrmmrrrkrrrrmmrr',
+  'mmmmmrrkrrrmmmmm',
+  'kkkkkkkkkkkkkkkk',
+  'rrrrrrrrrrrrrrrr',
+  'rmrrrrkrrrrrrrmr',
+  'mmmrrrkrrrrmmmmm',
+  'mmmmmmkmmmmmmmmm',
+  'kkkkkkkkkkkkkkkk',
+  'rrrrrrrrrrrrrrrr',
+  'rrrmrrrrrrkrrrrr',
+  'mrmmmrrrrrkrmmrm',
+  'dmmmmmmmmmkmmmmd',
+  'dddddddddddddddd',
+])
+
 export const SPRITES: Record<string, Sprite> = {
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
@@ -1520,6 +2126,16 @@ export const SPRITES: Record<string, Sprite> = {
   'water-1': WATER_1,
   'pier-plank': PIER_PLANK,
   'pier-post': PIER_POST,
+  'river-0': RIVER_0,
+  'river-1': RIVER_1,
+  'pond-0': POND_0,
+  'pond-1': POND_1,
+  'basin-0': BASIN_0,
+  'basin-1': BASIN_1,
+  'falls-0': FALLS_0,
+  'falls-1': FALLS_1,
+  'bridge-plank': BRIDGE_PLANK,
+  'tile-cliff': TILE_CLIFF,
   bobber: BOBBER,
   bang: BANG,
   splash: SPLASH,
@@ -1544,6 +2160,23 @@ export const SPRITES: Record<string, Sprite> = {
   'fish-conger': FISH_CONGER,
   'fish-pufferfish': FISH_PUFFERFISH,
   'fish-octopus': FISH_OCTOPUS,
+  'fish-pale-chub': FISH_PALE_CHUB,
+  'fish-dark-chub': FISH_DARK_CHUB,
+  'fish-skin-carp': FISH_SKIN_CARP,
+  'fish-aucha-perch': FISH_AUCHA_PERCH,
+  'fish-sweetfish': FISH_SWEETFISH,
+  'fish-catfish': FISH_CATFISH,
+  'fish-mandarin-fish': FISH_MANDARIN_FISH,
+  'fish-eel': FISH_EEL,
+  'fish-golden-mandarin': FISH_GOLDEN_MANDARIN,
+  'fish-crucian': FISH_CRUCIAN,
+  'fish-carp': FISH_CARP,
+  'fish-bluegill': FISH_BLUEGILL,
+  'fish-loach': FISH_LOACH,
+  'fish-snakehead': FISH_SNAKEHEAD,
+  'fish-stream-minnow': FISH_STREAM_MINNOW,
+  'fish-lenok': FISH_LENOK,
+  'fish-century-snakehead': FISH_CENTURY_SNAKEHEAD,
   'icon-sun': ICON_SUN,
   'icon-rain': ICON_RAIN,
   'icon-snow': ICON_SNOW,

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { MAP_H, MAP_W, PIER_END, SPAWN, TILE, isWalkable } from './map.ts'
+import { TILE, isWalkable, pierEnd } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
 import { MAX_DT_MS } from './minigame.ts'
 import { FEET, WALK_SPEED, cameraFor, joystickVector, keysVector, stepWalk, type Player } from './walk.ts'
+
+const MAP_W = VILLAGE.w
+const MAP_H = VILLAGE.h
+const SPAWN = VILLAGE.spawn
+const PIER_END = pierEnd(VILLAGE)!
 
 function player(pos: { x: number; y: number }): Player {
   return { pos: { ...pos }, facing: 'down', moving: false, walkMs: 0 }
@@ -13,7 +19,7 @@ function feetOverlapsBlocked(pos: { x: number; y: number }): boolean {
   const tx1 = Math.floor((pos.x + FEET.w / 2 - e) / TILE)
   const ty0 = Math.floor((pos.y - FEET.h / 2 + e) / TILE)
   const ty1 = Math.floor((pos.y + FEET.h / 2 - e) / TILE)
-  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(tx, ty)) return true
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(VILLAGE, tx, ty)) return true
   return false
 }
 
@@ -45,7 +51,7 @@ describe('입력 벡터', () => {
 
 describe('stepWalk', () => {
   const open = findTile((tx, ty) => {
-    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (!isWalkable(tx + dx, ty + dy)) return false
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (!isWalkable(VILLAGE, tx + dx, ty + dy)) return false
     return true
   })
 
@@ -57,16 +63,16 @@ describe('stepWalk', () => {
     let p = player(center(open!.tx, open!.ty))
     const start = { ...p.pos }
     const s = Math.SQRT1_2
-    for (let i = 0; i < 20; i++) p = stepWalk(p, { x: s, y: s }, 50)
+    for (let i = 0; i < 20; i++) p = stepWalk(VILLAGE, p, { x: s, y: s }, 50)
     expect(Math.hypot(p.pos.x - start.x, p.pos.y - start.y)).toBeGreaterThan(WALK_SPEED - 0.5)
     expect(Math.hypot(p.pos.x - start.x, p.pos.y - start.y)).toBeLessThan(WALK_SPEED + 0.5)
   })
 
   it('물을 향해 아래로 걸으면 발이 물과 겹치기 전에 멈춘다', () => {
-    const shore = findTile((tx, ty) => isWalkable(tx, ty) && !isWalkable(tx, ty + 1) && ty + 1 < MAP_H)
+    const shore = findTile((tx, ty) => isWalkable(VILLAGE, tx, ty) && !isWalkable(VILLAGE, tx, ty + 1) && ty + 1 < MAP_H)
     expect(shore).not.toBeNull()
     let p = player(center(shore!.tx, shore!.ty))
-    for (let i = 0; i < 40; i++) p = stepWalk(p, { x: 0, y: 1 }, 50)
+    for (let i = 0; i < 40; i++) p = stepWalk(VILLAGE, p, { x: 0, y: 1 }, 50)
     expect(feetOverlapsBlocked(p.pos)).toBe(false)
     expect(p.pos.y + FEET.h / 2).toBeLessThanOrEqual((shore!.ty + 1) * TILE + 1e-6)
     expect(p.pos.y + FEET.h / 2).toBeGreaterThan((shore!.ty + 1) * TILE - (WALK_SPEED * 50) / 1000) // 한 걸음 안쪽에서 멈춘다
@@ -74,12 +80,12 @@ describe('stepWalk', () => {
 
   it('물 쪽 대각선 입력이면 x는 계속 움직인다 (벽 따라 미끄러짐)', () => {
     const shore = findTile((tx, ty) =>
-      [0, 1, 2, 3].every((d) => isWalkable(tx + d, ty) && !isWalkable(tx + d, ty + 1)),
+      [0, 1, 2, 3].every((d) => isWalkable(VILLAGE, tx + d, ty) && !isWalkable(VILLAGE, tx + d, ty + 1)),
     )
     expect(shore).not.toBeNull()
     let p = player(center(shore!.tx, shore!.ty))
     const x0 = p.pos.x
-    for (let i = 0; i < 20; i++) p = stepWalk(p, { x: Math.SQRT1_2, y: Math.SQRT1_2 }, 50)
+    for (let i = 0; i < 20; i++) p = stepWalk(VILLAGE, p, { x: Math.SQRT1_2, y: Math.SQRT1_2 }, 50)
     expect(p.pos.x - x0).toBeGreaterThan(30)
     expect(feetOverlapsBlocked(p.pos)).toBe(false)
   })
@@ -99,7 +105,7 @@ describe('stepWalk', () => {
           const m = rnd() < 0.1 ? 0 : 1
           input = { x: Math.cos(a) * m, y: Math.sin(a) * m }
         }
-        p = stepWalk(p, input, 50)
+        p = stepWalk(VILLAGE, p, input, 50)
         expect(feetOverlapsBlocked(p.pos)).toBe(false)
         expect(p.pos.x).toBeGreaterThan(0)
         expect(p.pos.y).toBeGreaterThan(0)
@@ -111,15 +117,15 @@ describe('stepWalk', () => {
 
   it('큰 dt는 MAX_DT_MS로 잘린다', () => {
     const p = player(center(open!.tx, open!.ty))
-    const a = stepWalk(p, { x: 1, y: 0 }, 5000)
-    const b = stepWalk(p, { x: 1, y: 0 }, MAX_DT_MS)
+    const a = stepWalk(VILLAGE, p, { x: 1, y: 0 }, 5000)
+    const b = stepWalk(VILLAGE, p, { x: 1, y: 0 }, MAX_DT_MS)
     expect(a).toEqual(b)
-    expect(stepWalk(p, { x: 1, y: 0 }, -10).pos).toEqual(p.pos)
+    expect(stepWalk(VILLAGE, p, { x: 1, y: 0 }, -10).pos).toEqual(p.pos)
   })
 
   it('입력 0이면 facing 유지, moving false, walkMs 0', () => {
     const p: Player = { pos: center(open!.tx, open!.ty), facing: 'left', moving: true, walkMs: 200 }
-    const q = stepWalk(p, { x: 0, y: 0 }, 16)
+    const q = stepWalk(VILLAGE, p, { x: 0, y: 0 }, 16)
     expect(q.facing).toBe('left')
     expect(q.moving).toBe(false)
     expect(q.walkMs).toBe(0)
@@ -128,14 +134,14 @@ describe('stepWalk', () => {
 
   it('입력이 있으면 facing·moving·walkMs 갱신 (막혀도 방향은 바뀐다)', () => {
     let p = player(center(open!.tx, open!.ty))
-    p = stepWalk(p, { x: -1, y: 0.5 }, 20)
+    p = stepWalk(VILLAGE, p, { x: -1, y: 0.5 }, 20)
     expect(p.facing).toBe('left')
     expect(p.moving).toBe(true)
     expect(p.walkMs).toBe(20)
-    p = stepWalk(p, { x: 0.2, y: -0.9 }, 30)
+    p = stepWalk(VILLAGE, p, { x: 0.2, y: -0.9 }, 30)
     expect(p.facing).toBe('up')
     expect(p.walkMs).toBe(50)
-    p = stepWalk(p, { x: 0.5, y: 0.5 }, 10)
+    p = stepWalk(VILLAGE, p, { x: 0.5, y: 0.5 }, 10)
     expect(p.facing).toBe('right')
   })
 })
@@ -144,14 +150,14 @@ describe('cameraFor', () => {
   const mapW = MAP_W * TILE
   const mapH = MAP_H * TILE
   it('맵 모서리에서 clamp', () => {
-    expect(cameraFor({ x: 0, y: 0 }, { w: 195, h: 280 })).toEqual({ x: 0, y: 0 })
-    expect(cameraFor({ x: mapW, y: mapH }, { w: 195, h: 280 })).toEqual({ x: mapW - 195, y: mapH - 280 })
+    expect(cameraFor(VILLAGE, { x: 0, y: 0 }, { w: 195, h: 280 })).toEqual({ x: 0, y: 0 })
+    expect(cameraFor(VILLAGE, { x: mapW, y: mapH }, { w: 195, h: 280 })).toEqual({ x: mapW - 195, y: mapH - 280 })
   })
   it('화면이 맵보다 넓으면 가운데 정렬(음수 오프셋)', () => {
-    const c = cameraFor({ x: 100, y: 100 }, { w: 2000, h: 280 })
+    const c = cameraFor(VILLAGE, { x: 100, y: 100 }, { w: 2000, h: 280 })
     expect(c.x).toBe(-Math.floor((2000 - mapW) / 2))
   })
   it('중앙은 round(target - view/2)', () => {
-    expect(cameraFor({ x: 300.4, y: 200 }, { w: 195, h: 280 })).toEqual({ x: Math.round(300.4 - 97.5), y: 60 })
+    expect(cameraFor(VILLAGE, { x: 300.4, y: 200 }, { w: 195, h: 280 })).toEqual({ x: Math.round(300.4 - 97.5), y: 60 })
   })
 })
