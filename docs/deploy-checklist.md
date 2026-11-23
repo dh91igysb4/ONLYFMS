@@ -173,7 +173,7 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
 순서: DB push → `world` 함수 배포 → Vercel.
 
 - [ ] 마이그레이션 먼저: `npx supabase@2 db push` → `20261122191800_world.sql`(테이블 `world_saves`·`game_records`, RPC `user_records`), `20261122193304_fishing.sql`(`game_modes`·`hidden_games` 행)
-- [ ] 함수 배포. `world`는 `src/games/**` 로직·데이터를 번들하므로 `src/games/fishing/data.ts`·`logic.ts`가 바뀔 때마다 다시 배포한다.
+- [ ] 함수 배포. `world`는 `src/games/**` 로직·데이터를 번들하므로 `src/games/fishing/data.ts`·`logic.ts`가 바뀔 때마다 다시 배포한다. 낚시 마을(걷기·부두 크기 보너스·가방 업그레이드, `logic.version` 2) 변경도 `logic.ts`·`data.ts`가 바뀌므로 `world` 함수 재배포가 필요하다.
 ```bash
 npx supabase@2 functions deploy world --no-verify-jwt
 ```
@@ -189,6 +189,14 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] 새로고침·다른 브라우저에서 세이브가 이어진다
 - [ ] 프로필 기록 탭에 누적 수익·최대어·도감이 뜨고, 낚싯대를 사도 누적 수익이 줄지 않는다
 - [ ] 터치(개발자 도구 모바일 모드)로 전 과정이 된다, 길게 눌러도 화면이 스크롤·확대되지 않는다
+- [ ] 폰(또는 모바일 모드)에서 조이스틱으로 마을을 걷는다. 건물·나무·물에 닿으면 벽을 따라 미끄러지고, 걷는 동안 화면이 스크롤·확대되지 않는다
+- [ ] 한 손가락은 조이스틱, 다른 손가락은 행동 버튼으로 동시에 조작된다
+- [ ] 물가에서는 행동 버튼 글자가 "낚시", 부두 위에서도 "낚시", 상점 문 앞에서는 "상점"이다. 상점은 문 앞에서만 열리고 다른 곳에서는 열리지 않는다
+- [ ] 부두 끝에서 상점 문 앞까지 걷는 데 10~15초 걸린다 (최단 경로 37칸, 초당 3칸 ≈ 12초)
+- [ ] 부두 위에서 던지면 큰 물고기가 더 잘 나온다 (크기 보너스)
+- [ ] 가방 업그레이드 구매: 20칸 → 30칸(800 G) → 40칸(5,000 G), 가득 차면 "상점에 가서 팔아 주세요"가 뜬다
+- [ ] 새로고침 후 걷던 위치가 유지된다
+- [ ] 데스크톱(1280px)에서 방향키로 걷고 스페이스로 낚시·상점이 된다
 - [ ] 브라우저 콘솔에서 `world_saves`·`game_records`에 직접 update를 시도하면 거부되고, `supabase.from('world_saves').select('state')`는 행 없이 오류(권한 거부)를 돌려준다
 
 ## 문제가 생기면
