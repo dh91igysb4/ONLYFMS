@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+// (sprites.ts가 캔버스 타입을 쓰므로 DOM 타입만 빌려 온다. 실행은 node에서 그림 데이터만 쓴다)
 // 옷장 미리보기(설계 2026-11-24-fishing-wardrobe §4.4). 품목마다 기본 옷차림에 하나씩 입혀
 // 앞·뒤·오른쪽·왼쪽 대기 + 걷기·던지기·감기 자세를 한 장의 PNG로 쓴다. 테스트·빌드에는 들어가지 않는다.
 // 실행: node --experimental-strip-types scripts/preview-wardrobe.ts [출력 폴더]
