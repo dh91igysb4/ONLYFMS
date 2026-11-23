@@ -10,24 +10,27 @@ import {
   GROUND_TOL,
   LAND_GRACE,
   MM,
+  MOVER_MEMORY,
   PERFECT_MULT,
   PERFECT_TOL,
   REST_LEN,
   SPIN_MAX,
   START_LEN,
+  SUBSTEPS,
   V_MAX,
   V_TERMINAL,
   WHEELBASE,
   WHEELIE_ACC,
   WHEEL_R,
 } from './constants.ts'
-import { collideWheel, windowCands } from './collide.ts'
-import { courseFromTemplates, courseOf } from './course.ts'
+import { collideWheel, toFrame, windowCands } from './collide.ts'
+import { courseFromTemplates, courseOf, getCourse } from './course.ts'
 import type { Course } from './course.ts'
 import { TEMPLATES } from './pieces.ts'
 import type { Template } from './pieces.ts'
 import type { HazardDef } from './hazards.ts'
-import type { Motion } from './motion.ts'
+import { poseAt, type Motion } from './motion.ts'
+import { moverSegsAt, type MoverDef } from './movers.ts'
 import { bodyAngle, flipsOf, initSim, initSimAt, scoreOf, step } from './sim.ts'
 import type { SimState, Wheel } from './sim.ts'
 import { TRIG_ONE, TURN, angDiff, cosT, isqrt, sinT } from './trig.ts'
@@ -720,4 +723,325 @@ describe('위험물 판정', () => {
     const b = JSON.stringify(run(initSimAt(c, TPL_X, V_MAX), 600, () => true, c))
     expect(a).toBe(b)
   })
+})
+
+describe('움직이는 길', () => {
+  const road = (segs: { x0: number; y0: number; x1: number; y1: number }[], motion: Motion, start: MoverDef['start'] = { k: 'time' }): MoverDef => ({
+    segs: segs.map((g) => ({ ...g, boost: false })),
+    pivotX: 0,
+    pivotY: 0,
+    motion,
+    start,
+    look: 'yellow',
+  })
+  const flatRoad = (len: number, motion: Motion, start?: MoverDef['start']): MoverDef => road([{ x0: 0, y0: 0, x1: len, y1: 0 }], motion, start)
+  // 템플릿 원점(TPL_X, 0)에서 (dx, dy)에 길들을 놓고, 그 뒤로 평지 400 m(낭떠러지 없음). 길 좌표는 놓은 점 기준.
+  const withRoads = (roads: [number, number, MoverDef][], ground: Template['prims'] = [{ t: 'line', dx: mm(400000), dy: 0 }]): Course =>
+    courseFromTemplates([{ id: 'mv', tier: 1, prims: [...roads.map(([dx, dy, m]) => ({ t: 'mover' as const, dx, dy, m })), ...ground] }])
+  // 뒷바퀴 x, 길 높이 y 위에 수평으로 앉은 차. 두 바퀴 속도 (vx, vy).
+  const restOn = (c: Course, x: number, y: number, vx = 0, vy = 0, ground = true): SimState => {
+    const w = (wx: number): Wheel => ({ x: wx, y: y + WHEEL_R, px: wx - vx, py: y + WHEEL_R - vy, ground })
+    return { ...initSimAt(c, TPL_X, 0), rear: w(x), front: w(x + WHEELBASE) }
+  }
+  // 반지름 R 정다각형 고리(n 조각, 기준점 = 중심).
+  const ring = (R: number, n: number, w: number): MoverDef => {
+    const p = (i: number): [number, number] => [Math.round(R * Math.cos((2 * Math.PI * i) / n)), Math.round(R * Math.sin((2 * Math.PI * i) / n))]
+    return { ...road(Array.from({ length: n }, (_, i) => ({ x0: p(i)[0], y0: p(i)[1], x1: p(i + 1)[0], y1: p(i + 1)[1] })), { k: 'rotate', a0: 0, w }), look: 'green' }
+  }
+  // 고리 중심 (cx, cy) 둘레 반지름 rw, 각도 ang(라디안)의 바퀴. 고리와 함께 도는 속도(w TURN/틱)를 준다.
+  const ringWheel = (cx: number, cy: number, rw: number, ang: number, w: number): Wheel => {
+    const om = (w * 2 * Math.PI) / TURN
+    const x = Math.round(cx + rw * Math.cos(ang))
+    const y = Math.round(cy + rw * Math.sin(ang))
+    return { x, y, px: x + Math.round(om * (y - cy)), py: y - Math.round(om * (x - cx)), ground: true }
+  }
+  const SWING: Motion = { k: 'swing', ax: mm(6000), ay: 0, period: 240, phase: 60 } // 한가운데(+3 m)에서 시작, 800 u/틱
+  const roadVx = (m: Motion, tick: number): number => poseAt(m, (tick + 1) * SUBSTEPS, null).dx - poseAt(m, tick * SUBSTEPS, null).dx
+  const carVx = (s: SimState): number => Math.floor((vxOf(s.rear) + vxOf(s.front)) / 2)
+
+  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone만 늘었다)', () => {
+    // 움직이는 길을 넣기 전 코드로 만든 최종 상태(JSON). 앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱.
+    const before = [
+      '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
+      '{"tick":379,"rear":{"x":958745,"y":-13004,"px":954348,"py":-12059,"ground":false},"front":{"x":937502,"y":-5892,"px":934005,"py":-2266,"ground":false},"progress":191,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":1810,"pending":null,"lastAward":null,"gems":6,"takenGems":[],"dead":"crash","airBefore":true}',
+      '{"tick":527,"rear":{"x":669049,"y":-5120,"px":665937,"py":-5127,"ground":true},"front":{"x":647387,"y":590,"px":644782,"py":2503,"ground":false},"progress":195,"nextSection":0,"sectionScore":0,"flipScore":1,"airAngle":1842,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":{"tick":387,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
+      '{"tick":217,"rear":{"x":640660,"y":4834,"px":637440,"py":4113,"ground":true},"front":{"x":618406,"y":7379,"px":615473,"py":9179,"ground":false},"progress":87,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":null,"pending":null,"lastAward":null,"gems":5,"takenGems":[0,1,2,3,4],"dead":"crash","airBefore":false}',
+      '{"tick":260,"rear":{"x":644397,"y":36521,"px":644162,"py":37548,"ground":false},"front":{"x":634453,"y":16451,"px":635018,"py":17080,"ground":true},"progress":83,"nextSection":1,"sectionScore":1,"flipScore":1,"airAngle":null,"pending":null,"lastAward":{"tick":237,"flips":1,"perfect":false,"points":1},"gems":5,"takenGems":[0,1,2,3,4],"dead":"crash","airBefore":false}'
+    ]
+    const after: string[] = []
+    for (const [ids, seed] of [[['ramp', 'hill', 'bowl'], 7], [['loop', 'spikepit', 'waves'], 3], [['loop2', 'spikefloor', 'ramp'], 5]] as const) {
+      const c = courseOf(ids)
+      after.push(JSON.stringify(run(initSim(c), 1500, randomInput(seed), c)))
+    }
+    for (const seed of ['0123456789abcdef0123456789abcdef', 'fedcba9876543210fedcba9876543210']) {
+      const c = getCourse(seed)
+      after.push(JSON.stringify(run(initSim(c), 3000, (_, i) => i % 50 < 30, c)))
+    }
+    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[]}'))
+  })
+
+  it('수평으로 왕복하는 길 위에 (길에 대해) 정지한 차는 방향이 네 번 바뀌는 동안 길과 함께 움직인다', () => {
+    const c = withRoads([[mm(20000), mm(2000), flatRoad(mm(20000), SWING)]])
+    let s = restOn(c, TPL_X + mm(29000), mm(2000), roadVx(SWING, -1))
+    const rel: number[] = []
+    for (let t = 0; t < 480; t++) {
+      s = step(s, false, c)
+      expect(s.dead).toBeNull()
+      expect(s.rear.ground && s.front.ground).toBe(true)
+      rel.push(carVx(s) - roadVx(SWING, t))
+    }
+    for (let i = 0; i < rel.length; i += 10) {
+      const avg = Math.abs(rel.slice(i, i + 10).reduce((a, b) => a + b, 0)) / 10
+      expect(avg, `ticks ${i}~${i + 9}`).toBeLessThan(WHEEL_R / 20)
+    }
+    expect(s.rear.y).toBe(mm(2000) + WHEEL_R) // 길에서 떨어지지 않았다
+  })
+
+  it('구동 최고 속도는 뒷바퀴가 닿은 길에 대한 상대 속도로 잰다', () => {
+    const slow: Motion = { k: 'swing', ax: mm(60000), ay: 0, period: 2400, phase: 600 } // 800 u/틱으로 한 방향
+    const c = withRoads([[mm(20000), mm(2000), flatRoad(mm(200000), slow)]])
+    // phase 600(¼주기)이라 처음 자세가 이미 ax/2 = 30 m 옮겨져 있다: 길은 템플릿 x 50~250 m.
+    const s = run(restOn(c, TPL_X + mm(60000), mm(2000), roadVx(slow, -1)), 90, () => true, c)
+    expect(s.dead).toBeNull()
+    const rel = carVx(s) - roadVx(slow, s.tick - 1)
+    expect(Math.abs(rel - V_MAX)).toBeLessThan(Math.floor(V_MAX / 20))
+    expect(carVx(s)).toBeGreaterThan(V_MAX + 700)
+  })
+
+  it('회전 고리: 고리와 함께 도는 차는 느리면 붙어 있고, 빠르면(ω²R > G) 튕겨 나가 뜬다', () => {
+    const R = mm(4000)
+    const H = mm(7000)
+    const liftTick = (w: number): number => {
+      const c = withRoads([[mm(30000), H, ring(R, 32, w)]])
+      const cx = TPL_X + mm(30000)
+      const rw = R * Math.cos(Math.PI / 32) + WHEEL_R
+      const half = Math.asin(WHEELBASE / 2 / rw)
+      let s: SimState = { ...initSimAt(c, TPL_X, 0), rear: ringWheel(cx, H, rw, Math.PI / 2 + half, w), front: ringWheel(cx, H, rw, Math.PI / 2 - half, w) }
+      for (let i = 0; i < 60 && !s.dead; i++) {
+        s = step(s, false, c)
+        if (!s.rear.ground && !s.front.ground) return s.tick
+      }
+      return -1
+    }
+    // 고리 위 바퀴 중심 반지름 ≈ 4.18 m: 문턱 ω = √(G / R) ≈ 21.8 TURN/틱
+    expect(liftTick(8)).toBeGreaterThan(30)
+    expect(liftTick(16)).toBeGreaterThan(20)
+    expect(liftTick(28)).toBeLessThanOrEqual(8)
+    expect(liftTick(40)).toBeLessThanOrEqual(4)
+  })
+
+  it('회전 고리 위·안에서 임의 입력 600틱(20개 시드): 바퀴 중심이 고리 선분을 뚫지 않는다(길 기준 상대 위치로 검사)', () => {
+    const R = mm(4000)
+    const H = mm(7000)
+    const W = 12
+    const def = ring(R, 32, W)
+    const cx = TPL_X + mm(30000)
+    const rOut = R * Math.cos(Math.PI / 32) + WHEEL_R
+    const rIn = R * Math.cos(Math.PI / 32) - WHEEL_R
+    const starts: [number, number][] = [
+      [rOut, Math.PI / 2], // 고리 위
+      [rIn, -Math.PI / 2], // 고리 안 바닥
+    ]
+    let checked = 0
+    for (const [rw, mid] of starts) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const c = withRoads([[mm(30000), H, def]])
+        const [m] = c.moversNear({ x0: cx, y0: H, x1: cx, y1: H })
+        const half = Math.asin(WHEELBASE / 2 / rw)
+        const up = mid > 0
+        let s: SimState = {
+          ...initSimAt(c, TPL_X, 0),
+          rear: ringWheel(cx, H, rw, up ? mid + half : mid - half, W),
+          front: ringWheel(cx, H, rw, up ? mid - half : mid + half, W),
+        }
+        const inp = randomInput(seed)
+        for (let i = 0; i < 600; i++) {
+          const n = step(s, inp(s, i), c)
+          if (n.dead) break
+          const g0 = moverSegsAt(m, s.tick * SUBSTEPS, 0)
+          const g1 = moverSegsAt(m, n.tick * SUBSTEPS, 0)
+          for (const [a, b] of [
+            [s.rear, n.rear],
+            [s.front, n.front],
+          ]) {
+            for (let j = 0; j < g1.length; j++) {
+              const g = g1[j]
+              if (Math.min(g.x0, g.x1) - WHEELBASE > b.x || Math.max(g.x0, g.x1) + WHEELBASE < b.x) continue
+              // 틱 시작 위치를 길에 실어 틱 끝 자세로 옮긴 점 → 틱 끝 위치의 이동이 선분을 가로지르면 관통이다.
+              const o = toFrame(g0[j], g, a.x, a.y)
+              expect(crosses({ ...a, ...o }, b, g), `seed ${seed} tick ${i} seg ${j}`).toBe(false)
+              for (const [ex, ey] of [
+                [g.x0, g.y0],
+                [g.x1, g.y1],
+              ]) {
+                expect(isqrt((b.x - ex) ** 2 + (b.y - ey) ** 2)).toBeGreaterThan(Math.floor(WHEEL_R / 2))
+              }
+              checked++
+            }
+          }
+          s = n
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(100000)
+  }, 60000)
+
+  it('touch 길: 바퀴가 처음 닿은 틱 + delay = t0, 그 전에는 처음 자세, t0 뒤에 움직인다', () => {
+    const lift: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 60, dx: 0, dy: mm(2000), a: 0 }] }
+    const c = withRoads([[mm(20000), mm(2000), flatRoad(mm(6000), lift, { k: 'touch', delay: 10 })]])
+    let s = restOn(c, TPL_X + mm(22000), mm(2500), 0, 0, false)
+    let touchTick = -1
+    for (let i = 0; i < 40 && touchTick < 0; i++) {
+      const n = step(s, false, c)
+      if (!s.rear.ground && !s.front.ground && (n.rear.ground || n.front.ground)) touchTick = n.tick
+      else expect(n.movers).toEqual([])
+      s = n
+    }
+    expect(touchTick).toBeGreaterThan(0)
+    const t0 = touchTick + 10
+    expect(s.movers).toEqual([{ id: 0, t0 }])
+    const m = c.moverById(0)
+    for (const T of [0, touchTick * SUBSTEPS, t0 * SUBSTEPS]) expect(moverSegsAt(m, T, t0 * SUBSTEPS)).toEqual(m.segs)
+    expect(moverSegsAt(m, t0 * SUBSTEPS + 1, t0 * SUBSTEPS)).not.toEqual(m.segs)
+    s = run(s, t0 - s.tick, () => false, c)
+    expect(s.tick).toBe(t0)
+    expect(s.rear.y).toBe(mm(2000) + WHEEL_R) // t0까지 처음 높이에 앉아 있다
+    expect(s.movers).toEqual([{ id: 0, t0 }]) // 다시 닿아도 t0은 그대로
+    s = run(s, 30, () => false, c)
+    expect(s.rear.y - (mm(2000) + WHEEL_R)).toBeGreaterThan(mm(900)) // 30틱 동안 반쯤 올라갔다(차를 싣고)
+    expect(s.dead).toBeNull()
+  })
+
+  it('Review Focus 2: 끝난 keys 길은 moversDone으로 옮겨지고, 차가 다시 닿으면 마지막 키 자세에 닿는다', () => {
+    const lift: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 60, dx: 0, dy: mm(2000), a: 0 }] }
+    const c = withRoads([[mm(20000), mm(2000), flatRoad(mm(6000), lift, { k: 'touch', delay: 0 })]])
+    let s = run(restOn(c, TPL_X + mm(22000), mm(2100), 0, 0, false), 120, () => false, c)
+    expect(s.movers).toEqual([])
+    expect(s.moversDone).toEqual([0])
+    expect(s.rear.y).toBe(mm(4000) + WHEEL_R)
+    // 차를 들어 올렸다가(공중) 떨어뜨린다: 처음 자세(2 m)가 아니라 마지막 키(4 m)에 내려앉는다.
+    s = { ...s, ...restOn(c, TPL_X + mm(23000), mm(5000), 0, 0, false), tick: s.tick, movers: s.movers, moversDone: s.moversDone }
+    s = run(s, 120, () => false, c)
+    expect(s.dead).toBeNull()
+    expect(s.rear.ground && s.front.ground).toBe(true)
+    expect(s.rear.y).toBe(mm(4000) + WHEEL_R)
+    expect(s.moversDone).toEqual([0])
+  })
+
+  it('일회성 도로: 조각 셋 중 밟은 조각만 떨어지고, 같이 떨어지면 fall', () => {
+    const piece = flatRoad(mm(3000), { k: 'fall', w: 0 }, { k: 'touch', delay: 5 })
+    const ground: Template['prims'] = [
+      { t: 'line', dx: mm(10000), dy: 0 },
+      { t: 'gap', dx: mm(9300), dy: 0 },
+      { t: 'line', dx: mm(400000), dy: 0 },
+    ]
+    const c = withRoads([0, 1, 2].map((k) => [mm(10100 + 3050 * k), 0, piece] as [number, number, MoverDef]), ground)
+    let s = restOn(c, TPL_X + mm(10100 + 3050 + 800), mm(300), 0, 0, false)
+    const seen = new Set<number>()
+    for (let i = 0; i < 600 && !s.dead; i++) {
+      s = step(s, false, c)
+      for (const e of s.movers) seen.add(e.id)
+      for (const id of s.moversDone) seen.add(id)
+    }
+    expect(s.dead).toBe('fall')
+    expect([...seen]).toEqual([1])
+    const T = s.tick * SUBSTEPS
+    expect(moverSegsAt(c.moverById(0), T, null)).toEqual(c.moverById(0).segs)
+    expect(moverSegsAt(c.moverById(2), T, null)).toEqual(c.moverById(2).segs)
+  })
+
+  it('pass 길: 차 중심 x가 pass.x를 넘기 전에는 처음 자세, 넘은 틱 + delay부터 움직인다', () => {
+    const swingUp: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 30, dx: 0, dy: mm(3000), a: 0 }] }
+    // 길은 땅 위 6 m에 떠 있어 차가 닿지 않는다. pass.x는 템플릿 원점 + 20 m(길보다 10 m 앞).
+    const c = withRoads([[mm(30000), mm(6000), flatRoad(mm(4000), swingUp, { k: 'pass', x: -mm(10000), delay: 7 })]])
+    const passX = TPL_X + mm(20000)
+    let s = initSimAt(c, TPL_X, V_MAX)
+    let crossed = -1
+    for (let i = 0; i < 400 && crossed < 0; i++) {
+      const n = step(s, true, c)
+      if (Math.floor((n.rear.x + n.front.x) / 2) > passX) crossed = n.tick
+      else expect(n.movers).toEqual([])
+      s = n
+    }
+    expect(crossed).toBeGreaterThan(0)
+    expect(s.movers).toEqual([{ id: 0, t0: crossed + 7 }])
+    const m = c.moverById(0)
+    const T0 = (crossed + 7) * SUBSTEPS
+    expect(moverSegsAt(m, T0, T0)).toEqual(m.segs)
+    expect(moverSegsAt(m, T0 + SUBSTEPS * 10, T0)[0].y0).toBeGreaterThan(m.segs[0].y0)
+    s = run(s, 60, () => true, c)
+    expect(s.movers).toEqual([])
+    expect(s.moversDone).toEqual([0])
+  })
+
+  it('Review Focus 1: 평지에 정지한 차 쪽으로 돌아 들어온 막대 길이 바퀴를 지면 쪽으로 밀면 바퀴가 지면 아래로 가지 않고 crash', () => {
+    // 앞바퀴 1.5 m 앞, 지면 위 0.3 m(바퀴 지름보다 낮다)에 기준점. 거기서 뒤로 150° 방향 1.9 m 막대가 반시계로 돌며 내려온다.
+    const L = mm(1900)
+    const a = (150 * Math.PI) / 180
+    const bar = road([{ x0: 0, y0: 0, x1: Math.round(L * Math.cos(a)), y1: Math.round(L * Math.sin(a)) }], { k: 'rotate', a0: 0, w: 16 })
+    const c = withRoads([[WHEELBASE + mm(1500), mm(300), bar]])
+    let s = initSimAt(c, TPL_X, 0)
+    let lowest = Infinity
+    for (let i = 0; i < 400 && !s.dead; i++) {
+      s = step(s, false, c)
+      lowest = Math.min(lowest, s.front.y, s.rear.y)
+    }
+    expect(s.dead).toBe('crash')
+    expect(lowest).toBeGreaterThan(0) // 바퀴 중심이 지면(y = 0) 아래로 간 적이 없다
+    // 막대가 닿기 전에는 끼임으로 죽지 않는다(차체 판정원이 아니라 끼임으로 죽었다: 차체는 막대 끝보다 뒤에 있다).
+    expect(s.tick).toBeGreaterThan(15)
+  })
+
+  it('끼임 규칙은 고정 지형끼리는 걸지 않는다: 바퀴가 길 위에만 깊게 눌려도 crash 아님(길만 있는 곳)', () => {
+    // 길이 위로 빠르게 올라와 차를 싣고 가도(바퀴가 길에만 닿음) 죽지 않는다.
+    const up: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 20, dx: 0, dy: mm(3000), a: 0 }] }
+    const c = withRoads([[mm(20000), mm(2000), flatRoad(mm(6000), up)]])
+    const s = run(restOn(c, TPL_X + mm(22000), mm(2000)), 120, () => false, c)
+    expect(s.dead).toBeNull()
+  })
+
+  it('움직이는 길 위 착지에서도 공중제비·퍼펙트가 정상 지급된다(평평한 swing 길)', () => {
+    const c = withRoads([[mm(20000), mm(3000), flatRoad(mm(20000), SWING)]])
+    // 길과 같은 속도로 떨어뜨린다(길이 차 밑에서 빠져나가지 않게).
+    const s0 = airborne(c, TPL_X + mm(28000), mm(4000), 0, TURN, roadVx(SWING, -1))
+    const s = run(s0, 150, () => false, c)
+    expect(s.dead).toBeNull()
+    expect(s.rear.y).toBe(mm(3000) + WHEEL_R)
+    expect(s.lastAward).toMatchObject({ flips: 1, perfect: true, points: PERFECT_MULT })
+    expect(s.progress).toBe(s0.progress) // 움직이는 길은 진행 번호를 바꾸지 않는다
+  })
+
+  it('고정 지형보다 FALL_DEPTH 넘게 낮은 움직이는 길 위에 선 차는 fall로 죽지 않는다(구간 바닥에 길이 들어간다)', () => {
+    const c = withRoads([[mm(10000), -mm(9000), flatRoad(mm(20000), { k: 'swing', ax: 0, ay: -mm(1000), period: 120, phase: 0 })]])
+    const s = run(restOn(c, TPL_X + mm(15000), -mm(9000)), 300, () => false, c)
+    expect(s.dead).toBeNull()
+    expect(s.rear.ground).toBe(true)
+  })
+
+  it('상태 크기: 끝난 길 기록은 MOVER_MEMORY까지만, 가장 오래된 것부터 버린다', () => {
+    // 길이 1 m짜리 touch 길 12개를 깐 템플릿을 이어 붙인다. 밟으면 1틱 만에 끝나는(제자리) keys.
+    const blip: Motion = { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 1, dx: 0, dy: 0, a: 0 }] }
+    const T: Template = {
+      id: 'blips',
+      tier: 1,
+      prims: [
+        ...Array.from({ length: 12 }, (_, k) => ({ t: 'mover' as const, dx: mm(1000 * k), dy: 0, m: flatRoad(mm(1000), blip, { k: 'touch', delay: 0 }) })),
+        { t: 'line', dx: mm(12000), dy: 0 },
+      ],
+    }
+    const c = courseFromTemplates([T])
+    let s = initSim(c)
+    let maxDone = 0
+    for (let i = 0; i < 3000; i++) {
+      s = step(s, true, c)
+      maxDone = Math.max(maxDone, s.moversDone.length)
+      expect(s.movers.length).toBeLessThanOrEqual(2)
+    }
+    expect(s.dead).toBeNull()
+    expect(maxDone).toBe(MOVER_MEMORY)
+    const done = s.moversDone
+    expect(done[done.length - 1]).toBeGreaterThan(MOVER_MEMORY * 2) // 최근 것이 남았다
+    expect(done.every((id, k) => k === 0 || id > done[k - 1])).toBe(true)
+    expect(JSON.stringify(s).length).toBeLessThan(2000)
+  }, 20000)
 })

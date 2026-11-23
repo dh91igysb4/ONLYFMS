@@ -306,6 +306,25 @@ describe('neon-rider 코스: 위험물·움직이는 길·블록', () => {
     expect(() => c.moverById(1000000)).toThrow()
   })
 
+  it('구간 바닥(minY)에 움직이는 길의 움직임 범위 최저점이 들어간다(fall은 처음 자세 최저점)', () => {
+    const minY = (m: MoverDef, dy: number): number => courseFromTemplates([flat('mn', 1, [mv(5000, dy, m)])]).section(0).minY
+    expect(minY(yellow(1000, NONE), 300)).toBe(0) // 땅보다 높은 길은 바닥을 바꾸지 않는다
+    expect(minY(yellow(1000, NONE), -7000)).toBe(-7000)
+    expect(minY(yellow(1000, { k: 'swing', ax: 0, ay: -9000, period: 60, phase: 0 }), -1000)).toBe(-10000)
+    expect(minY(yellow(1000, { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }, { t: 9, dx: 0, dy: -4000, a: 0 }] }), 0)).toBe(-4000)
+    expect(minY(yellow(3000, { k: 'rotate', a0: 0, w: 5 }), 1000)).toBe(1000 - 3002) // 기준점(왼쪽 끝) 둘레 반지름 3000 + 여유 2
+    expect(minY({ ...yellow(3000, { k: 'fall', w: 0 }), start: { k: 'touch', delay: 0 } }, -2000)).toBe(-2000) // FALL_DEPTH가 아니다
+  })
+
+  it('pass 길은 pass.x까지 넓힌 상자로 찾는다(차 중심이 pass.x를 넘는 틱에 찾을 수 있게)', () => {
+    const pass: MoverDef = { ...yellow(3000, { k: 'keys', keys: [{ t: 0, dx: 0, dy: 0, a: 0 }] }), start: { k: 'pass', x: -9000, delay: 0 } }
+    const c = courseFromTemplates([flat('ps', 1, [mv(10000, 0, pass)])])
+    const ox = origin(c, 0)
+    expect(c.moversNear(at(ox + 21000, 0)).map((m) => m.id)).toEqual([0]) // pass.x = 원점 + 21000
+    expect(c.moversNear(at(ox + 20500, 0))).toEqual([])
+    expect(c.moversNear({ x0: ox + 21000, y0: -Infinity, x1: ox + 21000, y1: Infinity }).map((m) => m.id)).toEqual([0])
+  })
+
   it('위험물이 없는 코스에서 *Near는 빈 목록', () => {
     const c = makeSeededCourse('1234abcd', POOL)
     const box = { x0: 0, y0: -1000000, x1: c.section(10).endX, y1: 1000000 }

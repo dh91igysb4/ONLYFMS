@@ -15,7 +15,7 @@ export type Course = {
   seg(i: number): Seg // 필요하면 i까지 생성
   section(k: number): Section // 필요하면 k까지 생성
   gemsBetween(segFrom: number, segTo: number): readonly Gem[]
-  // 상자와 "움직임 전체를 덮는 상자"(블록은 처음 자세)가 겹치는 것, id 오름차순. 필요한 구간까지 만든다(x 범위로 찾는다).
+  // 상자와 "움직임 전체를 덮는 상자"(블록은 처음 자세, pass 길은 pass.x까지 넓힌 상자)가 겹치는 것, id 오름차순. 필요한 구간까지 만든다(x 범위로 찾는다).
   hazardsNear(box: Box): readonly Hazard[]
   moversNear(box: Box): readonly Mover[]
   blocksNear(box: Box): readonly Block[]
@@ -88,6 +88,21 @@ function blockRestBox(b: BlockDef): Box {
   return { x0: x0 - 2, y0: y0 - 2, x1: x1 + 2, y1: y1 + 2 }
 }
 
+/** 움직이는 길의 색인 상자: 움직임 전체를 덮는 상자에, pass 길이면 pass.x까지 x를 넓힌다(차 중심이 pass.x를 넘을 때 찾도록). */
+function moverIndexBox(m: Mover): Box {
+  const b = moverBox(m)
+  if (m.start.k !== 'pass') return b
+  return { ...b, x0: Math.min(b.x0, m.start.x), x1: Math.max(b.x1, m.start.x) }
+}
+
+/** 구간 바닥(minY)에 넣는 길의 최저 높이: 움직임 전체 범위. fall 길은 떨어진 깊이가 아니라 처음 자세의 최저점. */
+function moverFloor(m: Mover): number {
+  if (m.motion.k !== 'fall') return moverBox(m).y0
+  let y = Infinity
+  for (const s of m.segs) y = Math.min(y, s.y0, s.y1)
+  return y
+}
+
 function overlaps(a: Box, b: Box): boolean {
   return a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1
 }
@@ -130,7 +145,7 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
       const b = builtOf(tpl)
       const boxes = [
         ...b.hazards.map((h) => hazardBox({ ...h, id: 0 })),
-        ...b.movers.map((m) => moverBox({ ...m, id: 0 })),
+        ...b.movers.map((m) => moverIndexBox({ ...m, id: 0 })),
         ...b.blocks.map(blockRestBox),
       ]
       for (const x of boxes) {
@@ -161,7 +176,7 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
     for (const m of built.movers) {
       const item: Mover = { ...shiftMover(m, tx, penY), id: movers.length }
       movers.push(item)
-      items.movers.push({ item, box: moverBox(item) })
+      items.movers.push({ item, box: moverIndexBox(item) })
     }
     for (const b of built.blocks) {
       const item: Block = { ...shiftBlock(b, tx, penY), id: blockId++ }
@@ -174,7 +189,8 @@ function buildCourse(templates: readonly Template[], pick: (k: number) => Templa
       endX: built.endX + tx,
       firstSeg,
       lastSeg: segs.length - 1,
-      minY: Math.min(penY, built.minY + penY),
+      // 움직이는 길 위에 선 차가 fall 판정에 걸리지 않게 길이 움직이는 범위의 최저점도 넣는다.
+      minY: items.movers.reduce((y, e) => Math.min(y, moverFloor(e.item)), Math.min(penY, built.minY + penY)),
     })
     sectionGems.push(gems)
     sectionItems.push(items)

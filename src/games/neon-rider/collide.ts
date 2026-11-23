@@ -1,11 +1,15 @@
 // 원-선분 충돌. 순수 정수 TS (설계 §5.2, §5.5).
 // 선분은 양면의 얇은 장애물로 다룬다: 원 중심이 이동 전에 있던 쪽으로 법선을 따라 밀어낸다.
+import { SUBSTEPS } from './constants.ts'
 import type { Course } from './course.ts'
 import type { Seg } from './pieces.ts'
 import { isqrt } from './trig.ts'
 
-/** 충돌 후보 선분. sx, sy는 방향 벡터, len은 그 길이(정수 제곱근), l2 = sx² + sy². */
-export type Cand = { i: number; seg: Seg; sx: number; sy: number; len: number; l2: number }
+/**
+ * 충돌 후보 선분. sx, sy는 방향 벡터, len은 그 길이(정수 제곱근), l2 = sx² + sy².
+ * prev: 움직이는 길이면 같은 선분의 한 부분 틱 전(이전 이동 단계 끝) 자세. 고정 선분은 없다. 움직이는 길의 i는 음수다(진행 번호를 바꾸지 않는다).
+ */
+export type Cand = { i: number; seg: Seg; sx: number; sy: number; len: number; l2: number; prev?: Seg }
 /** 움직이는 원(바퀴). 속도는 u/틱. */
 export type Body = { x: number; y: number; vx: number; vy: number }
 export type Box = { x0: number; y0: number; x1: number; y1: number }
@@ -49,7 +53,68 @@ export function windowCands(course: Course, p: number, window: number, box: Box,
   return out
 }
 
-function far(c: Cand, x: number, y: number, m: number): boolean {
+/** 선분 seg의 후보. 길이 0이면 null. */
+export function candOf(i: number, seg: Seg, prev?: Seg): Cand | null {
+  const sx = seg.x1 - seg.x0
+  const sy = seg.y1 - seg.y0
+  const l2 = sx * sx + sy * sy
+  if (l2 === 0) return null
+  return prev ? { i, seg, sx, sy, len: isqrt(l2), l2, prev } : { i, seg, sx, sy, len: isqrt(l2), l2 }
+}
+
+/**
+ * 점 (x, y)를 선분 from 기준 상대 좌표(선분 방향 성분, 왼쪽 법선 성분)로 옮긴 뒤 선분 to 기준으로 되돌린 점.
+ * 같은 선분의 두 자세(from = 이전, to = 지금)에 쓰면 "길에 실려 함께 움직인 점"이다.
+ */
+export function toFrame(from: Seg, to: Seg, x: number, y: number): { x: number; y: number } {
+  const fx = from.x1 - from.x0
+  const fy = from.y1 - from.y0
+  const tx = to.x1 - to.x0
+  const ty = to.y1 - to.y0
+  const lf = Math.max(1, isqrt(fx * fx + fy * fy))
+  const lt = Math.max(1, isqrt(tx * tx + ty * ty))
+  const rx = x - from.x0
+  const ry = y - from.y0
+  const a = divRound(rx * fx + ry * fy, lf) // 선분 방향 성분(u)
+  const q = divRound(fx * ry - fy * rx, lf) // 왼쪽 법선 성분(u)
+  return { x: to.x0 + divRound(a * tx - q * ty, lt), y: to.y0 + divRound(a * ty + q * tx, lt) }
+}
+
+/**
+ * 움직이는 길 선분에서 (x, y)에 가장 가까운 점(선분 안으로 자름)의 속도(u/틱): 지금 자세 − 이전 자세(한 부분 틱)에 SUBSTEPS를 곱한다.
+ * 강체 운동의 속도는 선분 위에서 일차식이라 두 끝점 변위를 선분 위치로 보간하면 정확하다. 고정 선분은 0.
+ */
+export function candVel(c: Cand, x: number, y: number): { vx: number; vy: number } {
+  const p = c.prev
+  if (!p) return { vx: 0, vy: 0 }
+  const along = divRound(Math.min(c.l2, Math.max(0, dotOf(c, x, y))), c.len) // 0..len (u)
+  const dx0 = c.seg.x0 - p.x0
+  const dy0 = c.seg.y0 - p.y0
+  const dx1 = c.seg.x1 - p.x1
+  const dy1 = c.seg.y1 - p.y1
+  return {
+    vx: (dx0 + divRound((dx1 - dx0) * along, c.len)) * SUBSTEPS,
+    vy: (dy0 + divRound((dy1 - dy0) * along, c.len)) * SUBSTEPS,
+  }
+}
+
+// 움직이는 길이면 바퀴 이전 위치를 길에 실어 지금 자세로 옮긴다(어느 쪽에서 왔는지는 길에 대한 상대 위치로 정한다).
+function originOf(c: Cand, ox: number, oy: number): { x: number; y: number } {
+  return c.prev ? toFrame(c.prev, c.seg, ox, oy) : { x: ox, y: oy }
+}
+
+// respond를 길에 대한 상대 속도로 한다: 접점의 길 속도를 빼고 응답한 뒤 다시 더한다.
+function respondOn(c: Cand, b: Body, nx: number, ny: number, nl: number, push: number, e: number): void {
+  const v = candVel(c, b.x, b.y)
+  b.vx -= v.vx
+  b.vy -= v.vy
+  respond(b, nx, ny, nl, push, e)
+  b.vx += v.vx
+  b.vy += v.vy
+}
+
+/** 선분 상자에서 m 넘게 떨어졌는지(빠른 거름). */
+export function far(c: Cand, x: number, y: number, m: number): boolean {
   const g = c.seg
   return x + m < Math.min(g.x0, g.x1) || x - m > Math.max(g.x0, g.x1) || y + m < Math.min(g.y0, g.y1) || y - m > Math.max(g.y0, g.y1)
 }
@@ -94,7 +159,8 @@ export function collideWheel(b: Body, ox: number, oy: number, r: number, tol: nu
     const dot = dotOf(c, b.x, b.y)
     if (dot < 0 || dot > c.l2) continue
     const cross = crossOf(c, b.x, b.y)
-    const before = crossOf(c, ox, oy)
+    const o = originOf(c, ox, oy)
+    const before = crossOf(c, o.x, o.y)
     const side = before > 0 ? 1 : before < 0 ? -1 : cross < 0 ? -1 : 1
     const rl = r * c.len
     if (side * cross > rl) {
@@ -102,7 +168,7 @@ export function collideWheel(b: Body, ox: number, oy: number, r: number, tol: nu
       continue
     }
     hit(c)
-    respond(b, -side * c.sy, side * c.sx, c.len, ceilDiv(rl - side * cross, c.len), e)
+    respondOn(c, b, -side * c.sy, side * c.sx, c.len, ceilDiv(rl - side * cross, c.len), e)
   }
   for (const c of cands) {
     if (far(c, b.x, b.y, r + tol)) continue
@@ -115,9 +181,27 @@ export function collideWheel(b: Body, ox: number, oy: number, r: number, tol: nu
     hit(c)
     if (d2 > r * r) continue
     const d = isqrt(d2)
-    respond(b, ex, ey, Math.max(1, d), r - d, e)
+    respondOn(c, b, ex, ey, Math.max(1, d), r - d, e)
   }
   return hits
+}
+
+/**
+ * 반지름 r 원 (x, y)가 선분 c에 파고든 깊이(음수면 떨어진 거리). 선분 안쪽은 이동 전 중심 (ox, oy)가 있던 쪽 기준이라
+ * 중심이 선분을 넘어가면 r보다 깊다. 끝점 쪽은 끝점까지의 거리로 잰다.
+ */
+export function depthIn(c: Cand, x: number, y: number, ox: number, oy: number, r: number): number {
+  const dot = dotOf(c, x, y)
+  if (dot >= 0 && dot <= c.l2) {
+    const cross = crossOf(c, x, y)
+    const o = originOf(c, ox, oy)
+    const before = crossOf(c, o.x, o.y)
+    const side = before > 0 ? 1 : before < 0 ? -1 : cross < 0 ? -1 : 1
+    return r - Math.floor((side * cross) / c.len)
+  }
+  const ex = x - (dot < 0 ? c.seg.x0 : c.seg.x1)
+  const ey = y - (dot < 0 ? c.seg.y0 : c.seg.y1)
+  return r - isqrt(ex * ex + ey * ey)
 }
 
 /** 반지름 r 원이 후보 선분 중 하나와 겹치는지. */
