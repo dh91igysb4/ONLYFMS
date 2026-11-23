@@ -89,6 +89,13 @@ test('world modules: category world, all modes off, ids unique across all regist
   expect(getWorld('nope')).toBeUndefined()
 })
 
+test('world modules: 지갑 계약 — legacyGold는 wallet 게임만 (설계 §6)', () => {
+  for (const w of worlds) {
+    expect([undefined, true, false]).toContain(w.logic.wallet)
+    if (w.logic.legacyGold) expect(w.logic.wallet, `${w.manifest.id}: legacyGold에는 wallet: true가 필요하다`).toBe(true)
+  }
+})
+
 test('manifest records keys are unique per game', () => {
   for (const { manifest: m } of [...games, ...duels, ...worlds]) {
     const keys = (m.records ?? []).map((r) => r.key)

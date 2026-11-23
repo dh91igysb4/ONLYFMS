@@ -108,9 +108,16 @@ export interface DuelLogic<State, Action, View> {
 export type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }
 
 // ---- 지속형(world) 게임 계약: 저장이 이어지는 게임 ----
+//
+// 지속형 게임 공통 규칙(설계 docs/superpowers/specs/2026-11-23-wallet-design.md §6):
+// 골드는 세이브에 두지 않는다. 플랫폼 지갑이 원본이고 게임은 ctx.gold를 읽고 증감만 돌려준다.
+// 지갑을 쓰는 게임은 `wallet: true`를 둔다. 없으면 world 핸들러는 지갑을 잠그지도 읽지도 않고,
+// ctx.gold는 0, 응답에 최상위 gold가 없다(지갑 이전 전의 게임이 그대로 동작하게).
 
-/** 서버가 넘기는 시각(밀리초)과 난수 함수 */
-export type WorldCtx = { now: number; rng: () => number }
+/** 서버가 넘기는 시각(밀리초), 난수 함수, 지갑 잔액(잠근 뒤 읽은 값. `wallet`이 없는 게임은 0) */
+// gold는 지갑 1단계 동안 선택값이다(낚시가 지갑으로 옮기기 전 테스트·호출이 그대로 컴파일되게).
+// 핸들러는 언제나 채운다. 낚시 지갑 이전(계획 Task 4) 때 필수로 바꾼다.
+export type WorldCtx = { now: number; rng: () => number; gold?: number }
 
 /** 게임이 남기는 기록 하나. key는 manifest.records의 key와 맞는다 */
 export type WorldRecord = { key: string; value: number; detail?: string }
@@ -118,14 +125,21 @@ export type WorldRecord = { key: string; value: number; detail?: string }
 export interface WorldLogic<State, Action, View> {
   /** 규칙·저장 형식을 바꿀 때마다 1씩 올린다 */
   version: number
+  /** 플랫폼 지갑을 쓴다. true면 핸들러가 지갑을 잠그고 ctx.gold를 채우며 apply의 gold를 장부에 반영한다 */
+  wallet?: boolean
   init(): State
   /** 옛 버전 state를 현재 형식으로. 모르는 값은 기본값으로 채우고 던지지 않는다 */
   migrate(state: unknown, fromVersion: number): State
-  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
-  apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown } | { error: string }
-  /** 브라우저에 보낼 상태 */
-  view(state: State, ctx: { now: number }): View
+  /**
+   * 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다.
+   * gold: 이 행동의 골드 증감(정수). 생략하면 0. 지출은 ctx.gold로 먼저 검사해 not_enough_gold를 돌려준다.
+   */
+  apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown; gold?: number } | { error: string }
+  /** 브라우저에 보낼 상태. gold: 이 응답 시점의 지갑 잔액(`wallet`이 없는 게임은 0) */
+  view(state: State, ctx: { now: number; gold?: number }): View
   records(state: State): WorldRecord[]
+  /** 옛 세이브 안에 들어 있던 골드(0 이상 정수). 세이브 버전이 바뀔 때 핸들러가 한 번 지갑으로 옮긴다 */
+  legacyGold?(raw: unknown, fromVersion: number): number
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
