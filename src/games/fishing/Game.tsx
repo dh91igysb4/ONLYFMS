@@ -895,12 +895,35 @@ export function Game({ gameId }: WorldGameProps) {
     setNotice(null)
     try {
       const res = await act({ type: 'unlockArea', area })
-      if (!alive.current || !res.view.areas.includes(area)) return
+      if (!alive.current) return
+      if (!res.view.areas.includes(area)) {
+        // 성공 응답인데 지역이 없다: 창을 열어 둔 채 다시 시도하라고 알린다
+        setNotice({ kind: 'error', text: RETRY })
+        return
+      }
       // 열렸다: 창을 닫는다. 문은 다음 프레임부터 열린 지역으로 그려지고 걸을 수 있다
       if (menuRef.current === 'unlock') closeMenu()
       setNotice({ kind: 'info', text: UNLOCK_NOTICES[area] ?? '새 지역을 열었어요' })
     } catch (e) {
+      if (!alive.current) return
+      const code = codeOf(e)
+      if (code === 'already_open') {
+        // 다른 기기에서 이미 열었다: 창을 닫고 상태를 다시 불러와 문을 연다
+        if (menuRef.current === 'unlock') closeMenu()
+        setNotice({ kind: 'info', text: fishingMessage(code) })
+        await reload()
+        return
+      }
       // 창은 열어 둔 채 오류만 알린다(상점 구매와 같은 표시)
+      setNotice({ kind: 'error', text: fishingMessage(code) })
+    }
+  }
+
+  /** 진행 중인 낚시는 건드리지 않고 view만 다시 불러온다. 실패하면 오류 알림 */
+  async function reload() {
+    try {
+      await send({ game: gameId, action: 'load' })
+    } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }

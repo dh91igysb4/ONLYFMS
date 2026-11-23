@@ -1920,6 +1920,41 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
   })
 
+  test('already_open(다른 기기에서 이미 엶) → 창이 닫히고 알림, view를 다시 불러와 다리를 지나갈 수 있다', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({
+      unlockArea: () => Promise.reject(new ApiError('already_open', 400)),
+      load: () => ok({ ...view, gold: 1000, areas: [...BASE, 'lake'] }),
+    })
+    const loadsBefore = calls('load').length
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    await flush()
+    expect(screen.queryByRole('region', { name: '지역 열기' })).not.toBeInTheDocument()
+    expect(screen.getByText('이미 열려 있어요')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(calls('load')).toHaveLength(loadsBefore + 1)
+    expect(screen.getByText('1,000 G')).toBeInTheDocument()
+    key('ArrowUp', true)
+    await advance(1200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('lake')
+  })
+
+  test('성공 응답인데 areas에 지역이 없으면 창은 그대로, 다시 시도 오류 문구', async () => {
+    const view = makeView({ gold: 6000, areas: BASE })
+    await mount(view, AT_BRIDGE)
+    await interact()
+    route({ unlockArea: () => ok({ ...view }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(unlockPanel()).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('다시 시도해 주세요')
+  })
+
   test('숲 동굴 입구를 열면 동굴 알림, 걸어 들어가면 동굴 맵과 지역 이름 알림', async () => {
     const gate = FOREST.gates[0]
     const view = makeView({ gold: 20000, areas: BASE })
@@ -1988,7 +2023,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(lastScene().player.facing).toBe(back.facing)
   })
 
-  test('섬 선착장 → 마을은 서버 areas에 섬이 없어도 간다(마을은 늘 열림)', async () => {
+  test('저장 위치가 섬 선착장이어도 서버 areas에 섬이 없으면 마을 시작 위치에서 시작한다', async () => {
     await mount(makeView({ areas: ['village'] }), { ...AT_ISLAND_DOCK })
     await advance(50)
     // 섬이 안 열렸으니 저장 위치는 쓰지 않고 마을 시작 위치에서 시작한다
