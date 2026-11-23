@@ -23,7 +23,7 @@ export type Species = {
   hours?: readonly [number, number]
   /** 없으면 날씨 무관 */
   weather?: Weather
-  /** 전설 어종. power는 이 어종이 나오는 데 필요한 던지기 힘의 기준(강도는 rollCatch가 본다) */
+  /** 전설 어종. power는 이 어종이 나오는 데 필요한 최소 던지기 힘 (rollCatch가 확인한다) */
   legend?: { power: number }
 }
 export type Rod = {

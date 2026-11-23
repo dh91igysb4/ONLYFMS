@@ -1,10 +1,25 @@
 // 낚시 추첨·가격. 순수 함수만, 외부 의존 없음.
 import type { WorldLogic, WorldRecord } from '../types.ts'
-import { AREAS, BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, type Rarity, type Rod, type Species } from './data.ts'
+import { conditionsAt, type Conditions } from './clock.ts'
+import {
+  AREAS, areaHasSpecies, BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS,
+  PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, type AreaId, type Rod, type Species,
+} from './data.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
+export type CastCtx = {
+  rodTier: 1 | 2 | 3 | 4
+  power: number
+  sizeBonus: number
+  area: AreaId
+  spot: string
+  cond: Conditions
+  /** 이미 잡은 전설 어종 id. 다시 나오지 않는다 */
+  legends: readonly string[]
+}
 
-const RARITIES: (keyof Rod['weights'])[] = ['common', 'uncommon', 'rare']
+type NormalRarity = keyof Rod['weights']
+const RARITIES: NormalRarity[] = ['common', 'uncommon', 'rare']
 
 function speciesById(id: string): Species {
   const s = SPECIES.find((x) => x.id === id)
@@ -12,27 +27,48 @@ function speciesById(id: string): Species {
   return s
 }
 
-// rng 호출 순서 고정: 등급 → 등급 안 어종 → 크기 → 입질.
-export function rollCatch(rng: () => number, rodTier: 1 | 2 | 3 | 4, power: number, sizeBonus?: number): Catch {
-  const rod = RODS.find((r) => r.tier === rodTier)
-  if (!rod) throw new Error(`unknown rod tier: ${rodTier}`)
+// 뽑힌 등급에 후보가 없을 때: 아래 등급으로 차례로(common까지), 그래도 없으면 위 등급으로. 전부 비면 [].
+export function pickPool(byRarity: Record<NormalRarity, Species[]>, rarity: NormalRarity): Species[] {
+  const i = RARITIES.indexOf(rarity)
+  const order = [...RARITIES.slice(0, i + 1).reverse(), ...RARITIES.slice(i + 1)]
+  for (const r of order) if (byRarity[r].length > 0) return byRarity[r]
+  return []
+}
 
-  const total = RARITIES.reduce((sum, r) => sum + rod.weights[r], 0)
-  let pick = rng() * total
-  let rarity: Rarity = RARITIES[RARITIES.length - 1]
-  for (const r of RARITIES) {
-    if (pick < rod.weights[r]) {
-      rarity = r
-      break
+// rng 호출 순서 고정, 항상 5번: 전설 판정(r0) → 등급(r1) → 등급 안 어종(r2) → 크기(r3) → 입질(r4).
+// 전설이 뽑혀도 r1·r2는 쓰지 않고 소비한다.
+export function rollCatch(rng: () => number, c: CastCtx): Catch {
+  const rod = RODS.find((r) => r.tier === c.rodTier)
+  if (!rod) throw new Error(`unknown rod tier: ${c.rodTier}`)
+  const available = SPECIES.filter((s) => speciesAvailable(s, c.area, c.spot, c.cond, c.rodTier))
+
+  const r0 = rng()
+  const r1 = rng()
+  const r2 = rng()
+  const legend = available.find((s) => s.legend && c.power >= s.legend.power && !c.legends.includes(s.id))
+
+  let species: Species
+  if (legend && r0 < LEGEND_CHANCE) {
+    species = legend
+  } else {
+    const total = RARITIES.reduce((sum, r) => sum + rod.weights[r], 0)
+    let pick = r1 * total
+    let rarity: NormalRarity = RARITIES[RARITIES.length - 1]
+    for (const r of RARITIES) {
+      if (pick < rod.weights[r]) {
+        rarity = r
+        break
+      }
+      pick -= rod.weights[r]
     }
-    pick -= rod.weights[r]
+    const byRarity: Record<NormalRarity, Species[]> = { common: [], uncommon: [], rare: [] }
+    for (const s of available) if (s.rarity !== 'legend') byRarity[s.rarity].push(s)
+    const pool = pickPool(byRarity, rarity)
+    if (pool.length === 0) throw new Error(`no species for ${c.area}/${c.spot} at rod ${c.rodTier}`)
+    species = pool[Math.floor(r2 * pool.length)]
   }
 
-  const pool = SPECIES.filter((s) => s.rarity === rarity && s.minRod <= rodTier)
-  if (pool.length === 0) throw new Error(`no species for rarity ${rarity} at rod ${rodTier}`)
-  const species = pool[Math.floor(rng() * pool.length)]
-
-  const p = rng() ** (1.5 - Math.min(1.25, power + (sizeBonus ?? 0)))
+  const p = rng() ** (1.5 - Math.min(1.25, c.power + c.sizeBonus))
   const sizeCm = Math.round(species.minCm + p * (species.maxCm - species.minCm))
   const biteDelayMs = Math.round((1500 + rng() * 4500) * rod.biteScale)
   return { species: species.id, sizeCm, biteDelayMs }
@@ -60,6 +96,11 @@ export type Pending = {
   startedAt: number
   /** 챈 시각. null이면 아직 입질에 반응하지 않아 어종·크기를 브라우저에 보내지 않는다 */
   hookedAt: number | null
+  /** 던질 때의 지역·자리·조건·힘. 브라우저에 보내지 않는다 */
+  area: AreaId
+  spot: string
+  cond: Conditions
+  power: number
 }
 export type PendingView = {
   biteDelayMs: number
@@ -73,13 +114,15 @@ export type State = {
   totalEarned: number
   rodTier: 1 | 2 | 3 | 4
   bagTier: 1 | 2 | 3
-  areas: string[]
+  areas: AreaId[]
   bag: Fish[]
   dex: Record<string, { count: number; maxCm: number }>
+  /** 이미 잡은 전설 어종 id */
+  legends: string[]
   pending: Pending | null
 }
 export type Action =
-  | { type: 'cast'; area: string; power: number; spot?: 'pier' | 'shore' }
+  | { type: 'cast'; area: string; power: number; spot?: string }
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
@@ -106,9 +149,10 @@ const init = (): State => ({
   totalEarned: 0,
   rodTier: 1,
   bagTier: 1,
-  areas: ['pier'],
+  areas: [...DEFAULT_AREAS],
   bag: [],
   dex: {},
+  legends: [],
   pending: null,
 })
 
@@ -117,11 +161,25 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 const knownSpecies = (id: unknown): id is string => typeof id === 'string' && SPECIES.some((s) => s.id === id)
 
 function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng: () => number }): Out {
-  if (typeof a.area !== 'string' || !state.areas.includes(a.area)) return { error: 'bad_area' }
+  // 구버전 화면은 지역 'pier'를 보낸다
+  const areaId = a.area === 'pier' ? 'village' : a.area
+  const area = AREAS.find((x) => x.id === areaId)
+  if (!area || !state.areas.includes(area.id) || !areaHasSpecies(area.id)) return { error: 'bad_area' }
+  const spot = a.spot === undefined ? (area.id === 'village' ? 'shore' : area.spots[0]) : a.spot
+  if (typeof spot !== 'string' || !area.spots.includes(spot)) return { error: 'bad_spot' }
   if (!isNum(a.power) || a.power < 0 || a.power > 1) return { error: 'bad_power' }
   if (state.bag.length >= bagSize(state.bagTier)) return { error: 'bag_full' }
-  const c = rollCatch(ctx.rng, state.rodTier, a.power, a.spot === 'pier' ? PIER_POWER_BONUS : 0)
-  const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null }
+  const cond = conditionsAt(ctx.now)
+  const c = rollCatch(ctx.rng, {
+    rodTier: state.rodTier,
+    power: a.power,
+    sizeBonus: spot === 'pier' ? PIER_POWER_BONUS : 0,
+    area: area.id,
+    spot,
+    cond,
+    legends: state.legends,
+  })
+  const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power }
   return { state: { ...state, pending }, result: pendingView(pending) }
 }
 
@@ -148,7 +206,8 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     ...state.dex,
     [p.species]: { count: (prev?.count ?? 0) + 1, maxCm: Math.max(prev?.maxCm ?? 0, p.sizeCm) },
   }
-  return { state: { ...state, bag: [...state.bag, fish], dex, pending: null }, result: { caught: fish } }
+  const legends = speciesById(p.species).legend && !state.legends.includes(p.species) ? [...state.legends, p.species] : state.legends
+  return { state: { ...state, bag: [...state.bag, fish], dex, legends, pending: null }, result: { caught: fish } }
 }
 
 function sell(state: State): Out {
@@ -182,10 +241,12 @@ function migrate(raw: unknown, _fromVersion: number): State {
   const nonNeg = (v: unknown, d: number) => (isNum(v) && v >= 0 ? v : d)
   const rodTier = RODS.some((r) => r.tier === raw.rodTier) ? (raw.rodTier as State['rodTier']) : base.rodTier
   const bagTier = BAGS.some((b) => b.tier === raw.bagTier) ? (raw.bagTier as State['bagTier']) : base.bagTier
+  // 알려진 지역만 남기고 기본 지역은 항상 포함한다
   const knownAreas = AREAS.map((x) => x.id) as string[]
-  const areas = Array.isArray(raw.areas)
-    ? raw.areas.filter((x): x is string => typeof x === 'string' && knownAreas.includes(x))
+  const extra = Array.isArray(raw.areas)
+    ? raw.areas.filter((x): x is AreaId => typeof x === 'string' && knownAreas.includes(x))
     : []
+  const areas = [...new Set<AreaId>([...DEFAULT_AREAS, ...extra])]
   const bag: Fish[] = []
   if (Array.isArray(raw.bag)) {
     for (const f of raw.bag) {
@@ -200,14 +261,19 @@ function migrate(raw: unknown, _fromVersion: number): State {
       if (knownSpecies(id) && isObj(e) && isNum(e.count) && isNum(e.maxCm)) dex[id] = { count: e.count, maxCm: e.maxCm }
     }
   }
+  // 전설은 저장된 목록 + 도감에 있는 전설 어종 (v2 세이브에는 목록이 없다)
+  const legendIds = new Set(SPECIES.filter((s) => s.legend).map((s) => s.id))
+  const savedLegends = Array.isArray(raw.legends) ? raw.legends : []
+  const legends = [...legendIds].filter((id) => savedLegends.includes(id) || id in dex)
   return {
     gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
     rodTier,
     bagTier,
-    areas: areas.length > 0 ? areas : base.areas,
+    areas,
     bag: bag.slice(0, bagSize(bagTier)),
     dex,
+    legends,
     pending: null,
   }
 }
@@ -227,7 +293,7 @@ function records(state: State): WorldRecord[] {
 }
 
 export const logic: WorldLogic<State, Action, View> = {
-  version: 2,
+  version: 3,
   init,
   migrate,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.

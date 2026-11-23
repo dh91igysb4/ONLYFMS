@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
-import { logic, price, rollCatch, sizePercentile, type Action, type Fish, type State } from './logic.ts'
+import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
+import { BAGS, bagSize, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, SPECIES, speciesAvailable, type Species } from './data.ts'
+import { logic, pickPool, price, rollCatch, sizePercentile, type Action, type CastCtx, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
@@ -20,28 +21,47 @@ describe('price', () => {
   })
 })
 
+const cond = (season: Season, hour: number, weather: Weather = 'sun'): Conditions => ({ gameMinute: hour * 60, gameDay: 100, season, weather })
+const WEEK = 7 * 86_400_000
+// weeks주째 계절(0 봄, 1 여름, 2 가을, 3 겨울)의 KST 자정 뒤 hour*60초 = 게임 hour시
+const nowAt = (weeks: number, hour: number): number => SEASON_ANCHOR_MS + weeks * WEEK + hour * 60 * 1000
+const ctxOf = (over: Partial<CastCtx> = {}): CastCtx => ({
+  rodTier: 1, power: 0.5, sizeBonus: 0, area: 'village', spot: 'shore', cond: cond('spring', 12), legends: [], ...over,
+})
+const sequence = (...vals: number[]) => {
+  let i = 0
+  return () => vals[Math.min(i++, vals.length - 1)]
+}
+const counting = (inner: () => number) => {
+  const f = Object.assign(() => (f.n++, inner()), { n: 0 })
+  return f
+}
+
 describe('rollCatch', () => {
-  it('rod 1 never yields rare or legend (10k draws)', () => {
+  it('조건에 맞는 어종만 낸다 (마을, 봄 낮 맑음, rod 1, 5k회)', () => {
     const rng = rngFromSeed(seedBytes(1))
-    for (let i = 0; i < 10000; i++) {
-      const c = rollCatch(rng, 1, 0.5)
-      expect(['rare', 'legend']).not.toContain(byId(c.species).rarity)
+    const c = ctxOf()
+    for (let i = 0; i < 5000; i++) {
+      const s = byId(rollCatch(rng, c).species)
+      expect(speciesAvailable(s, 'village', 'shore', c.cond, 1)).toBe(true)
+      expect(['rare', 'legend']).not.toContain(s.rarity)
     }
   })
-  it('rod 2 never yields grouper; rod 3 can', () => {
+  it('rod 1 겨울 밤: uncommon을 뽑아도 결과는 후보 안, 예외 없음', () => {
+    const c = ctxOf({ cond: cond('winter', 22) })
+    const allowed = new Set(SPECIES.filter((s) => speciesAvailable(s, 'village', 'shore', c.cond, 1)).map((s) => s.id))
+    expect([...allowed].sort()).toEqual(['goby', 'hairtail', 'horse-mackerel', 'rockfish', 'squid'])
     const rng = rngFromSeed(seedBytes(2))
-    for (let i = 0; i < 10000; i++) expect(rollCatch(rng, 2, 0.5).species).not.toBe('grouper')
-    const rng3 = rngFromSeed(seedBytes(3))
-    let seen = false
-    for (let i = 0; i < 10000 && !seen; i++) seen = rollCatch(rng3, 3, 0.5).species === 'grouper'
-    expect(seen).toBe(true)
+    for (let i = 0; i < 5000; i++) expect(allowed.has(rollCatch(rng, c).species)).toBe(true)
+    // r1=0.99 → uncommon
+    expect(allowed.has(rollCatch(sequence(0.5, 0.99, 0.5, 0.5, 0.5), c).species)).toBe(true)
   })
   it('size within species range; bite delay 1500~6000, rod 4 1200~4800', () => {
     for (const tier of [1, 4] as const) {
       const rng = rngFromSeed(seedBytes(4 + tier))
       const [lo, hi] = tier === 4 ? [1200, 4800] : [1500, 6000]
       for (let i = 0; i < 5000; i++) {
-        const c = rollCatch(rng, tier, 0.5)
+        const c = rollCatch(rng, ctxOf({ rodTier: tier }))
         const s = byId(c.species)
         expect(c.sizeCm).toBeGreaterThanOrEqual(s.minCm)
         expect(c.sizeCm).toBeLessThanOrEqual(s.maxCm)
@@ -55,28 +75,92 @@ describe('rollCatch', () => {
       const rng = rngFromSeed(seedBytes(9))
       let sum = 0
       for (let i = 0; i < 5000; i++) {
-        const c = rollCatch(rng, 3, power)
+        const c = rollCatch(rng, ctxOf({ rodTier: 3, power }))
         sum += sizePercentile(c.species, c.sizeCm)
       }
       return sum / 5000
     }
     expect(mean(1)).toBeGreaterThan(mean(0))
   })
-  it('rollCatch calls rng the same number of times with or without bonus', () => {
-    const counted = (bonus?: number): number => {
-      const inner = rngFromSeed(seedBytes(21))
-      let n = 0
-      const rng = () => (n++, inner())
-      for (let i = 0; i < 50; i++) rollCatch(rng, 3, 0.5, bonus)
-      return n
+  it('rng를 항상 5번 부른다 (전설 후보 있음/없음, 등급 대체 발생 시)', () => {
+    const winter = { cond: cond('winter', 12), rodTier: 3 as const, spot: 'pier', power: 0.95 }
+    const cases: [string, CastCtx][] = [
+      ['전설 후보 있음', ctxOf(winter)],
+      ['전설 후보 없음', ctxOf({ ...winter, spot: 'shore' })],
+      ['이미 잡음', ctxOf({ ...winter, legends: ['grouper'] })],
+      // rod 1 겨울 밤엔 rare가 없다. r1=0.999 → rare → uncommon으로 대체
+      ['등급 대체', ctxOf({ cond: cond('winter', 22) })],
+    ]
+    for (const [, c] of cases) {
+      for (const r0 of [0.01, 0.5]) {
+        for (const r1 of [0.01, 0.999]) {
+          const rng = counting(sequence(r0, r1, 0.3, 0.6, 0.4))
+          rollCatch(rng, c)
+          expect(rng.n).toBe(5)
+        }
+      }
+      const real = counting(rngFromSeed(seedBytes(21)))
+      for (let i = 0; i < 50; i++) rollCatch(real, c)
+      expect(real.n).toBe(250)
     }
-    expect(counted(0.25)).toBe(counted())
-    expect(counted(0.25)).toBe(counted(0))
+  })
+  it('pier 보너스(sizeBonus)는 rng 호출 수를 바꾸지 않는다', () => {
+    const n = (sizeBonus: number): number => {
+      const rng = counting(rngFromSeed(seedBytes(22)))
+      for (let i = 0; i < 20; i++) rollCatch(rng, ctxOf({ sizeBonus }))
+      return rng.n
+    }
+    expect(n(PIER_POWER_BONUS)).toBe(n(0))
   })
   it('deterministic for the same rng sequence', () => {
     const a = rngFromSeed(seedBytes(7))
     const b = rngFromSeed(seedBytes(7))
-    for (let i = 0; i < 100; i++) expect(rollCatch(a, 3, 0.4)).toEqual(rollCatch(b, 3, 0.4))
+    for (let i = 0; i < 100; i++) expect(rollCatch(a, ctxOf({ rodTier: 3 }))).toEqual(rollCatch(b, ctxOf({ rodTier: 3 })))
+  })
+
+  describe('전설', () => {
+    const base = { area: 'village' as const, spot: 'pier', cond: cond('winter', 12), rodTier: 3 as const, power: 0.95 }
+    const roll = (over: Partial<CastCtx>, r0: number) => rollCatch(sequence(r0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...base, ...over })).species
+    it('pier·겨울·rod 3·power 0.95·r0=0.01 → grouper', () => {
+      expect(roll({}, 0.01)).toBe('grouper')
+      expect(roll({}, LEGEND_CHANCE - 1e-9)).toBe('grouper')
+    })
+    it('power 0.94, shore, 이미 잡음, r0=0.5, 낮은 rod, 다른 계절 → grouper 아님', () => {
+      expect(roll({ power: 0.94 }, 0.01)).not.toBe('grouper')
+      expect(roll({ spot: 'shore' }, 0.01)).not.toBe('grouper')
+      expect(roll({ legends: ['grouper'] }, 0.01)).not.toBe('grouper')
+      expect(roll({}, 0.5)).not.toBe('grouper')
+      expect(roll({}, LEGEND_CHANCE)).not.toBe('grouper')
+      expect(roll({ rodTier: 2 }, 0.01)).not.toBe('grouper')
+      expect(roll({ cond: cond('summer', 12) }, 0.01)).not.toBe('grouper')
+    })
+    it('전설 크기는 sizeBonus·power 식을 따른다', () => {
+      const g = byId('grouper')
+      const c = rollCatch(sequence(0.01, 0.5, 0.5, 0, 0.5), ctxOf({ ...base }))
+      expect(c.sizeCm).toBe(g.minCm)
+    })
+  })
+})
+
+describe('pickPool', () => {
+  const sp = (id: string): Species => ({ id } as Species)
+  const pools = (c: string[], u: string[], r: string[]) => ({ common: c.map(sp), uncommon: u.map(sp), rare: r.map(sp) })
+  const ids = (l: Species[]) => l.map((s) => s.id)
+  it('뽑힌 등급에 후보가 있으면 그대로', () => {
+    expect(ids(pickPool(pools(['c'], ['u'], ['r']), 'uncommon'))).toEqual(['u'])
+  })
+  it('rare가 비면 uncommon, uncommon도 비면 common', () => {
+    expect(ids(pickPool(pools(['c'], ['u'], []), 'rare'))).toEqual(['u'])
+    expect(ids(pickPool(pools(['c'], [], []), 'rare'))).toEqual(['c'])
+    expect(ids(pickPool(pools(['c'], [], ['r']), 'uncommon'))).toEqual(['c'])
+  })
+  it('아래가 모두 비면 위로', () => {
+    expect(ids(pickPool(pools([], ['u'], ['r']), 'common'))).toEqual(['u'])
+    expect(ids(pickPool(pools([], [], ['r']), 'common'))).toEqual(['r'])
+    expect(ids(pickPool(pools([], [], ['r']), 'uncommon'))).toEqual(['r'])
+  })
+  it('전부 비면 []', () => {
+    expect(pickPool(pools([], [], []), 'rare')).toEqual([])
   })
 })
 
@@ -101,16 +185,16 @@ const err = (r: ReturnType<typeof logic.apply>) => {
   return r.error
 }
 const withPending = (over: Partial<State> = {}): State =>
-  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: null }, ...over })
+  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: null, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5 }, ...over })
 const BITE = T0 + 3000
 const withHooked = (over: Partial<State> = {}): State =>
-  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE }, ...over })
+  fresh({ pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5 }, ...over })
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(2)
+    expect(logic.version).toBe(3)
     expect(logic.init()).toEqual({
-      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null,
+      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], pending: null,
     })
   })
 
@@ -131,18 +215,81 @@ describe('fishing WorldLogic', () => {
     expect(s.pending).toBeNull()
   })
 
-  it("cast without spot and with spot 'shore' and spot 'zzz' give identical pending (same seed)", () => {
+  it("cast without spot and with spot 'shore' give identical pending (same seed)", () => {
     const pend = (spot?: string) => {
       const rng = rngFromSeed(seedBytes(31))
-      const action = { type: 'cast', area: 'pier', power: 0.5, ...(spot === undefined ? {} : { spot }) } as unknown as Action
+      const action = { type: 'cast', area: 'village', power: 0.5, ...(spot === undefined ? {} : { spot }) } as unknown as Action
       return ok(logic.apply(fresh(), action, { now: T0, rng })).state.pending
     }
     expect(pend('shore')).toEqual(pend())
-    expect(pend('zzz')).toEqual(pend())
+    expect(pend('shore')?.spot).toBe('shore')
+  })
+
+  it("cast { area: 'pier', spot: 'pier' }는 village로 정상 처리되고 부두 보너스가 붙는다", () => {
+    const r = ok(logic.apply(fresh(), { type: 'cast', area: 'pier', power: 0.5, spot: 'pier' }, ctx()))
+    expect(r.state.pending).toMatchObject({ area: 'village', spot: 'pier' })
+    // 같은 rng 값이면 부두가 더 큰 크기 백분위를 낸다
+    const pct = (spot: string) => {
+      const rng = sequence(0.5, 0.5, 0.5, 0.5, 0.5)
+      const p = ok(logic.apply(fresh(), { type: 'cast', area: 'village', power: 0.5, spot }, { now: nowAt(1, 12), rng })).state.pending!
+      return sizePercentile(p.species, p.sizeCm)
+    }
+    expect(pct('pier')).toBeGreaterThan(pct('shore'))
+  })
+
+  it("cast area 'river'(열린 지역, 어종 없음)·'lake'(안 열림) → bad_area; spot 'zzz' → bad_spot; 오류 시 상태 불변", () => {
+    const s = deepFreeze(fresh())
+    const before = JSON.stringify(s)
+    expect(err(logic.apply(s, { type: 'cast', area: 'river', power: 0.5 }, ctx()))).toBe('bad_area')
+    expect(err(logic.apply(s, { type: 'cast', area: 'lake', power: 0.5 }, ctx()))).toBe('bad_area')
+    for (const spot of ['zzz', 'river', 1, null]) {
+      expect(err(logic.apply(s, { type: 'cast', area: 'village', power: 0.5, spot } as unknown as Action, ctx()))).toBe('bad_spot')
+    }
+    expect(JSON.stringify(s)).toBe(before)
+  })
+
+  it('pending은 던질 때의 area·spot·cond·power를 저장하고, view의 pending에는 그 필드가 없다', () => {
+    const now = nowAt(3, 12)
+    const r = ok(logic.apply(fresh(), { type: 'cast', area: 'village', power: 0.7, spot: 'pier' }, { now, rng: fixedRng }))
+    expect(r.state.pending).toMatchObject({ area: 'village', spot: 'pier', power: 0.7, cond: conditionsAt(now) })
+    for (const v of [logic.view(r.state, { now }).pending, r.result]) {
+      expect(Object.keys(v as object).sort()).toEqual(['biteDelayMs', 'hooked', 'sizeCm', 'species', 'startedAt'])
+    }
+  })
+
+  it('던진 뒤 now가 다음 게임 날·다른 계절이 되어도 resolve는 저장된 어종을 그대로 넣는다', () => {
+    const now = nowAt(3, 12)
+    const cast = ok(logic.apply(fresh(), { type: 'cast', area: 'village', power: 0.5, spot: 'shore' }, { now, rng: fixedRng })).state
+    const p = cast.pending!
+    const hooked = ok(logic.apply(cast, { type: 'hook' }, ctx(now + p.biteDelayMs))).state
+    const later = now + 2 * WEEK + 5_000_000
+    expect(conditionsAt(later).season).not.toBe(p.cond.season)
+    expect(conditionsAt(later).gameDay).not.toBe(p.cond.gameDay)
+    const r = ok(logic.apply(hooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
+    expect(r.state.bag).toEqual([{ species: p.species, sizeCm: p.sizeCm, perfect: false }])
+  })
+
+  it('resolve로 전설을 잡으면 legends에 추가, 이후 같은 조건·r0=0에서도 다시 안 나옴; 놓치면 legends 그대로', () => {
+    const now = nowAt(3, 12)
+    const legendRng = () => sequence(0, 0.5, 0.5, 0.5, 0.5)
+    const act = { type: 'cast', area: 'village', power: 1, spot: 'pier' } as const
+    const cast = ok(logic.apply(fresh({ rodTier: 3 }), act, { now, rng: legendRng() })).state
+    expect(cast.pending?.species).toBe('grouper')
+    const hooked = ok(logic.apply(cast, { type: 'hook' }, ctx(now + cast.pending!.biteDelayMs))).state
+    const miss = ok(logic.apply(hooked, { type: 'resolve', success: false, perfect: false }, ctx(now + 1e5)))
+    expect(miss.state.legends).toEqual([])
+    const caught = ok(logic.apply(hooked, { type: 'resolve', success: true, perfect: false }, ctx(now + 1e5))).state
+    expect(caught.legends).toEqual(['grouper'])
+    expect(caught.dex.grouper.count).toBe(1)
+    const again = ok(logic.apply(caught, act, { now, rng: legendRng() })).state
+    expect(again.pending?.species).not.toBe('grouper')
+    // 일반 어종을 잡아도 legends는 그대로
+    const norm = ok(logic.apply(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e5))).state
+    expect(norm.legends).toEqual([])
   })
 
   it('pier spot raises mean size percentile', () => {
-    const mean = (spot: 'pier' | 'shore'): number => {
+    const mean = (spot: string): number => {
       const rng = rngFromSeed(seedBytes(32))
       let sum = 0
       for (let i = 0; i < 3000; i++) {
@@ -207,7 +354,7 @@ describe('fishing WorldLogic', () => {
     for (const power of [NaN, -0.1, 2, '1', Infinity, null, undefined]) {
       expect(err(logic.apply(s, { type: 'cast', area: 'pier', power } as unknown as Action, ctx()))).toBe('bad_power')
     }
-    for (const area of ['ocean', 1, null, undefined]) {
+    for (const area of ['ocean', 1, null, undefined, 'lake', 'river']) {
       expect(err(logic.apply(s, { type: 'cast', area, power: 0.5 } as unknown as Action, ctx()))).toBe('bad_area')
     }
     // 경계값 0과 1은 허용
@@ -301,7 +448,7 @@ describe('fishing WorldLogic', () => {
     expect(r.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: true }])
     expect(r.state.dex.anchovy).toEqual({ count: 2, maxCm: 14 })
     s = withHooked({
-      pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0, hookedAt: T0 + 1500 },
+      pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0, hookedAt: T0 + 1500, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5 },
       dex: { anchovy: { count: 2, maxCm: 14 } },
     })
     r = ok(logic.apply(s, { type: 'resolve', success: true, perfect: false }, late))
@@ -398,6 +545,21 @@ describe('fishing WorldLogic', () => {
     expect(logic.migrate([], 1)).toEqual(logic.init())
   })
 
+  it('migrate v2(areas [pier], dex에 grouper) → areas 기본값, legends [grouper], 골드·가방·도감 유지', () => {
+    const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
+    const dex = { grouper: { count: 1, maxCm: 100 }, goby: { count: 2, maxCm: 12 } }
+    const m = logic.migrate({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }, 2)
+    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], pending: null })
+    expect(logic.migrate({ dex: { goby: { count: 1, maxCm: 10 } }, areas: ['pier'] }, 2).legends).toEqual([])
+  })
+
+  it('migrate legends: 모르는 id·비전설 id는 버리고, 기본 지역은 항상 포함, 알려진 추가 지역은 유지', () => {
+    const m = logic.migrate({ legends: ['grouper', 'kraken', 'goby', 3], areas: ['lake', 'zzz', 'village'] }, 3)
+    expect(m.legends).toEqual(['grouper'])
+    expect(m.areas).toEqual([...DEFAULT_AREAS, 'lake'])
+    expect(logic.migrate({ legends: 'grouper' }, 3).legends).toEqual([])
+  })
+
   it('migrate drops unknown species, bad fields, and pending', () => {
     const m = logic.migrate(
       {
@@ -411,23 +573,23 @@ describe('fishing WorldLogic', () => {
     expect(m.gold).toBe(0)
     expect(m.totalEarned).toBe(40)
     expect(m.rodTier).toBe(1)
-    expect(m.areas).toEqual(['pier'])
+    expect(m.areas).toEqual([...DEFAULT_AREAS])
     expect(m.bag).toEqual([{ species: 'anchovy', sizeCm: 10, perfect: true }])
     expect(m.dex).toEqual({ goby: { count: 1, maxCm: 10 } })
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/12'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/16'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/12' },
+      { key: 'dex', value: 0, detail: '0/16' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/12' },
+      { key: 'dex', value: 2, detail: '2/16' },
     ])
   })
 
