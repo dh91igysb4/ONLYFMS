@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -199,7 +199,7 @@ const RETRY = '다시 시도해 주세요'
 // 낚시 로직의 오류 코드 문구. 플랫폼 공통 문구(MESSAGES)에 넣지 않고 여기서만 쓴다.
 /** need_rod: 낚싯대 요구가 있는 해금(난파선 앞바다)의 가장 낮은 단계 이름으로 만든다("백골 낚싯대 이상이 있어야 해요") */
 const NEED_ROD_TIER = Math.min(...Object.values(UNLOCKS).flatMap((u) => (u?.minRod ? [u.minRod] : [])), ...AREAS.flatMap((a) => (a.minRod ? [a.minRod] : [])))
-const NEED_ROD = `${RODS.find((r) => r.tier === NEED_ROD_TIER)?.name ?? '더 좋은 낚싯대'} 이상이 있어야 해요`
+const NEED_ROD = `${rodAtLeast(NEED_ROD_TIER)}이 있어야 해요`
 const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
   not_enough_gold: '골드가 부족해요',

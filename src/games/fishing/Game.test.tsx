@@ -427,7 +427,7 @@ describe('fishing Game', () => {
     expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
     expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
     // 5단계(백골)는 난파선 앞바다를 연다, 6단계(용왕)는 고급 장비: 신화 말고는 없어도 모든 물고기를 낚는다
-    expect(within(rods).getAllByText('난파선 앞바다에 갈 수 있어요')).toHaveLength(1)
+    expect(within(rods).getAllByText('난파선 앞바다(원양 어선)를 열 수 있어요')).toHaveLength(1)
     expect(within(rods).getAllByText('고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요')).toHaveLength(1)
     unmount()
 

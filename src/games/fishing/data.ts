@@ -243,6 +243,11 @@ export const RODS: Rod[] = [
   { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]
 
+/** 낚싯대 요구 문구 머리("백골 낚싯대 이상"). 해금 창·지도·오류 문구가 함께 쓴다. 모르는 단계는 "n단계 낚싯대 이상" */
+export function rodAtLeast(tier: number): string {
+  return `${RODS.find((r) => r.tier === tier)?.name ?? `${tier}단계 낚싯대`} 이상`
+}
+
 /** 지역·자리·계절·시간·날씨·낚싯대 조건을 모두 만족하는가. legend.power는 보지 않는다. */
 export function speciesAvailable(s: Species, area: AreaId, spot: string, cond: Conditions, rodTier: number): boolean {
   if (s.area !== area) return false

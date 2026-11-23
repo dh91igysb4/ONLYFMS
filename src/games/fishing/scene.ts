@@ -241,10 +241,10 @@ const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
 function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
   const kind = tileAt(map, tx, ty)
   if (kind === null || kind === 'rock' || kind === 'reed' || kind === 'deadtree' || kind === 'cliff' || kind === 'cave-wall') return null
-  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품). 얼음은 가장자리를 주고받지 않는다
+  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품)
   if (kind === 'mud') return tide === 'high' ? 'water' : 'sand'
-  if (kind === 'ice') return 'cave'
-  if (kind === 'snow' || kind === 'snowpine') return 'snow'
+  // 얼음은 눈 땅으로 친다(얼음판 가의 바위·갈대가 눈 위에 놓이게). 얼음 칸 자체는 drawTile이 따로 그린다
+  if (kind === 'ice' || kind === 'snow' || kind === 'snowpine') return 'snow'
   if (WATER_GROUND.has(kind)) return 'water'
   if (kind === 'sand' || kind === 'palm') return 'sand'
   if (kind === 'cave-floor' || kind === 'cave-mouth') return 'cave'
@@ -474,7 +474,8 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
     if (kind === 'marsh') drawSedgeFringe(ctx, g, tx, ty)
   } else if (ground === 'snow') {
-    drawSprite(ctx, 'tile-snow', x, y, 1)
+    // 칸 몇 곳(칸마다 고정)은 바람에 쌓인 눈더미 결
+    drawSprite(ctx, hash(tx, ty) % 6 === 0 ? 'tile-snow-drift' : 'tile-snow', x, y, 1)
   } else if (ground === 'cave') {
     drawSprite(ctx, 'tile-cave-floor', x, y, 1)
   } else if (ground === 'sand') {
@@ -490,14 +491,14 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   if (tall) drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
   else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
-    else drawSprite(ctx, 'tile-rock', x, y, 1)
+    else drawSprite(ctx, ground === 'snow' ? 'tile-rock-snow' : 'tile-rock', x, y, 1)
   } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
   else if (kind === 'boardwalk') drawSprite(ctx, boardwalkVertical(g.map, tx, ty) ? 'boardwalk-plank-v' : 'boardwalk-plank', x, y, 1)
   else if (kind === 'deck') drawSprite(ctx, 'deck-plank', x, y, 1)
-  else if (kind === 'hull') drawSprite(ctx, 'tile-hull', x, y, 1)
+  else if (kind === 'hull') drawSprite(ctx, hullSide(g.map, tx, ty) ? 'tile-hull-v' : 'tile-hull', x, y, 1)
 }
 
 /** 얼음판 가장자리(얼음이 아닌 쪽 변)에 짙은 테 1px와 그 안쪽 빛 1px: 눈밭과 얼음판의 경계가 보이게 */
@@ -578,6 +579,15 @@ function drawSedgeFringe(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, t
     if (!grass(dx, dy) || grass(dx, 0) || grass(0, dy)) continue
     rect(ctx, dx < 0 ? x : x + TILE - 3, dy < 0 ? y : y + TILE - 3, 3, 3, C.sedge)
   }
+}
+
+/** 선체 옆판: 왼쪽이나 오른쪽이 갑판이면 세로 판자(배 옆면), 아니면(뱃머리·선미, 위·아래가 갑판) 가로 그림 */
+function hullSide(map: MapDef, tx: number, ty: number): boolean {
+  const deck = (dx: number) => {
+    const k = tileAt(map, tx + dx, ty)
+    return k === 'deck' || k === 'mast'
+  }
+  return deck(-1) || deck(1)
 }
 
 /** 위아래로만 데크가 이어지는 칸(세로 데크 그림). 갈림길·가로 데크·외톨이는 가로 그림 */

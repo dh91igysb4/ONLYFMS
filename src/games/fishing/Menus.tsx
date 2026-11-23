@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { sellPrice, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
@@ -10,8 +10,7 @@ const ICON_SCALE = 2
 /** 신화를 뺀 어종이 요구하는 가장 높은 낚싯대. 이보다 높은 단계는 "고급 장비"(신화만 그 단계를 요구할 수 있다) */
 const PREMIUM_ROD = Math.max(...SPECIES.filter((s) => s.rarity !== 'mythic').map((s) => s.minRod))
 /** 그 낚싯대가 있어야 들어가는 지역 이름들(난파선 앞바다는 백골 이상) */
-const areasNeeding = (tier: number): string[] => AREAS.filter((a) => a.minRod === tier).map((a) => a.name)
-const rodName = (tier: number) => RODS.find((r) => r.tier === tier)?.name ?? `${tier}단계 낚싯대`
+const areasNeeding = (tier: number) => AREAS.filter((a) => a.minRod === tier)
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
@@ -213,7 +212,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
               <div className="fish-rod-info">
                 <strong>{rod.name}</strong>
                 <span className="muted">{rod.price === 0 ? '기본' : gold(rod.price)}</span>
-                {!owned && areasNeeding(rod.tier).length > 0 && <span className="muted">{`${areasNeeding(rod.tier).join('·')}에 갈 수 있어요`}</span>}
+                {!owned && areasNeeding(rod.tier).length > 0 && <span className="muted">{areasNeeding(rod.tier).map((a) => `${a.name}(${UNLOCKS[a.id]?.name ?? '해금'})`).join('·') + '를 열 수 있어요'}</span>}
                 {rod.tier > PREMIUM_ROD && !owned && areasNeeding(rod.tier).length === 0 && <span className="muted">고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
                 {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
@@ -328,7 +327,7 @@ export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
           <span className="fish-unlock-price">{gold(unlock.price)}</span>
           <span className="muted">보유 {gold(view.gold)}</span>
           {unlock.minRod !== undefined && (
-            <span className={rodShort ? 'fish-shop-note' : 'muted'}>{`${rodName(unlock.minRod)} 이상이 있어야 나갈 수 있어요`}</span>
+            <span className={rodShort ? 'fish-shop-note' : 'muted'}>{`${rodAtLeast(unlock.minRod)}이 있어야 나갈 수 있어요`}</span>
           )}
           {short && <span className="fish-shop-note">골드가 모자라요</span>}
         </div>

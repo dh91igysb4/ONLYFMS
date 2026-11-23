@@ -3,7 +3,7 @@ import { inHours, isNight, type Conditions, type Season, type Weather } from './
 import { SPRITES } from './sprites.ts'
 import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 import {
-  AREAS, areaHasSpecies, areaMinRod, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
+  AREAS, areaHasSpecies, areaMinRod, rodAtLeast, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
   speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, type Species,
 } from './data.ts'
 
@@ -361,6 +361,11 @@ describe('물때 자리·지역 최소 낚싯대', () => {
   it('areaMinRod: 난파선만 5, 나머지 지역·모르는 지역은 1', () => {
     for (const a of AREAS) expect(areaMinRod(a.id), a.id).toBe(a.id === 'wreck' ? 5 : 1)
     expect(areaMinRod('atlantis' as never)).toBe(1)
+  })
+  it('rodAtLeast: 낚싯대 이름 + 이상, 모르는 단계는 n단계', () => {
+    expect(rodAtLeast(5)).toBe('백골 낚싯대 이상')
+    expect(rodAtLeast(6)).toBe('용왕의 낚싯대 이상')
+    expect(rodAtLeast(9)).toBe('9단계 낚싯대 이상')
   })
   it('TIDE_GRACE_MIN 10, MYTHIC_CHANCE 0.02', () => {
     expect(TIDE_GRACE_MIN).toBe(10)

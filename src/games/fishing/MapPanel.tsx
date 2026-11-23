@@ -2,7 +2,7 @@
 // 축소 그림(<img>, 지역별 캐시) 위에 표시 버튼을 퍼센트 좌표로 띄우고, 아래 상세 칸에 고른 것의 정보를 보인다.
 // 안 잡은 물고기는 실루엣·등급·"지금" 칩만(이름·그림·조건은 alt·aria-label 어디에도 없다).
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { AREAS, RODS, UNLOCKS, type AreaId, type Rarity } from './data.ts'
+import { AREAS, RODS, rodAtLeast, UNLOCKS, type AreaId, type Rarity } from './data.ts'
 import { LOW_TIDE_HOURS, SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
   areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, teleporterInfo, unlockPlace,
@@ -39,7 +39,7 @@ function spotNote(area: AreaId, spot: string): string | null {
 /** 해금에 필요한 낚싯대 문구("백골 낚싯대 이상이 있어야 해요"). 요구가 없으면 null */
 function rodNeed(area: AreaId): string | null {
   const tier = UNLOCKS[area]?.minRod
-  return tier ? `${RODS.find((r) => r.tier === tier)?.name ?? `${tier}단계 낚싯대`} 이상이 있어야 해요` : null
+  return tier ? `${rodAtLeast(tier)}이 있어야 해요` : null
 }
 
 /** 받침 있는 글자인가(ㄹ 받침은 따로) */

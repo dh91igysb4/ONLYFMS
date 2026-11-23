@@ -1366,15 +1366,26 @@ describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
     expect(names(3, 0)).toContainEqual(expect.stringMatching(/^deep-[01]$/))
     expect(names(2, 2)).toContainEqual(expect.stringMatching(/^hotspring-[01]$/))
     expect(names(1, 1)).toContain('deck-plank')
-    expect(names(0, 1)).toContain('tile-hull')
+    expect(names(0, 1)).toContain('tile-hull-v')
     expect(names(2, 1)).toContain('deck-plank')
+  })
+
+  test('선체: 옆이 갑판이면 세로 옆판(tile-hull-v), 위·아래만 갑판이면(뱃머리·선미) 가로 그림', () => {
+    const m = defineMap('lake', ['~~n~~', '~nen~', '~nen~', '~~n~~', '~~~~~', '~~~~~'], { spots: { water: 'wreck' } })
+    const { names } = draw(m, tileCentre(2, 1))
+    expect(names(1, 1)).toContain('tile-hull-v')
+    expect(names(3, 2)).toContain('tile-hull-v')
+    expect(names(2, 0)).toContain('tile-hull')
+    expect(names(2, 3)).toContain('tile-hull')
+    expect(names(2, 0)).not.toContain('tile-hull-v')
   })
 
   test('눈 칸은 눈 그림, 눈 사이 바위는 눈 위, 얼음은 얼음', () => {
     const { names } = draw()
-    expect(names(0, 2)).toContain('tile-snow')
-    expect(names(4, 2)).toContain('tile-snow')
-    expect(names(4, 2)).toContain('tile-rock')
+    expect(names(0, 2)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(4, 2)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(4, 2)).toContain('tile-rock-snow')
+    expect(names(4, 2)).not.toContain('tile-rock')
     expect(names(2, 3)).toContain('tile-ice')
   })
 
@@ -1403,6 +1414,18 @@ describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
     const tb = tops(b, below.camera)
     expect(tb.length).toBeGreaterThan(0)
     expect(tb.every(({ i }) => i < players(b)[0].at)).toBe(true)
+  })
+
+  test('눈밭 몇 칸은 눈더미 결(칸마다 고정), 얼음판 가 갈대는 눈 위에', () => {
+    const row = 's'.repeat(12)
+    const m = defineMap('lake', [row, row, row, row, row, row, row, row, 'ssRiiiiiiiii', row])
+    const { ctx, names } = draw(m, tileCentre(5, 5))
+    const drift = ctx.sprites.filter((c) => c.name === 'tile-snow-drift').length
+    const plain = ctx.sprites.filter((c) => c.name === 'tile-snow').length
+    expect(drift).toBeGreaterThan(0)
+    expect(plain).toBeGreaterThan(drift * 2)
+    expect(names(2, 8)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(2, 8)).not.toContain('tile-cave-floor')
   })
 
   test('잠긴 눈더미 문은 gate-snowdrift를 그린다', () => {

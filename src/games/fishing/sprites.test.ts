@@ -549,9 +549,15 @@ describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
   })
   it('눈 소나무·돛대는 16×32, 눈·갑판 판자·선체·문 16×16(눈·갑판·선체는 칸을 꽉 채운다), 모두 서로 다르다', () => {
     for (const n of ['tile-snowpine', 'tile-mast']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 32])
-    for (const n of ['tile-snow', 'deck-plank', 'tile-hull', 'gate-snowdrift']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
-    for (const n of ['tile-snow', 'deck-plank', 'tile-hull']) expect(SPRITES[n].rows.join('').includes('.'), n).toBe(false)
-    const all = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), 'tile-snow', 'tile-snowpine', 'tile-mast', 'deck-plank', 'tile-hull', 'gate-snowdrift']
+    for (const n of ['tile-snow', 'deck-plank', 'tile-hull', 'tile-hull-v', 'tile-rock-snow', 'gate-snowdrift']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    for (const n of ['tile-snow', 'deck-plank', 'tile-hull', 'tile-hull-v']) expect(SPRITES[n].rows.join('').includes('.'), n).toBe(false)
+    // 세로 옆판은 맨 위·맨 아래 줄이 같은 결이라 위아래로 이어 붙여도 이음매가 없다
+    expect(SPRITES['tile-hull-v'].rows[0].replace(/[wg]/g, 'a')).toBe(SPRITES['tile-hull-v'].rows[15].replace(/[wg]/g, 'a'))
+    // 가로 띠(사다리 가로대처럼 보이던 줄)가 없다
+    expect(SPRITES['tile-hull-v'].rows.some((r) => /r{6,}/.test(r))).toBe(false)
+    // 눈 바위에는 이끼 색이 없다
+    expect(SPRITES['tile-rock-snow'].rows.join('')).not.toContain('m')
+    const all = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), 'tile-snow', 'tile-snowpine', 'tile-mast', 'deck-plank', 'tile-hull', 'tile-hull-v', 'tile-rock-snow', 'gate-snowdrift']
     expect(new Set(all.map(key)).size).toBe(all.length)
     for (const old of ['tile-tree', 'tile-palm', 'tile-ice', 'dock-plank', 'pier-plank', 'boardwalk-plank', 'gate-rubble', 'gate-vines']) for (const n of all) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
   })
