@@ -42,7 +42,10 @@ vi.mock('./minimap.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./minimap.ts')>()
   return { ...orig, minimapUrl: vi.fn(() => 'data:mini'), spotHighlightUrl: vi.fn(() => 'data:hl'), releaseMinimapCache: vi.fn() }
 })
-vi.mock('./sprites.ts', () => ({
+vi.mock('./sprites.ts', async (importOriginal) => ({
+  // 옷장 미리보기 합성은 실제 그림 자료(SPRITES)를 쓴다
+  SPRITES: (await importOriginal<typeof import('./sprites.ts')>()).SPRITES,
+  drawSpriteData: vi.fn(),
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
 }))
@@ -2594,5 +2597,43 @@ describe('큰 지도', () => {
     expect(releaseMinimapCache).not.toHaveBeenCalled()
     unmount()
     expect(releaseMinimapCache).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('옷장', () => {
+  beforeEach(() => {
+    // 옷장 미리보기 캔버스: 칠하기만 받아 주고, 작은 그림 PNG는 가짜 주소
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(() => ({ fillRect: vi.fn() }) as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:thumb')
+  })
+  test('상점 → 옷 가게 열기 → 사기는 buyWear, 입기는 wear', async () => {
+    const view = makeView({ gold: 10_000 })
+    await mountAtShop(view)
+    route({
+      buyWear: () => ok({ ...view, gold: 4_000, wardrobe: ['hat:cap'], outfit: { ...DEFAULT_OUTFIT, hat: 'cap' } }),
+      wear: () => ok({ ...view, gold: 4_000, wardrobe: ['hat:cap'], outfit: { ...DEFAULT_OUTFIT, hat: 'none' } }),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '옷 가게 열기' }))
+    await flush()
+    expect(screen.getByRole('heading', { name: '옷장' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '남색 야구모자 사기' }))
+    await flush()
+    expect(calls('buyWear')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyWear', slot: 'hat', id: 'cap' } }])
+    expect(screen.getByText('4,000 G', { selector: '.fish-gold' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '모자 없음 입기' }))
+    await flush()
+    expect(calls('wear')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'wear', slot: 'hat', id: 'none' } }])
+    // 장면에 입은 옷이 넘어간다(다음 프레임)
+    await advance(50)
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].outfit).toEqual({ ...DEFAULT_OUTFIT, hat: 'none' })
+  })
+
+  test('가방의 옷장 버튼으로 열고, 상점 밖이라 사기는 꺼져 있다', async () => {
+    await mount(makeView({ gold: 1_000_000 }))
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(screen.getByRole('button', { name: '옷장' }))
+    await flush()
+    expect(screen.getByRole('heading', { name: '옷장' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '남색 야구모자 사기' })).toBeDisabled()
   })
 })

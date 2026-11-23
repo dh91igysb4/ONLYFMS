@@ -3631,6 +3631,18 @@ export function drawSprite(
 ): void {
   const sp = SPRITES[name]
   if (!sp) throw new Error(`unknown sprite: ${name}`)
+  drawSpriteData(ctx, sp, x, y, scale, opts)
+}
+
+/** 이름 대신 Sprite 자체를 그린다(옷 입힌 캐릭터처럼 SPRITES에 없는 합성 그림) */
+export function drawSpriteData(
+  ctx: CanvasRenderingContext2D,
+  sp: Sprite,
+  x: number,
+  y: number,
+  scale: number,
+  opts?: { silhouette?: boolean; flipX?: boolean },
+): void {
   const silhouette = opts?.silhouette === true
   const flipX = opts?.flipX === true
   // 같은 색이 가로로 이어지면 한 번에 칠한다. flipX면 같은 상자 안에서 좌우를 뒤집는다

@@ -17,7 +17,10 @@ import { loadPosition, savePosition, startPosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
 import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
+import { WardrobePanel } from './WardrobePanel.tsx'
 import { releaseMinimapCache } from './minimap.ts'
+import { normalizeOutfit } from './outfit.ts'
+import { DEFAULT_OUTFIT, type Outfit, type WearSlot } from './wardrobe.ts'
 import './fishing.css'
 
 const OUTCOME_MS = 1200
@@ -74,8 +77,18 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map'
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
+const outfitMemo = new WeakMap<object, Outfit>()
+/** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
+function outfitOf(view: View | null): Outfit {
+  if (!view) return DEFAULT_OUTFIT
+  const hit = outfitMemo.get(view)
+  if (hit) return hit
+  const o = normalizeOutfit(view.outfit)
+  outfitMemo.set(view, o)
+  return o
+}
 const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
@@ -176,6 +189,8 @@ const FISHING_MESSAGES: Record<string, string> = {
   bad_teleporter: RETRY,
   same: RETRY,
   not_open: '아직 켜지지 않은 순간이동기예요',
+  bad_wear: RETRY,
+  not_for_sale: '업적으로만 얻을 수 있어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 /** 서버에 낚시(pending)가 남아 있어 지역을 못 열 때. 다시 던졌다 거두면 풀린다 */
@@ -692,6 +707,7 @@ export function Game({ gameId }: WorldGameProps) {
       fade: rt.fade,
       opened,
       teleporterOn: tpOpen(viewRef.current, rt.map.id),
+      outfit: outfitOf(viewRef.current),
     }, size)
   }
 
@@ -961,6 +977,24 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
+  async function buyWear(slot: WearSlot, id: string) {
+    setNotice(null)
+    try {
+      await act({ type: 'buyWear', slot, id })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
+  async function wear(slot: WearSlot, id: string) {
+    setNotice(null)
+    try {
+      await act({ type: 'wear', slot, id })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
   async function unlock(area: AreaId) {
     setNotice(null)
     try {
@@ -1120,7 +1154,7 @@ export function Game({ gameId }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', wardrobe: '옷장', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1205,7 +1239,7 @@ export function Game({ gameId }: WorldGameProps) {
                 </button>
               </div>
               {menu === 'bag' && (
-                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} />
+                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} />
               )}
               {menu === 'shop' && (
                 <ShopPanel
@@ -1215,7 +1249,11 @@ export function Game({ gameId }: WorldGameProps) {
                   onBuy={(t) => void buyRod(t)}
                   onBuyBag={(t) => void buyBag(t)}
                   onBuyTackle={(id) => void buyTackle(id)}
+                  onWardrobe={() => setMenu('wardrobe')}
                 />
+              )}
+              {menu === 'wardrobe' && (
+                <WardrobePanel view={view} atShop={atShop} busy={busy} onWear={(sl, id) => void wear(sl, id)} onBuy={(sl, id) => void buyWear(sl, id)} />
               )}
               {menu === 'unlock' && unlockTarget && (
                 <UnlockPanel view={view} area={unlockTarget} busy={busy} onUnlock={() => void unlock(unlockTarget)} />
