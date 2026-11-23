@@ -428,6 +428,11 @@ describe('순간이동기', () => {
     for (const s of starts) expect(bfs(map, s, opened).has(key(tp(map).front)), `${id} from (${s.tx},${s.ty})`).toBe(true)
   })
 
+  it.each(ALL.map((m) => [m.id, m] as const))('%s: 도착 자리 바로 아래 칸에 나무·야자수가 없다(윗부분이 도착한 캐릭터를 가리지 않게)', (_id, map) => {
+    const { front } = tp(map)
+    expect(['tree', 'palm']).not.toContain(tileAt(map, front.tx, front.ty + 1))
+  })
+
   it('세계 원점은 맵마다 다르고, 섬은 멀리 있다', () => {
     const origins = ALL.map((m) => key(m.world))
     expect(new Set(origins).size).toBe(ALL.length)

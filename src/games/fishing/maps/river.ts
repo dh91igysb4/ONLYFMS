@@ -55,7 +55,7 @@ export const RIVER = defineMap('river', [
   ],
   // 산 호수를 열기 전에는 골짜기 다리가 무너져 있다. 다리 남쪽 길에서 위를 보면 구매 창
   gates: [{ area: 'lake', tiles: { tx: 24, ty: 2, w: 2, h: 2 }, look: 'broken-bridge', front: { tx: 24, ty: 4, facing: 'up' } }],
-  // 순간이동기: 남쪽 들판 길(tx 31) 동쪽. 세계 지도에서 마을 바로 북쪽
-  teleporter: { tiles: { tx: 34, ty: 20, w: 2, h: 2 }, front: { tx: 34, ty: 22, facing: 'down' } },
+  // 순간이동기: 다리 남쪽 들판, 강가 모래톱 아래 풀밭. 세계 지도에서 마을 바로 북쪽
+  teleporter: { tiles: { tx: 39, ty: 19, w: 2, h: 2 }, front: { tx: 39, ty: 21, facing: 'down' } },
   world: { tx: 0, ty: -34 },
 })
