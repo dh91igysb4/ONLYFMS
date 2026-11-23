@@ -319,8 +319,32 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
 - 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다. 옛 로직은 세이브에 gold가 없어 0으로 시작하고, 그 사이 번 골드는 다시 배포해도 **사라진다**: 이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시되기 때문이다.
 - 수동 확인: 낚시를 열기 전 헤더 `0 G`(지연 이전), 낚시를 열면 헤더와 낚시 화면 골드가 옛 골드와 같음, 새로고침해도 같음; 물고기 팔기 → 헤더가 바로 오름; 낚싯대·가방·찌·해금·순간이동·고급 장비 구매 → 헤더가 바로 내림, 모자라면 "골드가 부족해요".
 - 확인 쿼리: 아직 이전되지 않은 세이브 `select count(*) from world_saves where game_id = 'fishing' and logic_version <= <LAST_GOLD_IN_SAVE>;`, 이전 합계 `select count(*), sum(delta) from gold_ledger where reason = 'migrate';`, 이중 이전 없음 `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행).
-- 사이트 하루 상한 확인: 관리자 계정으로 낚시를 해 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림이 3초 뜨고 헤더 증가가 넘은 몫의 20%; 관리자 장부에 "(상한, 원래 …)".
+- 사이트 하루 상한 확인: 관리자 계정으로 낚시를 해 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림이 3초 뜨고 헤더 증가가 넘은 몫의 20%; 관리자 장부에 "(상한, 원래 …)" (2단계 PR 뒤에는 들어간 합계 41,000 위 몫은 4%).
 - 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표(`REF × 40`)를 다시 본다.
+
+## 지갑 배포 (2단계 자유 플레이 지급, `feat/wallet-free`)
+설계 §5.6(2단 상한 개정)·§7, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 2단계(Task 8~12). 1단계(`feat/wallet-core`) 뒤에 쌓인 브랜치라 **1단계 PR이 먼저 머지·배포**돼야 한다. 낚시 다듬기 PR(#81)·Task 4(낚시 → 지갑)와는 독립이다(낚시 코드를 건드리지 않는다).
+
+바뀌는 것:
+- 마이그레이션 `20261123191621_soft_cap_tier2.sql`: 사이트 하루 상한 2단(들어간 합계 30,750까지 100%, 41,000까지 20%, 그 위 4%). `_economy()`·`_gold_move`를 `create or replace`.
+- 마이그레이션 `20261123192423_free_gold.sql`: `game_modes.gold_per_point·gold_play_cap·gold_daily_cap`과 다섯 게임 수치, `free_plays` after insert 트리거 `free_plays_gold`.
+- 화면: 자유 플레이 결과에 `+N G`(지갑을 쓰는 게임이 등록돼 있을 때만, 헤더 배지와 같은 조건 `walletEnabled()`).
+
+**Task 4 전에 배포하면**: 트리거는 바로 지급하지만(지갑에 쌓임) 헤더·결과 화면에는 골드가 보이지 않는다. Task 4가 배포되면 낚시 옛 골드와 합쳐져 한꺼번에 보인다(사라지는 골드 없음). 사용자에게 "미니게임 골드가 미리 쌓이고 있다"고 알릴지는 운영 판단.
+
+순서: DB push → PR 머지 → Vercel. (함수 재배포 없음: `play`·`world`는 바뀌지 않았다. `world`는 `_gold_move`를 SQL로 부르므로 2단 상한이 DB push 때 바로 적용된다)
+
+- [ ] `npx supabase@2 db push` → 위 두 마이그레이션. 트리거가 이때부터 지급한다(옛 화면에서 끝낸 판도 받는다)
+- [ ] PR 머지 → Vercel 배포
+- [ ] 수동 확인(미리보기 → 운영, 폰 390px·PC). 결과 화면의 골드 줄은 Task 4 뒤에만 보이므로, Task 4 전이면 장부 쿼리로 확인한다:
+  - [ ] 양치·몰래 수능·볼 런·네온 라이더·후알야 자유 플레이 한 판씩 → (Task 4 뒤) `+N G`와 헤더 증가가 같다. 관리자 장부에 `free` 줄과 게임 이름
+  - [ ] 비행기 모드로 끝낸 판 → "+N G · 저장되면 골드가 들어가요", 온라인 복귀 뒤 장부에 한 번만 들어온다
+  - [ ] 같은 게임 하루 상한: 관리자가 SQL로 오늘 free 장부 확인 `select game_id, sum(coalesce(raw_delta, delta)) asked, sum(delta) got from gold_ledger where reason = 'free' and created_at >= date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' group by 1;` → 게임마다 `asked` ≤ 20,500
+  - [ ] 사이트 상한과 함께: 같은 날 30,750을 넘긴 계정(관리자 조정은 세지 않으니 낚시로)으로 자유 플레이 한 판 → `+N G · 오늘 상한을 넘어 일부만`, 헤더 증가가 N과 같다
+  - [ ] 2단 상한: 오늘 들어간 합계가 41,000을 넘은 계정의 `free`·`world` 줄은 원래 금액의 4%(관리자 장부 "(상한, 원래 …)")
+- 일주일 뒤 기준 플레이 확인: `select game_id, count(*), avg(score), percentile_cont(0.5) within group (order by score) from free_plays where played_at > now() - interval '7 days' group by 1;` → 설계 §7.3 표의 `avgScore`(양치 5.81, 몰래 수능 921, 볼 런 60, 네온 라이더 30, 후알야 6)에서 ±30% 넘게 벗어난 게임은 수치 조정 PR(manifest `gold`·새 마이그레이션 `update game_modes set gold_…`·`gold.test.ts` 함께). 특히 가정으로 둔 볼 런·네온 라이더·후알야.
+- 일주일 뒤 상한 모양 확인: 1단계 절의 "사람별 하루 들어옴" 쿼리에서 하루 여러 시간 하는 사람의 `earned`가 41,000 근처에 몰리고 4% 구간 수입이 거의 없으면 정상. 하루 1시간쯤 하는 사람의 `earned`가 41,000을 자주 넘으면(데일리 상금 등) 41,000·4%를 다시 본다(`economyPace.test.ts`로 날짜를 다시 재서).
+- 낚시 다듬기 PR(#81)을 이 뒤에 머지할 때: 그 PR의 `fishing/gold.test.ts` "하루 여러 시간 (지금 값 기록)"(16.4·11.4일, 1단 20%로 계산)과 `econSim.ts`의 `DayPlan {cap, rate}`를 2단 상한(`SOFT_CAP_TIERS`)으로 바꾸고 기록 값을 25.0·22.0일로 고친다. 이 브랜치의 `src/games/economyPace.test.ts`는 그때 `econSim`을 직접 import해도 된다.
 
 ## 문제가 생기면
 아래를 그대로 보내 준다.
