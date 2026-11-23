@@ -55,7 +55,7 @@ const PLAYER_W = 16
 const PLAYER_H = 24
 
 // 자세별 낚싯대 끝(스프라이트 안 좌표, 오른쪽을 볼 때). 왼쪽은 x를 거울로 뒤집는다.
-const ROD_TIP: Record<string, [number, number]> = {
+export const ROD_TIP: Readonly<Record<string, [number, number]>> = {
   'player-idle-down': [14, 2],
   'player-cast': [5, 0],
   'player-reel': [15, 23],
