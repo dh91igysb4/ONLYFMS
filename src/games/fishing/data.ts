@@ -42,7 +42,17 @@ export const RODS: Rod[] = [
 ]
 
 export const AREAS = [{ id: 'pier', name: '부두' }] as const
-export const BAG_SIZE = 20
+export const BAGS: readonly { tier: 1 | 2 | 3; size: number; price: number }[] = [
+  { tier: 1, size: 20, price: 0 },
+  { tier: 2, size: 30, price: 800 },
+  { tier: 3, size: 40, price: 5000 },
+]
+/** 모르는 tier는 기본 가방(20칸) */
+export function bagSize(tier: number): number {
+  return BAGS.find((b) => b.tier === tier)?.size ?? BAGS[0].size
+}
+/** 부두에서 던지면 크기 추첨 힘에 더해지는 값 */
+export const PIER_POWER_BONUS = 0.25
 export const MIN_FIGHT_MS = 2000
 export const HOOK_WINDOW_MS = 800
 /** 챔 창이 끝난 뒤 서버가 더 받아 주는 네트워크 지연 여유 */

@@ -2,16 +2,20 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
-import { drawScene, releaseSceneCache } from './scene.ts'
+import { drawWorld, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type PendingView, type View } from './logic.ts'
+import { PIER_END, SPAWN, TILE, type Facing, type Vec } from './map.ts'
+import fishingCss from './fishing.css?raw'
+import type { Player } from './walk.ts'
 
 vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
   return { ...orig, world: vi.fn() }
 })
-vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('../../platform/auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
+vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -42,7 +46,7 @@ const worldMock = vi.mocked(world)
 const actualMinigame = await vi.importActual<typeof import('./minigame.ts')>('./minigame.ts')
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null, ...over }
 }
 
 type Body = { game: string; action: 'load' } | { game: string; action: 'act'; payload: { type: string } & Record<string, unknown> }
@@ -78,12 +82,14 @@ beforeEach(() => {
     () => ({}) as unknown as CanvasRenderingContext2D,
   )
   worldMock.mockReset()
-  vi.mocked(drawScene).mockClear()
+  localStorage.clear()
+  vi.mocked(drawWorld).mockClear()
   vi.mocked(barResult).mockReset().mockImplementation(actualMinigame.barResult)
 })
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 /** 무대(.fish-stage)의 너비·높이·문서 위치와 창 높이를 정한다. 되돌리는 함수를 돌려준다. */
@@ -106,14 +112,89 @@ function stubStage({ width, height = 0, top = 0, innerH }: { width: number; heig
 const flush = () => act(async () => { await Promise.resolve() })
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 const canvas = () => screen.getByLabelText('낚시터')
-const press = () => fireEvent.pointerDown(canvas())
-const release = () => fireEvent.pointerUp(canvas())
+/** 행동(데스크톱 스페이스): 물가면 충전·던지기, 상점 문 앞이면 상점, 낚시 중이면 챔·감기 */
+const press = () => fireEvent.keyDown(window, { key: ' ', code: 'Space' })
+const release = () => fireEvent.keyUp(window, { key: ' ', code: 'Space' })
+const tapCanvas = () => {
+  fireEvent.pointerDown(canvas(), { pointerId: 9 })
+  fireEvent.pointerUp(canvas(), { pointerId: 9 })
+}
+const key = (code: string, down: boolean) =>
+  down ? fireEvent.keyDown(window, { code, key: code }) : fireEvent.keyUp(window, { code, key: code })
 
-async function mount(view = makeView()) {
+const POS_KEY = 'fishing-pos:u1'
+const tileCenter = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
+type At = { pos: Vec; facing: Facing }
+/** 부두 끝에서 바다를 본다 → 낚시(pier) */
+const PIER: At = { pos: tileCenter(PIER_END.tx, PIER_END.ty), facing: 'down' }
+/** 모래사장 맨 아래 줄(10, 25)에서 바다를 본다 → 낚시(shore) */
+const SHORE: At = { pos: tileCenter(10, 25), facing: 'down' }
+/** 모래밭 한가운데, 앞도 모래 → 행동 없음 */
+const SAND: At = { pos: tileCenter(5, 20), facing: 'down' }
+
+/** 저장 위치(null이면 저장 없음 → SPAWN)를 넣고 화면을 띄운다. 기본은 부두 끝. */
+async function mount(view = makeView(), at: At | null = PIER) {
+  if (at) localStorage.setItem(POS_KEY, JSON.stringify(at))
+  else localStorage.removeItem(POS_KEY)
   route({ load: () => ok(view) })
   const r = render(<Game gameId="fishing" />)
   await flush()
   return r
+}
+
+/** 마지막으로 그린 장면의 캐릭터 */
+const lastPlayer = (): Player => {
+  const call = vi.mocked(drawWorld).mock.calls.at(-1)
+  if (!call) throw new Error('drawWorld was not called')
+  return call[1].player
+}
+
+/** 터치 입력이 있는 기기((any-pointer: coarse))로 만든다: 조이스틱·행동 버튼이 보인다 */
+function stubTouch() {
+  vi.stubGlobal('matchMedia', (q: string) => ({
+    matches: q === '(any-pointer: coarse)',
+    media: q,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }))
+}
+const actionButton = () => screen.getByTestId('fish-action')
+const stick = () => screen.getByTestId('fish-stick')
+const pointer = (type: 'down' | 'move' | 'up', el: Element, pointerId: number, x = 0, y = 0) => {
+  const init = { pointerId, clientX: x, clientY: y }
+  if (type === 'down') fireEvent.pointerDown(el, init)
+  else if (type === 'move') fireEvent.pointerMove(el, init)
+  else fireEvent.pointerUp(el, init)
+}
+
+/** 상점 문 앞(저장 위치 없음 = SPAWN)에서 스페이스로 상점을 열고, 유령 클릭 방지 시간(300ms)을 넘긴다 */
+async function mountAtShop(view = makeView()) {
+  const r = await mount(view, null)
+  press()
+  release()
+  await advance(300)
+  return r
+}
+/** 마지막으로 그린 장면의 미니게임 바 */
+const lastBar = () => {
+  const bar = vi.mocked(drawWorld).mock.calls.at(-1)?.[1].bar
+  if (!bar) throw new Error('no bar drawn')
+  return bar
+}
+/** 터치: 행동 버튼으로 던지고 입질까지 기다린다 */
+async function touchCastToBite(view = makeView()) {
+  stubTouch()
+  await mount(view, PIER)
+  route({
+    cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
+    hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }),
+    resolve: () => new Promise(() => {}),
+  })
+  pointer('down', actionButton(), 2)
+  await advance(300)
+  pointer('up', actionButton(), 2)
+  await flush()
+  await advance(3100)
 }
 
 /** 던지고 cast 응답까지 받은 상태(waiting)로 만든다. */
@@ -157,8 +238,9 @@ describe('fishing Game', () => {
     await flush()
     const sent = calls('cast')
     expect(sent).toHaveLength(1)
-    const payload = (sent[0] as unknown as { payload: { area: string; power: number } }).payload
+    const payload = (sent[0] as unknown as { payload: { area: string; power: number; spot: string } }).payload
     expect(payload.area).toBe('pier')
+    expect(payload.spot).toBe('pier') // 부두 위에서 던졌다
     expect(payload.power).toBeGreaterThanOrEqual(0)
     expect(payload.power).toBeLessThanOrEqual(1)
     expect(payload.power).toBeGreaterThan(0.3) // 400ms 모으면 게이지가 절반쯤 찬다
@@ -222,9 +304,8 @@ describe('fishing Game', () => {
 
   test('shop: sell calls act sell and updates gold from the response', async () => {
     const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
-    await mount(view)
+    await mountAtShop(view)
     route({ sell: () => ok({ ...view, gold: 1600, bag: [] }, { earned: 1500 }) })
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
     fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
     await flush()
     expect(calls('sell')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'sell' } }])
@@ -234,17 +315,16 @@ describe('fishing Game', () => {
   })
 
   test('shop: buy button disabled when gold is short; enabled and calls buyRod when enough', async () => {
-    const { unmount } = await mount(makeView({ gold: 1000 }))
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
-    expect(screen.getByRole('button', { name: '구매' })).toBeDisabled()
-    expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
-    expect(screen.getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(2)
+    const { unmount } = await mountAtShop(makeView({ gold: 1000 }))
+    const rods = screen.getByRole('list', { name: '낚싯대 목록' })
+    expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
+    expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
+    expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(2)
     unmount()
 
     const rich = makeView({ gold: 2000 })
-    await mount(rich)
+    await mountAtShop(rich)
     route({ buyRod: () => ok({ ...rich, gold: 500, rodTier: 2 }) })
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
     const buy = screen.getByRole('button', { name: '구매' })
     expect(buy).toBeEnabled()
     fireEvent.click(buy)
@@ -255,17 +335,15 @@ describe('fishing Game', () => {
 
   test('shop: a not_enough_gold failure on buy shows the Korean message', async () => {
     const rich = makeView({ gold: 2000 })
-    await mount(rich)
+    await mountAtShop(rich)
     route({ buyRod: () => Promise.reject(new ApiError('not_enough_gold', 400)), load: () => ok(rich) })
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
     fireEvent.click(screen.getByRole('button', { name: '구매' }))
     await flush()
     expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
   })
 
   test('shop shows the top-tier message when the best rod is owned', async () => {
-    await mount(makeView({ rodTier: 4 }))
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    await mountAtShop(makeView({ rodTier: 4 }))
     expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '구매' })).not.toBeInTheDocument()
   })
@@ -282,17 +360,15 @@ describe('fishing Game', () => {
     expect(imgs.some((i) => i.src === 'data:fish-anchovy')).toBe(true)
   })
 
-  test('bag_full on cast shows the shop hint', async () => {
+  test('bag_full on cast tells the player to go and sell at the shop, with no open-shop button', async () => {
     await mount()
     route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
     press()
     await advance(200)
     release()
     await flush()
-    const hint = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
-    expect(hint).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '상점 열기' }))
-    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('상점에 가서 팔아 주세요')
+    expect(screen.queryByRole('button', { name: /상점/ })).not.toBeInTheDocument()
   })
 
   test('no_pending on resolve reloads and returns to idle without an error screen', async () => {
@@ -380,6 +456,9 @@ describe('fishing Game', () => {
     press()
     await advance(300)
     release()
+    fireEvent.pointerDown(canvas(), { pointerId: 9 })
+    await advance(300)
+    fireEvent.pointerUp(canvas(), { pointerId: 9 })
     await flush()
     expect(calls('cast')).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
@@ -396,7 +475,8 @@ describe('fishing Game', () => {
     press()
     release()
     await flush()
-    expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '가방' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '도감' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '전체화면' })).toBeDisabled()
   })
 
@@ -425,7 +505,7 @@ describe('fishing Game', () => {
       expect(c.style.width).toBe(`${fit.w * fit.scale}px`)
       expect(c.style.height).toBe(`${fit.h * fit.scale}px`)
       await advance(100)
-      const last = vi.mocked(drawScene).mock.calls.at(-1)
+      const last = vi.mocked(drawWorld).mock.calls.at(-1)
       expect(last?.[2]).toEqual({ w: fit.w, h: fit.h })
     } finally {
       restore()
@@ -459,12 +539,14 @@ describe('fishing Game', () => {
   })
 
   test('Escape with a menu open keeps fullscreen; menus open inside the overlay', async () => {
-    const { container } = await mount()
+    const { container } = await mount(makeView(), null)
     const root = container.querySelector('.fish') as HTMLElement
     fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
-    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    press() // 상점 문 앞: 떼면 상점이 열린다
+    release()
     const shop = screen.getByRole('region', { name: '상점' })
     expect(root.contains(shop)).toBe(true)
+    await advance(300)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(root).toHaveClass('fish-full')
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
@@ -587,13 +669,13 @@ describe('fishing Game', () => {
       await advance(200)
       release()
       await flush()
-      const note = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      const note = screen.getByText(/상점에 가서 팔아 주세요/)
       const stage = container.querySelector('.fish-stage') as HTMLElement
       expect(stage.contains(note)).toBe(true)
       expect([c.width, c.height]).toEqual(before)
       // 보통 화면에서는 예전처럼 무대 아래
       fireEvent.keyDown(window, { key: 'Escape' })
-      const again = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      const again = screen.getByText(/상점에 가서 팔아 주세요/)
       expect(stage.contains(again)).toBe(false)
     } finally {
       restore()
@@ -646,6 +728,645 @@ describe('fishing Game', () => {
     }
   })
 
+  test('canvas taps hook during a bite but do not cast from idle', async () => {
+    const view = makeView()
+    await mount(view)
+    tapCanvas()
+    await advance(300)
+    expect(calls('cast')).toHaveLength(0)
+    route({
+      cast: () => { const p = pending(); return ok({ ...view, pending: p }, p) },
+      hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }),
+    })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    await advance(3100)
+    tapCanvas()
+    await flush()
+    expect(calls('hook')).toHaveLength(1)
+  })
+})
+
+describe('fishing Game: walking and interaction', () => {
+  test('at the spawn spot the touch action reads 상점; the shop opens on release, not on press', async () => {
+    stubTouch()
+    await mount(makeView(), null)
+    expect(actionButton()).toHaveTextContent('상점')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'false')
+    const btn = actionButton()
+    pointer('down', btn, 2)
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+    pointer('up', btn, 2)
+    expect(screen.getByRole('region', { name: '상점' })).toBeInTheDocument()
+    // 메뉴가 열린 동안 조작은 숨는다
+    expect(screen.queryByTestId('fish-action')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '전부 팔기' })).toBeInTheDocument()
+  })
+
+  test('Space opens the shop on keyup, not keydown', async () => {
+    await mount(makeView(), null)
+    press()
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+    release()
+    expect(screen.getByRole('region', { name: '상점' })).toBeInTheDocument()
+  })
+
+  test('a click landing on a shop button within 300ms of opening does nothing (no ghost click)', async () => {
+    stubTouch()
+    const rich = makeView({ gold: 2000 })
+    await mount(rich, null)
+    route({ buyRod: () => ok({ ...rich, gold: 500, rodTier: 2 }) })
+    pointer('down', actionButton(), 2)
+    pointer('up', actionButton(), 2)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await advance(250)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(calls('buyRod')).toHaveLength(0)
+    await advance(60)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(calls('buyRod')).toHaveLength(1)
+  })
+
+  test('releasing the shop action after walking away from the door does not open the shop', async () => {
+    await mount(makeView(), null)
+    press()
+    key('ArrowRight', true)
+    await advance(500)
+    key('ArrowRight', false)
+    release()
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+  })
+
+  test('touch: a press on the joystick during a bite hooks like a canvas press', async () => {
+    await touchCastToBite()
+    expect(calls('hook')).toHaveLength(0)
+    pointer('down', stick(), 5, 100, 100)
+    await flush()
+    expect(calls('hook')).toHaveLength(1)
+  })
+
+  test('touch: holding the joystick during a fight reels, and it does not walk', async () => {
+    await touchCastToBite()
+    pointer('down', stick(), 5, 100, 100) // 챔
+    await flush()
+    pointer('move', stick(), 5, 140, 100)
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    expect(lastPlayer().pos).toEqual(PIER.pos)
+    pointer('up', stick(), 5, 140, 100)
+    await advance(100)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('fight: lifting another finger does not release the bar while the action button is held', async () => {
+    await touchCastToBite()
+    pointer('down', actionButton(), 2) // 챔, 계속 누르고 있다
+    await flush()
+    await advance(50)
+    fireEvent.pointerDown(canvas(), { pointerId: 9 })
+    fireEvent.pointerUp(canvas(), { pointerId: 9 })
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    pointer('up', actionButton(), 2)
+    await advance(100)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('a lost pointer capture on the joystick stops walking; on the action button it ends the press', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    const { unmount } = await mount(view, SAND)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 160, 100)
+    await advance(200)
+    expect(lastPlayer().moving).toBe(true)
+    fireEvent(stick(), new TestPointerEvent('lostpointercapture', { bubbles: true, pointerId: 1 }))
+    await advance(50)
+    const stopped = lastPlayer().pos
+    await advance(200)
+    expect(lastPlayer().pos).toEqual(stopped)
+    unmount()
+
+    await mount(view, SHORE)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    fireEvent(actionButton(), new TestPointerEvent('lostpointercapture', { bubbles: true, pointerId: 2 }))
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+  })
+
+  test('the joystick knob is drawn from where the finger first touched', async () => {
+    stubTouch()
+    await mount(makeView(), SAND)
+    const knob = stick().querySelector('.fish-stick-knob') as HTMLElement
+    pointer('down', stick(), 1, 30, 70) // 받침 왼쪽 위 (jsdom 상자는 0,0)
+    expect(knob.style.left).toBe('30px')
+    expect(knob.style.top).toBe('70px')
+    pointer('move', stick(), 1, 50, 70)
+    expect(knob.style.left).toBe('50px')
+    pointer('move', stick(), 1, 130, 70) // 반지름(36) 넘게 밀면 손잡이는 반지름에서 멈춘다
+    expect(knob.style.left).toBe('66px')
+    pointer('up', stick(), 1, 130, 70)
+    expect(knob.style.left).toBe('')
+  })
+
+  test('at the pier end the action reads 낚시 and a cast sends spot pier; on the sand shore spot shore', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    const { unmount } = await mount(view, PIER)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    expect(actionButton()).toHaveTextContent('낚시')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'false')
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    pointer('up', actionButton(), 2)
+    await flush()
+    expect((calls('cast')[0] as unknown as { payload: { spot: string } }).payload.spot).toBe('pier')
+    unmount()
+
+    await mount(view, SHORE)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    expect(actionButton()).toHaveTextContent('낚시')
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    pointer('up', actionButton(), 2)
+    await flush()
+    expect((calls('cast')[1] as unknown as { payload: { spot: string } }).payload.spot).toBe('shore')
+  })
+
+  test('the action button is disabled where there is neither water nor the shop door', async () => {
+    stubTouch()
+    await mount(makeView(), SAND)
+    expect(actionButton()).toHaveTextContent('낚시')
+    // disabled 속성 대신 aria-disabled: 눌렀다 뗀 알림이 늘 온다
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+    expect(actionButton()).not.toHaveAttribute('disabled')
+  })
+
+  test('the bottom row has bag, dex and fullscreen but no shop; the bag says where to sell', async () => {
+    const { container } = await mount()
+    const bottom = container.querySelector('.fish-bottom') as HTMLElement
+    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '전체화면'])
+    expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
+  })
+
+  test('the bag panel has no sell hint when standing at the shop', async () => {
+    await mount(makeView(), null)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    expect(screen.queryByText('상점에서 팔 수 있어요')).not.toBeInTheDocument()
+  })
+
+  test('desktop hides the touch controls and shows the keyboard hint', async () => {
+    await mount()
+    expect(screen.queryByTestId('fish-action')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('fish-stick')).not.toBeInTheDocument()
+    expect(screen.getByText('방향키로 이동 · 스페이스로 낚시/상점')).toBeInTheDocument()
+  })
+
+  test('desktop: arrow keys and WASD walk the character', async () => {
+    const { unmount } = await mount(makeView(), PIER)
+    await advance(50)
+    expect(lastPlayer().pos).toEqual(PIER.pos)
+    key('ArrowUp', true)
+    await advance(500)
+    const up = lastPlayer()
+    expect(up.pos.x).toBe(PIER.pos.x)
+    expect(up.pos.y).toBeLessThan(PIER.pos.y - 20) // 48px/s × 0.5s ≈ 24px
+    expect(up.facing).toBe('up')
+    expect(up.moving).toBe(true)
+    key('ArrowUp', false)
+    await advance(50)
+    expect(lastPlayer().moving).toBe(false)
+    unmount()
+
+    await mount(makeView(), SAND)
+    key('KeyD', true)
+    await advance(500)
+    expect(lastPlayer().pos.x).toBeGreaterThan(SAND.pos.x + 20)
+    expect(lastPlayer().facing).toBe('right')
+  })
+
+  test('the camera follows the rounded player position', async () => {
+    // 홀수 폭(195)에서 반올림하지 않은 x(392.6)로 재면 295, 반올림한 x(393)로 재면 296
+    const restore = stubStage({ width: 390, top: 82, innerH: 650 })
+    try {
+      await mount(makeView(), { pos: { x: 392.6, y: 328 }, facing: 'down' })
+      await advance(50)
+      const call = vi.mocked(drawWorld).mock.calls.at(-1)
+      expect(call?.[2]).toEqual({ w: 195, h: 280 })
+      expect(call?.[1].camera).toEqual({ x: 296, y: 188 })
+    } finally {
+      restore()
+    }
+  })
+
+  test('stopping saves the position, and unmounting saves it too', async () => {
+    const { unmount } = await mount(makeView(), PIER)
+    key('ArrowUp', true)
+    await advance(300)
+    key('ArrowUp', false)
+    await advance(50)
+    const stopped = JSON.parse(localStorage.getItem(POS_KEY) ?? 'null') as At
+    expect(stopped.pos).toEqual(lastPlayer().pos)
+    expect(stopped.pos.y).toBeLessThan(PIER.pos.y)
+    expect(stopped.facing).toBe('up')
+
+    key('ArrowUp', true)
+    await advance(200)
+    const walking = lastPlayer().pos
+    expect(walking.y).toBeLessThan(stopped.pos.y)
+    unmount()
+    expect((JSON.parse(localStorage.getItem(POS_KEY) ?? 'null') as At).pos).toEqual(walking)
+  })
+
+  test('an unusable saved position starts at the spawn spot', async () => {
+    stubTouch()
+    await mount(makeView(), { pos: tileCenter(10, 30), facing: 'down' }) // 바다 한가운데
+    await advance(50)
+    expect(lastPlayer().pos).toEqual(SPAWN.pos)
+    expect(lastPlayer().facing).toBe(SPAWN.facing)
+    expect(actionButton()).toHaveTextContent('상점')
+  })
+
+  test('losing window focus or opening a menu clears held movement keys', async () => {
+    await mount(makeView(), PIER)
+    key('ArrowUp', true)
+    await advance(200)
+    act(() => { window.dispatchEvent(new Event('blur')) })
+    await advance(50)
+    const afterBlur = lastPlayer().pos
+    await advance(300)
+    expect(lastPlayer().pos).toEqual(afterBlur)
+
+    key('ArrowUp', true)
+    await advance(100)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    await advance(50)
+    const afterMenu = lastPlayer().pos
+    await advance(300)
+    expect(lastPlayer().pos).toEqual(afterMenu)
+  })
+
+  test('touch: the joystick walks the character and letting go stops it', async () => {
+    stubTouch()
+    await mount(makeView(), SAND)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 160, 100)
+    await advance(500)
+    const moved = lastPlayer()
+    expect(moved.pos.x).toBeGreaterThan(SAND.pos.x + 20)
+    expect(moved.facing).toBe('right')
+    pointer('up', stick(), 1, 160, 100)
+    await advance(50)
+    const stopped = lastPlayer().pos
+    await advance(300)
+    expect(lastPlayer().pos).toEqual(stopped)
+    expect(lastPlayer().moving).toBe(false)
+  })
+
+  test('while charging, joystick input moves nothing and does not turn the character', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    await mount(view, SHORE)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 40, 100) // 왼쪽으로 끝까지
+    await advance(400)
+    expect(lastPlayer().pos).toEqual(SHORE.pos)
+    expect(lastPlayer().facing).toBe('down')
+    pointer('up', actionButton(), 2)
+    await flush()
+    expect((calls('cast')[0] as unknown as { payload: { spot: string } }).payload.spot).toBe('shore')
+  })
+
+  test('two fingers: action down/up does not cut the joystick, and lifting the joystick does not cut a charge', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    const { unmount } = await mount(view, SAND)
+    // 걷는 중 다른 손가락으로 (비활성) 행동 버튼을 눌렀다 뗀다 → 계속 걷는다
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 160, 100)
+    await advance(200)
+    const x1 = lastPlayer().pos.x
+    expect(x1).toBeGreaterThan(SAND.pos.x)
+    pointer('down', actionButton(), 2)
+    pointer('up', actionButton(), 2)
+    await advance(200)
+    expect(lastPlayer().pos.x).toBeGreaterThan(x1 + 5)
+    expect(lastPlayer().moving).toBe(true)
+    unmount()
+
+    // 물가에서 행동 버튼으로 충전하는 동안 조이스틱 손가락을 떼도 충전은 이어진다
+    await mount(view, SHORE)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 100, 140)
+    await advance(200)
+    pointer('up', stick(), 1, 100, 140)
+    await advance(200)
+    expect(calls('cast')).toHaveLength(0)
+    expect(screen.getByText('떼면 던져요')).toBeInTheDocument()
+    pointer('up', actionButton(), 2)
+    await flush()
+    const sent = calls('cast') as unknown as { payload: { power: number; spot: string } }[]
+    expect(sent).toHaveLength(1)
+    expect(sent[0].payload.power).toBeGreaterThan(0.3) // 400ms 내내 모았다
+  })
+
+  test('touch fullscreen: notices sit at the top, let presses through, and the action button still works', async () => {
+    stubTouch()
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      const view = makeView()
+      const { container } = await mount(view, PIER)
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
+      pointer('down', actionButton(), 2)
+      await advance(200)
+      pointer('up', actionButton(), 2)
+      await flush()
+      const layer = container.querySelector('.fish-notices') as HTMLElement
+      expect(layer).toHaveTextContent('상점에 가서 팔아 주세요')
+      // 조작이 있는 아래쪽이 아니라 위쪽에 뜬다
+      expect(layer).toHaveClass('fish-notices-top')
+      // 알림 층은 누르기를 받지 않는다(알림 안의 버튼만 받는다)
+      const rule = (sel: string) => fishingCss.match(new RegExp(`(^|\\n)${sel.replace(/[.*]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? ''
+      expect(rule('.fish-notices')).toMatch(/pointer-events:\s*none/)
+      expect(rule('.fish-notices-top')).toMatch(/top:\s*8px/)
+      expect(rule('.fish-notices-top')).toMatch(/bottom:\s*auto/)
+      expect(rule('.fish-notices button')).toMatch(/pointer-events:\s*auto/)
+      // 알림이 떠 있어도 행동 버튼은 누르기를 받는다
+      const p = pending()
+      route({ cast: () => ok({ ...view, pending: p }, p) })
+      pointer('down', actionButton(), 3)
+      expect(screen.getByText('떼면 던져요')).toBeInTheDocument()
+      await advance(200)
+      pointer('up', actionButton(), 3)
+      await flush()
+      expect(calls('cast')).toHaveLength(2)
+    } finally {
+      restore()
+    }
+  })
+
+  test('desktop fullscreen notices stay at the bottom of the canvas', async () => {
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      const { container } = await mount()
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
+      press()
+      await advance(200)
+      release()
+      await flush()
+      const layer = container.querySelector('.fish-notices') as HTMLElement
+      expect(layer).toHaveTextContent('상점에 가서 팔아 주세요')
+      expect(layer).not.toHaveClass('fish-notices-top')
+    } finally {
+      restore()
+    }
+  })
+
+  test('losing focus while charging returns to idle and never casts (Space and the touch button)', async () => {
+    const view = makeView()
+    const p = pending()
+    const { unmount } = await mount(view, PIER)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    expect(screen.getByText('떼면 던져요')).toBeInTheDocument()
+    act(() => { window.dispatchEvent(new Event('blur')) })
+    await advance(50)
+    expect(screen.queryByText('떼면 던져요')).not.toBeInTheDocument()
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].phase).toBe('idle')
+    release()
+    await flush()
+    expect(calls('cast')).toHaveLength(0)
+    unmount()
+
+    stubTouch()
+    await mount(view, PIER)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    expect(screen.getByText('떼면 던져요')).toBeInTheDocument()
+    act(() => { window.dispatchEvent(new Event('blur')) })
+    await flush()
+    expect(screen.queryByText('떼면 던져요')).not.toBeInTheDocument()
+    expect(actionButton()).not.toHaveClass('fish-action-on')
+    pointer('up', actionButton(), 2)
+    await flush()
+    expect(calls('cast')).toHaveLength(0)
+  })
+
+  test('the page being hidden while charging also returns to idle without casting', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, PIER)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    vis.mockReturnValue('visible')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await advance(50)
+    expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].phase).toBe('idle')
+    release()
+    await flush()
+    expect(calls('cast')).toHaveLength(0)
+  })
+
+  test('after losing focus with Space held, the fight bar is not pulled up without input', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({ hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }), resolve: () => new Promise(() => {}) })
+    await advance(3100)
+    press() // 챔, 스페이스를 계속 누르고 있다
+    await flush()
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    // 창이 초점을 잃어 keyup이 오지 않는다
+    act(() => { window.dispatchEvent(new Event('blur')) })
+    await advance(150)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('a stale shop press (release lost) does not swallow the next cast release at the water', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, null) // 상점 문 앞 (12, 6)
+    press() // 상점 행동을 눌렀지만 뗀 알림을 잃었다 (창 초점은 그대로)
+    // (13, 6)으로 한 칸 옮긴 뒤 아래로 곧장 내려가 (13, 25) 물가에서 바다를 본다
+    key('ArrowRight', true)
+    await advance(340)
+    key('ArrowRight', false)
+    key('ArrowDown', true)
+    await advance(7500)
+    key('ArrowDown', false)
+    await advance(50)
+    expect(Math.floor(lastPlayer().pos.y / TILE)).toBe(25)
+    expect(lastPlayer().facing).toBe('down')
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' })
+    await advance(300)
+    release()
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+  })
+
+  test('a lost pointer capture on the canvas releases its press', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    route({ hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }), resolve: () => new Promise(() => {}) })
+    await advance(3100)
+    fireEvent.pointerDown(canvas(), { pointerId: 9 }) // 챔, 계속 누른다
+    await flush()
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    fireEvent(canvas(), new TestPointerEvent('lostpointercapture', { bubbles: true, pointerId: 9 }))
+    await advance(150)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('touch: a press on the disabled action button does nothing, but its release is still handled', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    await mount(view, SAND)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    expect(actionButton()).not.toHaveClass('fish-action-on')
+    pointer('up', actionButton(), 2)
+    await flush()
+    expect(calls('cast')).toHaveLength(0)
+  })
+
+  test('touch: a joystick touch that starts while the catch is shown walks once the phase is idle, without lifting', async () => {
+    stubTouch()
+    const view = makeView()
+    await mount(view, PIER)
+    route({
+      cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
+      hook: () => ok(view, { species: 'mackerel', sizeCm: 40 }),
+      resolve: () => {
+        const fish = { species: 'mackerel', sizeCm: 40, perfect: false }
+        return ok({ ...view, bag: [fish], dex: { mackerel: { count: 1, maxCm: 40 } } }, { caught: fish })
+      },
+    })
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    pointer('up', actionButton(), 2)
+    await flush()
+    await advance(3100)
+    pointer('down', actionButton(), 2) // 챔
+    pointer('up', actionButton(), 2)
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(MIN_FIGHT_MS + 200)
+    expect(screen.getByText(/고등어 40cm/)).toBeInTheDocument()
+    vi.mocked(barResult).mockImplementation(actualMinigame.barResult)
+    // 결과가 떠 있는 동안 조이스틱을 위로 밀고 있다
+    pointer('down', stick(), 5, 100, 100)
+    pointer('move', stick(), 5, 100, 40)
+    await advance(300)
+    expect(lastPlayer().pos).toEqual(PIER.pos)
+    await advance(1200) // 결과가 닫히고 대기로 돌아온다
+    expect(screen.queryByText(/고등어 40cm/)).not.toBeInTheDocument()
+    await advance(300)
+    expect(lastPlayer().pos.y).toBeLessThan(PIER.pos.y - 5)
+    expect(calls('resolve')).toHaveLength(1)
+  })
+
+  test('touch: a joystick tap while waiting for a bite sends nothing', async () => {
+    stubTouch()
+    const view = makeView()
+    await mount(view, PIER)
+    route({
+      cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
+      resolve: () => ok(view, { caught: null }),
+    })
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    pointer('up', actionButton(), 2)
+    await flush()
+    await advance(1000)
+    expect(screen.getByText('입질을 기다리는 중…')).toBeInTheDocument()
+    pointer('down', stick(), 5, 100, 100)
+    await advance(100)
+    pointer('up', stick(), 5, 100, 100)
+    await flush()
+    expect(calls('resolve')).toHaveLength(0)
+    expect(calls('hook')).toHaveLength(0)
+    expect(screen.getByText('입질을 기다리는 중…')).toBeInTheDocument()
+  })
+
+  test('desktop: after the bag or dex button (and the panel close button) focus returns to the game so Space casts', async () => {
+    const view = makeView()
+    const { container } = await mount(view, PIER)
+    const root = container.querySelector('.fish') as HTMLElement
+    for (const name of ['가방', '도감']) {
+      const btn = screen.getByRole('button', { name })
+      btn.focus()
+      fireEvent.click(btn)
+      expect(document.activeElement).toBe(root)
+      const close = screen.getByRole('button', { name: '닫기' })
+      close.focus()
+      fireEvent.click(close)
+      expect(document.activeElement).toBe(root)
+    }
+    const p = pending()
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: ' ', code: 'Space' })
+    await advance(300)
+    fireEvent.keyUp(document.activeElement as HTMLElement, { key: ' ', code: 'Space' })
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+  })
+
+  test('shop: a bag upgrade is buyable with exactly enough gold and sends buyBag', async () => {
+    const view = makeView({ gold: 800 })
+    await mountAtShop(view)
+    route({ buyBag: () => ok({ ...view, gold: 0, bagTier: 2 }) })
+    const bags = screen.getByRole('list', { name: '가방 목록' })
+    const buy = within(bags).getByRole('button', { name: '30칸 가방 구매' })
+    expect(buy).toBeEnabled()
+    expect(within(bags).getByText('800 G')).toBeInTheDocument()
+    fireEvent.click(buy)
+    await flush()
+    expect(calls('buyBag')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyBag', tier: 2 } }])
+    expect(screen.getByText('0/30')).toBeInTheDocument()
+  })
+
+  test('shop: a bag upgrade is disabled one gold short, and the top bag says so', async () => {
+    const { unmount } = await mountAtShop(makeView({ gold: 799 }))
+    const bags = screen.getByRole('list', { name: '가방 목록' })
+    expect(within(bags).getByRole('button', { name: '30칸 가방 구매' })).toBeDisabled()
+    expect(within(bags).getByText('골드가 부족해요')).toBeInTheDocument()
+    unmount()
+
+    await mountAtShop(makeView({ gold: 99999, bagTier: 3, rodTier: 1 }))
+    const top = screen.getByRole('list', { name: '가방 목록' })
+    expect(within(top).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
+    expect(screen.getByText('0/40')).toBeInTheDocument()
+  })
+
   test('unmount releases the scene background cache', async () => {
     vi.mocked(releaseSceneCache).mockClear()
     const { unmount } = await mount()
@@ -657,11 +1378,11 @@ describe('fishing Game', () => {
   test('stops drawing after unmount', async () => {
     const { unmount } = await mount()
     await advance(100)
-    expect(vi.mocked(drawScene).mock.calls.length).toBeGreaterThan(0)
+    expect(vi.mocked(drawWorld).mock.calls.length).toBeGreaterThan(0)
     unmount()
-    const n = vi.mocked(drawScene).mock.calls.length
+    const n = vi.mocked(drawWorld).mock.calls.length
     await advance(200)
-    expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+    expect(vi.mocked(drawWorld).mock.calls.length).toBe(n)
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { BAG_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
+import { BAGS, bagSize, HOOK_GRACE_MS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES } from './data.ts'
 import { logic, price, rollCatch, sizePercentile, type Action, type Fish, type State } from './logic.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -75,6 +75,17 @@ describe('rollCatch', () => {
     }
     expect(mean(1)).toBeGreaterThan(mean(0))
   })
+  it('rollCatch calls rng the same number of times with or without bonus', () => {
+    const counted = (bonus?: number): number => {
+      const inner = rngFromSeed(seedBytes(21))
+      let n = 0
+      const rng = () => (n++, inner())
+      for (let i = 0; i < 50; i++) rollCatch(rng, 3, 0.5, bonus)
+      return n
+    }
+    expect(counted(0.25)).toBe(counted())
+    expect(counted(0.25)).toBe(counted(0))
+  })
   it('deterministic for the same rng sequence', () => {
     const a = rngFromSeed(seedBytes(7))
     const b = rngFromSeed(seedBytes(7))
@@ -110,9 +121,9 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(1)
+    expect(logic.version).toBe(2)
     expect(logic.init()).toEqual({
-      gold: 0, totalEarned: 0, rodTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null,
+      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['pier'], bag: [], dex: {}, pending: null,
     })
   })
 
@@ -127,10 +138,81 @@ describe('fishing WorldLogic', () => {
   })
 
   it('cast with full bag -> bag_full, no pending', () => {
-    const bag: Fish[] = Array.from({ length: BAG_SIZE }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const bag: Fish[] = Array.from({ length: bagSize(1) }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
     const s = deepFreeze(fresh({ bag }))
     expect(err(logic.apply(s, { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
     expect(s.pending).toBeNull()
+  })
+
+  it("cast without spot and with spot 'shore' and spot 'zzz' give identical pending (same seed)", () => {
+    const pend = (spot?: string) => {
+      const rng = rngFromSeed(seedBytes(31))
+      const action = { type: 'cast', area: 'pier', power: 0.5, ...(spot === undefined ? {} : { spot }) } as unknown as Action
+      return ok(logic.apply(fresh(), action, { now: T0, rng })).state.pending
+    }
+    expect(pend('shore')).toEqual(pend())
+    expect(pend('zzz')).toEqual(pend())
+  })
+
+  it('pier spot raises mean size percentile', () => {
+    const mean = (spot: 'pier' | 'shore'): number => {
+      const rng = rngFromSeed(seedBytes(32))
+      let sum = 0
+      for (let i = 0; i < 3000; i++) {
+        const p = ok(logic.apply(fresh({ rodTier: 3 }), { type: 'cast', area: 'pier', power: 0.5, spot }, { now: T0, rng })).state.pending!
+        sum += sizePercentile(p.species, p.sizeCm)
+      }
+      return sum / 3000
+    }
+    expect(mean('pier')).toBeGreaterThan(mean('shore') + 0.05)
+  })
+
+  it('buyBag 1->2 at 800 gold leaves 0 gold, bagTier 2, totalEarned unchanged', () => {
+    const r = ok(logic.apply(fresh({ gold: 800, totalEarned: 900 }), { type: 'buyBag', tier: 2 }, ctx()))
+    expect(r.state).toMatchObject({ gold: 0, bagTier: 2, totalEarned: 900 })
+  })
+
+  it('buyBag 2->3 costs 5000; 799 gold -> not_enough_gold', () => {
+    expect(err(logic.apply(fresh({ gold: 799 }), { type: 'buyBag', tier: 2 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(logic.apply(fresh({ gold: 5000, bagTier: 2 }), { type: 'buyBag', tier: 3 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 3 })
+  })
+
+  it('buyBag rejects skipped, malformed, current and beyond-max tiers', () => {
+    const rich = deepFreeze(fresh({ gold: 1e6 }))
+    for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 4]) {
+      expect(err(logic.apply(rich, { type: 'buyBag', tier } as unknown as Action, ctx()))).toBe('bad_tier')
+    }
+    const max = deepFreeze(fresh({ gold: 1e6, bagTier: 3 }))
+    expect(err(logic.apply(max, { type: 'buyBag', tier: 4 }, ctx()))).toBe('bad_tier')
+  })
+
+  it('bagTier 2 allows the 21st..30th fish and rejects the 31st cast with bag_full', () => {
+    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    for (const n of [20, 29]) {
+      expect(ok(logic.apply(fresh({ bagTier: 2, bag: fish(n) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBeTruthy()
+    }
+    expect(err(logic.apply(fresh({ bagTier: 2, bag: fish(30) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
+    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000]])
+    expect(bagSize(99)).toBe(20)
+  })
+
+  it('migrate v1 save without bagTier -> bagTier 1, gold/dex/rodTier kept; bad bagTier -> 1', () => {
+    const m = logic.migrate({ gold: 70, rodTier: 2, dex: { goby: { count: 1, maxCm: 10 } } }, 1)
+    expect(m).toMatchObject({ bagTier: 1, gold: 70, rodTier: 2, dex: { goby: { count: 1, maxCm: 10 } } })
+    expect(logic.migrate({ bagTier: 7 }, 1).bagTier).toBe(1)
+    expect(logic.migrate({ bagTier: 3 }, 2).bagTier).toBe(3)
+  })
+
+  it('migrate keeps every fish the bag can hold: a v1 save with 20 fish keeps 20, a bagTier 3 save with 40 keeps 40', () => {
+    const fish = (n: number): Fish[] => Array.from({ length: n }, (_, i) => ({ species: 'anchovy', sizeCm: 10 + (i % 5), perfect: i % 2 === 0 }))
+    const v1 = fish(20)
+    expect(logic.migrate({ gold: 5, bag: v1 }, 1).bag).toEqual(v1)
+    const full = fish(40)
+    expect(logic.migrate({ bagTier: 3, bag: full }, 2).bag).toEqual(full)
+  })
+
+  it('view exposes bagTier', () => {
+    expect(logic.view(fresh({ bagTier: 2 }), { now: T0 }).bagTier).toBe(2)
   })
 
   it('cast rejects bad payloads', () => {
@@ -285,7 +367,7 @@ describe('fishing WorldLogic', () => {
   })
 
   it('errors never mutate the input state', () => {
-    const full: Fish[] = Array.from({ length: BAG_SIZE }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const full: Fish[] = Array.from({ length: bagSize(1) }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
     const cases: [State, unknown, number?][] = [
       [fresh(), { type: 'cast', area: 'x', power: 0.5 }],
       [fresh(), { type: 'cast', area: 'pier', power: 9 }],
@@ -301,6 +383,9 @@ describe('fishing WorldLogic', () => {
       [fresh(), { type: 'sell' }],
       [fresh(), { type: 'buyRod', tier: 3 }],
       [fresh({ gold: 5 }), { type: 'buyRod', tier: 2 }],
+      [fresh(), { type: 'buyBag', tier: 3 }],
+      [fresh({ gold: 799 }), { type: 'buyBag', tier: 2 }],
+      [fresh({ gold: 1e6 }), { type: 'buyBag', tier: '2' }],
       [fresh(), { type: 'dance' }],
       [fresh(), null],
       [fresh(), 'cast'],
