@@ -304,3 +304,61 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
     }
   })
 })
+
+describe('가라앉는(sinker) 물고기: 안 누르면 잡히지 않는다', () => {
+  const sinkers = SPECIES.filter((s) => s.behavior === 'sinker')
+  const play = (params: ReturnType<typeof barParams>, seedN: number, strategy: (b: Bar) => boolean) => {
+    const rng = seeded(seedN)
+    let bar = initBar()
+    for (let t = 0; t < 60000 && barResult(bar) === 'playing'; t += 16) bar = stepBar(bar, strategy(bar), 16, params, rng)
+    return barResult(bar)
+  }
+  const idleRate = (params: ReturnType<typeof barParams>) => {
+    let caught = 0
+    for (let n = 0; n < 100; n++) if (play(params, 500 + n, () => false) === 'caught') caught++
+    return caught / 100
+  }
+
+  it('sinker 어종이 여럿 있다', () => {
+    expect(sinkers.length).toBeGreaterThanOrEqual(8)
+  })
+
+  it('가장 낮은 낚싯대, 그리고 6단계+코르크(가장 큰 바)에서 60초 동안 안 누르면 잡히는 비율 ≤ 5%', () => {
+    for (const s of sinkers) {
+      expect(idleRate(barParams(s.id, s.minRod)), `${s.id} rod ${s.minRod}`).toBeLessThanOrEqual(0.05)
+      expect(idleRate(barParams(s.id, 6, ['cork'])), `${s.id} rod 6 cork`).toBeLessThanOrEqual(0.05)
+    }
+  })
+
+  it('따라가면(물고기가 바보다 위면 누름) 쉬운 sinker(우럭, 2단계)는 잘 잡힌다', () => {
+    let caught = 0
+    for (let n = 0; n < 50; n++) if (play(barParams('rockfish', 2), 900 + n, (b) => b.fishPos > b.barPos) === 'caught') caught++
+    expect(caught).toBeGreaterThanOrEqual(45)
+  })
+
+  it('sinker는 여전히 트랙 아래쪽에 머문다(바 0.22, 평균 < 0.45)', () => {
+    const params = { barSize: 0.22, difficulty: 0.5, behavior: 'sinker' as const, drain: 1, pull: 0 }
+    const rng = seeded(11)
+    let bar = initBar()
+    let sum = 0
+    for (let i = 0; i < 3750; i++) {
+      bar = stepBar({ ...bar, progress: 0.5 }, false, 16, params, rng)
+      sum += bar.fishPos
+    }
+    expect(sum / 3750).toBeLessThan(0.45)
+  })
+})
+
+describe('barParams: 더 새 서버가 준 모르는 값', () => {
+  it('모르는 어종이면 throw하지 않고 중립값(난이도 0.5, mixed)', () => {
+    const p = barParams('fish-from-the-future', 2)
+    expect(p.difficulty).toBe(0.5)
+    expect(p.behavior).toBe('mixed')
+    expect(p.barSize).toBeCloseTo(barParams('goby', 2).barSize)
+  })
+  it('모르는 낚싯대 단계면 기본 바(보너스 없음)', () => {
+    const p = barParams('goby', 9 as never)
+    expect(p.barSize).toBeCloseTo(0.22)
+    expect(p.difficulty).toBe(SPECIES.find((s) => s.id === 'goby')!.difficulty)
+  })
+})

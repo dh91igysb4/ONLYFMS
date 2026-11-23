@@ -37,7 +37,10 @@ const DART_RETARGET_SCALE = 2.5 // dart: 목표 변경 빈도 배율
 const DART_SPEED_SCALE = 1.5
 const DART_MIN_JUMP = 0.4 // dart: 새 목표는 현재 위치에서 이만큼 이상 떨어진 곳
 const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
-const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
+// sinker: 새 목표는 손을 놓아 바닥에 붙은 바 바로 위(barSize + GAP ~ + GAP + SPAN). 트랙 아래쪽에 머물지만
+// 쉬는 바에는 들어오지 않아, 살살 눌러 받쳐야 잡힌다(예전에는 0~0.45라 안 눌러도 잡혔다).
+const SINKER_GAP = 0.03
+const SINKER_SPAN = 0.27
 // 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
 // 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
 // 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
@@ -48,28 +51,30 @@ const GAUGE_PERIOD_MS = 1600
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
+/** 더 새 서버가 준 모르는 어종이면 이 값으로 싸운다(화면이 죽지 않게) */
+const NEUTRAL_FISH = { difficulty: 0.5, behavior: 'mixed' as const }
+
 export function barParams(speciesId: string, rodTier: RodTier, equipped: readonly TackleId[] = []): BarParams {
-  const species = SPECIES.find((s) => s.id === speciesId)
-  const rod = RODS.find((r) => r.tier === rodTier)
-  if (!species) throw new Error(`unknown species: ${speciesId}`)
-  if (!rod) throw new Error(`unknown rod tier: ${rodTier}`)
+  const fish = SPECIES.find((s) => s.id === speciesId) ?? NEUTRAL_FISH
+  // 모르는 낚싯대 단계는 보너스 없는 기본 바
+  const barBonus = RODS.find((r) => r.tier === rodTier)?.barBonus ?? 0
   return {
-    barSize: BASE_BAR_SIZE * (1 + rod.barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
-    difficulty: species.difficulty,
-    behavior: species.behavior,
+    barSize: BASE_BAR_SIZE * (1 + barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
+    difficulty: fish.difficulty,
+    behavior: fish.behavior,
     drain: equipped.includes('trap') ? TACKLE_FX.trapDrain : 1,
     pull: equipped.includes('barbed') ? BARBED_PULL : 0,
   }
 }
 
 // 유형별 새 목표. rng는 한 번만 부른다(mixed는 예전과 같은 난수열).
-function pickTarget(behavior: Behavior, fishPos: number, rng: () => number): number {
+function pickTarget(behavior: Behavior, fishPos: number, barSize: number, rng: () => number): number {
   const r = rng()
   switch (behavior) {
     case 'floater':
       return FLOATER_MIN + (1 - FLOATER_MIN) * r
     case 'sinker':
-      return SINKER_MAX * r
+      return Math.min(1, barSize + SINKER_GAP + SINKER_SPAN * r)
     case 'dart': {
       // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간을 이어 붙여 고른다
       const below = Math.max(0, fishPos - DART_MIN_JUMP)
@@ -113,7 +118,7 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   let fishTarget = bar.fishTarget
   const retargetScale = behavior === 'smooth' ? SMOOTH_RETARGET_SCALE : behavior === 'dart' ? DART_RETARGET_SCALE : 1
   const retargetRate = (RETARGET_RATE_MIN + (RETARGET_RATE_MAX - RETARGET_RATE_MIN) * d) * retargetScale
-  if (rng() < 1 - Math.exp(-retargetRate * dt)) fishTarget = pickTarget(behavior, bar.fishPos, rng)
+  if (rng() < 1 - Math.exp(-retargetRate * dt)) fishTarget = pickTarget(behavior, bar.fishPos, params.barSize, rng)
   const speedScale = behavior === 'dart' ? DART_SPEED_SCALE : 1
   const maxStep = (FISH_SPEED_MIN + (FISH_SPEED_MAX - FISH_SPEED_MIN) * d) * speedScale * dt
   const gap = fishTarget - bar.fishPos
@@ -123,7 +128,7 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   let fishPos = Math.abs(gap) <= Math.max(step, snap) ? fishTarget : bar.fishPos + Math.sign(gap) * step
   fishPos = clamp01(fishPos)
   const arriveRetarget = behavior === 'smooth' ? SMOOTH_ARRIVE_RETARGET : 0.5
-  if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, rng) // 도착하면 곧 다시 움직인다
+  if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, params.barSize, rng) // 도착하면 곧 다시 움직인다
 
   // 진행도
   const inside = Math.abs(fishPos - barPos) <= params.barSize / 2
