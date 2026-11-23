@@ -3618,7 +3618,8 @@ export const SPRITES: Record<string, Sprite> = {
   'map-teleporter': MAP_TELEPORTER,
 }
 
-const SILHOUETTE = '#1b1f2a'
+/** 안 잡은 물고기 실루엣 색(모양만). 중간 밝기라 모든 팔레트의 어두운·밝은 패널에서 대비 3:1 이상(sprites.test) */
+export const SILHOUETTE = '#767e90'
 
 export function drawSprite(
   ctx: CanvasRenderingContext2D,
