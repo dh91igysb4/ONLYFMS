@@ -6,13 +6,16 @@ import type { WorldGameProps } from '../ui.ts'
 import { AREAS, BAG_SIZE, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
-import { drawScene, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { drawScene, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
 import { BagPanel, DexPanel, ShopPanel } from './Menus.tsx'
 import './fishing.css'
 
 const AREA = AREAS[0].id
 const OUTCOME_MS = 1200
 const MAX_SCALE = 4
+/** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
+const MAX_SCENE_W = 320
+const MAX_SCENE_H = 480
 /** 무대 아래 요소를 재고도 남겨 두는 여유 높이 */
 const FIT_MARGIN = 8
 
@@ -20,6 +23,25 @@ const FIT_MARGIN = 8
 export function canvasScale(availW: number, availH: number): number {
   const fit = Math.min(Math.floor(availW / SCENE_W), Math.floor(availH / SCENE_H))
   return Math.max(1, Math.min(MAX_SCALE, fit))
+}
+
+export type SceneFit = { scale: number; w: number; h: number }
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+const sizeOrZero = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
+
+/**
+ * 쓸 수 있는 영역에 맞춘 캔버스: 정수 배율과, 그 배율로 영역을 채우는 장면 논리 크기(160~320 × 240~480).
+ * 장면은 늘이지 않고 더 넓게 그린다(scene.ts의 안전 상자 밖은 배경).
+ */
+export function fitScene(availW: number, availH: number): SceneFit {
+  const aw = sizeOrZero(availW)
+  const ah = sizeOrZero(availH)
+  const scale = canvasScale(aw, ah)
+  return {
+    scale,
+    w: clamp(Math.floor(aw / scale), SCENE_W, MAX_SCENE_W),
+    h: clamp(Math.floor(ah / scale), SCENE_H, MAX_SCENE_H),
+  }
 }
 
 /** 캔버스에 쓸 수 있는 높이: 창 높이 - 문서 맨 위에서 무대까지 - 무대 아래 요소 - 여유. 음수일 수 있다. */
@@ -49,6 +71,15 @@ type Runtime = {
   settling: boolean
   caughtSpecies: string | null
   lastFrame: number
+}
+
+/** 전체화면 요청·해제는 실패해도(거절·미지원) 조용히 넘긴다. */
+function ignoreRejection(fn: () => Promise<void> | void): void {
+  try {
+    void Promise.resolve(fn()).catch(() => {})
+  } catch {
+    /* 지원하지 않는 브라우저 */
+  }
 }
 
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
@@ -88,8 +119,13 @@ export function Game({ gameId }: WorldGameProps) {
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
-  const [scale, setScale] = useState(1)
+  const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
+  const [fullscreen, setFullscreen] = useState(false)
 
+  const rootRef = useRef<HTMLElement>(null)
+  /** 사용자가 지금 전체화면을 원하는지, 요소 전체화면 요청이 아직 끝나지 않았는지 */
+  const wantFullscreen = useRef(false)
+  const fullscreenPending = useRef(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -314,7 +350,7 @@ export function Game({ gameId }: WorldGameProps) {
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
-    })
+    }, { w: fit.w, h: fit.h })
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
@@ -333,6 +369,9 @@ export function Game({ gameId }: WorldGameProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId])
+
+  // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
+  useEffect(() => releaseSceneCache, [])
 
   const loaded = view !== null
 
@@ -366,20 +405,26 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }, [loaded, rt])
 
-  // 캔버스 배율: 무대 너비와 남은 화면 높이에 함께 들어가는 가장 큰 정수 배.
+  // 캔버스 크기: 무대 너비와 남은 화면 높이로 fitScene(정수 배율 + 그 배율로 채우는 장면 크기).
   // 무대 위(사이트 머리·제목·골드 줄)는 무대의 문서 위치로, 무대 아래는 늘 있는 가방·메뉴 줄과 간격만 잰다.
   // 안내 줄과 메뉴 창은 캔버스 위에 겹쳐 뜨고, 잠깐 뜨는 알림은 재지 않아 캔버스 크기가 흔들리지 않는다.
-  // 캔버스 자신의 높이는 쓰지 않으므로 배율이 바뀌어도 다시 재는 값은 그대로다.
+  // 캔버스 자신의 높이는 쓰지 않으므로 크기가 바뀌어도 다시 재는 값은 그대로다.
+  // 전체화면에서는 화면을 채우는 캔버스 칸(무대) 자신의 상자를 잰다.
   useEffect(() => {
     const el = stageRef.current
     if (!loaded || !el) return
-    const measure = () => {
+    const available = (): [number, number] => {
+      if (fullscreen) return [el.clientWidth, el.clientHeight]
       const bottom = bottomRef.current
       const root = el.parentElement
       const gap = root ? parseFloat(getComputedStyle(root).rowGap) || 0 : 0
       const belowH = (bottom?.offsetHeight ?? 0) + gap
       const stageTop = el.getBoundingClientRect().top + window.scrollY
-      setScale(canvasScale(el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH)))
+      return [el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH)]
+    }
+    const measure = () => {
+      const next = fitScene(...available())
+      setFit((prev) => (prev.scale === next.scale && prev.w === next.w && prev.h === next.h ? prev : next))
     }
     measure()
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
@@ -391,7 +436,40 @@ export function Game({ gameId }: WorldGameProps) {
       window.removeEventListener('resize', measure)
       window.removeEventListener('orientationchange', measure)
     }
-  }, [loaded])
+  }, [loaded, fullscreen])
+
+  // 전체화면: 게임 전체가 화면을 덮는 고정 덮개가 된다(아이폰 사파리처럼 요소 전체화면이 없어도 동작).
+  // 있는 동안 페이지 스크롤을 막고, Esc(메뉴 창이 없을 때)나 브라우저 전체화면 종료로 나간다.
+  // 나가거나 페이지를 떠나면 스크롤을 되돌리고 브라우저 전체화면도 끝낸다.
+  // 요소 전체화면 요청이 끝나기 전에 알림이 와도(전체화면 요소 없음) 덮개는 그대로 둔다.
+  useEffect(() => {
+    if (!fullscreen) return
+    const root = rootRef.current
+    const html = document.documentElement
+    const prevOverflow = html.style.overflow
+    html.style.overflow = 'hidden'
+    const leave = () => {
+      wantFullscreen.current = false
+      setFullscreen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !menuRef.current) leave()
+    }
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && !fullscreenPending.current) leave()
+    }
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => {
+      wantFullscreen.current = false
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      html.style.overflow = prevOverflow
+      if (root && document.fullscreenElement === root && typeof document.exitFullscreen === 'function') {
+        ignoreRejection(() => document.exitFullscreen())
+      }
+    }
+  }, [fullscreen])
 
   // 스페이스 키 = 누르기. 버튼·입력칸에 초점이 있으면 그쪽 동작에 맡긴다.
   useEffect(() => {
@@ -438,6 +516,35 @@ export function Game({ gameId }: WorldGameProps) {
 
   const toggleMenu = (m: Menu) => setMenu(menuRef.current === m ? null : m)
 
+  function toggleFullscreen() {
+    const root = rootRef.current
+    // 초점을 게임으로 돌려 스페이스(던지기)가 이 버튼을 누르지 않게 한다
+    root?.focus({ preventScroll: true })
+    if (fullscreen) {
+      wantFullscreen.current = false
+      setFullscreen(false)
+      return
+    }
+    wantFullscreen.current = true
+    setFullscreen(true)
+    // 데스크톱·안드로이드에서는 브라우저 화면 요소까지 숨긴다. 거절돼도 덮개는 그대로 쓴다.
+    // 요청이 끝나기 전에 나갔으면(또는 화면을 떠났으면) 끝난 뒤 브라우저 전체화면도 끝낸다.
+    if (root && typeof root.requestFullscreen === 'function') {
+      fullscreenPending.current = true
+      const settle = () => {
+        fullscreenPending.current = false
+      }
+      ignoreRejection(() =>
+        Promise.resolve(root.requestFullscreen()).then(() => {
+          settle()
+          if (!wantFullscreen.current && document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+            ignoreRejection(() => document.exitFullscreen())
+          }
+        }, settle),
+      )
+    }
+  }
+
   // ------------------------------------------------------------ 그리기
   if (!view) {
     if (loadError) {
@@ -453,24 +560,39 @@ export function Game({ gameId }: WorldGameProps) {
     return <p className="muted">불러오는 중…</p>
   }
 
+  const notices = notice && (
+    <>
+      {notice.kind === 'bag_full' && (
+        <div className="notice fish-notice" role="alert">
+          <span>가방이 가득 찼어요. 상점에서 팔아 주세요</span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setMenu('shop')}>
+            상점 열기
+          </button>
+        </div>
+      )}
+      {notice.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
+      {notice.kind === 'info' && <p className="fish-info">{notice.text}</p>}
+    </>
+  )
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
-  const hint = menu ? null : HINTS[phase]
+  // 전체화면에서는 알림이 캔버스 아래쪽에 겹쳐 뜨므로 그동안 안내 줄은 숨긴다
+  const hint = menu || (fullscreen && notices) ? null : HINTS[phase]
 
   return (
-    <section className="fish">
+    <section className={fullscreen ? 'fish fish-full' : 'fish'} ref={rootRef} tabIndex={-1}>
       <div className="fish-top">
         <strong className="fish-gold">{gold(view.gold)}</strong>
       </div>
 
       <div className="fish-stage" ref={stageRef}>
-        <div className="fish-frame" style={{ width: SCENE_W * scale, height: SCENE_H * scale }}>
+        <div className="fish-frame" style={{ width: fit.w * fit.scale, height: fit.h * fit.scale }}>
           <canvas
             ref={canvasRef}
             className="fish-canvas"
             aria-label="낚시터"
-            width={SCENE_W}
-            height={SCENE_H}
-            style={{ width: SCENE_W * scale, height: SCENE_H * scale }}
+            width={fit.w}
+            height={fit.h}
+            style={{ width: fit.w * fit.scale, height: fit.h * fit.scale }}
             onPointerDown={(e) => {
               e.preventDefault()
               try {
@@ -517,19 +639,11 @@ export function Game({ gameId }: WorldGameProps) {
               {menu === 'dex' && <DexPanel view={view} />}
             </div>
           )}
+          {fullscreen && notices && <div className="fish-notices">{notices}</div>}
         </div>
       </div>
 
-      {notice?.kind === 'bag_full' && (
-        <div className="notice fish-notice" role="alert">
-          <span>가방이 가득 찼어요. 상점에서 팔아 주세요</span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setMenu('shop')}>
-            상점 열기
-          </button>
-        </div>
-      )}
-      {notice?.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
-      {notice?.kind === 'info' && <p className="fish-info">{notice.text}</p>}
+      {!fullscreen && notices}
 
       <div className="fish-bottom" ref={bottomRef}>
         <span className="fish-bag-count">
@@ -548,6 +662,15 @@ export function Game({ gameId }: WorldGameProps) {
               {m === 'bag' ? '가방' : m === 'shop' ? '상점' : '도감'}
             </button>
           ))}
+          <button
+            type="button"
+            className={`btn btn-sm ${fullscreen ? 'btn-primary' : 'btn-ghost'}`}
+            aria-pressed={fullscreen}
+            disabled={phase === 'fighting'}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? '나가기' : '전체화면'}
+          </button>
         </div>
       </div>
     </section>

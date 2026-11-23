@@ -35,6 +35,10 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* 게임 화면(useGameScreen)에서는 길게 눌러도 글자 선택·복사 메뉴가 뜨지 않게. 입력칸(후알야 검색, 채팅)은 예외 */
+html.game-screen body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
 .app-header {
   padding: 12px 16px 0;
   background: var(--panel);

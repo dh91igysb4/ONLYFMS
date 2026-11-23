@@ -43,6 +43,15 @@ test('renders the registered component with its gameId and the manifest name', (
 test('unknown game', () => {
   renderAt('nope')
   expect(screen.getByText('없는 게임이에요')).toBeInTheDocument()
+  expect(document.documentElement).not.toHaveClass('game-screen')
+})
+
+test('marks the page as a game screen (no text selection) only while the game is shown', () => {
+  const { unmount } = renderAt('test-world')
+  expect(screen.getByText('fake:test-world')).toBeInTheDocument()
+  expect(document.documentElement).toHaveClass('game-screen')
+  unmount()
+  expect(document.documentElement).not.toHaveClass('game-screen')
 })
 
 test('hidden world shows only to admins', () => {

@@ -4,6 +4,7 @@ import { getDuel } from '../../games/index.ts'
 import { getDuelComponent } from '../../games/ui.ts'
 import type { DuelResult } from '../../games/types.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { useGameScreen } from '../games/useGameScreen.ts'
 
 const NAMES: [string, string] = ['플레이어 1', '플레이어 2']
 
@@ -26,8 +27,10 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   const [passed, setPassed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [round, setRound] = useState(0)
+  const playable = !!mod && !!Board && !!mod.manifest.duel?.sameScreen
+  useGameScreen(playable)
 
-  if (!mod || !Board || !mod.manifest.duel?.sameScreen) {
+  if (!mod || !Board || !playable) {
     return (
       <div className="stack">
         <p className="muted">없는 게임이에요</p>

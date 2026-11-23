@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { availableHeight, canvasScale, Game } from './Game.tsx'
+import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
-import { drawScene } from './scene.ts'
+import { drawScene, releaseSceneCache } from './scene.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { price, type PendingView, type View } from './logic.ts'
@@ -11,7 +11,7 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
   return { ...orig, world: vi.fn() }
 })
-vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('./scene.ts', () => ({ drawScene: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
 vi.mock('./sprites.ts', () => ({
   spriteDataUrl: vi.fn((name: string, _scale: number, opts?: { silhouette?: boolean }) =>
     `data:${name}${opts?.silhouette ? ':silhouette' : ''}`),
@@ -85,6 +85,23 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
+
+/** 무대(.fish-stage)의 너비·높이·문서 위치와 창 높이를 정한다. 되돌리는 함수를 돌려준다. */
+function stubStage({ width, height = 0, top = 0, innerH }: { width: number; height?: number; top?: number; innerH: number }) {
+  const prevInnerH = window.innerHeight
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+  const rect = HTMLElement.prototype.getBoundingClientRect
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? new DOMRect(0, top, width, height) : rect.call(this)
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? width : 0
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? height : 0
+  })
+  return () => Object.defineProperty(window, 'innerHeight', { configurable: true, value: prevInnerH })
+}
 
 const flush = () => act(async () => { await Promise.resolve() })
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
@@ -380,25 +397,261 @@ describe('fishing Game', () => {
     release()
     await flush()
     expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '전체화면' })).toBeDisabled()
   })
 
-  test('canvas scale uses the height left below the stage, not a fixed allowance', async () => {
-    const innerH = window.innerHeight
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 650 })
-    const rect = HTMLElement.prototype.getBoundingClientRect
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('fish-stage') ? new DOMRect(0, 191, 688, 0) : rect.call(this)
-    })
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('fish-stage') ? 688 : 0
-    })
+  test('canvas size uses the height left below the stage, not a fixed allowance', async () => {
+    const restore = stubStage({ width: 688, top: 191, innerH: 650 })
     try {
       await mount()
-      expect(canvas().style.width).toBe('160px')
-      expect(canvas().style.height).toBe('240px')
+      // 남은 높이 650 - 191 - 8 = 451 → fitScene(688, 451) = 1배, 320×451
+      expect(canvas().style.width).toBe('320px')
+      expect(canvas().style.height).toBe('451px')
     } finally {
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+      restore()
     }
+  })
+
+  test('the canvas backing store is fitScene w×h and the scene is drawn at that size', async () => {
+    // 폰: 무대 너비 390, 남은 높이 650 - 82 - 8 = 560
+    const restore = stubStage({ width: 390, top: 82, innerH: 650 })
+    try {
+      await mount()
+      const fit = fitScene(390, 560)
+      expect(fit).toEqual({ scale: 2, w: 195, h: 280 })
+      const c = canvas() as HTMLCanvasElement
+      expect(c.width).toBe(fit.w)
+      expect(c.height).toBe(fit.h)
+      expect(c.style.width).toBe(`${fit.w * fit.scale}px`)
+      expect(c.style.height).toBe(`${fit.h * fit.scale}px`)
+      await advance(100)
+      const last = vi.mocked(drawScene).mock.calls.at(-1)
+      expect(last?.[2]).toEqual({ w: fit.w, h: fit.h })
+    } finally {
+      restore()
+    }
+  })
+
+  test('fullscreen toggle covers the page, locks scroll, and Escape leaves', async () => {
+    document.documentElement.style.overflow = 'auto'
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    const toggle = screen.getByRole('button', { name: '전체화면' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(root).not.toHaveClass('fish-full')
+
+    fireEvent.click(toggle)
+    expect(root).toHaveClass('fish-full')
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    const exit = screen.getByRole('button', { name: '나가기' })
+    expect(exit).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).not.toHaveClass('fish-full')
+    expect(document.documentElement.style.overflow).toBe('auto')
+    expect(screen.getByRole('button', { name: '전체화면' })).toHaveAttribute('aria-pressed', 'false')
+
+    // 나가기 버튼으로도 나간다
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+    expect(root).not.toHaveClass('fish-full')
+    document.documentElement.style.overflow = ''
+  })
+
+  test('Escape with a menu open keeps fullscreen; menus open inside the overlay', async () => {
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    fireEvent.click(screen.getByRole('button', { name: '상점' }))
+    const shop = screen.getByRole('region', { name: '상점' })
+    expect(root.contains(shop)).toBe(true)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).toHaveClass('fish-full')
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(root).not.toHaveClass('fish-full')
+  })
+
+  test('unmounting in fullscreen restores page scroll', async () => {
+    const { unmount } = await mount()
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    unmount()
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+
+  test('in fullscreen the canvas fits the canvas area box', async () => {
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      await mount()
+      expect((canvas() as HTMLCanvasElement).height).toBe(280) // 보통: 남은 높이 560
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      const fit = fitScene(390, 700)
+      expect(fit).toEqual({ scale: 2, w: 195, h: 350 })
+      const c = canvas() as HTMLCanvasElement
+      expect([c.width, c.height]).toEqual([fit.w, fit.h])
+      expect(c.style.height).toBe('700px')
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect((canvas() as HTMLCanvasElement).height).toBe(280)
+    } finally {
+      restore()
+    }
+  })
+
+  test('uses element fullscreen when available and leaves when the browser exits it', async () => {
+    let fsEl: Element | null = null
+    const request = vi.fn(function (this: Element) {
+      fsEl = this
+      return Promise.resolve()
+    })
+    const exitFs = vi.fn(() => {
+      fsEl = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+      return Promise.resolve()
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request })
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fsEl })
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFs })
+    try {
+      const { container, unmount } = await mount()
+      const root = container.querySelector('.fish') as HTMLElement
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      await flush() // 요청이 끝난다
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(request.mock.contexts[0]).toBe(root)
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) }) // 들어감 알림: 그대로
+      expect(root).toHaveClass('fish-full')
+
+      // Esc·뒤로 가기로 브라우저가 전체화면을 끝냄
+      fsEl = null
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
+      expect(root).not.toHaveClass('fish-full')
+      expect(document.documentElement.style.overflow).toBe('')
+
+      // 버튼으로 나가면 브라우저 전체화면도 끝낸다
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+      expect(exitFs).toHaveBeenCalledTimes(1)
+
+      // 전체화면 중 페이지를 떠나도 끝낸다
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      unmount()
+      expect(exitFs).toHaveBeenCalledTimes(2)
+      expect(fsEl).toBeNull()
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement
+      delete (document as { exitFullscreen?: unknown }).exitFullscreen
+    }
+  })
+
+  test('a rejected element fullscreen request still shows the overlay', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: () => Promise.reject(new Error('denied')),
+    })
+    try {
+      const { container } = await mount()
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      await flush()
+      expect(container.querySelector('.fish')).toHaveClass('fish-full')
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
+    }
+  })
+
+  test('the toggle gives focus back to the game so Space does not press it', async () => {
+    const { container } = await mount()
+    const root = container.querySelector('.fish') as HTMLElement
+    const toggle = screen.getByRole('button', { name: '전체화면' })
+    toggle.focus()
+    fireEvent.click(toggle)
+    const exit = screen.getByRole('button', { name: '나가기' })
+    expect(document.activeElement).not.toBe(exit)
+    expect(document.activeElement).toBe(root)
+    exit.focus()
+    fireEvent.click(exit)
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: '전체화면' }))
+    expect(document.activeElement).toBe(root)
+  })
+
+  test('in fullscreen notices sit over the canvas area and do not resize the canvas', async () => {
+    const restore = stubStage({ width: 390, height: 700, top: 82, innerH: 650 })
+    try {
+      const { container } = await mount()
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      const c = canvas() as HTMLCanvasElement
+      const before = [c.width, c.height]
+      route({ cast: () => Promise.reject(new ApiError('bag_full', 400)) })
+      press()
+      await advance(200)
+      release()
+      await flush()
+      const note = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      const stage = container.querySelector('.fish-stage') as HTMLElement
+      expect(stage.contains(note)).toBe(true)
+      expect([c.width, c.height]).toEqual(before)
+      // 보통 화면에서는 예전처럼 무대 아래
+      fireEvent.keyDown(window, { key: 'Escape' })
+      const again = screen.getByText('가방이 가득 찼어요. 상점에서 팔아 주세요')
+      expect(stage.contains(again)).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  test('leaving before the element fullscreen request settles exits native fullscreen when it does', async () => {
+    let fsEl: Element | null = null
+    let resolveRequest: () => void = () => {}
+    const request = vi.fn(function (this: Element) {
+      const el = this
+      return new Promise<void>((res) => {
+        resolveRequest = () => {
+          fsEl = el
+          document.dispatchEvent(new Event('fullscreenchange'))
+          res()
+        }
+      })
+    })
+    const exitFs = vi.fn(() => {
+      fsEl = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+      return Promise.resolve()
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: request })
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fsEl })
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFs })
+    try {
+      const { container } = await mount()
+      const root = container.querySelector('.fish') as HTMLElement
+      fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
+      // 요청이 아직 끝나지 않았을 때 오는 알림(전체화면 요소 없음)으로는 나가지 않는다
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')) })
+      expect(root).toHaveClass('fish-full')
+      fireEvent.click(screen.getByRole('button', { name: '나가기' }))
+      expect(root).not.toHaveClass('fish-full')
+      expect(exitFs).not.toHaveBeenCalled()
+      await act(async () => {
+        resolveRequest()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(exitFs).toHaveBeenCalledTimes(1)
+      expect(fsEl).toBeNull()
+      expect(root).not.toHaveClass('fish-full')
+    } finally {
+      delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement
+      delete (document as { exitFullscreen?: unknown }).exitFullscreen
+    }
+  })
+
+  test('unmount releases the scene background cache', async () => {
+    vi.mocked(releaseSceneCache).mockClear()
+    const { unmount } = await mount()
+    expect(releaseSceneCache).not.toHaveBeenCalled()
+    unmount()
+    expect(releaseSceneCache).toHaveBeenCalledTimes(1)
   })
 
   test('stops drawing after unmount', async () => {
@@ -409,6 +662,22 @@ describe('fishing Game', () => {
     const n = vi.mocked(drawScene).mock.calls.length
     await advance(200)
     expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+  })
+})
+
+describe('fitScene', () => {
+  test('integer scale and a logical size that fills the area, within 160–320 × 240–480', () => {
+    expect(fitScene(390, 560)).toEqual({ scale: 2, w: 195, h: 280 })
+    expect(fitScene(358, 565)).toEqual({ scale: 2, w: 179, h: 282 })
+    expect(fitScene(1280, 696)).toEqual({ scale: 2, w: 320, h: 348 })
+    expect(fitScene(688, 371)).toEqual({ scale: 1, w: 320, h: 371 })
+    expect(fitScene(150, 200)).toEqual({ scale: 1, w: 160, h: 240 })
+  })
+
+  test('zero, negative and non-finite sizes give the minimum scene', () => {
+    expect(fitScene(0, 0)).toEqual({ scale: 1, w: 160, h: 240 })
+    expect(fitScene(NaN, -5)).toEqual({ scale: 1, w: 160, h: 240 })
+    expect(fitScene(Infinity, 600)).toEqual({ scale: 1, w: 160, h: 480 })
   })
 })
 

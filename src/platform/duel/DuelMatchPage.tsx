@@ -4,6 +4,7 @@ import { ApiError, duel, duelErrorMessage, rpc, type DuelCreated, type DuelView 
 import { getDuel } from '../../games/index.ts'
 import { getDuelComponent } from '../../games/ui.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { useGameScreen } from '../games/useGameScreen.ts'
 import { InviteLink } from '../contests/InviteLink.tsx'
 import { formatClock, remainingMs, useDuelMatch } from './data.ts'
 
@@ -135,6 +136,11 @@ export function DuelMatchPage() {
 
   useEffect(() => { setRematchError(null) }, [id])
 
+  const boardShown = !fatal && !!v && v.status !== 'waiting' && v.status !== 'void'
+    && !!getDuelComponent(v.game_id) && v.view !== null && v.view !== undefined
+  // 게임 화면이 떠 있을 때만 글자 선택을 막는다(대기 중 초대 링크는 고를 수 있게)
+  useGameScreen(boardShown)
+
   async function rematch() {
     if (!v || rematching.current) return
     rematching.current = true
@@ -178,7 +184,6 @@ export function DuelMatchPage() {
   const myTurn = v.status === 'active' && mine && v.to_move === v.my_seat
   const iCreated = v.status === 'waiting' && v.players[0]?.id === profile?.id
   const names: [string, string] = [nameOf(v, 0), nameOf(v, 1)]
-  const boardShown = v.status !== 'waiting' && v.status !== 'void' && !!Board && v.view !== null && v.view !== undefined
   // 선수·차례·결과·기권. 게임 화면이 있으면 화면 안(넓은 화면에서는 조작 열)에 넣는다. 폰에서는 순서가 같다
   const head = (
     <>

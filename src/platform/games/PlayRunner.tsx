@@ -9,6 +9,7 @@ import * as freeQueue from './freeQueue.ts'
 import * as freeLogQueue from './freeLogQueue.ts'
 import { newSeed, seedHex } from './seed.ts'
 import { rngFromSeed } from '../../shared/rng.ts'
+import { useGameScreen } from './useGameScreen.ts'
 
 export type PlayRunnerProps =
   | {
@@ -28,6 +29,7 @@ export type PlayRunnerProps =
     }
 
 export function PlayRunner(props: PlayRunnerProps) {
+  useGameScreen()
   return props.mode === 'server' ? <ServerRunner {...props} /> : <LocalRunner {...props} />
 }
 
