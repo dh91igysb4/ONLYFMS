@@ -1,15 +1,15 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
 // 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type TackleId } from './data.ts'
+import { AREAS, bagSize, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
 import { price, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, exitAt, interactionAt, shopSpot, TILE, tileOf, type Exit, type Interaction, type MapDef, type Vec } from './map.ts'
+import { castTarget, exitAt, interactionAt, shopSpot, TILE, tileOf, type Exit, type Interaction, type MapDef, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
@@ -184,14 +184,22 @@ const coarseQuery = (): MediaQueryList | null =>
  * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
  * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
  */
-function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): Interaction {
-  const front = interactionAt(map, p.pos, p.facing)
+function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened): Interaction {
+  const front = interactionAt(map, p.pos, p.facing, opened)
   if (front) return front
   const t = tileOf(p.pos)
   const door = shopSpot(map)
   return door && t.tx === door.tx && t.ty === door.ty ? { kind: 'shop' } : null
 }
-const interactionKey = (i: Interaction): string => (i ? (i.kind === 'fish' ? `fish-${i.spot}` : 'shop') : '')
+function interactionKey(i: Interaction): string {
+  if (!i) return ''
+  if (i.kind === 'fish') return `fish-${i.spot}`
+  if (i.kind === 'gate') return `gate-${i.area}`
+  if (i.kind === 'dock') return `dock-${i.target}`
+  return 'shop'
+}
+/** 열린 지역: 서버 상태의 areas. 아직 못 받았으면 기본 지역(마을·강·숲) */
+const openedOf = (view: View | null): Opened => new Set<AreaId>(view?.areas ?? DEFAULT_AREAS)
 
 export function Game({ gameId }: WorldGameProps) {
   const { profile } = useAuth()
@@ -199,6 +207,7 @@ export function Game({ gameId }: WorldGameProps) {
   const userIdRef = useRef(userId)
   userIdRef.current = userId
   const [view, setView] = useState<View | null>(null)
+  const opened = useMemo(() => openedOf(view), [view])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [phase, setPhaseState] = useState<Phase>('idle')
@@ -229,11 +238,11 @@ export function Game({ gameId }: WorldGameProps) {
     const player: Player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
     return {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, shopKey: null, chargeStart: 0, gauge: 0, castPower: 0,
-      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player)), castSpot: 'shore', bobber: null,
+      player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player, openedOf(null))), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0, map, trans: null, fade: 0,
     }
   })
-  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player))
+  const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
   const [touch, setTouch] = useState(() => coarseQuery()?.matches ?? false)
 
   // ------------------------------------------------------------ 도우미
@@ -438,13 +447,15 @@ export function Game({ gameId }: WorldGameProps) {
     switch (rt.phase) {
       case 'idle': {
         if (source !== 'action') break
-        const at = interactionFor(rt.map, rt.player)
+        const at = interactionFor(rt.map, rt.player, opened)
         if (!at) break
         if (at.kind === 'shop') {
           // 상점은 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 상점 버튼에 떨어진다
           rt.shopKey = key
           break
         }
+        // 문(구매)·선착장(배 타기)은 아직 처리하지 않는다
+        if (at.kind !== 'fish') break
         // 충전부터는 걷지 않으므로 자리와 방향이 그대로 고정된다.
         // 뗀 알림을 잃은 상점 누르기가 남아 있으면 버린다(같은 열쇠의 떼기를 상점 쪽이 가로채지 않게).
         setNotice(null)
@@ -472,7 +483,7 @@ export function Game({ gameId }: WorldGameProps) {
     if (key === rt.shopKey) {
       rt.shopKey = null
       // 아직 대기 중이고 여전히 상점 문 앞일 때만
-      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.map, rt.player)?.kind === 'shop') {
+      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.map, rt.player, opened)?.kind === 'shop') {
         setNotice(null)
         setMenu('shop')
       }
@@ -531,7 +542,7 @@ export function Game({ gameId }: WorldGameProps) {
 
   /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
   function syncHere() {
-    const at = interactionFor(rt.map, rt.player)
+    const at = interactionFor(rt.map, rt.player, opened)
     const k = interactionKey(at)
     if (k === rt.hereKey) return
     rt.hereKey = k
@@ -548,7 +559,7 @@ export function Game({ gameId }: WorldGameProps) {
       stepTransition(dt)
     } else if (rt.phase === 'idle' && !menuRef.current) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
-      rt.player = stepWalk(rt.map, rt.player, input, dt)
+      rt.player = stepWalk(rt.map, rt.player, input, dt, opened)
       // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다)
       const exit = exitAt(rt.map, rt.player.pos)
       if (exit && mapFor(exit.target)) {
@@ -590,6 +601,7 @@ export function Game({ gameId }: WorldGameProps) {
       cond: conditionsAt(Date.now() + rt.offset),
       hudTop: hudTopFor(touch, fit.scale),
       fade: rt.fade,
+      opened,
     }, size)
   }
 
@@ -912,7 +924,7 @@ export function Game({ gameId }: WorldGameProps) {
   const action: ActionState =
     phase !== 'idle' ? { label: '낚시', enabled: true }
       : atShop ? { label: '상점', enabled: true }
-        : here ? { label: '낚시', enabled: true }
+        : here?.kind === 'fish' ? { label: '낚시', enabled: true }
           : { label: '낚시', enabled: false }
 
   return (

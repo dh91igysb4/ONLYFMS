@@ -237,3 +237,12 @@ describe('drawSprite', () => {
     expect(b).not.toEqual(a)
   })
 })
+
+describe('3단계 문·배 스프라이트', () => {
+  it('gate-broken-bridge·gate-rubble은 16×16, boat는 32×16이고 서로 다르다', () => {
+    expect([SPRITES['gate-broken-bridge']?.w, SPRITES['gate-broken-bridge']?.h]).toEqual([16, 16])
+    expect([SPRITES['gate-rubble']?.w, SPRITES['gate-rubble']?.h]).toEqual([16, 16])
+    expect([SPRITES.boat?.w, SPRITES.boat?.h]).toEqual([32, 16])
+    expect(SPRITES['gate-broken-bridge'].rows.join('\n')).not.toBe(SPRITES['gate-rubble'].rows.join('\n'))
+  })
+})

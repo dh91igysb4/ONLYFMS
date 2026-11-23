@@ -34,7 +34,9 @@ describe('position', () => {
   })
 
   test('a river position restores; an unknown or map-less area, a blocked river tile or broken JSON gives null', () => {
-    const walkable = center(RIVER.exits[0].from, RIVER.h - 2) // 남쪽 출구 바로 안쪽 길
+    const south = RIVER.exits[0]
+    if (!('edge' in south)) throw new Error('river exit 0 should be an edge exit')
+    const walkable = center(south.from, RIVER.h - 2) // 남쪽 출구 바로 안쪽 길
     const saved = { area: 'river' as const, pos: walkable, facing: 'up' as const }
     savePosition('u1', saved)
     expect(loadPosition('u1')).toEqual(saved)

@@ -2,7 +2,7 @@
 // 좌표: 타일 (tx, ty)는 정수, 월드 픽셀 Vec은 타일 * TILE. 캐릭터 pos는 발 중앙.
 // 맵 자체(행 문자열)는 maps/<지역>.ts에서 defineMap으로 만든다.
 
-import type { AreaId } from './data.ts'
+import { AREAS, type AreaId } from './data.ts'
 
 export const TILE = 16
 
@@ -45,11 +45,35 @@ const STEP: Readonly<Record<Facing, { dx: number; dy: number }>> = {
   right: { dx: 1, dy: 0 },
 }
 
+/** 칸 사각형(왼쪽 위 tx, ty와 칸 수 w, h) */
+export type Rect = { tx: number; ty: number; w: number; h: number }
+/** 칸 하나와 그 칸에서 보는 방향 */
+export type TileFacing = { tx: number; ty: number; facing: Facing }
+
 /**
- * 가장자리 출구. from..to는 그 가장자리를 따라 센 칸 범위(포함, n/s는 tx, e/w는 ty).
- * 출구 칸 = 그 가장자리 줄(행/열)의 범위 안 걸을 수 있는 칸. entry는 도착 맵(target)에서 설 칸과 방향.
+ * 출구 두 가지. entry는 도착 맵(target)에서 설 칸과 방향.
+ * - 가장자리 출구: from..to는 그 가장자리를 따라 센 칸 범위(포함, n/s는 tx, e/w는 ty).
+ *   출구 칸 = 그 가장자리 줄(행/열)의 범위 안 걸을 수 있는 칸.
+ * - 안쪽 출구(동굴 입구 등): at 사각형 안의 걸을 수 있는 칸.
  */
-export type Exit = { edge: 'n' | 's' | 'e' | 'w'; from: number; to: number; target: AreaId; entry: { tx: number; ty: number; facing: Facing } }
+export type Exit =
+  | { edge: 'n' | 's' | 'e' | 'w'; from: number; to: number; target: AreaId; entry: TileFacing }
+  | { at: Rect; target: AreaId; entry: TileFacing }
+
+/**
+ * 돈으로 여는 지역의 문. 잠긴 동안 tiles는 못 걷고 look 그림이 덮인다.
+ * 열리면 rows의 원래 칸 그대로(다리 H, 길 = 등). front에 서서 facing을 보면 { kind: 'gate', area } 상호작용.
+ */
+export type Gate = { area: AreaId; tiles: Rect; look: 'broken-bridge' | 'rubble'; front: TileFacing }
+
+/** 배 타는 곳. front에서 facing을 보면 { kind: 'dock', target }. boat는 배 그림 위치(물 위, 칸 좌표). */
+export type Dock = { front: TileFacing; target: AreaId; entry: TileFacing; boat: { tx: number; ty: number } }
+
+/** 열린 지역들. 기본 지역(마을·강·숲)은 늘 들어 있다 */
+export type Opened = ReadonlySet<AreaId>
+
+/** 모든 지역이 열린 집합(저장 위치 검사처럼 열림과 무관하게 맵만 볼 때) */
+export const ALL_AREAS_OPEN: Opened = new Set<AreaId>(AREAS.map((a) => a.id))
 
 /** 한 지역의 타일맵과 거기서 계산한 값. defineMap으로 만든다. */
 export type MapDef = {
@@ -63,6 +87,10 @@ export type MapDef = {
   /** 물 종류 → 낚시 자리 id. 여기 없는 물은 낚시할 수 없다 */
   spots: Partial<Record<WaterKind, string>>
   exits: readonly Exit[]
+  gates: readonly Gate[]
+  docks: readonly Dock[]
+  /** 실내(동굴 등): 비·눈·밤 색조를 그리지 않는다 */
+  indoor: boolean
 }
 
 export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
@@ -70,9 +98,18 @@ export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
   return TILE_CHARS[map.rows[ty][tx]] ?? null
 }
 
-export function isWalkable(map: MapDef, tx: number, ty: number): boolean {
+/** rows의 칸만 본 걷기 가능 여부(문 잠김 무시) */
+function tileWalkable(map: MapDef, tx: number, ty: number): boolean {
   const kind = tileAt(map, tx, ty)
   return kind !== null && WALKABLE.has(kind)
+}
+
+const inRect = (r: Rect, tx: number, ty: number): boolean => tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h
+
+/** 걸을 수 있는 칸인가. 잠긴 문(opened에 그 지역이 없음)의 칸은 못 걷고, 열린 문 칸은 rows 원래 칸의 규칙대로. */
+export function isWalkable(map: MapDef, tx: number, ty: number, opened: Opened): boolean {
+  if (!tileWalkable(map, tx, ty)) return false
+  return !map.gates.some((g) => !opened.has(g.area) && inRect(g.tiles, tx, ty))
 }
 
 export function tileOf(pos: Vec): { tx: number; ty: number } {
@@ -103,14 +140,39 @@ function computeShop(map: MapDef): MapDef['shop'] {
   return { tx, ty, w, h, doorTx: doors[0].tx }
 }
 
-/** 행 문자열로 맵을 만든다. 행 길이가 다르거나 문이 둘 이상이면 throw. */
-export function defineMap(id: AreaId, rows: readonly string[], opts: { spots?: MapDef['spots']; exits?: Exit[] } = {}): MapDef {
+type MapOpts = { spots?: MapDef['spots']; exits?: Exit[]; gates?: Gate[]; docks?: Dock[]; indoor?: boolean }
+
+const rectInside = (map: MapDef, r: Rect): boolean =>
+  r.w >= 1 && r.h >= 1 && r.tx >= 0 && r.ty >= 0 && r.tx + r.w <= map.w && r.ty + r.h <= map.h
+
+// 문·선착장·안쪽 출구 정의 검사. 문 칸이 맵 밖이거나 front가 못 걷는(또는 문 안) 칸, 선착장 front가 못 걷는 칸이면 throw.
+function checkPlaces(map: MapDef): void {
+  map.gates.forEach((g, i) => {
+    if (!rectInside(map, g.tiles)) throw new Error(`gate ${i} (${g.area}) tiles are outside the map`)
+    if (!tileWalkable(map, g.front.tx, g.front.ty) || inRect(g.tiles, g.front.tx, g.front.ty)) {
+      throw new Error(`gate ${i} (${g.area}) front is not a walkable tile outside the gate`)
+    }
+  })
+  map.docks.forEach((d, i) => {
+    if (!tileWalkable(map, d.front.tx, d.front.ty)) throw new Error(`dock ${i} (${d.target}) front is not a walkable tile`)
+  })
+  map.exits.forEach((e, i) => {
+    if ('at' in e && !rectInside(map, e.at)) throw new Error(`exit ${i} (${e.target}) rect is outside the map`)
+  })
+}
+
+/** 행 문자열로 맵을 만든다. 행 길이가 다르거나, 상점 문이 둘 이상이거나, 문·선착장 정의가 잘못되면 throw. */
+export function defineMap(id: AreaId, rows: readonly string[], opts: MapOpts = {}): MapDef {
   if (rows.length === 0) throw new Error('map needs at least one row')
   const w = rows[0].length
   rows.forEach((row, i) => {
     if (row.length !== w) throw new Error(`map row ${i} has length ${row.length}, expected ${w}`)
   })
-  const map: MapDef = { id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' }, spots: opts.spots ?? {}, exits: opts.exits ?? [] }
+  const map: MapDef = {
+    id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' },
+    spots: opts.spots ?? {}, exits: opts.exits ?? [], gates: opts.gates ?? [], docks: opts.docks ?? [], indoor: opts.indoor ?? false,
+  }
+  checkPlaces(map)
   map.shop = computeShop(map)
   // 시작 위치: 문 앞(문 바로 아래 타일), 문이 없으면 첫 걸을 수 있는 칸
   const at = shopSpot(map) ?? firstWalkable(map)
@@ -119,7 +181,7 @@ export function defineMap(id: AreaId, rows: readonly string[], opts: { spots?: M
 }
 
 function firstWalkable(map: MapDef): { tx: number; ty: number } {
-  for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) if (isWalkable(map, tx, ty)) return { tx, ty }
+  for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) if (tileWalkable(map, tx, ty)) return { tx, ty }
   throw new Error('map has no walkable tile')
 }
 
@@ -138,11 +200,16 @@ export function pierEnd(map: MapDef): { tx: number; ty: number } | null {
   return ends[0]
 }
 
-/** 발 중앙이 있는 칸이 출구 칸이면 그 출구, 아니면 null. */
+/** 발 중앙이 있는 칸이 출구 칸(가장자리 범위 또는 안쪽 사각형)이면 그 출구, 아니면 null. */
 export function exitAt(map: MapDef, pos: Vec): Exit | null {
   const { tx, ty } = tileOf(pos)
-  if (!isWalkable(map, tx, ty)) return null
+  // 잠긴 문 칸에는 발이 들어갈 수 없으므로 rows 칸만 본다
+  if (!tileWalkable(map, tx, ty)) return null
   for (const exit of map.exits) {
+    if ('at' in exit) {
+      if (inRect(exit.at, tx, ty)) return exit
+      continue
+    }
     const onEdge = exit.edge === 'n' ? ty === 0 : exit.edge === 's' ? ty === map.h - 1 : exit.edge === 'w' ? tx === 0 : tx === map.w - 1
     const along = exit.edge === 'n' || exit.edge === 's' ? tx : ty
     if (onEdge && along >= exit.from && along <= exit.to) return exit
@@ -150,7 +217,12 @@ export function exitAt(map: MapDef, pos: Vec): Exit | null {
   return null
 }
 
-export type Interaction = { kind: 'shop' } | { kind: 'fish'; spot: string } | null
+export type Interaction =
+  | { kind: 'shop' }
+  | { kind: 'fish'; spot: string }
+  | { kind: 'gate'; area: AreaId }
+  | { kind: 'dock'; target: AreaId }
+  | null
 
 /** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'. */
 export function spotFor(map: MapDef, standing: TileKind | null, front: TileKind | null): string | null {
@@ -160,10 +232,18 @@ export function spotFor(map: MapDef, standing: TileKind | null, front: TileKind 
   return standing === 'pier' && front === 'water' ? 'pier' : spot
 }
 
+const standsAt = (here: { tx: number; ty: number }, facing: Facing, at: TileFacing): boolean =>
+  here.tx === at.tx && here.ty === at.ty && facing === at.facing
+
 // 서 있는 타일 = tileOf(pos), 앞 타일 = 서 있는 타일 + facing.
-// 앞이 문이고 위를 보면 상점, 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
-export function interactionAt(map: MapDef, pos: Vec, facing: Facing): Interaction {
+// 잠긴 문의 front에서 그 방향을 보면 gate, 선착장 front에서 그 방향을 보면 dock(열림과 무관: 화면이 구매/출발을 가른다).
+// 그 외: 앞이 상점 문이고 위를 보면 상점, 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
+export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Opened): Interaction {
   const here = tileOf(pos)
+  const gate = map.gates.find((g) => !opened.has(g.area) && standsAt(here, facing, g.front))
+  if (gate) return { kind: 'gate', area: gate.area }
+  const dock = map.docks.find((d) => standsAt(here, facing, d.front))
+  if (dock) return { kind: 'dock', target: dock.target }
   const { dx, dy } = STEP[facing]
   const front = tileAt(map, here.tx + dx, here.ty + dy)
   if (front === 'door') return facing === 'up' ? { kind: 'shop' } : null

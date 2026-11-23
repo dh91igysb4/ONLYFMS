@@ -2,7 +2,7 @@
 // 저장소가 막혀 있거나 값이 깨졌거나 지역·맵이 바뀌어 못 쓰는 자리면 null(마을 시작 위치에서 시작).
 // 1단계 형식({pos, facing}, area 없음)은 마을로 읽는다.
 import { AREAS, type AreaId } from './data.ts'
-import type { Facing, MapDef, Vec } from './map.ts'
+import { ALL_AREAS_OPEN, type Facing, type MapDef, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { feetBlocked } from './walk.ts'
 
@@ -23,8 +23,9 @@ function parse(raw: string | null): SavedPosition | null {
   const { x, y } = pos as { x?: unknown; y?: unknown }
   if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!FACINGS.includes(facing as Facing)) return null
-  // 발이 걸을 수 없는 타일에 걸친 채로 시작하면 영영 움직일 수 없다
-  return feetBlocked(map, x, y) ? null : { area: map.id, pos: { x, y }, facing: facing as Facing }
+  // 발이 걸을 수 없는 타일에 걸친 채로 시작하면 영영 움직일 수 없다.
+  // 여기서는 맵만 본다(모든 지역이 열린 것으로). 아직 안 연 지역·문 칸인지는 화면이 열린 지역으로 다시 본다
+  return feetBlocked(map, x, y, ALL_AREAS_OPEN) ? null : { area: map.id, pos: { x, y }, facing: facing as Facing }
 }
 
 export function loadPosition(userId: string): SavedPosition | null {

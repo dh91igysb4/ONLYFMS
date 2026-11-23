@@ -2105,6 +2105,103 @@ const TILE_CLIFF = sprite(CLIFF, [
   'dddddddddddddddd',
 ])
 
+// ── 3단계: 잠긴 문과 배 ──
+// 무너진 다리(gate-broken-bridge): 물 위에 남은 말뚝, 꺾여 물에 잠긴 판자, 늘어진 밧줄. 배경이 투명해 물 위에 얹는다
+const BROKEN_BRIDGE: Record<string, string> = {
+  n: '#3b2a22', // 외곽선
+  U: '#e2b07a', // 말뚝 머리·판자 밝은 면
+  u: '#c8925a', // 나무
+  g: '#a8723f', // 나뭇결
+  G: '#86562f', // 그늘
+  y: '#e6d3a0', // 밧줄
+  Y: '#b59a62', // 밧줄 끝(젖은 부분)
+  s: '#2f7fb5', // 말뚝 둘레 물그늘
+  c: '#e4f6fc', // 물거품
+}
+const GATE_BROKEN_BRIDGE = sprite(BROKEN_BRIDGE, [
+  '.nnnn...........',
+  'nUUUUn..........',
+  'nuggGn..........',
+  'nugGGnnnnn......',
+  'nugGGnUUUUnn....',
+  'nugGGnuguuuunn..',
+  'nugGGnGGGuuuuun.',
+  'nugGGn.nnGGGgun.',
+  'nugGGny..nnGGGns',
+  'nugGGn.y...nnnsc',
+  'snnnns.y......c.',
+  'cssssc..y.......',
+  '.cccc...y.......',
+  '.........yY.....',
+  '..........cc....',
+  '................',
+])
+
+// 돌무더기(gate-rubble): 크고 작은 돌이 흙과 함께 쌓여 길을 막는다. 배경이 투명해 바닥 위에 얹는다
+const RUBBLE: Record<string, string> = {
+  k: '#39424c', // 외곽선
+  h: '#dfe5e8', // 반짝이는 모서리
+  G: '#c8d1d6', // 윗면
+  g: '#9eabb3', // 몸
+  d: '#727f89', // 그늘
+  D: '#5a6570', // 깊은 그늘
+  b: '#9a7a55', // 흙
+  B: '#6f5639', // 흙 그늘
+  x: GROUND_SHADOW,
+}
+const GATE_RUBBLE = sprite(RUBBLE, [
+  '................',
+  '.......kkkk.....',
+  '......khGGgk....',
+  '..kkk.kGggdk....',
+  '.khGgkkgggdkkk..',
+  '.kGggdkkddkhGgk.',
+  '.kggddkhGkkGggdk',
+  'kkkddkhGggkggddk',
+  'khGkkGGgggdkddDk',
+  'kGggkGggggddkkkk',
+  'kggdkggggddDkhGk',
+  'kgddkdgggdDDkgdk',
+  'kbkkbkddDDDkbkkk',
+  'kBbbbbkkkkkbbbBk',
+  '.xkkkkkkkkkkkkx.',
+  '..xxxxxxxxxxxx..',
+])
+
+// 나룻배(boat, 32×16): 뱃머리가 오른쪽, 가로대 두 개와 노 하나, 붉은 띠, 물에 비친 그늘
+const BOAT_PALETTE: Record<string, string> = {
+  k: '#3b2a22', // 외곽선
+  U: '#e8b87f', // 뱃전 윗면
+  u: '#c8925a', // 가로대
+  g: '#a8723f', // 가로대 나뭇결
+  i: '#6e4526', // 배 안쪽
+  I: '#57361c', // 배 바닥 그늘
+  o: '#d8b070', // 노
+  O: '#a07c40', // 노 날
+  r: '#d9573f', // 붉은 띠
+  R: '#a8402d', // 붉은 띠 그늘
+  s: '#246593', // 물그늘
+  c: '#d8eef8', // 물거품
+}
+const BOAT = sprite(BOAT_PALETTE, [
+  '................................',
+  '................................',
+  '...kkkkkkkkkkkkkkkkkkkkkk.......',
+  '..kUUUUUUUUUUUUUUUUUUUUUUkk.....',
+  '.kUiiiiiiiiiiiiiiiiiiiiiiUUk....',
+  '.kUiIIIuuuuIIIIIIIuuuuIIiiUUk...',
+  'kUiiIIIugguIIIIIooooooooooOiUk..',
+  'kUiiIoooooooooooOOOuuuuIIiiiUUk.',
+  'kUiiIIIugguIIIIIIIugguIIiiiiiUUk',
+  '.kUiIIIuuuuIIIIIIIuuuuIIiiiiUUk.',
+  '.kUUiiiiiiiiiiiiiiiiiiiiiiiUUk..',
+  '..krrrrrrrrrrrrrrrrrrrrrrrrrk...',
+  '..kRRRRRRRRRRRRRRRRRRRRRRRRk....',
+  '...kkkkkkkkkkkkkkkkkkkkkkkk.....',
+  '..cssssssssssssssssssssssssc....',
+  '....cc......cc.......cc.........',
+])
+
 // ── 찌 5종(상점·가방 아이콘, 16×16): 코르크 / 함정 / 가시 바늘 / 회전 / 호기심 ──
 const TACKLE_CORK = sprite(
   { k: '#2b2118', R: '#e0483c', r: '#a82e2a', w: '#ff9a8a', C: '#c8935a', c: '#e6b87c', d: '#8f6238' },
@@ -2247,6 +2344,9 @@ export const SPRITES: Record<string, Sprite> = {
   'falls-1': FALLS_1,
   'bridge-plank': BRIDGE_PLANK,
   'tile-cliff': TILE_CLIFF,
+  'gate-broken-bridge': GATE_BROKEN_BRIDGE,
+  'gate-rubble': GATE_RUBBLE,
+  boat: BOAT,
   bobber: BOBBER,
   bang: BANG,
   splash: SPLASH,

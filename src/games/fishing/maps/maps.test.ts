@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AREAS, type AreaId } from '../data.ts'
 import {
+  ALL_AREAS_OPEN,
   TILE,
   TILE_CHARS,
   exitAt,
@@ -38,19 +39,27 @@ function allTiles(map: MapDef): Tile[] {
   return out
 }
 
-/** 출구 칸: 그 가장자리 줄의 from..to 범위 안 걸을 수 있는 칸 */
+/** 출구 칸: 가장자리 출구는 그 가장자리 줄의 from..to 범위, 안쪽 출구는 at 사각형 안의 걸을 수 있는 칸 */
 function exitTiles(map: MapDef, exit: Exit): Tile[] {
   const out: Tile[] = []
+  if ('at' in exit) {
+    for (let ty = exit.at.ty; ty < exit.at.ty + exit.at.h; ty++)
+      for (let tx = exit.at.tx; tx < exit.at.tx + exit.at.w; tx++) if (isWalkable(map, tx, ty, ALL_AREAS_OPEN)) out.push({ tx, ty })
+    return out
+  }
   for (let i = exit.from; i <= exit.to; i++) {
     const t =
       exit.edge === 'n' ? { tx: i, ty: 0 }
       : exit.edge === 's' ? { tx: i, ty: map.h - 1 }
       : exit.edge === 'w' ? { tx: 0, ty: i }
       : { tx: map.w - 1, ty: i }
-    if (isWalkable(map, t.tx, t.ty)) out.push(t)
+    if (isWalkable(map, t.tx, t.ty, ALL_AREAS_OPEN)) out.push(t)
   }
   return out
 }
+
+/** 출구 종류: 가장자리 방향(n/s/e/w) 또는 안쪽 출구 'at' */
+const exitSide = (e: Exit): string => ('edge' in e ? e.edge : 'at')
 
 function onBorder(map: MapDef, t: Tile): boolean {
   return t.tx === 0 || t.ty === 0 || t.tx === map.w - 1 || t.ty === map.h - 1
@@ -65,7 +74,7 @@ function bfs(map: MapDef, from: Tile): Map<string, number> {
     const d = dist.get(`${tx},${ty}`)!
     for (const { dx, dy } of Object.values(DIRS)) {
       const n = { tx: tx + dx, ty: ty + dy }
-      if (!isWalkable(map, n.tx, n.ty) || dist.has(key(n))) continue
+      if (!isWalkable(map, n.tx, n.ty, ALL_AREAS_OPEN) || dist.has(key(n))) continue
       dist.set(key(n), d + 1)
       queue.push(n)
     }
@@ -106,7 +115,7 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
   it('테두리: 출구 칸을 빼고 걸을 수 있는 칸이 없다', () => {
     const exits = new Set(map.exits.flatMap((e) => exitTiles(map, e)).map(key))
     for (const t of allTiles(map)) {
-      if (!onBorder(map, t) || !isWalkable(map, t.tx, t.ty)) continue
+      if (!onBorder(map, t) || !isWalkable(map, t.tx, t.ty, ALL_AREAS_OPEN)) continue
       expect(exits.has(key(t)), `(${t.tx},${t.ty})`).toBe(true)
     }
   })
@@ -128,9 +137,9 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
     for (const e of ALL.flatMap((m) => m.exits.filter((x) => x.target === map.id).map((x) => ({ from: m.id, entry: x.entry })))) {
       const { tx, ty } = e.entry
       const label = `${e.from}→${map.id} (${tx},${ty})`
-      expect(isWalkable(map, tx, ty), label).toBe(true)
+      expect(isWalkable(map, tx, ty, ALL_AREAS_OPEN), label).toBe(true)
       const pos = center(tx, ty)
-      expect(feetBlocked(map, pos.x, pos.y), label).toBe(false)
+      expect(feetBlocked(map, pos.x, pos.y, ALL_AREAS_OPEN), label).toBe(false)
       expect(exitAt(map, pos), label).toBeNull()
       for (const t of allExitTiles) expect(Math.abs(t.tx - tx) + Math.abs(t.ty - ty), label).toBeGreaterThanOrEqual(1)
       const back = map.exits.find((x) => x.target === e.from)!
@@ -162,6 +171,7 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
     for (const e of map.exits) {
       for (const t of exitTiles(map, e)) {
         expect(exitAt(map, center(t.tx, t.ty))).toBe(e)
+        if (!('edge' in e)) continue
         const inward = e.edge === 'n' ? { tx: t.tx, ty: 1 } : e.edge === 's' ? { tx: t.tx, ty: map.h - 2 } : e.edge === 'w' ? { tx: 1, ty: t.ty } : { tx: map.w - 2, ty: t.ty }
         expect(exitAt(map, center(inward.tx, inward.ty)), `(${inward.tx},${inward.ty})`).toBeNull()
       }
@@ -175,8 +185,8 @@ describe('상점', () => {
     for (const map of [MAPS.river!, MAPS.forest!]) {
       expect(map.shop).toBeNull()
       for (const t of allTiles(map)) {
-        if (!isWalkable(map, t.tx, t.ty)) continue
-        for (const f of FACINGS) expect(interactionAt(map, center(t.tx, t.ty), f)?.kind, `${map.id} (${t.tx},${t.ty}) ${f}`).not.toBe('shop')
+        if (!isWalkable(map, t.tx, t.ty, ALL_AREAS_OPEN)) continue
+        for (const f of FACINGS) expect(interactionAt(map, center(t.tx, t.ty), f, ALL_AREAS_OPEN)?.kind, `${map.id} (${t.tx},${t.ty}) ${f}`).not.toBe('shop')
       }
     }
   })
@@ -193,14 +203,14 @@ describe('마을', () => {
   })
 
   it('북쪽 출구는 강으로 간다', () => {
-    expect(village.exits.map((e) => [e.edge, e.target])).toEqual([['n', 'river']])
+    expect(village.exits.map((e) => [exitSide(e), e.target])).toEqual([['n', 'river']])
   })
 })
 
 describe('강·숲 출구', () => {
   it('강: 남쪽 → 마을, 서쪽 → 숲, 북쪽 출구 없음', () => {
     const river = MAPS.river!
-    expect(river.exits.map((e) => [e.edge, e.target]).sort()).toEqual([['s', 'village'], ['w', 'forest']])
+    expect(river.exits.map((e) => [exitSide(e), e.target]).sort()).toEqual([['s', 'village'], ['w', 'forest']])
   })
 
   it('강: 다리가 있고 다리 위에서 강을 보면 river', () => {
@@ -208,12 +218,12 @@ describe('강·숲 출구', () => {
     const bridge = allTiles(river).find((t) => tileAt(river, t.tx, t.ty) === 'bridge')
     expect(bridge).toBeDefined()
     const f = FACINGS.find((d) => tileAt(river, bridge!.tx + DIRS[d].dx, bridge!.ty + DIRS[d].dy) === 'river')!
-    expect(interactionAt(river, center(bridge!.tx, bridge!.ty), f)).toEqual({ kind: 'fish', spot: 'river' })
+    expect(interactionAt(river, center(bridge!.tx, bridge!.ty), f, ALL_AREAS_OPEN)).toEqual({ kind: 'fish', spot: 'river' })
   })
 
   it('숲: 동쪽 → 강, 연못·폭포·웅덩이·절벽이 있다', () => {
     const forest = MAPS.forest!
-    expect(forest.exits.map((e) => [e.edge, e.target])).toEqual([['e', 'river']])
+    expect(forest.exits.map((e) => [exitSide(e), e.target])).toEqual([['e', 'river']])
     const kinds = new Set(allTiles(forest).map((t) => tileAt(forest, t.tx, t.ty)))
     for (const k of ['pond', 'falls', 'basin', 'cliff', 'tree'] as const) expect(kinds.has(k), k).toBe(true)
   })

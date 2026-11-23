@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { drawSprite } from './sprites.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
-import { TILE, castTarget, defineMap, pierEnd, type Facing, type Vec } from './map.ts'
+import { TILE, castTarget, defineMap, pierEnd, type Facing, type Opened, type Vec } from './map.ts'
+import { DEFAULT_AREAS, type AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
 import { cameraFor, type Player } from './walk.ts'
 import type { Conditions } from './clock.ts'
@@ -83,6 +84,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     cond: NOON_SUN,
     hudTop: 0,
     fade: 0,
+    opened: new Set<AreaId>(DEFAULT_AREAS),
     ...extra,
   }
 }
@@ -644,5 +646,110 @@ describe('hudLayout', () => {
       expect(frames.some((r) => r.x === track.x)).toBe(true)
       expect(frames.some((r) => r.x + r.w === track.x + track.w)).toBe(true)
     }
+  })
+})
+
+describe('문·선착장·실내', () => {
+  // (4,2) 다리 = 호수 문(무너진 다리), (8,1) 돌무더기 문, 배는 (5,5)
+  const GATED = defineMap('river', [
+    'TTTTTTTTTT',
+    'T,,,,,,,,T',
+    'TrrrHrrrrT',
+    'T,,,,,...T',
+    'T,,,,,.#.T',
+    'T~~~~~~#~T',
+    'T~~~~~~#~T',
+    'T~~~~~~~~T',
+    'TTTTTTTTTT',
+  ], {
+    gates: [
+      { area: 'lake', tiles: { tx: 4, ty: 2, w: 1, h: 1 }, look: 'broken-bridge', front: { tx: 4, ty: 3, facing: 'up' } },
+      { area: 'cave', tiles: { tx: 8, ty: 1, w: 1, h: 1 }, look: 'rubble', front: { tx: 7, ty: 1, facing: 'right' } },
+    ],
+    docks: [{ front: { tx: 7, ty: 5, facing: 'left' }, target: 'island', entry: { tx: 2, ty: 2, facing: 'down' }, boat: { tx: 5, ty: 5 } }],
+  })
+  const BASE: Opened = new Set<AreaId>(DEFAULT_AREAS)
+  const ALL: Opened = new Set<AreaId>([...DEFAULT_AREAS, 'lake', 'cave', 'island'])
+  const size = { w: 195, h: 280 }
+  const p = player(tileCentre(4, 3))
+  const cam = cameraFor(GATED, p.pos, size)
+  const gatedScene = (opened: Opened, extra: Partial<WorldScene> = {}): WorldScene => ({ ...scene('idle', p, size), map: GATED, camera: cam, opened, ...extra })
+  const at = (c: RecordingCtx, name: string) => c.sprites.filter((s) => s.name === name)
+
+  describe('with an offscreen canvas', () => {
+    let made: RecordingCtx[]
+    beforeEach(() => {
+      made = []
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+        const c = new RecordingCtx()
+        made.push(c)
+        return c as unknown as RenderingContext
+      })
+    })
+
+    test('잠긴 문 칸에 look 스프라이트, 열리면 안 그린다 — 캐시는 다시 만들지 않는다', () => {
+      const main = new RecordingCtx()
+      drawWorld(asCtx(main), gatedScene(BASE), size)
+      drawWorld(asCtx(main), gatedScene(BASE), size)
+      expect(made).toHaveLength(2)
+      // 문 그림은 캐시가 아니라 매 프레임 화면에
+      expect(made.some((c) => c.sprites.some((s) => s.name.startsWith('gate-')))).toBe(false)
+      const locked = new RecordingCtx()
+      drawWorld(asCtx(locked), gatedScene(BASE), size)
+      expect(at(locked, 'gate-broken-bridge').map((s) => [s.x, s.y])).toEqual([[4 * TILE - cam.x, 2 * TILE - cam.y]])
+      expect(at(locked, 'gate-rubble').map((s) => [s.x, s.y])).toEqual([[8 * TILE - cam.x, 1 * TILE - cam.y]])
+      // 캐릭터보다 아래(먼저) 그린다
+      const playerAt = players(locked)[0].at
+      for (const g of at(locked, 'gate-broken-bridge')) expect(g.at).toBeLessThan(playerAt)
+
+      const lakeOpen = new RecordingCtx()
+      drawWorld(asCtx(lakeOpen), gatedScene(new Set<AreaId>([...DEFAULT_AREAS, 'lake'])), size)
+      expect(at(lakeOpen, 'gate-broken-bridge')).toHaveLength(0)
+      expect(at(lakeOpen, 'gate-rubble')).toHaveLength(1)
+      const opened = new RecordingCtx()
+      drawWorld(asCtx(opened), gatedScene(ALL), size)
+      expect(opened.sprites.some((s) => s.name.startsWith('gate-'))).toBe(false)
+      expect(made).toHaveLength(2) // renderFrame 호출 수 불변
+    })
+
+    test('선착장의 배는 boat 칸에 월드 레이어로, 열림과 무관하게 그린다', () => {
+      for (const opened of [BASE, ALL]) {
+        const main = new RecordingCtx()
+        drawWorld(asCtx(main), gatedScene(opened), size)
+        const boats = at(main, 'boat')
+        expect(boats).toHaveLength(1)
+        expect(boats[0].x).toBe(5 * TILE - cam.x)
+        expect(boats[0].y - (5 * TILE - cam.y)).toBeGreaterThanOrEqual(0)
+        expect(boats[0].y - (5 * TILE - cam.y)).toBeLessThanOrEqual(1) // 물결에 1px 흔들림
+        expect(boats[0].at).toBeLessThan(players(main)[0].at)
+      }
+      expect(made.some((c) => c.sprites.some((s) => s.name === 'boat'))).toBe(false)
+    })
+  })
+
+  test('indoor 맵은 비 오는 밤에도 입자·밤 색조 없음, HUD 시계는 있다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const RAINY_NIGHT: Conditions = { gameMinute: 0, gameDay: 1, season: 'spring', weather: 'rain' }
+    const cave = defineMap('cave', GATED.rows, { indoor: true })
+    const outside = defineMap('river', GATED.rows)
+    const draw = (map: typeof cave) => {
+      const ctx = new RecordingCtx()
+      drawWorld(asCtx(ctx), { ...gatedScene(BASE), map, cond: RAINY_NIGHT }, size)
+      return ctx
+    }
+    const cover = (c: RecordingCtx) => c.rects.filter((r) => r.x === 0 && r.y === 0 && r.w >= size.w && r.h >= size.h && r.color.startsWith('rgba'))
+    const drops = (c: RecordingCtx) => c.rects.filter((r) => r.color === '#bfe6f7' && r.w === 1 && r.h === 3)
+    const out = draw(outside)
+    expect(cover(out)).toHaveLength(1)
+    expect(drops(out).length).toBeGreaterThan(0)
+    const inside = draw(cave)
+    expect(cover(inside)).toHaveLength(0)
+    expect(drops(inside)).toHaveLength(0)
+    expect(inside.sprites.some((s) => s.name === 'icon-rain')).toBe(true)
+    expect(inside.sprites.some((s) => s.name.startsWith('digit-'))).toBe(true)
+    // 겨울 눈도 없다
+    const snowy = new RecordingCtx()
+    drawWorld(asCtx(snowy), { ...gatedScene(BASE), map: cave, cond: { ...RAINY_NIGHT, season: 'winter' } }, size)
+    expect(snowy.rects.filter((r) => r.color === '#ffffff' && r.w === 2 && r.h === 2)).toHaveLength(0)
   })
 })

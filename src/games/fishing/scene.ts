@@ -4,7 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
-import { TILE, tileAt, type MapDef, type TileKind, type Vec } from './map.ts'
+import { TILE, tileAt, type MapDef, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite } from './sprites.ts'
 import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
@@ -29,6 +29,8 @@ export type WorldScene = {
   hudTop: number
   /** 지역 전환 페이드: 화면 전체 검정 채우기 알파(0~1). 0이면 그리지 않는다 */
   fade: number
+  /** 열린 지역. 여기 없는 지역의 문은 잠긴 그림(look)으로 덮는다 */
+  opened: Opened
 }
 
 /** 화면 좌표 사각형 */
@@ -666,7 +668,8 @@ function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, box: Box): v
 
 /**
  * 장면 한 프레임. size는 캔버스의 논리 크기다.
- * 정적 맵 → 찌·낚싯줄 → 캐릭터와 나무 윗부분(발 y 순) → 입질 느낌표 → 비·눈 → 밤 색조 → 게이지·트랙·결과 → 시계 순으로 그린다.
+ * 정적 맵 → 잠긴 문·배 → 찌·낚싯줄 → 캐릭터와 나무 윗부분(발 y 순) → 입질 느낌표 → 비·눈 → 밤 색조(실내는 둘 다 없음)
+ * → 게이지·트랙·결과 → 시계 순으로 그린다.
  */
 export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: SceneSize): void {
   const w = Math.max(1, Math.floor(size.w) || 0)
@@ -700,8 +703,11 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
     ctx.restore()
   }
 
-  drawPrecipitation(ctx, s.cond, s.tMs, w, h)
-  drawNightTint(ctx, s.cond, w, h)
+  // 실내(동굴 등)에는 비·눈이 오지 않고 밤 색조도 없다. 시계는 그대로
+  if (!s.map.indoor) {
+    drawPrecipitation(ctx, s.cond, s.tMs, w, h)
+    drawNightTint(ctx, s.cond, w, h)
+  }
 
   // HUD (화면 좌표)
   const screenX = Math.round(s.player.pos.x) - cam.x
@@ -718,11 +724,49 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   }
 }
 
+/** 타일 사각형이 화면 타일 범위 [tx0..tx1]×[ty0..ty1]과 겹치는가 */
+const rectInView = (r: Rect, tx0: number, ty0: number, tx1: number, ty1: number): boolean =>
+  r.tx <= tx1 && r.tx + r.w - 1 >= tx0 && r.ty <= ty1 && r.ty + r.h - 1 >= ty0
+
+/**
+ * 잠긴 문과 선착장의 배(월드 좌표, 캐릭터·찌보다 먼저). 정적 캐시에는 넣지 않아 지역이 열려도 캐시를 다시 만들지 않는다.
+ * 무너진 다리는 칸마다 물(물결 박자 그대로)을 깔고 끊긴 판자를 얹는다. 돌무더기는 캐시의 바닥 위에 바로 얹는다.
+ * 같은 그림이 줄지어 보이지 않게 칸마다 좌우를 번갈아 뒤집는다.
+ */
+function drawPlaces(ctx: CanvasRenderingContext2D, s: WorldScene, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
+  for (const gate of s.map.gates) {
+    if (s.opened.has(gate.area) || !rectInView(gate.tiles, tx0, ty0, tx1, ty1)) continue
+    const { tiles } = gate
+    for (let ty = tiles.ty; ty < tiles.ty + tiles.h; ty++) {
+      for (let tx = tiles.tx; tx < tiles.tx + tiles.w; tx++) {
+        const kind = tileAt(s.map, tx, ty)
+        if (gate.look === 'broken-bridge' && kind !== null && WATER_GROUND.has(kind)) {
+          drawSprite(ctx, `${WATER_SPRITE[kind] ?? 'water'}-${(k + tx + ty * 3) % 2}`, tx * TILE, ty * TILE, 1)
+        }
+        drawSprite(ctx, `gate-${gate.look}`, tx * TILE, ty * TILE, 1, (tx + ty) % 2 === 1 ? { flipX: true } : undefined)
+      }
+    }
+  }
+  const boatW = Math.ceil(SPRITES.boat.w / TILE)
+  for (const dock of s.map.docks) {
+    if (!rectInView({ tx: dock.boat.tx, ty: dock.boat.ty, w: boatW, h: 1 }, tx0, ty0, tx1, ty1)) continue
+    // 물 타일과 같은 박자로 1px 출렁인다
+    drawSprite(ctx, 'boat', dock.boat.tx * TILE, dock.boat.ty * TILE + k, 1)
+  }
+}
+
 /** 월드 좌표로 그리는 움직이는 것들 */
 function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, cam: Vec, w: number, h: number): void {
   const t = s.tMs
   const b = s.bobber ? { x: Math.round(s.bobber.x), y: Math.round(s.bobber.y) } : null
   const tip = rodTip(pose, px, py)
+  const tx0 = Math.floor(cam.x / TILE)
+  const tx1 = Math.floor((cam.x + w - 1) / TILE)
+  const ty0 = Math.floor(cam.y / TILE)
+  const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
+
+  // 바닥에 붙은 것(잠긴 문·배)이 맨 먼저
+  drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 
   // 물 위 요소(물결·찌·줄)는 캐릭터보다 먼저
   if (b) {
@@ -749,10 +793,6 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
 
   // 캐릭터와 나무 윗부분: 발 y가 작은(먼) 것부터
   const trees: { x: number; y: number; key: number }[] = []
-  const tx0 = Math.floor(cam.x / TILE)
-  const tx1 = Math.floor((cam.x + w - 1) / TILE)
-  const ty0 = Math.floor(cam.y / TILE)
-  const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
       if (tileAt(s.map, tx, ty) === 'tree') trees.push({ x: tx * TILE, y: (ty - 1) * TILE, key: ty * TILE + TREE_BASE })

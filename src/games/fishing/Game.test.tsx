@@ -8,7 +8,7 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
+import { ALL_AREAS_OPEN, TILE, exitAt, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
@@ -1617,8 +1617,8 @@ describe('fishing Game: 지역 전환', () => {
       for (let tx = 0; tx < map.w; tx++)
         for (const facing of ['up', 'down', 'left', 'right'] as const) {
           const pos = tileCenter(tx, ty)
-          if (feetBlocked(map, pos.x, pos.y)) continue
-          const at = interactionAt(map, pos, facing)
+          if (feetBlocked(map, pos.x, pos.y, ALL_AREAS_OPEN)) continue
+          const at = interactionAt(map, pos, facing, ALL_AREAS_OPEN)
           if (at?.kind === 'fish' && at.spot === spot) return { area: map.id, pos, facing }
         }
     throw new Error(`no ${spot} spot in ${map.id}`)
@@ -1656,6 +1656,12 @@ describe('fishing Game: 지역 전환', () => {
     expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')).toEqual({
       area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: ENTRY.facing,
     })
+  })
+
+  test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
+    await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
+    await advance(50)
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
