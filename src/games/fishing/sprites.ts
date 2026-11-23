@@ -4163,7 +4163,7 @@ const FISH_IMUGI = sprite(
 
 // ── 낚시 5부 M2: 갯벌·늪지 타일 ──
 const CREEK: Record<string, string> = { a: '#5e8e8c', d: '#4c7978', b: '#86b2ab', c: '#d2e8e1' } // 갯골: 흙빛이 도는 청록 물길
-const MARSH: Record<string, string> = { a: '#5d7b48', d: '#4b6739', b: '#7f9e57', c: '#b3cc7c' } // 늪: 개구리밥이 뜬 탁한 초록
+const MARSH: Record<string, string> = { a: '#65805a', d: '#596f4e', b: '#78935f', c: '#93aa78' } // 늪: 개구리밥이 뜬 탁한 초록(안개가 덮여도 읽히게 채도를 낮췄다)
 const BOG: Record<string, string> = { a: '#2f2b22', d: '#24211a', b: '#4b4534', c: '#787152' } // 수렁: 검은 진흙물과 거품
 const CREEK_0 = sprite(CREEK, [
   'aaaaaaaaaaaaaaaa',
@@ -4273,24 +4273,81 @@ const BOG_1 = sprite(BOG, [
   'aaaaaaaaaaaaaaaa',
   'aaaaaaaaaaaaaaaa',
 ])
-// 나무 데크(boardwalk-plank): 늪물 위 비바람에 바랜 판자 세 장, 틈으로 늪이 비친다
-const BOARDWALK_PLANK = sprite({ k: '#3b2f26', U: '#b4a07a', u: '#94805c', g: '#7f6c4c', n: '#4e4030' }, [
-  'UUUUUUUUUUUUUUUU',
-  'uuuguuuuunuuuguu',
-  'uuuuuuguuuuuuuuu',
+// 나무 데크(boardwalk-plank): 가로로 이어지는 데크. 비바람에 바랜 넓은 판자 두 줄, 판자 끝 이음매가 엇갈리고 양옆에 테두리
+const BOARDWALK_PLANK = sprite({ k: '#3b2f26', U: '#b4a07a', u: '#94805c', g: '#83704f', n: '#6a573e' }, [
   'kkkkkkkkkkkkkkkk',
-  '................',
-  'UUUUUUUUUUUUUUUU',
-  'uunuuuuguuuuuuuu',
-  'uuuuuuuuuuuguunu',
+  'UUUUUUUUUUUnUUUU',
+  'uuuuuuuuuuunuuuu',
+  'uuuuuuuuuuunuuuu',
+  'uuuuguuuuuunuuuu',
+  'uuuuuuuuuuunuuuu',
+  'uuuuuuuguuunuuuu',
+  'uuuuuuuuuuunuuuu',
+  'nnnnnnnnnnnnnnnn',
+  'UUUUnUUUUUUUUUUU',
+  'uuuunuuuuuuuuuuu',
+  'uuuunuuuuuuuuuuu',
+  'uguunuuuguuuuuug',
+  'uuuunuuuguuuuuuu',
+  'uuuunuuuuuuuuuuu',
   'kkkkkkkkkkkkkkkk',
-  '................',
-  'UUUUUUUUUUUUUUUU',
-  'uuuuuguuuuuuuuuu',
-  'uguuuuuuuunuuuug',
-  'uuuuuuuuuuuuuuuu',
-  'kkkkkkkkkkkkkkkk',
-  '................',
+])
+// 세로 데크(boardwalk-plank-v): 위아래로 이어지는 데크. 판자가 길이 방향(세로)으로 놓여 사다리처럼 보이지 않는다
+const BOARDWALK_PLANK_V = sprite({ k: '#3b2f26', U: '#b4a07a', u: '#94805c', g: '#83704f', n: '#6a573e' }, [
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuguuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuguuunnnnnnnk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuugunUuuuuuk',
+  'kUuuuuuunUuugguk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'knnnnnnnnUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuuuuk',
+  'kUuuuuuunUuuguuk',
+])
+// 연잎이 뜬 늪(marsh-lily, 두 장): 늪 칸 몇 곳에만 섞어 단조롭지 않게. 분홍 꽃 한 송이
+const MARSH_LILY: Record<string, string> = { ...MARSH, p: '#e892b0', P: '#fbe0ea' }
+const MARSH_LILY_0 = sprite(MARSH_LILY, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaabbbbaaaaaaaa',
+  'aaabbbbbbaaaadaa',
+  'aabbbbpbbbaaaaaa',
+  'aabbbpPpbbaaaaaa',
+  'aabbbbpbbbaaaaaa',
+  'aaabbbbbcaaaaaaa',
+  'aaaabbbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbaaaa',
+  'adaaaaaaabccbaaa',
+  'aaaaaaaaaabbaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaddaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+const MARSH_LILY_1 = sprite(MARSH_LILY, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaadaa',
+  'aaaabbbbaaaaaaaa',
+  'aaabbbbbbaaaaaaa',
+  'aabbbbpbbbaaaaaa',
+  'aabbbpPpbbaaaaaa',
+  'aabbbbpbbbaaaaaa',
+  'aaabbbbbcaaaaaaa',
+  'aaaabbbbaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaabbaaaa',
+  'aaaaaaaaabccbaaa',
+  'aaaaaaaaaabbaada',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaddaaaaaaaaaaaa',
 ])
 // 갈대(tile-reed, 16×32): 부들 이삭이 솟은 갈대 덤불. 아래 16px가 자기 칸
 const TILE_REED = sprite({ k: '#2c3a1e', h: '#7a4a2a', H: '#5a3420', s: '#8fa452', S: '#66803a', l: '#b9c873', x: GROUND_SHADOW }, [
@@ -4409,6 +4466,9 @@ export const SPRITES: Record<string, Sprite> = {
   'bog-0': BOG_0,
   'bog-1': BOG_1,
   'boardwalk-plank': BOARDWALK_PLANK,
+  'boardwalk-plank-v': BOARDWALK_PLANK_V,
+  'marsh-lily-0': MARSH_LILY_0,
+  'marsh-lily-1': MARSH_LILY_1,
   'tile-reed': TILE_REED,
   'tile-deadtree': TILE_DEADTREE,
   'gate-driftwood': GATE_DRIFTWOOD,

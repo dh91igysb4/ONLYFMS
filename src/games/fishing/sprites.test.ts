@@ -517,3 +517,17 @@ describe('낚시 5부 M2 물고기 그림 19종', () => {
     for (const id of ['king-croaker', 'thousand-turtle', 'imugi']) expect(new Set(SPRITES[`fish-${id}`].rows.join('').replace(/\./g, '')).size, id).toBeGreaterThanOrEqual(6)
   })
 })
+
+describe('늪지 그림 다듬기: 세로 데크·연잎 늪', () => {
+  it('세로 데크는 가로 데크를 돌린 그림(16×16), 연잎 늪 두 장은 칸을 꽉 채우고 서로·늪과 다르다', () => {
+    const h = SPRITES['boardwalk-plank'].rows
+    const v = SPRITES['boardwalk-plank-v'].rows
+    expect(v).toEqual(h.map((_, x) => h.map((row) => row[x]).join('')))
+    for (const n of ['marsh-lily-0', 'marsh-lily-1']) {
+      expect([SPRITES[n].w, SPRITES[n].h]).toEqual([16, 16])
+      expect(SPRITES[n].rows.join('').includes('.')).toBe(false)
+    }
+    const art = (n: string) => SPRITES[n].rows.join('|')
+    expect(new Set(['marsh-0', 'marsh-1', 'marsh-lily-0', 'marsh-lily-1'].map(art)).size).toBe(4)
+  })
+})

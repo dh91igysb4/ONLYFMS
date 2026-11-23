@@ -88,6 +88,8 @@ const C = {
   outline: '#2a2135',
   sandWet: '#c7a96e',
   foam: '#e9f6fb',
+  bogRim: '#65805a', // 수렁 둘레 늪물(늪 바탕과 같은 색)
+  bogEdge: '#3e3a2a', // 수렁 가장자리 진흙
   grass: '#78b85c',
   grassDark: '#5f9e4a',
   pierFace: '#6e4526',
@@ -453,8 +455,11 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'falls') drawSprite(ctx, `falls-${(k + tx) % 2}`, x, y, 1)
   else if (ground === 'water') {
     // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게. 다리 밑은 강물, 바위 밑은 둘레의 물
-    drawSprite(ctx, `${waterSpriteAt(g.map, tx, ty)}-${(k + tx + ty * 3) % 2}`, x, y, 1)
+    // 늪 칸 몇 곳(칸마다 고정)은 연잎이 뜬 그림
+    const name = kind === 'marsh' && hash(tx, ty) % 9 === 0 ? 'marsh-lily' : waterSpriteAt(g.map, tx, ty)
+    drawSprite(ctx, `${name}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
+    if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
   } else if (ground === 'cave') {
     drawSprite(ctx, 'tile-cave-floor', x, y, 1)
   } else if (ground === 'sand') {
@@ -473,7 +478,71 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
-  else if (kind === 'boardwalk') drawSprite(ctx, 'boardwalk-plank', x, y, 1)
+  else if (kind === 'boardwalk') drawSprite(ctx, boardwalkVertical(g.map, tx, ty) ? 'boardwalk-plank-v' : 'boardwalk-plank', x, y, 1)
+}
+
+/** 위아래로만 데크가 이어지는 칸(세로 데크 그림). 갈림길·가로 데크·외톨이는 가로 그림 */
+function boardwalkVertical(map: MapDef, tx: number, ty: number): boolean {
+  const bw = (dx: number, dy: number) => tileAt(map, tx + dx, ty + dy) === 'boardwalk'
+  return (bw(0, -1) || bw(0, 1)) && !bw(-1, 0) && !bw(1, 0)
+}
+
+/**
+ * 수렁 가장자리: 수렁이 아닌 쪽 변에 늪물 띠(칸마다 고정된 들쭉날쭉 1~3px)와 진흙 테두리, 두 변이 열린 모서리는 둥글게 깎는다.
+ * 네모난 웅덩이가 아니라 늪에 고인 검은 물처럼 보이게. 정적 레이어라 매 프레임 비용 없음.
+ */
+function drawBogRim(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const x = tx * TILE
+  const y = ty * TILE
+  const open = (dx: number, dy: number) => tileAt(g.map, tx + dx, ty + dy) !== 'bog'
+  const up = open(0, -1)
+  const down = open(0, 1)
+  const left = open(-1, 0)
+  const right = open(1, 0)
+  for (let i = 0; i < TILE; i++) {
+    const d = (a: number, b: number) => 1 + (hash(a, b) % 3)
+    if (up) {
+      const n = d(x + i, y)
+      rect(ctx, x + i, y, 1, n, C.bogRim)
+      rect(ctx, x + i, y + n, 1, 1, C.bogEdge)
+    }
+    if (down) {
+      const n = d(x + i, y + TILE)
+      rect(ctx, x + i, y + TILE - n, 1, n, C.bogRim)
+      rect(ctx, x + i, y + TILE - n - 1, 1, 1, C.bogEdge)
+    }
+    if (left) {
+      const n = d(x, y + i)
+      rect(ctx, x, y + i, n, 1, C.bogRim)
+      rect(ctx, x + n, y + i, 1, 1, C.bogEdge)
+    }
+    if (right) {
+      const n = d(x + TILE, y + i)
+      rect(ctx, x + TILE - n, y + i, n, 1, C.bogRim)
+      rect(ctx, x + TILE - n - 1, y + i, 1, 1, C.bogEdge)
+    }
+  }
+  // 둥근 모서리: 두 변이 열린 모서리를 계단 모양(반지름 약 7px)으로 늪물로 채운다
+  const steps = [7, 5, 4, 3, 2, 1, 1]
+  const corner = (cx: number, cy: number, sx: number, sy: number) => {
+    steps.forEach((w, r) => {
+      const yy = cy + sy * r - (sy < 0 ? 1 : 0)
+      rect(ctx, sx > 0 ? cx : cx - w, yy, w, 1, C.bogRim)
+    })
+  }
+  if (up && left) corner(x, y, 1, 1)
+  if (up && right) corner(x + TILE, y, -1, 1)
+  if (down && left) corner(x, y + TILE, 1, -1)
+  if (down && right) corner(x + TILE, y + TILE, -1, -1)
+  // 안쪽 모서리(두 변은 수렁인데 대각선만 늪): 진흙 점 두 개로 꺾인 물가를 잇는다
+  const diag = (dx: number, dy: number) => !open(dx, 0) && !open(0, dy) && open(dx, dy)
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    if (!diag(dx, dy)) continue
+    const cx = dx < 0 ? x : x + TILE - 2
+    const cy = dy < 0 ? y : y + TILE - 2
+    rect(ctx, cx, cy, 2, 2, C.bogRim)
+    rect(ctx, dx < 0 ? cx + 2 : cx - 1, cy, 1, 2, C.bogEdge)
+  }
 }
 
 /** 부두 칸 바깥으로 삐져나오는 것: 그늘, 기둥, 끝 옆면, 외곽선 */

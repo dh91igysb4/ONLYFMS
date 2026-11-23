@@ -1204,7 +1204,7 @@ describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
     const ctx = new RecordingCtx()
     drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: SWAMPY, camera: cam }, size)
     const at = (tx: number, ty: number) => ctx.sprites.filter((c) => c.x === tx * 16 - cam.x && c.y === ty * 16 - cam.y).map((c) => c.name)
-    expect(at(0, 0)).toContainEqual(expect.stringMatching(/^marsh-[01]$/))
+    expect(at(0, 0)).toContainEqual(expect.stringMatching(/^marsh-(lily-)?[01]$/))
     expect(at(4, 1)).toContainEqual(expect.stringMatching(/^bog-[01]$/))
     expect(at(0, 2)).toContainEqual(expect.stringMatching(/^creek-[01]$/))
     expect(at(2, 1)).toContainEqual(expect.stringMatching(/^marsh-[01]$/))
@@ -1281,5 +1281,44 @@ describe('낚시 5부 M2: 밀물 진흙 옆 갈대', () => {
     const at = ctx.sprites.filter((c) => c.x === 2 * 16 - cam.x && c.y === 1 * 16 - cam.y).map((c) => c.name)
     expect(at).toContainEqual(expect.stringMatching(/^tile-mud-wet-[01]$/))
     expect(at.some((n) => /^water-[01]$/.test(n))).toBe(false)
+  })
+})
+
+describe('늪지 그림 다듬기', () => {
+  const size = { w: 195, h: 280 }
+  const draw = (m: ReturnType<typeof defineMap>) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const p = player(tileCentre(0, m.h - 1))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    return { ctx, cam, at: (tx: number, ty: number) => ctx.sprites.filter((c) => c.x === tx * 16 - cam.x && c.y === ty * 16 - cam.y).map((c) => c.name) }
+  }
+  test('세로로만 이어진 데크는 세로 판자, 가로·갈림길은 가로 판자', () => {
+    const m = defineMap('forest', ['zdzzz', 'zdzzz', 'zdddd', 'zzzzz', ',,,,,'], { spots: { marsh: 'marsh' } })
+    const { at } = draw(m)
+    expect(at(1, 0)).toContain('boardwalk-plank-v')
+    expect(at(1, 1)).toContain('boardwalk-plank-v')
+    expect(at(1, 2)).toContain('boardwalk-plank')
+    expect(at(3, 2)).toContain('boardwalk-plank')
+  })
+  test('수렁 가장자리: 늪 쪽 변에는 늪물 띠와 진흙 테두리, 수렁끼리 붙은 변에는 없다', () => {
+    const m = defineMap('forest', ['zzzz', 'zQQz', 'zzzz', ',,,,'], { spots: { marsh: 'marsh', bog: 'bog' } })
+    const { ctx, cam } = draw(m)
+    const inTile = (r: { x: number; y: number }, tx: number, ty: number) =>
+      r.x >= tx * 16 - cam.x && r.x < (tx + 1) * 16 - cam.x && r.y >= ty * 16 - cam.y && r.y < (ty + 1) * 16 - cam.y
+    const rim = ctx.rects.filter((r) => r.color === '#3e3a2a' && inTile(r, 1, 1))
+    expect(rim.length).toBeGreaterThan(0)
+    // (1,1)의 오른쪽 변(수렁 (2,1)과 붙은 쪽) 끝 열에는 테두리가 없다
+    expect(rim.some((r) => r.x === 2 * 16 - cam.x - 1 && r.w === 1 && r.y > 16 - cam.y + 3 && r.y < 32 - cam.y - 4)).toBe(false)
+  })
+  test('늪 칸 일부(칸마다 고정)는 연잎 그림이다', () => {
+    const rows = Array.from({ length: 12 }, () => 'z'.repeat(12))
+    rows.push(','.repeat(12))
+    const { ctx } = draw(defineMap('forest', rows, { spots: { marsh: 'marsh' } }))
+    const lily = ctx.sprites.filter((c) => c.name.startsWith('marsh-lily-')).length
+    const plain = ctx.sprites.filter((c) => /^marsh-[01]$/.test(c.name)).length
+    expect(lily).toBeGreaterThan(0)
+    expect(plain).toBeGreaterThan(lily * 2)
   })
 })
