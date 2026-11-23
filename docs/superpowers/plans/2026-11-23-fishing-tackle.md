@@ -95,7 +95,7 @@
 
 - [ ] **Step 1: 실패하는 테스트 작성**
   - `barParams: equipped 없음 → drain 1·pull 0·barSize 지금 값; cork → barSize ×1.2; trap → drain 0.75; barbed → pull > 0; 세 개 조합은 각각 반영`
-  - `trap: 물고기가 바 밖에 있는 같은 상황 1초에서 진행도 감소량이 절반`
+  - `trap: 물고기가 바 밖에 있는 같은 상황 1초에서 진행도 감소량이 ×0.75(TACKLE_FX.trapDrain)`
   - `barbed: 물고기가 바 안 위쪽 끝 근처일 때, 버튼을 안 눌러도 바 중심이 물고기 쪽으로 움직인다(같은 상황 pull 0 대비 더 위); 물고기가 바 밖이면 효과 없음`
   - `기존 mixed golden 테스트 통과(찌 없음)`
 - [ ] **Step 2: 실패 확인** — Run: `npx vitest run src/games/fishing/minigame.test.ts` / Expected: FAIL
