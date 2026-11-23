@@ -82,6 +82,7 @@ function scene(phase: Phase, p: Player, size: { w: number; h: number }, extra: P
     caughtSpecies: phase === 'caught' ? 'mackerel' : null,
     cond: NOON_SUN,
     hudTop: 0,
+    fade: 0,
     ...extra,
   }
 }
@@ -460,6 +461,17 @@ describe('시계·밤·날씨', () => {
   const clockSprites = (c: RecordingCtx) =>
     c.sprites.filter((sp) => sp.name.startsWith('digit-') || sp.name.startsWith('season-') || sp.name.startsWith('icon-'))
   const digits = (c: RecordingCtx) => c.sprites.filter((sp) => sp.name.startsWith('digit-')).sort((a, b) => a.x - b.x).map((sp) => sp.name)
+
+  test('fade 0.5면 마지막에 화면 전체 채우기 한 번, 0이면 없다', () => {
+    const none = draw('idle', idle, NOON_SUN, { fade: 0 })
+    expect(cover(none)).toHaveLength(0)
+    const faded = draw('idle', idle, NOON_SUN, { fade: 0.5 })
+    const full = cover(faded)
+    expect(full).toHaveLength(1)
+    expect(full[0].color).toBe('rgba(0, 0, 0, 0.5)')
+    // 시계 판(HUD)까지 덮도록 가장 마지막 채우기다
+    expect(faded.rects.at(-1)).toBe(full[0])
+  })
 
   test('HUD 시계는 픽셀 숫자·계절 아이콘·날씨 아이콘 스프라이트로 그리고 fillText는 쓰지 않는다', () => {
     const ctx = draw('idle', idle, SPRING_14_37)

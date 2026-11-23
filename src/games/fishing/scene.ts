@@ -27,6 +27,8 @@ export type WorldScene = {
   cond: Conditions
   /** HUD 시계를 이 y(논리 px) 아래에 둔다. 터치에서 캔버스 위에 겹치는 안내 줄을 피한다. 데스크톱은 0 */
   hudTop: number
+  /** 지역 전환 페이드: 화면 전체 검정 채우기 알파(0~1). 0이면 그리지 않는다 */
+  fade: number
 }
 
 /** 화면 좌표 사각형 */
@@ -693,6 +695,11 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   drawOutcome(ctx, s, screenX, py - cam.y, w)
   // 시계는 낚시 트랙의 반대쪽 위, 모든 단계에서
   drawClock(ctx, s.cond, hud.clock)
+  // 지역 전환 페이드는 HUD까지 덮도록 맨 마지막에, 화면 전체를 한 번에
+  if (s.fade > 0) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, s.fade)})`
+    ctx.fillRect(0, 0, w, h)
+  }
 }
 
 /** 월드 좌표로 그리는 움직이는 것들 */

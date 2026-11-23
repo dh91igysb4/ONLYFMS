@@ -8,8 +8,12 @@ import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { conditionLabel } from './Menus.tsx'
 import { price, type PendingView, type View } from './logic.ts'
-import { TILE, pierEnd, type Facing, type Vec } from './map.ts'
+import { TILE, interactionAt, pierEnd, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
+import { RIVER } from './maps/river.ts'
+import { FOREST } from './maps/forest.ts'
+import { feetBlocked } from './walk.ts'
+import type { AreaId } from './data.ts'
 import fishingCss from './fishing.css?raw'
 import { WALK_SPEED, type Player } from './walk.ts'
 
@@ -130,7 +134,7 @@ const key = (code: string, down: boolean) =>
 
 const POS_KEY = 'fishing-pos:u1'
 const tileCenter = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
-type At = { pos: Vec; facing: Facing }
+type At = { pos: Vec; facing: Facing; area?: AreaId }
 /** 부두 끝에서 바다를 본다 → 낚시(pier) */
 const PIER: At = { pos: tileCenter(PIER_END.tx, PIER_END.ty), facing: 'down' }
 /** 모래사장 맨 아래 줄(10, 25)에서 바다를 본다 → 낚시(shore) */
@@ -1512,5 +1516,133 @@ describe('availableHeight', () => {
     const h = availableHeight(200, 191, 80)
     expect(h).toBeLessThan(0)
     expect(canvasScale(688, h)).toBe(1)
+  })
+})
+
+
+describe('fishing Game: 지역 전환', () => {
+  const lastScene = () => {
+    const call = vi.mocked(drawWorld).mock.calls.at(-1)
+    if (!call) throw new Error('drawWorld was not called')
+    return call[1]
+  }
+  /** 맵에서 낚시 자리 id가 spot인 걸을 수 있는 자리와 방향 */
+  function fishingAt(map: MapDef, spot: string): At {
+    for (let ty = 0; ty < map.h; ty++)
+      for (let tx = 0; tx < map.w; tx++)
+        for (const facing of ['up', 'down', 'left', 'right'] as const) {
+          const pos = tileCenter(tx, ty)
+          if (feetBlocked(map, pos.x, pos.y)) continue
+          const at = interactionAt(map, pos, facing)
+          if (at?.kind === 'fish' && at.spot === spot) return { area: map.id, pos, facing }
+        }
+    throw new Error(`no ${spot} spot in ${map.id}`)
+  }
+  /** 마을 북쪽 출구 바로 아래 칸에서 위를 보고 시작 */
+  const NEAR_EXIT: At = { area: 'village', pos: tileCenter(24, 1), facing: 'up' }
+  const ENTRY = VILLAGE.exits[0].entry
+
+  /** 마을 북쪽 출구를 걸어 나가 페이드가 끝날 때까지 기다린다 */
+  async function walkToRiver() {
+    await mount(makeView(), NEAR_EXIT)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0) // 전환 중
+    await advance(400)
+  }
+
+  test('북쪽 출구로 걸어가면 페이드 뒤 강 맵의 entry 자리에 서고, 위치가 {area:river}로 저장된다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    expect(lastScene().map.id).toBe('village')
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    // 페이드 아웃 중에는 아직 마을
+    expect(lastScene().map.id).toBe('village')
+    expect(lastScene().fade).toBeGreaterThan(0)
+    await advance(400)
+    const scene = lastScene()
+    expect(scene.map.id).toBe('river')
+    expect(scene.fade).toBe(0)
+    expect(scene.player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+    expect(scene.player.facing).toBe(ENTRY.facing)
+    expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null')).toEqual({
+      area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: ENTRY.facing,
+    })
+  })
+
+  test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(130)
+    key('ArrowUp', false)
+    const before = { ...lastScene().player.pos }
+    expect(lastScene().fade).toBeGreaterThan(0)
+    key('ArrowLeft', true)
+    await advance(15)
+    expect(lastScene().player.pos).toEqual(before) // 페이드 아웃 중
+    await advance(160)
+    expect(lastScene().map.id).toBe('river') // 페이드 인 중
+    expect(lastScene().fade).toBeGreaterThan(0)
+    expect(lastScene().player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+    key('ArrowLeft', false)
+    await advance(400)
+    expect(lastScene().player.pos).toEqual(tileCenter(ENTRY.tx, ENTRY.ty))
+  })
+
+  test('도착 직후 0.5초 동안 입력이 없거나 반대 방향으로 한 걸음 걸어도 다시 마을로 가지 않는다', async () => {
+    await walkToRiver()
+    await advance(500)
+    expect(lastScene().map.id).toBe('river')
+    key('ArrowDown', true) // 들어온 출구 쪽(entry는 출구 두 칸 안쪽)
+    await advance(150)
+    key('ArrowDown', false)
+    await advance(500)
+    expect(lastScene().map.id).toBe('river')
+    expect(JSON.parse(localStorage.getItem(POS_KEY) ?? 'null').area).toBe('river')
+  })
+
+  test('지역에 들어가면 지역 이름 알림이 1.5초 보인다', async () => {
+    await walkToRiver()
+    expect(screen.getByText('마을 강')).toBeInTheDocument()
+    await advance(1600)
+    expect(screen.queryByText('마을 강')).not.toBeInTheDocument()
+  })
+
+  test('저장된 {area:river}에서 시작하면 강 맵으로 시작한다', async () => {
+    await mount(makeView(), { area: 'river', pos: tileCenter(ENTRY.tx, ENTRY.ty), facing: 'up' })
+    await advance(100)
+    expect(lastScene().map.id).toBe('river')
+  })
+
+  test('강에서 물을 보고 던지면 cast 페이로드가 {area:river, spot:river}', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, fishingAt(RIVER, 'river'))
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
+    expect(payload.area).toBe('river')
+    expect(payload.spot).toBe('river')
+  })
+
+  test('숲 연못에서 던지면 {area:forest, spot:pond}', async () => {
+    const view = makeView()
+    const p = pending()
+    await mount(view, fishingAt(FOREST, 'pond'))
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    press()
+    await advance(300)
+    release()
+    await flush()
+    const payload = (calls('cast')[0] as unknown as { payload: { area: string; spot: string } }).payload
+    expect(payload.area).toBe('forest')
+    expect(payload.spot).toBe('pond')
   })
 })
