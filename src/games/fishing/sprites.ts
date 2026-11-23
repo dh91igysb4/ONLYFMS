@@ -2173,7 +2173,7 @@ const BOAT_PALETTE: Record<string, string> = {
   k: '#3b2a22', // 외곽선
   U: '#e8b87f', // 뱃전 윗면
   u: '#c8925a', // 가로대
-  g: '#a8723f', // 가로대 나뭇결
+  g: '#9a6436', // 가로대 나뭇결(낚시 트랙 나무색과 다른 색)
   i: '#6e4526', // 배 안쪽
   I: '#57361c', // 배 바닥 그늘
   o: '#d8b070', // 노
@@ -2516,31 +2516,31 @@ const TILE_CAVE_MOUTH = sprite(CAVE_MOUTH, [
   'dkffffffffffffkd',
 ])
 
-// 선착장 판자: 볕에 바랜 세로 판자, 판자 틈('.')으로 아래 바다가 보인다. 가로 장선 두 줄과 못
+// 선착장 판자: 부두보다 붉고 어두운 가로 판자 네 장(폭이 조금씩 다름), 양옆 어두운 테두리. 물이 비치지 않는다
 const DOCK: Record<string, string> = {
-  U: '#e6d4ae', // 판자 밝은 모서리
-  u: '#c9b08a', // 판자
-  g: '#a68c66', // 나뭇결
-  G: '#7d6648', // 장선
-  k: '#5a4a38', // 못
+  n: '#3b2a22', // 틈·테두리
+  U: '#d9a271', // 판자 윗면 밝은 줄
+  u: '#b97d4c', // 판자
+  g: '#9a6238', // 나뭇결
+  G: '#7c4b2b', // 판자 아래 그늘
 }
 const DOCK_PLANK = sprite(DOCK, [
-  'Uuu.Uuu.Uuu.Uuu.',
-  'Uku.Uuk.Uku.Uuk.',
-  'Uuu.Uuu.Uuu.Uuu.',
-  'Uuu.Ugu.Uuu.Uuu.',
-  'Ugu.Ugu.Uuu.Uug.',
-  'Ugu.Uuu.Uug.Uug.',
-  'Uuu.Uuu.Uug.Uuu.',
-  'UuuGUuuGUuuGUuuG',
-  'Uuu.Uug.Uuu.Uuu.',
-  'Uug.Uug.Uuu.Uuu.',
-  'Uug.Uuu.Ugu.Uuu.',
-  'Uuu.Uuu.Ugu.Ugu.',
-  'Uuu.Uuu.Uuu.Ugu.',
-  'Uku.Uuk.Uku.Uuk.',
-  'Uuu.Uuu.Uuu.Uuu.',
-  'UuuGUuuGUuuGUuuG',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuggguuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nnnnnnnnnnnnnnnn',
+  'nUUUUUUUUUUUUUUn',
+  'nuuuuuuuuuuuuuun',
+  'nuuuuuuuuuuuuuun',
+  'nGGGGGGGGGGGGGGn',
+  'nnnnnnnnnnnnnnnn',
 ])
 
 // 야자수: 나무처럼 아래 16px가 자기 칸(줄기 밑동), 위 16px는 윗칸에 겹친다. 늘어진 잎 여섯 갈래와 열매

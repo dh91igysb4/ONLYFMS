@@ -478,12 +478,7 @@ describe('drawWorld with an offscreen canvas', () => {
         const camera = { x: p.pos.x - screenX, y: p.pos.y - Math.floor(h / 2) }
         const ctx = new RecordingCtx()
         drawWorld(asCtx(ctx), scene('fighting', p, { w, h }, { camera }), { w, h })
-        // 같은 화면의 idle 프레임에도 있는 칸(마을 선착장 배처럼 트랙과 같은 색을 쓰는 월드 그림)은 트랙이 아니다
-        const idle = new RecordingCtx()
-        drawWorld(asCtx(idle), scene('idle', p, { w, h }, { camera }), { w, h })
-        const rectKey = (r: Rect) => `${r.x},${r.y},${r.w},${r.h},${r.color}`
-        const world = new Set(idle.rects.map(rectKey))
-        const track = ctx.rects.filter((r) => TRACK_COLORS.has(r.color) && !world.has(rectKey(r)))
+        const track = ctx.rects.filter((r) => TRACK_COLORS.has(r.color))
         expect(track.length).toBeGreaterThan(0)
         const x0 = Math.min(...track.map((r) => r.x))
         const x1 = Math.max(...track.map((r) => r.x + r.w))

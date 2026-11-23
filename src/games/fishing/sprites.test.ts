@@ -273,6 +273,14 @@ describe('산 호수·동굴·섬 타일 스프라이트', () => {
     expect([SPRITES['tile-palm']?.w, SPRITES['tile-palm']?.h]).toEqual([16, 32])
   })
 
+  it('선착장 판자는 물이 비치지 않고(투명 칸 없음), 부두 판자와 다른 그림이며 fillRect 수가 부두 판자 이하', () => {
+    const runs = (name: string) =>
+      SPRITES[name].rows.reduce((n, row) => n + [...row].filter((ch, i) => ch !== '.' && ch !== row[i - 1]).length, 0)
+    expect(SPRITES['dock-plank'].rows.join('').includes('.')).toBe(false)
+    expect(art('dock-plank')).not.toBe(art('pier-plank'))
+    expect(runs('dock-plank')).toBeLessThanOrEqual(runs('pier-plank'))
+  })
+
   it('새 타일은 서로 다르고, 기존 물·땅 타일과도 다르다', () => {
     const fresh = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), ...GROUNDS, 'tile-palm']
     expect(new Set(fresh.map(art)).size).toBe(fresh.length)
