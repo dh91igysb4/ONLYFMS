@@ -145,6 +145,10 @@ function ignoreRejection(fn: () => Promise<void> | void): void {
 
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
+/** 전설 어종인가. 모르는 어종(더 새 서버)은 아니다 */
+const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
+/** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
+const safePrice = (f: Fish): number | null => (SPECIES.some((s) => s.id === f.species) ? price(f.species, f.sizeCm, f.perfect) : null)
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 // 결과를 모르는 실패: 오류 화면 없이 view를 다시 불러와 맞춘다.
 const SILENT_CODES = new Set(['network', 'no_pending'])
@@ -1167,14 +1171,17 @@ export function Game({ gameId }: WorldGameProps) {
             <div className="fish-toast" aria-live="polite">
               {outcome.kind === 'caught' ? (
                 <>
-                  {outcome.isNew && <strong className="fish-new">새로운 물고기!</strong>}
+                  {isLegend(outcome.fish.species) ? (
+                    <strong className="fish-new fish-toast-legend">전설의 물고기!</strong>
+                  ) : (
+                    outcome.isNew && <strong className="fish-new">새로운 물고기!</strong>
+                  )}
                   <span>
                     {speciesName(outcome.fish.species)} {outcome.fish.sizeCm}cm
                     {outcome.fish.perfect ? ' · 완벽!' : ''}
                   </span>
-                  <span className="fish-toast-price">
-                    {gold(price(outcome.fish.species, outcome.fish.sizeCm, outcome.fish.perfect))}
-                  </span>
+                  {isLegend(outcome.fish.species) && <span className="muted">세이브당 한 마리 · 가방에 잠가 뒀어요</span>}
+                  {safePrice(outcome.fish) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish)!)}</span>}
                 </>
               ) : (
                 <span>{outcome.early ? '너무 일찍 챘어요' : '놓쳤어요'}</span>
