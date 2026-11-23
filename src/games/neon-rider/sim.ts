@@ -92,6 +92,9 @@ export type SimState = {
   blocks: BlockState[]
   // 끝난 블록 id(오래된 것부터, 최대 BLOCK_MEMORY). 다시 깨우지 않는다
   blocksDone: number[]
+  // takenGems에서 버린(충돌 창을 벗어났거나 GEM_MEMORY를 넘친) 보석 id의 최댓값(없으면 -1). 이 값 이하 id의 보석은 다시 줍지 않는다.
+  // 보석이 점수에 들어가므로, 되굴러가서 같은 보석을 다시 줍는 것을 막는다
+  gemFloor: number
 }
 
 // 한 틱 동안의 작업용 바퀴: 속도를 따로 들고, 이번 틱에 닿은 선분을 기록한다.
@@ -371,7 +374,7 @@ export function flipsOf(airAngle: number): number {
 }
 
 export function scoreOf(s: SimState): number {
-  return Math.min(SCORE_MAX, s.sectionScore + s.flipScore)
+  return Math.min(SCORE_MAX, s.sectionScore + s.flipScore + s.gems)
 }
 
 /** 테스트·봇 전용: x의 지면 위에 뒷바퀴를 두고 지면 방향으로 앞바퀴를 둔다. 수평 속도 vx. x가 틈 위면 다음 선분 시작 높이에 둔다. */
@@ -410,6 +413,7 @@ export function initSimAt(course: Course, x: number, vx: number): SimState {
     moversDone: [],
     blocks: [],
     blocksDone: [],
+    gemFloor: -1,
   }
 }
 
@@ -572,11 +576,16 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
   }
   const list = course.gemsBetween(Math.max(0, progress - COLLIDE_WINDOW), progress + COLLIDE_WINDOW)
   const inWindow = new Set(list.map((g) => g.id))
-  const takenGems = s.takenGems.filter((id) => inWindow.has(id))
+  let gemFloor = s.gemFloor
+  const takenGems: number[] = []
+  for (const id of s.takenGems) {
+    if (inWindow.has(id)) takenGems.push(id)
+    else gemFloor = Math.max(gemFloor, id)
+  }
   const taken = new Set(takenGems)
   const h = headOf(r, f)
   for (const g of list) {
-    if (taken.has(g.id)) continue
+    if (g.id <= gemFloor || taken.has(g.id)) continue
     if (
       near(r.x, r.y, g.x, g.y, WHEEL_R) ||
       near(f.x, f.y, g.x, g.y, WHEEL_R) ||
@@ -588,10 +597,12 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     }
   }
   // 창 안의 보석이 아주 많은 지형에서도 상태가 커지지 않게, 가장 뒤의 것부터 버린다(gemsBetween은 id 오름차순).
-  // 받아들인 한계: 버린 id의 보석은 차가 그만큼 되굴러가면 다시 주울 수 있다.
+  // 버린 id는 gemFloor로 올려 다시 줍지 않는다(id는 코스 앞쪽으로 커진다. 받아들인 한계: 버린 id보다 작은, 아직 안 주운 보석도 더는 주울 수 없다).
   takenGems.sort((a, b) => a - b)
-  if (takenGems.length > GEM_MEMORY) takenGems.splice(0, takenGems.length - GEM_MEMORY)
+  if (takenGems.length > GEM_MEMORY) {
+    for (const id of takenGems.splice(0, takenGems.length - GEM_MEMORY)) gemFloor = Math.max(gemFloor, id)
+  }
 
   // ⑧
-  return { ...base, nextSection, sectionScore, flipScore, airAngle, pending, lastAward, gems, takenGems }
+  return { ...base, nextSection, sectionScore, flipScore, airAngle, pending, lastAward, gems, takenGems, gemFloor }
 }

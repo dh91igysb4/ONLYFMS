@@ -249,8 +249,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let seenAward = -1
   let seenGems = 0
   let seenDead = false
-  // 그린 뒤 사라지게 할 보석 id. 시뮬이 GEM_MEMORY를 넘겨 id를 버려도(되굴러가면 다시 주울 수 있음) 여기서는 잊지 않아,
-  // 그렇게 다시 주운 보석은 화면에 다시 나타나지 않는다(받아들인 차이). 새 판(reset)에서만 비운다.
+  // 그린 뒤 사라지게 할 보석 id. 시뮬이 충돌 창을 벗어난 id를 takenGems에서 버려도(gemFloor로 다시 줍지 않는다)
+  // 여기서는 잊지 않아 주운 보석이 다시 나타나지 않는다. 새 판(reset)에서만 비운다.
   const taken = new Set<number>()
   let particles: Particle[] = []
   let popups: Popup[] = []
