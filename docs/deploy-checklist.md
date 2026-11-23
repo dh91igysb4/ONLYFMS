@@ -368,6 +368,33 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
 - 데일리 게임이 늘면 `src/games/economy.test.ts`의 "데일리 게임 수 × 1등 상금 ≤ REF"가 넷째 게임에서 실패한다 → 설계 §8.1대로 상금 표를 줄이는 PR(`economy.ts`와 새 마이그레이션의 `_economy()` 함께).
 - 되돌리기: 화면만 문제면 Vercel 이전 배포로. DB의 `my_wallet()` 정산은 그대로 둬도 옛 화면과 호환된다. 정산 자체를 멈춰야 하면 새 마이그레이션으로 `my_wallet()`에서 `settle_due()` 호출을 뺀다(지급된 장부는 그대로 두고, 잘못 지급됐으면 `admin_gold_adjust`).
 
+## 지갑 배포 (4단계 대전 판돈, `feat/wallet-duel`)
+설계 §9·§14, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 4단계(Task 19~22). 3단계(`feat/wallet-daily`) 뒤에 쌓인 브랜치라 **3단계 PR이 먼저 머지·배포**돼야 한다.
+
+바뀌는 것:
+- 마이그레이션 `20261124010000_duel_stake.sql`: `duel_matches.stake`(0~41,000, 기본 0, 만든 뒤 변경 금지, 숨김 게임은 0만 — 트리거 `_duel_stake_guard`), 지급·환불 트리거 `_duel_settle_stakes`(`status`가 `finished`/`void`로 바뀌는 순간 장부 `duel_stake` 줄 기준: 승자 독식 `duel_payout`, 무승부·무효 `duel_refund`, `user_id` 오름차순), `_duel_item`에 `stake`, `duel_list()`의 10분 만료 정리를 만든 사람 순서로 하나씩(`for update skip locked`) 바꿈.
+- `duel` 함수: `create`의 `stake`(대국 insert 뒤 만든 사람 지갑에서 맡김), `join`의 `stake`(화면이 본 판돈, 다르면 409 `stake_mismatch { stake }`, 같으면 참가자 지갑에서 맡김), 잔액 부족 409 `not_enough_gold`(트랜잭션 전체 롤백), 잘못된 판돈·숨김 게임 판돈·**지갑 게임이 등록부에 없을 때 판돈 > 0** → 400 `invalid_stake`, 응답 `view.stake`.
+- 화면: 대국 만들기의 판돈(빠른 선택 0·100·500·1,000·5,000·10,000 중 상한 이하 + 직접 입력, 상한 min(내 골드, 41,000), "내 골드 N G"; 지갑 게임이 없거나 숨김 게임이면 입력 없음), 대기실·내 대국 "판돈 N G"와 "N G 걸고 참가", 초대 링크 참가 확인 화면, 대국 머리 "판돈 N G" 배지·대기 중 "맡겼어요" 안내, 결과 "+N G"/"−N G"/"판돈을 돌려받았어요", 재대결은 같은 판돈. `/duel/local`은 그대로.
+
+순서: DB push → `duel` 함수 → PR 머지 → Vercel.
+
+- [ ] `npx supabase@2 db push`. 옛 함수·옛 화면은 `stake`를 모르므로 모든 대국이 판돈 0(기본값)으로 지금과 같다.
+- [ ] `npx supabase@2 functions deploy duel --no-verify-jwt` (함수가 `src/games/economy.ts`·등록부를 번들한다). 새 함수 + 옛 화면: 옛 화면은 판돈을 보내지 않아 0으로만 만들고 0으로만 참가한다.
+- [ ] PR 머지 → Vercel 배포
+- [ ] **낚시 Task 4(지갑 이전) 전에는 판돈을 걸 수 없다**: 등록부에 `wallet: true` 게임이 없으면 함수가 판돈 > 0을 거절하고 화면에 입력이 없다(볼 수 없는 골드를 걸지 않게). 이때는 아래 수동 확인 가운데 "판돈 0 대국이 지금과 같다"만 본다. Task 4 배포 뒤 판돈 항목을 확인한다(Task 4 배포 때 `duel` 함수도 다시 배포해야 등록부의 `wallet: true`가 함수에 들어간다).
+- [ ] 수동 확인(두 계정 A·B, 미리보기 → 운영, 폰 390px·PC):
+  - [ ] 판돈 0 대국: 만들기·참가·끝까지 지금과 같다(골드 문구 없음)
+  - [ ] A가 판돈 500 대국을 만든다 → A 헤더 −500, 대기 화면 "판돈 500 G를 맡겼어요"
+  - [ ] B가 초대 링크를 연다 → "판돈 500 G를 걸고 참가할까요? · 이기면 1,000 G를 받아요 · 내 골드 N G" → 참가 → B 헤더 −500. 대기실(공개 대국)에서는 "500 G 걸고 참가" 버튼
+  - [ ] 끝까지 둔다 → 이긴 쪽 결과 "+1,000 G"·헤더 +1,000, 진 쪽 "−500 G". 비기면 둘 다 "판돈을 돌려받았어요"
+  - [ ] 판돈 대국을 만들고 "대국 취소" → 환불. 대기 10분 방치 → 대전 탭을 열거나 다음 대국을 만들 때 환불
+  - [ ] 참가 뒤 아무도 두기 전에 기권 → 무효, 둘 다 환불. 둘 다 둔 뒤 기권·시간 초과 → 패배(상대가 1,000)
+  - [ ] 잔액보다 큰 판돈 입력 → "골드가 부족해요"와 만들기 버튼 비활성. 잔액이 모자란 B의 링크 참가 → 확인 화면에 "골드가 부족해요", 참가 버튼 비활성
+  - [ ] 숨김 대전 게임(관리자) 선택 → 판돈 입력 없음
+  - [ ] `/admin` 골드 장부: "판돈"·"판돈 획득"·"판돈 환불" 줄(게임 이름 함께), 상한 표시 없음
+- 확인 쿼리: 끝난 대국의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'duel\_%' and l.ref in (select id::text from duel_matches where status in ('finished','void')) group by 1 having sum(l.delta) <> 0;`(0행. 진 사람 계정이 지워진 대국만 예외로 나올 수 있다 — 그 사람 장부가 계정과 함께 지워진다), 진행 중 맡긴 돈 `select sum(-delta) from gold_ledger where reason = 'duel_stake' and ref in (select id::text from duel_matches where status in ('waiting','active'));`, 이중 지급 없음은 장부 unique가 보장한다.
+- 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 판돈 0으로만 만들고, 판돈 > 0 대국에 링크로 들어오면 `stake_mismatch` 오류 문구). 함수 문제면 이전 `duel` 함수로 되돌린다 — 옛 함수는 `stake`를 모르고 맡기지 않으므로 판돈 0으로만 만든다. 이미 판돈이 걸린 대국은 트리거가 끝날 때 그대로 지급·환불한다(DB는 되돌리지 않는다).
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

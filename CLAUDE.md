@@ -39,6 +39,7 @@
 - manifest에 `category: 'duel'`, `modes`는 모두 false, `duel: { turnSeconds, sameScreen }`. 로직은 `DuelLogic`(`src/games/types.ts`).
 - 등록은 `src/games/index.ts`의 `duels`, 화면은 `src/games/ui.ts`의 `getDuelComponent`(`DuelGameProps`).
 - 마이그레이션에 `game_modes` (false, false, false) 행과 숨김이면 `hidden_games` 행.
+- 판돈(`duel_matches.stake`, 0~41,000, 숨김 게임 0만, 지갑 게임이 없으면 함수가 0만 받음)은 `duel` 함수가 `create`·`join`에서 `duel_stake`로 맡기고, 지급·환불은 트리거 `_duel_settle_stakes` 한 곳(`status`가 `finished`/`void`로 바뀔 때, 장부 기준). 대국을 끝내거나 무효로 만드는 새 길을 더해도 `status` update만 하면 된다. 참가는 화면이 본 `stake`를 보내고 다르면 409 `stake_mismatch`.
 - `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
 
 지속형(world) 게임은 대전과 비슷하게 추가한다:
