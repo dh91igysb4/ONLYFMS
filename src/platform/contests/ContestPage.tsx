@@ -4,6 +4,10 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import { getGame } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { fetchContestPrizes, type ContestPrize } from '../wallet/api.ts'
+import { walletEnabled } from '../wallet/enabled.ts'
+import { formatGold } from '../wallet/format.ts'
+import { refreshWallet } from '../wallet/useWallet.ts'
 import { syncServerTime } from './clock.ts'
 import { getContest, getEntries, getItems, type ContestRow, type ItemRow } from './data.ts'
 import { countdown, kindLabel, kstLabel, phaseOf } from './format.ts'
@@ -48,6 +52,9 @@ export function ContestPage() {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [, setTick] = useState(0)
   const autoJoinTried = useRef(false)
+  // 받은 상금(지갑 3단계). 끝난 대회에서만 읽는다
+  const [prizes, setPrizes] = useState<ContestPrize[]>([])
+  const [settling, setSettling] = useState(false)
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -109,6 +116,30 @@ export function ContestPage() {
     return () => { alive = false; clearInterval(t) }
   }, [phase, id, lbAttempt])
 
+  // 끝난 대회의 상금. 데일리인데 아직 없으면 정산이 안 됐을 수 있으므로 my_wallet()(= settle_due)을 한 번 부르고 다시 읽는다
+  const kind = contest?.kind
+  useEffect(() => {
+    if (phase !== 'ended' || !walletEnabled()) return
+    let alive = true
+    void (async () => {
+      try {
+        let rows = await fetchContestPrizes(id)
+        if (alive && rows.length === 0 && kind === 'daily') {
+          setSettling(true)
+          await refreshWallet()
+          if (!alive) return
+          rows = await fetchContestPrizes(id)
+        }
+        if (alive) setPrizes(rows)
+      } catch {
+        /* 상금 표시는 덤이다 */
+      } finally {
+        if (alive) setSettling(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [phase, id, kind])
+
   const join = useCallback(async () => {
     if (!me) return
     setJoining(true)
@@ -166,6 +197,9 @@ export function ContestPage() {
 
   const canJoinWithoutCode = contest.visibility === 'public' || isCreator || isAdmin
   const canCancel = (phase === 'lobby' && (isCreator || isAdmin)) || (phase === 'live' && isAdmin)
+  const prizeOf = new Map(prizes.map((p) => [p.userId, p]))
+  const myPrize = me ? prizeOf.get(me) : undefined
+  const showPrizes = phase === 'ended' && prizes.length > 0
   const startMs = Date.parse(contest.starts_at)
   const endMs = Date.parse(contest.ends_at)
 
@@ -229,6 +263,12 @@ export function ContestPage() {
           {(phase === 'live' || phase === 'ended') && (
             <section className="stack" aria-label="순위">
               <h3 className="section-title">{phase === 'live' ? '실시간 순위' : '최종 순위'}</h3>
+              {phase === 'ended' && settling && <p className="muted" role="status">상금을 정산하는 중이에요</p>}
+              {showPrizes && myPrize && (
+                <p className="contest-prize-me">
+                  내 상금 +{formatGold(myPrize.amount)}{myPrize.note ? ` (${myPrize.note})` : ''}
+                </p>
+              )}
               {lbError ? (
                 <div className="stack" role="alert">
                   <p className="form-error">순위를 불러오지 못했어요</p>
@@ -239,12 +279,15 @@ export function ContestPage() {
               ) : (
                 <table className="table">
                   <thead>
-                    <tr><th>순위</th><th>아이디</th><th>점수</th><th>푼 문제</th></tr>
+                    <tr><th>순위</th><th>아이디</th><th>점수</th><th>푼 문제</th>{showPrizes && <th>상금</th>}</tr>
                   </thead>
                   <tbody>
                     {lb.map((r) => (
                       <tr key={r.user_id} className={r.user_id === me ? 'me' : undefined}>
                         <td>{r.rank}</td><td>{r.handle ?? '(알 수 없음)'}</td><td>{r.score}</td><td>{r.solved_items}</td>
+                        {showPrizes && (
+                          <td className="prize-cell">{prizeOf.has(r.user_id) ? `+${formatGold(prizeOf.get(r.user_id)!.amount)}` : ''}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

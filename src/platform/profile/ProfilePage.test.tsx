@@ -386,3 +386,24 @@ test('profile_gold: 지갑을 쓰는 게임이 없으면 user_wallet을 부르�
   expect(rpcMock).not.toHaveBeenCalledWith('user_wallet', expect.anything())
   expect(screen.queryByLabelText(/^골드/)).toBeNull()
 })
+
+test('profile_prize: 데일리 상금 누적 (지갑 3단계)', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 12300 })
+  renderAt('messi')
+  expect(await screen.findByLabelText('데일리 상금 누적 12,300 G')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_prize_total', { p_handle: 'messi' })
+})
+
+test('profile_prize: 0이거나 지갑 게임이 없으면 줄 없음', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 0 })
+  const v = renderAt('messi')
+  await screen.findByLabelText('골드 5,000 G')
+  expect(screen.queryByLabelText(/데일리 상금/)).toBeNull()
+  v.unmount()
+  rpcMock.mockClear()
+  wallet.enabled = false
+  setup({ user_stats: emptyStats, user_prize_total: 12300 })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  expect(rpcMock).not.toHaveBeenCalledWith('user_prize_total', expect.anything())
+})

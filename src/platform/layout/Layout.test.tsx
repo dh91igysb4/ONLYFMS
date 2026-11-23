@@ -246,3 +246,23 @@ test('지갑을 쓰는 게임이 없으면(낚시 이전 전) 배지가 없고 m
   expect(screen.queryByLabelText(/내 골드/)).toBeNull()
   expect(fetchMyWallet).not.toHaveBeenCalled()
 })
+
+test('받은 상금이 있으면 헤더 아래 상금 알림 (지갑 3단계)', async () => {
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  fetchMyWallet.mockImplementation(async () => {
+    const w = { balance: 7384, today: {}, earnedToday: 0 }
+    setWallet(w)
+    setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+    return w
+  })
+  mount()
+  expect((await screen.findByRole('status')).textContent).toContain('데일리 상금이 들어왔어요 · 1등 +6,150 G')
+})
+
+test('지갑 게임이 없으면 상금 알림도 없다', async () => {
+  wallet.enabled = false
+  const { setPrizes } = await import('../../lib/walletStore.ts')
+  setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
+  mount()
+  expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
+})

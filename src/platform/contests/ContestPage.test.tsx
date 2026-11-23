@@ -11,6 +11,8 @@ const dataMock = {
   getEntries: vi.fn(),
 }
 let admin = false
+const wallet = vi.hoisted(() => ({ enabled: true }))
+vi.mock('../wallet/enabled.ts', () => ({ walletEnabled: () => wallet.enabled }))
 vi.mock('../../games/index.ts', async (orig) =>
   (await import('../../test-fixtures/registry.ts')).withTestGame(await orig()))
 vi.mock('../../games/ui.ts', async (orig) =>
@@ -81,6 +83,7 @@ beforeEach(() => {
   rpcMock.mockReset(); playMock.mockReset()
   Object.values(dataMock).forEach((m) => m.mockReset())
   admin = false
+  wallet.enabled = true
   serverOffset = 0
   resetServerTime()
 })
@@ -258,4 +261,88 @@ test('creator can cancel with two taps and sees the invite link', async () => {
   fireEvent.click(screen.getByRole('button', { name: '정말 취소할까요?' }))
   expect(await screen.findByText('취소된 대회예요')).toBeInTheDocument()
   expect(rpcMock).toHaveBeenCalledWith('cancel_contest', { p_id: 'c1' })
+})
+
+// ---- 받은 상금 (지갑 3단계) ----
+const endedDaily = () => contest({
+  kind: 'daily', title: '후알야 · 2026-11-24', daily_key: 'test-guess:2026-11-24',
+  starts_at: iso(sNow() - 25 * 60 * MIN), ends_at: iso(sNow() - 60 * MIN),
+})
+const lb2 = [
+  { rank: 1, user_id: 'u1', handle: 'kane', score: 9, solved_items: 1, action_count: 3, last_finished_at: null },
+  { rank: 2, user_id: 'u2', handle: 'son', score: 7, solved_items: 1, action_count: 4, last_finished_at: null },
+]
+
+function setupPrizes(prizes: unknown[][]) {
+  // contest_prizes를 부를 때마다 다음 값을 돌려준다(마지막 값 유지)
+  let i = 0
+  dataMock.getItems.mockResolvedValue([item(1)])
+  dataMock.getEntries.mockResolvedValue(['u1', 'u2'])
+  rpcMock.mockImplementation(async (name: string) => {
+    calls.push(name)
+    if (name === 'server_now') return sNow()
+    if (name === 'lb_contest') return lb2
+    if (name === 'contest_prizes') return prizes[Math.min(i++, prizes.length - 1)]
+    if (name === 'my_wallet') return { balance: 6150, today: {}, earned_today: 6150, prizes: [] }
+    return null
+  })
+}
+
+test('ended_daily_shows_prize_column_and_my_prize', async () => {
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[
+    { user_id: 'u1', handle: 'kane', amount: 6150, note: '1등' },
+    { user_id: 'u2', handle: 'son', amount: 5120, note: '2등' },
+  ]])
+  renderAt()
+  expect(await screen.findByText('내 상금 +6,150 G (1등)')).toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: '상금' })).toBeInTheDocument()
+  expect(screen.getByText('+5,120 G')).toBeInTheDocument()
+  expect(calls).toContain('contest_prizes')
+  expect(calls).not.toContain('my_wallet')
+})
+
+test('ended_daily_without_prizes_settles_once_then_reloads', async () => {
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[], [{ user_id: 'u1', handle: 'kane', amount: 6150, note: '1등' }]])
+  renderAt()
+  expect(await screen.findByText('내 상금 +6,150 G (1등)')).toBeInTheDocument()
+  expect(calls.filter((c) => c === 'my_wallet')).toHaveLength(1)
+  expect(calls.filter((c) => c === 'contest_prizes')).toHaveLength(2)
+})
+
+test('ended_daily_settle_shows_pending_text_while_running', async () => {
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[]])
+  let release!: () => void
+  const base = rpcMock.getMockImplementation()!
+  rpcMock.mockImplementation(async (name: string, ...rest: unknown[]) => {
+    if (name === 'my_wallet') { calls.push(name); await new Promise<void>((r) => { release = r }); return { balance: 0 } }
+    return base(name, ...rest)
+  })
+  renderAt()
+  expect(await screen.findByText('상금을 정산하는 중이에요')).toBeInTheDocument()
+  release()
+  await vi.waitFor(() => expect(screen.queryByText('상금을 정산하는 중이에요')).toBeNull())
+  expect(screen.queryByRole('columnheader', { name: '상금' })).toBeNull()
+})
+
+test('friendly_ended_without_prizes_has_no_prize_column_and_no_settle', async () => {
+  dataMock.getContest.mockResolvedValue(contest({ starts_at: iso(sNow() - 120 * MIN), ends_at: iso(sNow() - 60 * MIN) }))
+  setupPrizes([[]])
+  renderAt()
+  expect(await screen.findByText('kane')).toBeInTheDocument()
+  await vi.waitFor(() => expect(calls).toContain('contest_prizes'))
+  expect(screen.queryByRole('columnheader', { name: '상금' })).toBeNull()
+  expect(calls).not.toContain('my_wallet')
+})
+
+test('no_prize_ui_when_wallet_disabled', async () => {
+  wallet.enabled = false
+  dataMock.getContest.mockResolvedValue(endedDaily())
+  setupPrizes([[{ user_id: 'u1', handle: 'kane', amount: 6150, note: '1등' }]])
+  renderAt()
+  expect(await screen.findByText('kane')).toBeInTheDocument()
+  expect(calls).not.toContain('contest_prizes')
+  expect(screen.queryByText(/내 상금/)).toBeNull()
 })

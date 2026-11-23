@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useFreeQueueFlush } from '../games/freeQueue.ts'
 import { suggestionPendingCount } from '../suggest/adminApi.ts'
+import { PrizeNotice } from '../wallet/PrizeNotice.tsx'
 import { WalletBadge } from '../wallet/WalletBadge.tsx'
 import { refreshWallet } from '../wallet/useWallet.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
@@ -57,6 +58,7 @@ export function Layout() {
         </div>
       </header>
       <main className="page">
+        {showGold && uid && <PrizeNotice uid={uid} />}
         <Outlet />
       </main>
     </div>

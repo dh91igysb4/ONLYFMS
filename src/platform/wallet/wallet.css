@@ -36,3 +36,14 @@
   margin: 0; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--accent-strong);
 }
+
+/* 받은 상금 (지갑 3단계, 설계 §8): 헤더 아래 알림, 대회 순위의 상금 */
+.prize-notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent-edge);
+}
+.prize-notice-text { flex: 1 1 200px; margin: 0; font-weight: 600; }
+.prize-notice-text strong, .prize-cell, .contest-prize-me { color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+.prize-cell { white-space: nowrap; }
+.contest-prize-me { margin: 0; font-weight: 700; }
