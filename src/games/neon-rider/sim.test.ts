@@ -29,7 +29,7 @@ import {
   WHEEL_R,
 } from './constants.ts'
 import { collideWheel, toFrame, windowCands } from './collide.ts'
-import { courseFromTemplates, courseOf, getCourse } from './course.ts'
+import { courseFromTemplates, courseOf, makeSeededCourse } from './course.ts'
 import type { Course } from './course.ts'
 import { TEMPLATES } from './pieces.ts'
 import type { Template } from './pieces.ts'
@@ -769,18 +769,26 @@ describe('움직이는 길', () => {
     // 움직이는 길을 넣기 전 코드로 만든 최종 상태(JSON). 앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱.
     const before = [
       '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
-      '{"tick":379,"rear":{"x":958745,"y":-13004,"px":954348,"py":-12059,"ground":false},"front":{"x":937502,"y":-5892,"px":934005,"py":-2266,"ground":false},"progress":191,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":1810,"pending":null,"lastAward":null,"gems":6,"takenGems":[],"dead":"crash","airBefore":true}',
+      '{"tick":378,"rear":{"x":936344,"y":52061,"px":934107,"py":52520,"ground":false},"front":{"x":916208,"y":61878,"px":915063,"py":64574,"ground":false},"progress":88,"nextSection":1,"sectionScore":1,"flipScore":1,"airAngle":1705,"pending":{"flips":0,"perfect":false,"grace":9},"lastAward":{"tick":195,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
       '{"tick":527,"rear":{"x":669049,"y":-5120,"px":665937,"py":-5127,"ground":true},"front":{"x":647387,"y":590,"px":644782,"py":2503,"ground":false},"progress":195,"nextSection":0,"sectionScore":0,"flipScore":1,"airAngle":1842,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":{"tick":387,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
-      '{"tick":217,"rear":{"x":640660,"y":4834,"px":637440,"py":4113,"ground":true},"front":{"x":618406,"y":7379,"px":615473,"py":9179,"ground":false},"progress":87,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":null,"pending":null,"lastAward":null,"gems":5,"takenGems":[0,1,2,3,4],"dead":"crash","airBefore":false}',
-      '{"tick":260,"rear":{"x":644397,"y":36521,"px":644162,"py":37548,"ground":false},"front":{"x":634453,"y":16451,"px":635018,"py":17080,"ground":true},"progress":83,"nextSection":1,"sectionScore":1,"flipScore":1,"airAngle":null,"pending":null,"lastAward":{"tick":237,"flips":1,"perfect":false,"points":1},"gems":5,"takenGems":[0,1,2,3,4],"dead":"crash","airBefore":false}'
+      '{"tick":249,"rear":{"x":478770,"y":-72646,"px":477591,"py":-69925,"ground":false},"front":{"x":456536,"y":-75391,"px":455326,"py":-72398,"ground":false},"progress":8,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2125,"pending":null,"lastAward":null,"gems":1,"takenGems":[3],"dead":"crash","airBefore":true}',
+      '{"tick":232,"rear":{"x":662729,"y":11678,"px":659826,"py":10166,"ground":true},"front":{"x":640476,"y":9103,"px":637102,"py":11678,"ground":false},"progress":76,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2044,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":false}'
     ]
+    // 위험물을 더한 템플릿(waves·boostjump·crestgap·loop·spikepit)과 새 템플릿을 빼고 바뀌지 않은 템플릿으로 바꿨다(둘째·넷째·다섯째 값은 이 기능 전 코드 eadbecc에서 같은 시나리오로 뽑음).
+    const PRE_HAZARD_IDS = [
+      'hill', 'waves', 'bowl', 'boostflat', 'spikes', 'valley', 'cliff', 'ledge', 'bigdrop', 'rampflat', 'ramp',
+      'cup', 'quarter', 'boostjump', 'spikefloor', 'spikepit', 'roofs', 'stepup', 'crestgap', 'stairs', 'bowldrop',
+      'loop', 'humps', 'sinuous', 'vplat', 'curl', 'hook', 'arcs', 'loop2', 'spiral',
+    ]
+    const CHANGED = ['waves', 'boostjump', 'crestgap', 'loop', 'spikepit']
+    const statics = TEMPLATES.filter((t) => PRE_HAZARD_IDS.includes(t.id) && !CHANGED.includes(t.id))
     const after: string[] = []
-    for (const [ids, seed] of [[['ramp', 'hill', 'bowl'], 7], [['loop', 'spikepit', 'waves'], 3], [['loop2', 'spikefloor', 'ramp'], 5]] as const) {
+    for (const [ids, seed] of [[['ramp', 'hill', 'bowl'], 7], [['quarter', 'humps', 'valley'], 3], [['loop2', 'spikefloor', 'ramp'], 5]] as const) {
       const c = courseOf(ids)
       after.push(JSON.stringify(run(initSim(c), 1500, randomInput(seed), c)))
     }
     for (const seed of ['0123456789abcdef0123456789abcdef', 'fedcba9876543210fedcba9876543210']) {
-      const c = getCourse(seed)
+      const c = makeSeededCourse(seed, statics)
       after.push(JSON.stringify(run(initSim(c), 3000, (_, i) => i % 50 < 30, c)))
     }
     expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[]}'))
