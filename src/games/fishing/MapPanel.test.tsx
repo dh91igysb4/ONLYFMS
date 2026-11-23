@@ -7,6 +7,7 @@ import { SPECIES, type AreaId } from './data.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Season } from './clock.ts'
 import { minimapUrl } from './minimap.ts'
 import type { View } from './logic.ts'
+import { teleportFee } from './teleport.ts'
 import type { Facing } from './map.ts'
 
 vi.mock('./minimap.ts', async (importOriginal) => {
@@ -192,5 +193,57 @@ describe('MapPanel', () => {
     mount()
     expect(screen.getByTestId('fish-map').querySelector('img.fish-map-img')).toBeNull()
     expect(spotMarker('해안')).toBeInTheDocument()
+  })
+
+  describe('순간이동기', () => {
+    const DONE = { progress: 3, done: true }
+    const tp = () => within(screen.getByTestId('fish-map')).getByRole('button', { name: '순간이동기' })
+    const detail = () => panel().querySelector('.fish-map-detail') as HTMLElement
+
+    it('꺼짐: 과제 제목·설명·진행, 버튼 없음', () => {
+      mount(makeView({ challenges: { 'pier-perfect': { progress: 2, done: false } } }))
+      fireEvent.click(tp())
+      expect(within(detail()).getByText('순간이동기 · 꺼짐')).toBeInTheDocument()
+      expect(within(detail()).getByText('부두의 명수')).toBeInTheDocument()
+      expect(within(detail()).getByText('부두에서 완벽하게 3마리 낚기')).toBeInTheDocument()
+      expect(within(detail()).getByText('진행 2/3')).toBeInTheDocument()
+      expect(within(detail()).queryAllByRole('button')).toHaveLength(0)
+    })
+
+    it('challenges가 없는 옛 응답에도 그려지고 꺼짐·진행 0', () => {
+      const old = makeView() as Partial<View>
+      delete old.challenges
+      mount(old as View)
+      fireEvent.click(tp())
+      expect(within(detail()).getByText('순간이동기 · 꺼짐')).toBeInTheDocument()
+      expect(within(detail()).getByText('진행 0/3')).toBeInTheDocument()
+    })
+
+    it('켜짐: 지금 지역 이동기도 켜졌으면 요금 줄(teleportFee와 같은 값)', () => {
+      mount(makeView({ challenges: { 'pier-perfect': DONE, 'river-rain': { progress: 5, done: true } } }))
+      fireEvent.click(tab(/마을 강/))
+      fireEvent.click(tp())
+      expect(within(detail()).getByText('순간이동기 · 켜짐')).toBeInTheDocument()
+      expect(within(detail()).getByText(`바닷가 마을 이동기에서 오면 ${teleportFee('village', 'river').toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+      expect(within(detail()).queryAllByRole('button')).toHaveLength(0)
+    })
+
+    it('켜졌어도 지금 지역 이동기가 꺼져 있으면 요금 줄 없음', () => {
+      mount(makeView({ challenges: { 'river-rain': { progress: 5, done: true } } }))
+      fireEvent.click(tab(/마을 강/))
+      fireEvent.click(tp())
+      expect(within(detail()).getByText('순간이동기 · 켜짐')).toBeInTheDocument()
+      expect(within(detail()).queryByText(/이동기에서 오면/)).not.toBeInTheDocument()
+    })
+
+    it('가는 길: 두 이동기 모두 켜짐이면 "순간이동기로도 갈 수 있어요"', () => {
+      const { unmount } = mount(makeView({ challenges: { 'pier-perfect': DONE, 'forest-variety': DONE } }))
+      fireEvent.click(tab(/^숲/))
+      expect(within(panel()).getByText(/순간이동기로도 갈 수 있어요/)).toBeInTheDocument()
+      unmount()
+      mount(makeView({ challenges: { 'forest-variety': DONE } }))
+      fireEvent.click(tab(/^숲/))
+      expect(within(panel()).queryByText(/순간이동기로도/)).not.toBeInTheDocument()
+    })
   })
 })

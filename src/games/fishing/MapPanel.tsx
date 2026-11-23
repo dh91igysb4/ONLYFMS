@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { AREAS, RODS, UNLOCKS, type AreaId, type Rarity } from './data.ts'
 import { SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
-  areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, unlockPlace,
+  areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, teleporterInfo, unlockPlace,
   type FishFilter, type FishRow, type NotNow, type PlaceMarker,
 } from './atlas.ts'
 import type { Facing } from './map.ts'
@@ -278,9 +278,9 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
         {pickedSpot && spotRows[pickedSpot] ? (
           <SpotDetail spot={pickedSpot} rows={spotRows[pickedSpot]} filter={filter} view={view} />
         ) : pick?.kind === 'mark' && marks.some((m) => markKey(m) === pick.key) ? (
-          <MarkDetail mark={marks.find((m) => markKey(m) === pick.key)!} view={view} here={here.area} onTab={onTab} />
+          <MarkDetail mark={marks.find((m) => markKey(m) === pick.key)!} area={area} view={view} here={here.area} onTab={onTab} />
         ) : (
-          <AreaSummary rows={areaRows} route={route} />
+          <AreaSummary rows={areaRows} route={route} tpFee={route ? teleporterInfo(area, view, here.area)?.feeFromHere ?? null : null} />
         )}
       </div>
     </>
@@ -307,7 +307,7 @@ function routeText(path: readonly AreaId[]): string {
   }).join(' → ')
 }
 
-function AreaSummary({ rows, route }: { rows: FishRow[]; route: ReturnType<typeof areaRoute> | null }) {
+function AreaSummary({ rows, route, tpFee }: { rows: FishRow[]; route: ReturnType<typeof areaRoute> | null; tpFee: number | null }) {
   const found = rows.filter((r) => r.found).length
   const now = rows.filter((r) => r.now).length
   return (
@@ -315,6 +315,7 @@ function AreaSummary({ rows, route }: { rows: FishRow[]; route: ReturnType<typeo
       {route && (
         <p className="fish-map-route">{route.path ? `가는 길: ${routeText(route.path)}` : '지금은 가는 길이 없어요'}</p>
       )}
+      {tpFee !== null && <p className="muted">{`순간이동기로도 갈 수 있어요 · ${gold(tpFee)}`}</p>}
       <p className="muted">{`물고기 ${rows.length}종 중 ${found}종 찾음 · 지금 잡히는 ${now}종`}</p>
       <p className="muted">낚시 자리를 누르면 그 자리 물고기를 볼 수 있어요</p>
     </>
@@ -372,7 +373,7 @@ function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
   )
 }
 
-function MarkDetail({ mark, view, onTab }: { mark: PlaceMarker; view: View; here: AreaId; onTab(a: AreaId, p?: Pick | null): void }) {
+function MarkDetail({ mark, area, view, here, onTab }: { mark: PlaceMarker; area: AreaId; view: View; here: AreaId; onTab(a: AreaId, p?: Pick | null): void }) {
   const goto = (a: AreaId) => (
     <button type="button" className="btn btn-ghost btn-sm" onClick={() => onTab(a)}>
       {`${areaName(a)} 지도 보기`}
@@ -418,8 +419,35 @@ function MarkDetail({ mark, view, onTab }: { mark: PlaceMarker; view: View; here
     }
     case 'shop':
       return <p>상점 · 물고기 팔기, 낚싯대·가방·찌</p>
-    case 'teleporter':
-      return <p>순간이동기</p>
+    case 'teleporter': {
+      // 켜짐 판정·요금은 서버와 같은 teleporterOpen·teleportFee(atlas의 어댑터). 이동은 이동기 앞에서만 한다
+      const info = teleporterInfo(area, view, here)
+      if (!info) return <p>순간이동기</p>
+      if (info.open) {
+        return (
+          <>
+            <p><strong>순간이동기 · 켜짐</strong></p>
+            {info.feeFromHere !== null && <p className="muted">{`${areaName(here)} 이동기에서 오면 ${gold(info.feeFromHere)}`}</p>}
+            <p className="muted">켜진 다른 순간이동기와 오갈 수 있어요</p>
+          </>
+        )
+      }
+      return (
+        <>
+          <p><strong>순간이동기 · 꺼짐</strong></p>
+          {info.challenge ? (
+            <>
+              <p>{info.challenge.title}</p>
+              <p className="muted">{info.challenge.desc}</p>
+              <p className="muted">{`진행 ${info.challenge.progress}/${info.challenge.count}`}</p>
+              {!view.areas.includes(area) && <p className="muted">지역을 열어야 켤 수 있어요</p>}
+            </>
+          ) : (
+            <p className="muted">아직 꺼져 있어요</p>
+          )}
+        </>
+      )
+    }
   }
 }
 
