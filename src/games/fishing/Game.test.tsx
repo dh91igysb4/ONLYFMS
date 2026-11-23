@@ -16,6 +16,7 @@ import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
 import { CAVE } from './maps/cave.ts'
 import { ISLAND } from './maps/island.ts'
+import { LAKE } from './maps/lake.ts'
 import { DEFAULT_AREAS } from './data.ts'
 import { feetBlocked } from './walk.ts'
 import { teleportFee } from './teleport.ts'
@@ -425,8 +426,9 @@ describe('fishing Game', () => {
     expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
     expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
     expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
-    // 5·6단계는 고급 장비: 신화 말고는 없어도 모든 물고기를 낚는다
-    expect(within(rods).getAllByText('고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요')).toHaveLength(2)
+    // 5단계(백골)는 난파선 앞바다를 연다, 6단계(용왕)는 고급 장비: 신화 말고는 없어도 모든 물고기를 낚는다
+    expect(within(rods).getAllByText('난파선 앞바다에 갈 수 있어요')).toHaveLength(1)
+    expect(within(rods).getAllByText('고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요')).toHaveLength(1)
     unmount()
 
     const rich = makeView({ gold: 2000 })
@@ -2141,6 +2143,62 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
     await flush()
     expect(screen.getByText('덩굴을 걷어 냈어요 — 서쪽 늪지로 갈 수 있어요')).toBeInTheDocument()
+  })
+
+  test('산 호수 북동쪽 눈더미 → 등산 장비 · 120,000 G; 열면 알림, 위로 걸어 나가면 산정 호수 맵', async () => {
+    const gate = LAKE.gates.find((g) => g.area === 'summit')!
+    const view = makeView({ gold: 130000, areas: [...BASE, 'lake'] })
+    await mount(view, { area: 'lake', pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing })
+    await interact()
+    expect(screen.getByRole('heading', { name: '산정 호수' })).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('등산 장비')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('120,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).queryByText(/낚싯대 이상/)).not.toBeInTheDocument()
+    route({ unlockArea: () => ok({ ...view, gold: 10000, areas: [...BASE, 'lake', 'summit'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'summit' } }])
+    expect(screen.getByText('눈더미를 치웠어요 — 북쪽 산정 호수로 갈 수 있어요')).toBeInTheDocument()
+    key('ArrowUp', true)
+    await advance(700)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('summit')
+  })
+
+  test('섬 남쪽 선착장, 난파선 잠김 → 원양 어선 · 150,000 G · 백골 낚싯대 요구; 명장이면 골드가 넉넉해도 막히고, 백골이면 산다', async () => {
+    const dock = ISLAND.docks.find((d) => d.target === 'wreck')!
+    const at = { area: 'island' as const, pos: tileCenter(dock.front.tx, dock.front.ty), facing: dock.front.facing }
+    const { unmount } = await mount(makeView({ gold: 200000, rodTier: 4, areas: [...BASE, 'island'] }), at)
+    await interact()
+    expect(screen.getByRole('heading', { name: '난파선 앞바다' })).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('원양 어선')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('150,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('백골 낚싯대 이상이 있어야 나갈 수 있어요')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeDisabled()
+    unmount()
+    const view = makeView({ gold: 150000, rodTier: 5, areas: [...BASE, 'island'] })
+    await mount(view, at)
+    await interact()
+    expect(within(unlockPanel()).getByText('백골 낚싯대 이상이 있어야 나갈 수 있어요')).toBeInTheDocument()
+    route({ unlockArea: () => ok({ ...view, gold: 0, areas: [...BASE, 'island', 'wreck'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')[0]).toMatchObject({ payload: { type: 'unlockArea', area: 'wreck' } })
+    expect(screen.getByText('원양 어선을 샀어요 — 섬 남쪽 선착장에서 난파선 앞바다로 갈 수 있어요')).toBeInTheDocument()
+    await interact()
+    await advance(400)
+    expect(lastScene().map.id).toBe('wreck')
+  })
+
+  test('해금이 need_rod로 거절되면 낚싯대 요구 문구', async () => {
+    const dock = ISLAND.docks.find((d) => d.target === 'wreck')!
+    await mount(makeView({ gold: 200000, rodTier: 5, areas: [...BASE, 'island'] }), { area: 'island', pos: tileCenter(dock.front.tx, dock.front.ty), facing: dock.front.facing })
+    await interact()
+    route({ unlockArea: () => Promise.reject(new ApiError('need_rod', 400)) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(screen.getByText('백골 낚싯대 이상이 있어야 해요')).toBeInTheDocument()
   })
 
   test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 G); 사면 알림, 다시 행동하면 배를 탄다', async () => {

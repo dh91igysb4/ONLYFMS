@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -197,6 +197,9 @@ const SILENT_CODES = new Set(['network', 'no_pending'])
 
 const RETRY = '다시 시도해 주세요'
 // 낚시 로직의 오류 코드 문구. 플랫폼 공통 문구(MESSAGES)에 넣지 않고 여기서만 쓴다.
+/** need_rod: 낚싯대 요구가 있는 해금(난파선 앞바다)의 가장 낮은 단계 이름으로 만든다("백골 낚싯대 이상이 있어야 해요") */
+const NEED_ROD_TIER = Math.min(...Object.values(UNLOCKS).flatMap((u) => (u?.minRod ? [u.minRod] : [])), ...AREAS.flatMap((a) => (a.minRod ? [a.minRod] : [])))
+const NEED_ROD = `${RODS.find((r) => r.tier === NEED_ROD_TIER)?.name ?? '더 좋은 낚싯대'} 이상이 있어야 해요`
 const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
   not_enough_gold: '골드가 부족해요',
@@ -218,7 +221,7 @@ const FISHING_MESSAGES: Record<string, string> = {
   not_open: '아직 켜지지 않은 순간이동기예요',
   bad_wear: RETRY,
   not_for_sale: '업적으로만 얻을 수 있어요',
-  need_rod: '백골 낚싯대 이상이 있어야 해요',
+  need_rod: NEED_ROD,
   spot_closed: '물이 들어와 갯골에 갈 수 없어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
@@ -243,6 +246,8 @@ const UNLOCK_NOTICES: Partial<Record<AreaId, string>> = {
   island: '배를 샀어요 — 선착장에서 섬으로 갈 수 있어요',
   tideflat: '통나무 더미를 치웠어요 — 서쪽 갯벌로 갈 수 있어요',
   swamp: '덩굴을 걷어 냈어요 — 서쪽 늪지로 갈 수 있어요',
+  summit: '눈더미를 치웠어요 — 북쪽 산정 호수로 갈 수 있어요',
+  wreck: '원양 어선을 샀어요 — 섬 남쪽 선착장에서 난파선 앞바다로 갈 수 있어요',
 }
 const HINTS: Partial<Record<Phase, string>> = {
   charging: '떼면 던져요',

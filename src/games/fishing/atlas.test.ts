@@ -206,6 +206,15 @@ describe('unlockPlace / areaRoute / firstHop', () => {
     expect(unlockPlace('cave')).toEqual({ area: 'forest', kind: 'gate' })
     expect(unlockPlace('island')).toEqual({ area: 'village', kind: 'dock' })
     expect(unlockPlace('village')).toBeNull()
+    expect(unlockPlace('summit')).toEqual({ area: 'lake', kind: 'gate' })
+    expect(unlockPlace('wreck')).toEqual({ area: 'island', kind: 'dock' })
+  })
+
+  it('areaRoute: 섬 → (배) 난파선, 산 호수 → 산정', () => {
+    expect(areaRoute('village', 'wreck', opened('island', 'wreck'))).toEqual({ path: ['village', 'island', 'wreck'], unlockAt: null })
+    expect(areaRoute('village', 'wreck', opened('island'))).toEqual({ path: ['village', 'island'], unlockAt: { area: 'island', kind: 'dock' } })
+    expect(areaRoute('village', 'summit', opened('lake', 'summit')).path).toEqual(['village', 'river', 'lake', 'summit'])
+    expect(firstHop(map('island'), ['island'], 'wreck', opened('island'))).toMatchObject({ kind: 'dock', target: 'wreck' })
   })
 
   it('areaRoute', () => {

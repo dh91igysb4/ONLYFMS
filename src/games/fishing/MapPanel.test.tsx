@@ -327,6 +327,24 @@ describe('MapPanel', () => {
     expect(screen.queryByText(/썰물\(/)).not.toBeInTheDocument()
   })
 
+  it('잠긴 난파선 탭: 원양 어선 · 150,000 G, 섬의 선착장, 백골 낚싯대 이상', () => {
+    mount(makeView({ areas: ['village', 'river', 'forest', 'island'] }))
+    fireEvent.click(tab(/난파선/))
+    expect(within(panel()).getByText('난파선 앞바다는 아직 못 가요')).toBeInTheDocument()
+    expect(within(panel()).getByText('150,000 G')).toBeInTheDocument()
+    expect(within(panel()).getByText(/섬의 선착장 앞에서/)).toBeInTheDocument()
+    expect(within(panel()).getByText('백골 낚싯대 이상이 있어야 해요')).toBeInTheDocument()
+  })
+
+  it('산정 호수 탭: 얼음 구멍 상세에 구멍 뚫기 안내, 온천에는 없다', () => {
+    mount(makeView({ areas: ['village', 'river', 'forest', 'lake', 'summit'] }))
+    fireEvent.click(tab(/산정 호수/))
+    fireEvent.click(spotMarker('얼음 구멍'))
+    expect(screen.getByText('얼음에 구멍을 뚫고 낚아요')).toBeInTheDocument()
+    fireEvent.click(spotMarker('온천'))
+    expect(screen.queryByText('얼음에 구멍을 뚫고 낚아요')).not.toBeInTheDocument()
+  })
+
   it('늪지 탭: 늪·수렁 낚시 자리', () => {
     mount(makeView({ areas: ['village', 'river', 'forest', 'swamp'] }))
     fireEvent.click(tab(/늪지/))

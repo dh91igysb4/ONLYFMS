@@ -9,6 +9,9 @@ import { spriteDataUrl } from './sprites.ts'
 const ICON_SCALE = 2
 /** 신화를 뺀 어종이 요구하는 가장 높은 낚싯대. 이보다 높은 단계는 "고급 장비"(신화만 그 단계를 요구할 수 있다) */
 const PREMIUM_ROD = Math.max(...SPECIES.filter((s) => s.rarity !== 'mythic').map((s) => s.minRod))
+/** 그 낚싯대가 있어야 들어가는 지역 이름들(난파선 앞바다는 백골 이상) */
+const areasNeeding = (tier: number): string[] => AREAS.filter((a) => a.minRod === tier).map((a) => a.name)
+const rodName = (tier: number) => RODS.find((r) => r.tier === tier)?.name ?? `${tier}단계 낚싯대`
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
@@ -210,7 +213,8 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
               <div className="fish-rod-info">
                 <strong>{rod.name}</strong>
                 <span className="muted">{rod.price === 0 ? '기본' : gold(rod.price)}</span>
-                {rod.tier > PREMIUM_ROD && !owned && <span className="muted">고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요</span>}
+                {!owned && areasNeeding(rod.tier).length > 0 && <span className="muted">{`${areasNeeding(rod.tier).join('·')}에 갈 수 있어요`}</span>}
+                {rod.tier > PREMIUM_ROD && !owned && areasNeeding(rod.tier).length === 0 && <span className="muted">고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
                 {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
@@ -313,6 +317,8 @@ export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
   if (!unlock) return null
   const areaName = AREAS.find((a) => a.id === area)?.name ?? area
   const short = view.gold < unlock.price
+  // 낚싯대 요구(난파선 앞바다: 백골 이상). 서버도 unlockArea에서 need_rod로 막는다
+  const rodShort = unlock.minRod !== undefined && view.rodTier < unlock.minRod
   return (
     <section className="fish-panel-body" aria-label="지역 열기">
       <div className="fish-rod">
@@ -321,9 +327,12 @@ export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
           <span className="muted">{areaName}에 갈 수 있어요</span>
           <span className="fish-unlock-price">{gold(unlock.price)}</span>
           <span className="muted">보유 {gold(view.gold)}</span>
+          {unlock.minRod !== undefined && (
+            <span className={rodShort ? 'fish-shop-note' : 'muted'}>{`${rodName(unlock.minRod)} 이상이 있어야 나갈 수 있어요`}</span>
+          )}
           {short && <span className="fish-shop-note">골드가 모자라요</span>}
         </div>
-        <button type="button" className="btn btn-primary btn-sm" disabled={busy || short} onClick={onUnlock}>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy || short || rodShort} onClick={onUnlock}>
           열기
         </button>
       </div>
@@ -428,7 +437,7 @@ export function TeleportPanel({ view, area, busy, onTeleport }: TeleportProps) {
 }
 
 /** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
-export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호', estuary: '하구', creek: '갯골', marsh: '늪', bog: '수렁' }
+export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호', estuary: '하구', creek: '갯골', marsh: '늪', bog: '수렁', ice: '얼음 구멍', hotspring: '온천', wreck: '난파선', abyss: '심해' }
 
 /** 도감에 보일 출현 조건: 자리(spots가 있는 어종) · 계절 · 시간 · 날씨 */
 export function conditionLabel(s: Species): string {
