@@ -88,13 +88,13 @@ describe('map grid', () => {
     for (const k of kinds) expect(used.has(k), k).toBe(true)
   })
 
-  it('walkable kinds are exactly sand, grass, path, pier, flower', () => {
+  it('walkable kinds are exactly sand, grass, path, pier, flower, dock', () => {
     const walkable = new Set<TileKind>()
     for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) walkable.add(tileAt(VILLAGE, tx, ty)!)
-    expect([...walkable].sort()).toEqual(['flower', 'grass', 'path', 'pier', 'sand'])
+    expect([...walkable].sort()).toEqual(['dock', 'flower', 'grass', 'path', 'pier', 'sand'])
     for (const { tx, ty } of allTiles()) {
       const k = tileAt(VILLAGE, tx, ty)!
-      expect(isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)).toBe(['sand', 'grass', 'path', 'pier', 'flower'].includes(k))
+      expect(isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)).toBe(['sand', 'grass', 'path', 'pier', 'flower', 'dock'].includes(k))
     }
   })
 

@@ -33,15 +33,13 @@ describe('position', () => {
     expect(loadPosition('u1')).toEqual({ area: 'village', pos, facing: 'left' })
   })
 
-  test('a river position restores; an unknown or map-less area, a blocked river tile or broken JSON gives null', () => {
+  test('a river position restores; an unknown area, a blocked river tile or broken JSON gives null', () => {
     const south = RIVER.exits[0]
     if (!('edge' in south)) throw new Error('river exit 0 should be an edge exit')
     const walkable = center(south.from, RIVER.h - 2) // 남쪽 출구 바로 안쪽 길
     const saved = { area: 'river' as const, pos: walkable, facing: 'up' as const }
     savePosition('u1', saved)
     expect(loadPosition('u1')).toEqual(saved)
-    localStorage.setItem(KEY, JSON.stringify({ ...saved, area: 'lake' })) // 맵이 아직 없는 지역
-    expect(loadPosition('u1')).toBeNull()
     localStorage.setItem(KEY, JSON.stringify({ ...saved, area: 'moon' }))
     expect(loadPosition('u1')).toBeNull()
     localStorage.setItem(KEY, JSON.stringify({ ...saved, area: 'constructor' }))
@@ -50,6 +48,14 @@ describe('position', () => {
     expect(loadPosition('u1')).toBeNull()
     localStorage.setItem(KEY, '{broken')
     expect(loadPosition('u1')).toBeNull()
+  })
+
+  test('a spot on a locked gate tile (river broken bridge) is accepted: loadPosition checks the map with every area open', () => {
+    // 열린 지역으로 다시 거르는 일은 화면(서버 view의 areas)이 한다
+    const { tiles } = RIVER.gates[0]
+    const saved = { area: 'river' as const, pos: center(tiles.tx, tiles.ty), facing: 'up' as const }
+    savePosition('u1', saved)
+    expect(loadPosition('u1')).toEqual(saved)
   })
 
   test('nothing saved, broken JSON or a wrong shape gives null', () => {
