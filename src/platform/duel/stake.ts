@@ -39,9 +39,19 @@ export function stakeProblem(stake: number | null, balance: number | null): stri
 export type StakeOutcome = { kind: 'won' | 'lost' | 'refund'; amount: number }
 
 /** 끝난 대국에서 내 판돈이 어떻게 됐나. 판돈 0·진행 중이면 null */
-export function stakeOutcome(v: Pick<DuelView, 'status' | 'winner' | 'my_seat'> & { stake?: number | null }): StakeOutcome | null {
+export function stakeOutcome(
+  v: Pick<DuelView, 'status' | 'winner' | 'my_seat' | 'stake_settled'> & { stake?: number | null },
+): StakeOutcome | null {
   const stake = stakeOf(v)
   if (stake === 0) return null
+  // 새 함수는 내 장부 기준 실제 금액을 준다(계정 삭제로 판돈 일부가 사라진 경우까지 맞다)
+  const g = v.stake_settled
+  if (g && (v.status === 'finished' || v.status === 'void')) {
+    if (g.payout > 0) return { kind: 'won', amount: g.payout }
+    if (g.refund > 0) return { kind: 'refund', amount: g.refund }
+    return g.staked > 0 ? { kind: 'lost', amount: g.staked } : null
+  }
+  // 옛 함수(stake_settled 없음): 대국 결과로 계산
   // 무효(대기 중 취소·만료 포함)는 맡긴 사람에게 돌려준다. 대기 중 만든 사람은 자리가 없어도 해당
   if (v.status === 'void') return { kind: 'refund', amount: stake }
   if (v.status !== 'finished' || v.my_seat === null) return null

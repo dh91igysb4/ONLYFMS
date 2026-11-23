@@ -415,6 +415,102 @@ t('stake_version_change_void_refunds', async () => {
   }
 })
 
+// ---------------------------------------------------------------- 리뷰 반영 (I1·Minor 1·2)
+/** 다른 연결이 잠금을 기다리기 시작할 때까지 기다린다 */
+async function waitForLockWait(): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    const [{ n }] = await sql<{ n: number }[]>`
+      select count(*)::int as n from pg_stat_activity where wait_event_type = 'Lock' and datname = current_database()`
+    if (n > 0) return
+    await new Promise((r) => setTimeout(r, 20))
+  }
+  throw new Error('no lock wait observed')
+}
+
+t('stake_create_concurrent_with_wallet_move_no_deadlock', async () => {
+  // B가 X의 지갑을 잡은 채로 → X의 create(판돈)가 지갑을 기다림 → B가 X 장부를 쓴다(FK KEY SHARE on profiles).
+  // create가 profiles를 for update로 잡으면 교착이다. for no key update면 둘 다 커밋된다.
+  const x = await user(1000)
+  const b = await sql.reserve()
+  try {
+    await b`begin`
+    await b`select public._wallet_lock(${x})`
+    const pending = create(x, 300)
+    await waitForLockWait()
+    await b`select public._gold_move(${x}, 50, 'admin', ${crypto.randomUUID()})`
+    await b`commit`
+    const r = await pending
+    assert.equal(r.status, 200, JSON.stringify(r.body))
+    assert.equal(await bal(x), 750)
+  } finally {
+    b.release()
+  }
+})
+
+t('stake_create_concurrent_with_stale_void_refund_no_deadlock', async () => {
+  // X의 오래된 판돈 대기 대국 M을 B(duel_list·expireIfStale 흉내)가 잡고 → X의 create가 일괄 무효에서 M을 기다림 →
+  // B가 M을 무효로 해 환불 트리거가 X 장부를 쓴다. 둘 다 커밋되고 환불은 한 번.
+  const x = await user(1000)
+  const c = await create(x, 400)
+  const mid = c.body.match_id as string
+  const b = await sql.reserve()
+  try {
+    await b`begin`
+    await b`select id from public.duel_matches where id = ${mid} for update`
+    const pending = create(x, 100, T0 + 11 * MIN)
+    await waitForLockWait()
+    await b`update public.duel_matches set status = 'void', end_reason = 'void', ended_at = now() where id = ${mid}`
+    await b`commit`
+    const r = await pending
+    assert.equal(r.status, 200, JSON.stringify(r.body))
+    assert.equal(await status(mid), 'void')
+    const refunds = (await ledger(mid)).filter((l) => l.reason === 'duel_refund')
+    assert.equal(refunds.length, 1)
+    assert.equal(await bal(x), 900, '400 환불 뒤 100 맡김')
+  } finally {
+    b.release()
+  }
+})
+
+t('stake_join_options_mismatch_void_refunds_creator', async () => {
+  const a = await user(1000)
+  const b = await user(1000)
+  const c = await create(a, 500)
+  const id = c.body.match_id as string
+  // 지금 manifest에 없는 설정(배포 사이 manifest가 바뀐 경우)
+  await sql`update public.duel_matches set options = '{"gone":"x"}'::jsonb where id = ${id}`
+  const j = await join(b, id, 500)
+  assert.equal(j.status, 409)
+  assert.equal(j.body.error, 'not_waiting')
+  assert.equal(await status(id), 'void')
+  assert.equal(await bal(a), 1000, '만든 사람 환불')
+  assert.equal(await bal(b), 1000, '참가자 돈은 빠지지 않음')
+  assert.equal(await net(id), 0)
+})
+
+t('stake_view_reports_settled_amounts_from_ledger', async () => {
+  const s = await started(500)
+  await pick(s.first, s.id, 9, 0, T0 + 2 * SEC)
+  await pick(s.second, s.id, 1, 1, T0 + 3 * SEC)
+  const w = await call(s.first, { action: 'view', match_id: s.id }, T0 + 4 * SEC)
+  assert.deepEqual(w.body.stake_settled, { staked: 500, payout: 1000, refund: 0 })
+  const l = await call(s.second, { action: 'view', match_id: s.id }, T0 + 4 * SEC)
+  assert.deepEqual(l.body.stake_settled, { staked: 500, payout: 0, refund: 0 })
+  // 진행 중·판돈 0이면 없음
+  const z = await started(0)
+  const v0 = await call(z.a, { action: 'view', match_id: z.id }, T0 + 2 * SEC)
+  assert.equal(v0.body.stake_settled, undefined)
+  // 이긴 사람 계정이 지워진 대국: 트리거가 환불했으므로 진 사람은 '−'가 아니라 환불을 본다
+  const d = await started(500, 'stk-long')
+  await pick(d.first, d.id, 1, 0, T0 + 2 * SEC)
+  await pick(d.second, d.id, 9, 1, T0 + 3 * SEC)
+  await sql`delete from auth.users where id = ${d.second}`
+  await sql`update public.duel_matches set status = 'finished', winner = 1, end_reason = 'normal', ended_at = now()
+             where id = ${d.id}`
+  const wv = await call(d.first, { action: 'view', match_id: d.id }, T0 + 4 * SEC)
+  assert.deepEqual(wv.body.stake_settled, { staked: 500, payout: 0, refund: 500 })
+})
+
 t('stake_money_conserved_for_every_ended_match', async () => {
   const ended = await sql<{ id: string }[]>`
     select id::text from public.duel_matches where id = any(${made}::uuid[]) and status in ('finished', 'void')`

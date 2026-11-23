@@ -50,3 +50,14 @@ test('stakeOutcome', () => {
   expect(stakeOutcome(v({ status: 'void', winner: null, my_seat: null }))).toEqual({ kind: 'refund', amount: 1000 })
   expect(stakeOutcome(v({ status: 'active' }))).toBeNull()
 })
+
+test('stakeOutcome: 서버가 준 장부 금액(stake_settled)을 우선한다', () => {
+  const v = (o: Record<string, unknown>) => ({ status: 'finished', winner: 0, my_seat: 0, stake: 1000, ...o }) as never
+  // 진 사람 계정이 지워져 승자가 남은 판돈만 받음
+  expect(stakeOutcome(v({ stake_settled: { staked: 1000, payout: 1000, refund: 0 } }))).toEqual({ kind: 'won', amount: 1000 })
+  // 이긴 사람 계정이 지워져 진 사람이 환불받음
+  expect(stakeOutcome(v({ winner: 1, stake_settled: { staked: 1000, payout: 0, refund: 1000 } }))).toEqual({ kind: 'refund', amount: 1000 })
+  expect(stakeOutcome(v({ winner: 1, stake_settled: { staked: 1000, payout: 0, refund: 0 } }))).toEqual({ kind: 'lost', amount: 1000 })
+  // 맡긴 것도 받은 것도 없으면 표시 없음
+  expect(stakeOutcome(v({ status: 'void', winner: null, stake_settled: { staked: 0, payout: 0, refund: 0 } }))).toBeNull()
+})

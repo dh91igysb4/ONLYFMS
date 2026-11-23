@@ -37,6 +37,8 @@ export type DuelView = {
   end_reason: string | null
   final_scores: [number, number] | null
   rating_change?: { before: number; after: number }
+  /** 끝난 판돈 대국의 내 장부 기준 금액(맡김·지급·환불). 옛 함수면 없음 */
+  stake_settled?: { staked: number; payout: number; refund: number }
 }
 
 /** duel({action:'create'})의 응답 */

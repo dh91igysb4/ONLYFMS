@@ -483,3 +483,12 @@ test('match_stake_rematch_keeps_stake', async () => {
   await flush()
   expect((calls('create')[0][0] as { stake: number }).stake).toBe(1000)
 })
+
+test('match_stake_result: uses server ledger amounts when present', async () => {
+  // 이긴 사람 계정이 지워져 트리거가 환불한 경우: 진 사람에게 '−'가 아니라 환불
+  current = ended({ winner: 1, end_reason: 'normal', stake_settled: { staked: 1000, payout: 0, refund: 1000 } })
+  renderAt()
+  await flush()
+  expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
+  expect(screen.queryByText('−1,000 G')).toBeNull()
+})

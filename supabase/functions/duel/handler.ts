@@ -38,6 +38,8 @@ export type DuelView = {
   end_reason: string | null
   final_scores: [number, number] | null
   rating_change?: { before: number; after: number }
+  /** 끝난 판돈 대국에서 내 장부 기준 실제 금액: 맡긴 양·받은 지급·받은 환불 (계정 삭제 같은 경우에도 맞게) */
+  stake_settled?: { staked: number; payout: number; refund: number }
 }
 
 type Status = 'waiting' | 'active' | 'finished' | 'void'
@@ -340,6 +342,17 @@ async function buildView(tx: Tx, m: MatchRow, me: Me, logic: Logic | undefined, 
   const [rc] = await tx<{ before: number; after: number }[]>`
     select before, after from public.duel_rating_changes where match_id = ${m.id} and user_id = ${me.id}`
   if (rc) v.rating_change = { before: rc.before, after: rc.after }
+  // 지급·환불은 트리거가 같은 트랜잭션에서 이미 했다. 화면은 계산하지 않고 내 장부 줄을 그대로 보여 준다
+  if ((m.status === 'finished' || m.status === 'void') && Number(m.stake) > 0) {
+    const [g] = await tx<{ staked: string; payout: string; refund: string }[]>`
+      select coalesce(sum(-delta) filter (where reason = 'duel_stake'), 0)  as staked,
+             coalesce(sum(delta)  filter (where reason = 'duel_payout'), 0) as payout,
+             coalesce(sum(delta)  filter (where reason = 'duel_refund'), 0) as refund
+        from public.gold_ledger
+       where user_id = ${me.id} and ref = ${m.id}
+         and reason in ('duel_stake', 'duel_payout', 'duel_refund')`
+    v.stake_settled = { staked: Number(g.staked), payout: Number(g.payout), refund: Number(g.refund) }
+  }
   return v
 }
 
@@ -498,8 +511,11 @@ async function createTx(deps: DuelDeps, game: DuelModule, me: Me, a: CreateArgs)
     const hidden = await isHidden(tx, game.manifest.id)
     if (hidden && !me.admin) return err(404, 'unknown_game')
     if (hidden && stake > 0) return err(400, 'invalid_stake')
-    // 대기 대국 수 검사를 직렬화한다(같은 사람의 동시 생성)
-    await tx`select 1 from public.profiles where id = ${me.id} for update`
+    // 대기 대국 수 검사를 직렬화한다(같은 사람의 동시 생성).
+    // for no key update: 서로는 막지만 장부 insert의 FK 검사(profiles KEY SHARE)는 막지 않는다. for update면
+    // 내 지갑을 잡은 다른 트랜잭션(낚시 판매·정산·다른 대국 지급·만료 환불)이 내 장부를 쓰려다 이 잠금을 기다리고,
+    // 이쪽은 그 지갑·대국 행을 기다려 교착이 난다(지갑 4단계 리뷰 I1).
+    await tx`select 1 from public.profiles where id = ${me.id} for no key update`
     await tx`
       update public.duel_matches
          set status = 'void', end_reason = 'void', ended_at = ${new Date(now)}

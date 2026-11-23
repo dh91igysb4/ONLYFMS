@@ -392,7 +392,7 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
   - [ ] 잔액보다 큰 판돈 입력 → "골드가 부족해요"와 만들기 버튼 비활성. 잔액이 모자란 B의 링크 참가 → 확인 화면에 "골드가 부족해요", 참가 버튼 비활성
   - [ ] 숨김 대전 게임(관리자) 선택 → 판돈 입력 없음
   - [ ] `/admin` 골드 장부: "판돈"·"판돈 획득"·"판돈 환불" 줄(게임 이름 함께), 상한 표시 없음
-- 확인 쿼리: 끝난 대국의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'duel\_%' and l.ref in (select id::text from duel_matches where status in ('finished','void')) group by 1 having sum(l.delta) <> 0;`(0행. 진 사람 계정이 지워진 대국만 예외로 나올 수 있다 — 그 사람 장부가 계정과 함께 지워진다), 진행 중 맡긴 돈 `select sum(-delta) from gold_ledger where reason = 'duel_stake' and ref in (select id::text from duel_matches where status in ('waiting','active'));`, 이중 지급 없음은 장부 unique가 보장한다.
+- 확인 쿼리: 끝난 대국의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'duel\_%' and l.ref in (select id::text from duel_matches where status in ('finished','void')) group by 1 having sum(l.delta) <> 0;`(0행. 진 사람 계정이 지워진 대국만 예외로 나올 수 있다 — 그 사람 장부가 계정과 함께 지워진다), 진행 중 맡긴 돈 `select sum(-delta) from gold_ledger where reason = 'duel_stake' and ref in (select id::text from duel_matches where status in ('waiting','active'));`(예약 작업이 없으므로 **둘 다 떠난 진행 중 대국·아무도 열지 않은 만료 대기 대국도 누가 열거나(view·tick·기권·대전 탭) 다음 대국을 만들 때까지 여기에 남는다**. 게임이 등록부에서 빠진 대국은 시간 초과가 돌지 않아 기권으로만 끝난다), 이중 지급 없음은 장부 unique가 보장한다.
 - 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 판돈 0으로만 만들고, 판돈 > 0 대국에 링크로 들어오면 `stake_mismatch` 오류 문구). 함수 문제면 이전 `duel` 함수로 되돌린다 — 옛 함수는 `stake`를 모르고 맡기지 않으므로 판돈 0으로만 만든다. 이미 판돈이 걸린 대국은 트리거가 끝날 때 그대로 지급·환불한다(DB는 되돌리지 않는다).
 
 ## 문제가 생기면
