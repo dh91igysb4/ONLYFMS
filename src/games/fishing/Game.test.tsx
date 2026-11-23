@@ -2343,6 +2343,10 @@ describe('도전과제·순간이동기', () => {
     await flush()
     expect(calls('teleport')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'teleport', from: 'village', to: 'river' } }])
     expect(screen.queryByRole('region', { name: '순간이동기' })).not.toBeInTheDocument()
+    // 서버가 받자마자(맵을 바꾸기 전) 도착 자리를 저장한다
+    const dest = RIVER.teleporter!.front
+    expect(lastScene().map.id).toBe('village')
+    expect(savedPos()).toEqual({ area: 'river', pos: tileCenter(dest.tx, dest.ty), facing: dest.facing })
     await advance(400)
     const front = RIVER.teleporter!.front
     expect(lastScene().map.id).toBe('river')

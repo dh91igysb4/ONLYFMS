@@ -831,6 +831,8 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   if (tp && rectInView({ ...tp.tiles, ty: tp.tiles.ty - 1, h: tp.tiles.h + 1 }, tx0, ty0, tx1, ty1)) {
     tall.push({ key: (tp.tiles.ty + tp.tiles.h) * TILE, draw: () => drawTeleporter(ctx, s, tp.tiles, waterFrame(t)) })
   }
+  // 기준선 순으로 그린다(이동기 바로 아래 칸의 나무처럼 훑은 순서와 깊이가 다른 경우)
+  tall.sort((a, b) => a.key - b.key)
   const feet = s.player.pos.y
   for (const it of tall) if (it.key <= feet) it.draw()
   drawPlayer(ctx, s, pose, px, py, tip)

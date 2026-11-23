@@ -956,7 +956,12 @@ export function Game({ gameId }: WorldGameProps) {
     if (!alive.current) return
     if (menuRef.current === 'teleport') closeMenu()
     const dest = mapFor(to)?.teleporter
-    if (dest) startTransition(to, dest.front)
+    if (!dest) return
+    // 요금은 이미 냈으니 도착 자리를 바로 저장한다(맵을 바꾸기 전 새로고침해도 출발지로 돌아가지 않게)
+    const id = userIdRef.current
+    const { tx, ty, facing } = dest.front
+    if (id !== null && placed.current) savePosition(id, { area: to, pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing })
+    startTransition(to, dest.front)
   }
 
   /** 진행 중인 낚시는 건드리지 않고 view만 다시 불러온다. 실패하면 오류 알림 */

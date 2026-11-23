@@ -921,4 +921,31 @@ describe('순간이동기', () => {
     drawWorld(asCtx(c), sc, size)
     expect(named(c, 'teleporter')).toHaveLength(0)
   })
+
+  test('이동기 바로 아래 칸의 나무 윗부분은 (둘 다 캐릭터 앞일 때) 탑보다 나중에 그린다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    // 이동기 (3,3)~(4,4), 그 아래 (3,5)에 나무. 캐릭터는 둘보다 위(1,1)
+    const map = defineMap('river', [
+      'TTTTTTTTT',
+      'T,,,,,,,T',
+      'T,,,,,,,T',
+      'T,,,,,,,T',
+      'T,,,,,,,T',
+      'T,,T,,,,T',
+      'T,,,,,,,T',
+      'TTTTTTTTT',
+    ], { teleporter: { tiles: { tx: 3, ty: 3, w: 2, h: 2 }, front: { tx: 5, ty: 4, facing: 'right' } } })
+    const p = player(tileCentre(1, 1), 'down')
+    const sc: WorldScene = { ...scene('idle', p, size), map, camera: cameraFor(map, p.pos, size) }
+    const c = new RecordingCtx()
+    drawWorld(asCtx(c), sc, size)
+    const tpAt = named(c, 'teleporter')[0].at
+    const tpColors = new Set(Object.values(realSprites.SPRITES.teleporter.palette))
+    const treeOnly = Object.values(realSprites.SPRITES['tile-tree'].palette).filter((col) => !tpColors.has(col))
+    const x0 = 3 * TILE - sc.camera.x
+    const y0 = 4 * TILE - sc.camera.y
+    const leavesAfter = c.rects.filter((r, i) => i >= tpAt && treeOnly.includes(r.color) && r.x >= x0 && r.x < x0 + TILE && r.y >= y0 && r.y < y0 + TILE)
+    expect(tpAt).toBeGreaterThan(players(c)[0].at)
+    expect(leavesAfter.length).toBeGreaterThan(0)
+  })
 })
