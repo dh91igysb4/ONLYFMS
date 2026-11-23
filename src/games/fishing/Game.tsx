@@ -9,7 +9,7 @@ import { price, type Action, type Fish, type PendingView, type View } from './lo
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, exitAt, interactionAt, shopSpot, TILE, tileOf, type Interaction, type MapDef, type Opened, type TileFacing, type Vec } from './map.ts'
+import { castTarget, interactionAt, openExitAt, shopSpot, TILE, tileOf, type Interaction, type MapDef, type Opened, type TileFacing, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
@@ -162,6 +162,8 @@ const FISHING_MESSAGES: Record<string, string> = {
   busy: '낚시 중에는 바꿀 수 없어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
+/** 서버에 낚시(pending)가 남아 있어 지역을 못 열 때. 다시 던졌다 거두면 풀린다 */
+const UNLOCK_BUSY = '낚시를 마친 뒤에 열 수 있어요'
 
 const DESKTOP_IDLE_HINT = '방향키로 이동 · 스페이스로 낚시/상점'
 /** 잠긴 문·선착장 앞에서 행동이 하는 일(행동 버튼 글자, 데스크톱 안내) */
@@ -227,7 +229,6 @@ export function Game({ gameId }: WorldGameProps) {
   const [phase, setPhaseState] = useState<Phase>('idle')
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const badExits = useRef(new Set<string>())
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
@@ -615,15 +616,11 @@ export function Game({ gameId }: WorldGameProps) {
     } else if (rt.phase === 'idle' && !menuRef.current) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
       rt.player = stepWalk(rt.map, rt.player, input, dt, opened)
-      // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다)
-      const exit = exitAt(rt.map, rt.player.pos)
+      // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다). 안 연 지역·맵이 없는 지역으로 가는 출구는 무시한다
+      const exit = openExitAt(rt.map, rt.player.pos, opened)
       if (exit && mapFor(exit.target)) {
         startTransition(exit.target, exit.entry)
         started = true
-      } else if (exit && !badExits.current.has(exit.target)) {
-        // 맵이 없는 지역으로 가는 출구는 무시한다(전환을 시작하면 페이드만 하고 제자리라 갇힌 것처럼 보인다)
-        badExits.current.add(exit.target)
-        console.error(`fishing: exit to unmapped area "${exit.target}" ignored`)
       }
     } else if (rt.player.moving) {
       rt.player = { ...rt.player, moving: false, walkMs: 0 }
@@ -914,8 +911,8 @@ export function Game({ gameId }: WorldGameProps) {
         await reload()
         return
       }
-      // 창은 열어 둔 채 오류만 알린다(상점 구매와 같은 표시)
-      setNotice({ kind: 'error', text: fishingMessage(code) })
+      // 창은 열어 둔 채 오류만 알린다(상점 구매와 같은 표시). busy는 장비 문구 대신 해금 문구
+      setNotice({ kind: 'error', text: code === 'busy' ? UNLOCK_BUSY : fishingMessage(code) })
     }
   }
 

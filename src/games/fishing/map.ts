@@ -228,6 +228,33 @@ export function exitAt(map: MapDef, pos: Vec): Exit | null {
   return null
 }
 
+/** 출구 칸이고 그 출구가 가는 지역이 열려 있으면 그 출구. 안 연 지역으로 가는 출구는 null(걸어 들어가지 않는다). */
+export function openExitAt(map: MapDef, pos: Vec, opened: Opened): Exit | null {
+  const exit = exitAt(map, pos)
+  return exit && opened.has(exit.target) ? exit : null
+}
+
+/**
+ * 시작 칸들에서 4방향으로 걸어 닿는 칸들("tx,ty"). 열린 지역 기준(잠긴 문 칸은 못 지난다).
+ * 못 걷는 시작 칸은 무시한다.
+ */
+export function reachableTiles(map: MapDef, starts: readonly { tx: number; ty: number }[], opened: Opened): ReadonlySet<string> {
+  const seen = new Set<string>()
+  const queue: { tx: number; ty: number }[] = []
+  const visit = (tx: number, ty: number) => {
+    const k = `${tx},${ty}`
+    if (seen.has(k) || !isWalkable(map, tx, ty, opened)) return
+    seen.add(k)
+    queue.push({ tx, ty })
+  }
+  for (const s of starts) visit(s.tx, s.ty)
+  for (let i = 0; i < queue.length; i++) {
+    const { tx, ty } = queue[i]
+    for (const { dx, dy } of Object.values(STEP)) visit(tx + dx, ty + dy)
+  }
+  return seen
+}
+
 export type Interaction =
   | { kind: 'shop' }
   | { kind: 'fish'; spot: string }

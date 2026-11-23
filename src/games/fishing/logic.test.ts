@@ -917,7 +917,7 @@ describe('지역 해금', () => {
     expect(ok(logic.apply(fresh({ gold: 15000 }), unlock('cave'), ctx())).state.gold).toBe(0)
     expect(ok(logic.apply(fresh({ gold: 50000 }), unlock('island'), ctx())).state.gold).toBe(0)
   })
-  it('해금한 지역에는 던질 수 있다(어종이 있는 지역)', () => {
+  it('unlockArea lake 뒤 areas에 lake가 들어간다', () => {
     const s = ok(logic.apply(fresh({ gold: 5000 }), unlock('lake'), ctx())).state
     expect(s.areas).toContain('lake')
   })

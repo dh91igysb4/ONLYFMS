@@ -3,7 +3,7 @@
 // 1단계 형식({pos, facing}, area 없음)은 마을로 읽는다.
 // 열린 지역으로 거르는 일은 첫 서버 상태를 받은 뒤 startPosition이 한다.
 import { AREAS, type AreaId } from './data.ts'
-import { ALL_AREAS_OPEN, type Facing, type MapDef, type Opened, type Vec } from './map.ts'
+import { ALL_AREAS_OPEN, reachableTiles, tileOf, type Facing, type MapDef, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { feetBlocked } from './walk.ts'
@@ -47,11 +47,29 @@ export function savePosition(userId: string, p: SavedPosition): void {
 }
 
 /**
+ * 열린 지역 기준으로 이 맵에 실제로 들어올 수 있는 도착 칸들:
+ * 열린 다른 맵의 출구·선착장 중 이 맵으로 오는 것의 entry, 마을이면 시작 위치(상점 문 앞)도.
+ */
+function arrivalTiles(map: MapDef, opened: Opened): { tx: number; ty: number }[] {
+  const out = AREAS.flatMap((a) => {
+    const from = opened.has(a.id) ? mapFor(a.id) : null
+    if (!from) return []
+    return [...from.exits, ...from.docks].filter((e) => e.target === map.id).map(({ entry: { tx, ty } }) => ({ tx, ty }))
+  })
+  if (map.id === VILLAGE.id) out.push(tileOf(VILLAGE.spawn.pos))
+  return out
+}
+
+/**
  * 첫 서버 상태(열린 지역)를 받은 뒤 시작할 자리.
- * 저장 위치가 없거나, 그 지역이 아직 안 열렸거나, 발이 열린 지역 기준으로 못 걷는 칸(아직 잠긴 문 등)에 걸치면 마을 시작 위치.
+ * 저장 위치가 없거나, 그 지역이 아직 안 열렸거나, 발이 열린 지역 기준으로 못 걷는 칸(아직 잠긴 문 등)에 걸치거나,
+ * 열린 지역 기준으로 그 맵의 도착 칸들에서 걸어 닿지 못하는 칸(잠긴 문 너머 등)이면 마을 시작 위치.
  */
 export function startPosition(saved: SavedPosition | null, opened: Opened): SavedPosition {
   const map = saved && opened.has(saved.area) ? mapFor(saved.area) : null
-  if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) return saved
+  if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
+    const { tx, ty } = tileOf(saved.pos)
+    if (reachableTiles(map, arrivalTiles(map, opened), opened).has(`${tx},${ty}`)) return saved
+  }
   return { area: VILLAGE.id, pos: { ...VILLAGE.spawn.pos }, facing: VILLAGE.spawn.facing }
 }

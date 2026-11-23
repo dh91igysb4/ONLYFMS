@@ -139,6 +139,21 @@ describe('startPosition (첫 서버 상태를 받은 뒤 시작 자리)', () => 
     expect(startPosition(saved, opened('lake'))).toEqual(saved)
   })
 
+  test('a saved spot beyond a locked gate (river north of the broken bridge) is unreachable while lake is closed → spawn; kept once lake is open', () => {
+    // (24,1)은 산 호수에서 강으로 내려온 도착 칸. 산 호수가 닫혀 있으면 어느 도착점에서도 걸어 닿지 못한다
+    const saved = at('river', 24, 1)
+    expect(startPosition(saved, opened())).toEqual(AT_SPAWN)
+    expect(startPosition(saved, opened('lake'))).toEqual(saved)
+  })
+
+  test('reachable positions in base areas are still restored (river south field, forest)', () => {
+    const river = at('river', 24, 4)
+    expect(startPosition(river, opened())).toEqual(river)
+    const into = RIVER.exits.find((e) => e.target === 'forest')!.entry
+    const forest = { area: 'forest' as const, pos: center(into.tx, into.ty), facing: into.facing }
+    expect(startPosition(forest, opened())).toEqual(forest)
+  })
+
   test('a cave or island position restores there when that area is open', () => {
     const into = FOREST.exits.find((e) => e.target === 'cave')!.entry // 숲에서 들어온 자리
     const cave = { area: 'cave' as const, pos: center(into.tx, into.ty), facing: into.facing }

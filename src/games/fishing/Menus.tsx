@@ -8,6 +8,15 @@ import { spriteDataUrl } from './sprites.ts'
 const ICON_SCALE = 2
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
+/** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
+const knownSpecies = (id: string) => SPECIES.some((s) => s.id === id)
+/** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
+const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }): number | null =>
+  knownSpecies(f.species) ? price(f.species, f.sizeCm, f.perfect) : null
+const priceLabel = (f: { species: string; sizeCm: number; perfect: boolean }): string => {
+  const v = fishPrice(f)
+  return v === null ? '—' : gold(v)
+}
 
 type BagProps = {
   view: View
@@ -89,9 +98,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
                 onClick={() => onLock(i, !f.locked)}
               >
                 {f.locked && <span className="fish-cell-lock" aria-hidden="true" />}
-                <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt="" />
+                {knownSpecies(f.species) && <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt="" />}
                 <span className="fish-cell-size">{f.sizeCm}cm</span>
-                <span className="fish-cell-price">{gold(price(f.species, f.sizeCm, f.perfect))}</span>
+                <span className="fish-cell-price">{priceLabel(f)}</span>
               </button>
             </li>
           ) : (
@@ -109,7 +118,8 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
-  const bagValue = selling.reduce((sum, f) => sum + price(f.species, f.sizeCm, f.perfect), 0)
+  // 모르는 어종은 예상 금액에서 뺀다(서버가 팔 때 값을 정한다)
+  const bagValue = selling.reduce((sum, f) => sum + (fishPrice(f) ?? 0), 0)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
   const slots = tackleSlots(view.rodTier)

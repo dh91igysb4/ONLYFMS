@@ -9,7 +9,9 @@ import {
   exitAt,
   interactionAt,
   isWalkable,
+  openExitAt,
   pierEnd,
+  reachableTiles,
   shopSpot,
   spotFor,
   tileAt,
@@ -24,6 +26,8 @@ import {
 } from './map.ts'
 import type { AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
+import { RIVER } from './maps/river.ts'
+import { DEFAULT_AREAS } from './data.ts'
 
 const MAP_W = VILLAGE.w
 const MAP_H = VILLAGE.h
@@ -481,6 +485,35 @@ describe('문·선착장·안쪽 출구', () => {
     expect(exitAt(MAP, { x: 2 * TILE + TILE - 0.01, y: TILE + 1 })).toBe(CAVE_EXIT)
     expect(exitAt(MAP, center(3, 1))).toBeNull()
     expect(exitAt(MAP, center(1, 3))).toBeNull()
+  })
+
+  it('openExitAt: 안 연 지역으로 가는 출구는 null, 열면 그 출구(실제 강 북쪽 출구)', () => {
+    const base: Opened = new Set<AreaId>(DEFAULT_AREAS)
+    const lakeExit = RIVER.exits.find((e) => e.target === 'lake')!
+    for (const tx of [24, 25]) {
+      expect(exitAt(RIVER, center(tx, 0))).toBe(lakeExit)
+      expect(openExitAt(RIVER, center(tx, 0), base)).toBeNull()
+      expect(openExitAt(RIVER, center(tx, 0), new Set<AreaId>([...DEFAULT_AREAS, 'lake']))).toBe(lakeExit)
+    }
+    // 기본 지역으로 가는 출구는 그대로
+    const south = RIVER.exits.find((e) => e.target === 'village')!
+    expect(openExitAt(RIVER, center(24, RIVER.h - 1), base)).toBe(south)
+    expect(openExitAt(RIVER, center(10, 10), base)).toBeNull()
+  })
+
+  it('reachableTiles: 시작 칸에서 열린 지역 기준으로 걸어 닿는 칸. 잠긴 문 너머는 빠지고, 못 걷는 시작 칸은 무시', () => {
+    const base: Opened = new Set<AreaId>(DEFAULT_AREAS)
+    const start = [{ tx: 24, ty: 4 }]
+    const closed = reachableTiles(RIVER, start, base)
+    expect(closed.has('24,4')).toBe(true)
+    expect(closed.has('24,2')).toBe(false)
+    expect(closed.has('24,1')).toBe(false)
+    expect(closed.has('24,0')).toBe(false)
+    const open = reachableTiles(RIVER, start, new Set<AreaId>([...DEFAULT_AREAS, 'lake']))
+    expect(open.has('24,1')).toBe(true)
+    expect(open.has('25,0')).toBe(true)
+    // 시작 칸이 못 걷는 칸(나무)이면 아무 칸도 없다
+    expect(reachableTiles(RIVER, [{ tx: 0, ty: 0 }], base).size).toBe(0)
   })
 
   it('defineMap: 문 칸이 맵 밖이면 throw, 선착장 front가 못 걷는 칸이면 throw', () => {
