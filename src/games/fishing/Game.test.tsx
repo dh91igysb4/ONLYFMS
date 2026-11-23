@@ -2103,6 +2103,46 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(screen.getByText('동굴')).toBeInTheDocument()
   })
 
+  test('마을 서쪽 끝 통나무 더미 → 갯벌 장화 · 30,000 G; 열면 알림, 왼쪽으로 걸어 나가면 갯벌 맵', async () => {
+    const gate = VILLAGE.gates.find((g) => g.area === 'tideflat')!
+    const view = makeView({ gold: 35000, areas: BASE })
+    await mount(view, { area: 'village', pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing })
+    await advance(50)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 살펴보기')).toBeInTheDocument()
+    await interact()
+    expect(screen.getByRole('heading', { name: '갯벌' })).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('갯벌 장화')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('30,000 G')).toBeInTheDocument()
+    route({ unlockArea: () => ok({ ...view, gold: 5000, areas: [...BASE, 'tideflat'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'tideflat' } }])
+    expect(screen.getByText('통나무 더미를 치웠어요 — 서쪽 갯벌로 갈 수 있어요')).toBeInTheDocument()
+    key('ArrowLeft', true)
+    await advance(600)
+    key('ArrowLeft', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('tideflat')
+  })
+
+  test('숲 서쪽 엉킨 덩굴 → 늪 나무 데크 · 60,000 G; 골드가 모자라면 열기 비활성, 열면 알림', async () => {
+    const gate = FOREST.gates.find((g) => g.area === 'swamp')!
+    const at = { area: 'forest' as const, pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing }
+    const { unmount } = await mount(makeView({ gold: 59999, areas: BASE }), at)
+    await interact()
+    expect(within(unlockPanel()).getByText('늪 나무 데크')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('60,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeDisabled()
+    unmount()
+    const view = makeView({ gold: 60000, areas: BASE })
+    await mount(view, at)
+    await interact()
+    route({ unlockArea: () => ok({ ...view, gold: 0, areas: [...BASE, 'swamp'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(screen.getByText('덩굴을 걷어 냈어요 — 서쪽 늪지로 갈 수 있어요')).toBeInTheDocument()
+  })
+
   test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 G); 사면 알림, 다시 행동하면 배를 탄다', async () => {
     const view = makeView({ gold: 60000, areas: BASE })
     await mount(view, AT_VILLAGE_DOCK)

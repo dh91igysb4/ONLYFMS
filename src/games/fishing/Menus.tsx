@@ -428,7 +428,7 @@ export function TeleportPanel({ view, area, busy, onTeleport }: TeleportProps) {
 }
 
 /** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
-export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호' }
+export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호', estuary: '하구', creek: '갯골', marsh: '늪', bog: '수렁' }
 
 /** 도감에 보일 출현 조건: 자리(spots가 있는 어종) · 계절 · 시간 · 날씨 */
 export function conditionLabel(s: Species): string {

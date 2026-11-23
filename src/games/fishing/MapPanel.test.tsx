@@ -315,4 +315,21 @@ describe('MapPanel', () => {
       expect(within(panel()).queryByText(/순간이동기로도/)).not.toBeInTheDocument()
     })
   })
+
+  it('갯벌 탭: 갯골 상세에 썰물 안내, 하구에는 없다', () => {
+    mount(makeView({ areas: ['village', 'river', 'forest', 'tideflat'] }))
+    fireEvent.click(tab(/갯벌/))
+    fireEvent.click(spotMarker('갯골'))
+    expect(screen.getByText('썰물(2~6시·14~18시)에만 걸어 들어가요')).toBeInTheDocument()
+    fireEvent.click(spotMarker('하구'))
+    expect(screen.queryByText(/썰물\(/)).not.toBeInTheDocument()
+  })
+
+  it('늪지 탭: 늪·수렁 낚시 자리', () => {
+    mount(makeView({ areas: ['village', 'river', 'forest', 'swamp'] }))
+    fireEvent.click(tab(/늪지/))
+    expect(spotMarker('늪')).toBeInTheDocument()
+    expect(spotMarker('수렁')).toBeInTheDocument()
+  })
 })
+
