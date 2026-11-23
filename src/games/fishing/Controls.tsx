@@ -1,5 +1,6 @@
 // 터치 조작: 왼쪽 아래 조이스틱, 오른쪽 아래 행동 버튼. 캔버스 위에 겹쳐 뜬다.
 // 두 조작은 각자 잡은 손가락(pointerId)만 따라가므로 한 손가락으로 걸으면서 다른 손가락으로 누를 수 있다.
+// 손가락을 떼거나, 취소되거나, 포인터 캡처를 잃으면 모두 뗀 것으로 친다(걷기가 멈추지 않는 일이 없게).
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { joystickVector, type MoveInput } from './walk.ts'
 
@@ -15,7 +16,13 @@ type Props = {
   action: ActionState
   onActionDown(): void
   onActionUp(): void
+  /** 걸을 수 있는 때(대기)인가. 아니면 조이스틱 자리를 누르는 것은 캔버스를 누르는 것과 같다(챔·감기). */
+  walking: boolean
+  onTapDown(pointerId: number): void
+  onTapUp(pointerId: number): void
 }
+
+type Vec = { x: number; y: number }
 
 function capture(e: ReactPointerEvent<HTMLElement>): void {
   try {
@@ -25,55 +32,76 @@ function capture(e: ReactPointerEvent<HTMLElement>): void {
   }
 }
 
-export function Controls({ onMove, action, onActionDown, onActionUp }: Props) {
+export function Controls({ onMove, action, onActionDown, onActionUp, walking, onTapDown, onTapUp }: Props) {
   // 조이스틱: 누른 자리가 중심. 새 손가락이 누르면 그 손가락으로 넘어간다(떼는 알림을 놓쳐도 갇히지 않게).
+  // 누를 때 걸을 수 있으면 'walk'(방향 입력), 아니면 'tap'(누르기)으로 그 손가락이 뗄 때까지 간다.
   const stickId = useRef<number | null>(null)
-  const origin = useRef({ x: 0, y: 0 })
-  const [knob, setKnob] = useState({ x: 0, y: 0 })
+  const stickMode = useRef<'walk' | 'tap'>('walk')
+  const origin = useRef<{ client: Vec; local: Vec }>({ client: { x: 0, y: 0 }, local: { x: 0, y: 0 } })
+  /** 손잡이 중심(받침 안 좌표). null이면 받침 가운데 */
+  const [knob, setKnob] = useState<Vec | null>(null)
   const actionId = useRef<number | null>(null)
   const [pressed, setPressed] = useState(false)
 
   // 최신 콜백을 창 이벤트·정리 함수에서 부르기 위해
-  const onMoveRef = useRef(onMove)
-  onMoveRef.current = onMove
+  const latest = useRef({ onMove, onActionUp, onTapUp })
+  latest.current = { onMove, onActionUp, onTapUp }
 
-  const resetStick = () => {
+  const endStick = () => {
+    const id = stickId.current
+    if (id === null) return
     stickId.current = null
-    setKnob({ x: 0, y: 0 })
-    onMoveRef.current(STOP)
+    if (stickMode.current === 'tap') latest.current.onTapUp(id)
+    else {
+      setKnob(null)
+      latest.current.onMove(STOP)
+    }
+  }
+  const endAction = () => {
+    if (actionId.current === null) return
+    actionId.current = null
+    setPressed(false)
+    latest.current.onActionUp()
   }
 
-  // 창이 초점을 잃으면 손가락을 뗀 알림이 오지 않을 수 있다. 화면을 떠날 때도 멈춘다.
+  // 창이 초점을 잃으면 손가락을 뗀 알림이 오지 않을 수 있다. 화면을 떠날 때도 놓는다.
   useEffect(() => {
-    const onBlur = () => {
-      if (stickId.current !== null) resetStick()
-    }
-    window.addEventListener('blur', onBlur)
+    window.addEventListener('blur', endStick)
     return () => {
-      window.removeEventListener('blur', onBlur)
-      if (stickId.current !== null) onMoveRef.current(STOP)
+      window.removeEventListener('blur', endStick)
+      endStick()
+      endAction()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const stickDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     capture(e)
+    endStick()
     stickId.current = e.pointerId
-    origin.current = { x: e.clientX, y: e.clientY }
-    setKnob({ x: 0, y: 0 })
+    if (!walking) {
+      stickMode.current = 'tap'
+      onTapDown(e.pointerId)
+      return
+    }
+    stickMode.current = 'walk'
+    const box = e.currentTarget.getBoundingClientRect()
+    const local = { x: e.clientX - box.left, y: e.clientY - box.top }
+    origin.current = { client: { x: e.clientX, y: e.clientY }, local }
+    setKnob(local)
   }
   const stickMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current) return
-    const dx = e.clientX - origin.current.x
-    const dy = e.clientY - origin.current.y
+    if (e.pointerId !== stickId.current || stickMode.current !== 'walk') return
+    const dx = e.clientX - origin.current.client.x
+    const dy = e.clientY - origin.current.client.y
     const len = Math.hypot(dx, dy)
     const k = len > STICK_RADIUS ? STICK_RADIUS / len : 1
-    setKnob({ x: dx * k, y: dy * k })
+    setKnob({ x: origin.current.local.x + dx * k, y: origin.current.local.y + dy * k })
     onMove(joystickVector(dx, dy, STICK_RADIUS))
   }
   const stickUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current) return
-    resetStick()
+    if (e.pointerId === stickId.current) endStick()
   }
 
   const actionDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -84,10 +112,7 @@ export function Controls({ onMove, action, onActionDown, onActionUp }: Props) {
     onActionDown()
   }
   const actionUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (e.pointerId !== actionId.current) return
-    actionId.current = null
-    setPressed(false)
-    onActionUp()
+    if (e.pointerId === actionId.current) endAction()
   }
 
   return (
@@ -100,8 +125,9 @@ export function Controls({ onMove, action, onActionDown, onActionUp }: Props) {
         onPointerMove={stickMove}
         onPointerUp={stickUp}
         onPointerCancel={stickUp}
+        onLostPointerCapture={stickUp}
       >
-        <span className="fish-stick-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+        <span className="fish-stick-knob" style={knob ? { left: knob.x, top: knob.y } : undefined} />
       </div>
       <button
         type="button"
@@ -111,6 +137,7 @@ export function Controls({ onMove, action, onActionDown, onActionUp }: Props) {
         onPointerDown={actionDown}
         onPointerUp={actionUp}
         onPointerCancel={actionUp}
+        onLostPointerCapture={actionUp}
         // 길게 눌러도 메뉴가 뜨지 않게
         onContextMenu={(e) => e.preventDefault()}
       >

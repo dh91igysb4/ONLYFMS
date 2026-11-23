@@ -1,6 +1,6 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
 // 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
@@ -21,6 +21,8 @@ const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
 const MAX_SCENE_W = 320
 const MAX_SCENE_H = 480
+/** 상점 창이 열린 뒤 이 시간 동안은 누르기·클릭을 받지 않는다(여는 손가락의 클릭이 구매 버튼에 떨어지지 않게) */
+const PANEL_GUARD_MS = 300
 /** 무대 아래 요소를 재고도 남겨 두는 여유 높이 */
 const FIT_MARGIN = 8
 
@@ -62,12 +64,18 @@ type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: '
 type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
 /** 누르기를 보낸 곳. 낚시 시작(충전·던지기)과 상점은 행동(버튼·스페이스)으로만, 챔·감기는 캔버스로도 된다. */
 type Source = 'action' | 'canvas'
+// 누르고 있는 것마다 다른 열쇠: 행동 버튼 'button', 스페이스 'space', 캔버스 `canvas:<id>`, 조이스틱 자리 `stick:<id>`
 
 /** 렌더와 무관하게 프레임·타이머가 읽고 쓰는 진행 상태 */
 type Runtime = {
   phase: Phase
   busy: boolean
-  pointer: boolean
+  /** 지금 누르고 있는 것들의 열쇠. 하나라도 있으면 미니게임 바가 올라간다 */
+  held: Set<string>
+  /** 충전을 시작한 누르기. 그것을 뗄 때만 던진다 */
+  chargeKey: string | null
+  /** 상점 문 앞에서 누른 행동. 그것을 뗄 때 상점을 연다 */
+  shopKey: string | null
   chargeStart: number
   gauge: number
   castPower: number
@@ -177,6 +185,7 @@ export function Game({ gameId }: WorldGameProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View | null>(null)
   const menuRef = useRef<Menu | null>(null)
+  const shopOpenedAt = useRef(0)
   const alive = useRef(true)
   const timers = useRef(new Set<number>())
   const [rt] = useState<Runtime>(() => {
@@ -184,7 +193,7 @@ export function Game({ gameId }: WorldGameProps) {
     const start = (userId !== null ? loadPosition(userId) : null) ?? SPAWN
     const player: Player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
     return {
-      phase: 'idle', busy: false, pointer: false, chargeStart: 0, gauge: 0, castPower: 0,
+      phase: 'idle', busy: false, held: new Set(), chargeKey: null, shopKey: null, chargeStart: 0, gauge: 0, castPower: 0,
       player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(player)), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0,
     }
@@ -209,7 +218,10 @@ export function Game({ gameId }: WorldGameProps) {
   const setMenu = (m: Menu | null) => {
     if (m) {
       clearMove()
-      rt.pointer = false
+      rt.held.clear()
+      rt.chargeKey = null
+      rt.shopKey = null
+      if (m === 'shop') shopOpenedAt.current = performance.now()
     }
     menuRef.current = m
     setMenuState(m)
@@ -372,8 +384,8 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   // ------------------------------------------------------------ 입력
-  function press(source: Source) {
-    rt.pointer = true
+  function press(source: Source, key: string) {
+    rt.held.add(key)
     if (rt.busy || menuRef.current || !viewRef.current) return
     switch (rt.phase) {
       case 'idle': {
@@ -381,12 +393,13 @@ export function Game({ gameId }: WorldGameProps) {
         const at = interactionFor(rt.player)
         if (!at) break
         if (at.kind === 'shop') {
-          setNotice(null)
-          setMenu('shop')
+          // 상점은 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 상점 버튼에 떨어진다
+          rt.shopKey = key
           break
         }
         // 충전부터는 걷지 않으므로 자리와 방향이 그대로 고정된다
         setNotice(null)
+        rt.chargeKey = key
         rt.castSpot = at.spot
         rt.chargeStart = performance.now()
         rt.gauge = 0
@@ -404,10 +417,20 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }
 
-  function release(source: Source) {
-    rt.pointer = false
-    // 충전은 시작한 행동(버튼·스페이스)을 뗄 때만 던진다. 다른 손가락으로 캔버스를 건드려도 끊기지 않는다.
-    if (source !== 'action' || rt.phase !== 'charging' || rt.busy) return
+  function release(key: string) {
+    rt.held.delete(key)
+    if (key === rt.shopKey) {
+      rt.shopKey = null
+      // 아직 대기 중이고 여전히 상점 문 앞일 때만
+      if (rt.phase === 'idle' && !rt.busy && !menuRef.current && interactionFor(rt.player)?.kind === 'shop') {
+        setNotice(null)
+        setMenu('shop')
+      }
+      return
+    }
+    // 충전은 시작한 누르기를 뗄 때만 던진다. 다른 손가락을 떼도 끊기지 않는다.
+    if (key !== rt.chargeKey || rt.phase !== 'charging' || rt.busy) return
+    rt.chargeKey = null
     const power = gaugeAt(performance.now() - rt.chargeStart)
     rt.gauge = power
     void cast(power)
@@ -438,7 +461,7 @@ export function Game({ gameId }: WorldGameProps) {
 
     if (rt.phase === 'charging' && !rt.busy) rt.gauge = gaugeAt(now - rt.chargeStart)
     if (rt.phase === 'fighting' && rt.bar && rt.params && !rt.settling) {
-      rt.bar = stepBar(rt.bar, rt.pointer, dt, rt.params, Math.random)
+      rt.bar = stepBar(rt.bar, rt.held.size > 0, dt, rt.params, Math.random)
       const r = barResult(rt.bar)
       if (r !== 'playing') endFight(r === 'caught', rt.bar.perfect)
     }
@@ -623,7 +646,7 @@ export function Game({ gameId }: WorldGameProps) {
       }
       if (!isSpace(e) || onControl(e.target)) return
       e.preventDefault()
-      if (!e.repeat) handlers.current.press('action')
+      if (!e.repeat) handlers.current.press('action', 'space')
     }
     const up = (e: KeyboardEvent) => {
       const dir = MOVE_KEYS[e.code]
@@ -633,7 +656,7 @@ export function Game({ gameId }: WorldGameProps) {
       }
       if (!isSpace(e) || onControl(e.target)) return
       e.preventDefault()
-      handlers.current.release('action')
+      handlers.current.release('space')
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -669,6 +692,14 @@ export function Game({ gameId }: WorldGameProps) {
       await act({ type: 'buyBag', tier })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
+  /** 상점 창이 막 열렸으면 누르기·클릭을 버린다(여는 손가락의 유령 클릭 방지) */
+  const guardShop = (e: SyntheticEvent) => {
+    if (menuRef.current === 'shop' && performance.now() - shopOpenedAt.current < PANEL_GUARD_MS) {
+      e.preventDefault()
+      e.stopPropagation()
     }
   }
 
@@ -762,10 +793,10 @@ export function Game({ gameId }: WorldGameProps) {
               } catch {
                 /* 포인터 캡처를 못 해도 입력은 받는다 */
               }
-              handlers.current.press('canvas')
+              handlers.current.press('canvas', `canvas:${e.pointerId}`)
             }}
-            onPointerUp={() => handlers.current.release('canvas')}
-            onPointerCancel={() => handlers.current.release('canvas')}
+            onPointerUp={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
+            onPointerCancel={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
           />
           {touch && !menu && (
             <Controls
@@ -773,8 +804,11 @@ export function Game({ gameId }: WorldGameProps) {
                 rt.stick = v
               }}
               action={action}
-              onActionDown={() => handlers.current.press('action')}
-              onActionUp={() => handlers.current.release('action')}
+              onActionDown={() => handlers.current.press('action', 'button')}
+              onActionUp={() => handlers.current.release('button')}
+              walking={phase === 'idle'}
+              onTapDown={(id) => handlers.current.press('canvas', `stick:${id}`)}
+              onTapUp={(id) => handlers.current.release(`stick:${id}`)}
             />
           )}
           {outcome && (
@@ -797,7 +831,12 @@ export function Game({ gameId }: WorldGameProps) {
           )}
           {hint && !outcome && <p className={touch ? 'fish-hint fish-hint-top' : 'fish-hint'}>{hint}</p>}
           {menu && (
-            <div className="fish-panel">
+            <div
+              className="fish-panel"
+              onPointerDownCapture={guardShop}
+              onPointerUpCapture={guardShop}
+              onClickCapture={guardShop}
+            >
               <div className="fish-panel-head">
                 <h3 className="fish-panel-title">{menu === 'bag' ? '가방' : menu === 'shop' ? '상점' : '도감'}</h3>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMenu(null)}>

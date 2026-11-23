@@ -29,7 +29,8 @@ export function keysVector(k: { up: boolean; down: boolean; left: boolean; right
   return { x, y }
 }
 
-function feetBlocked(x: number, y: number): boolean {
+/** 발 사각형(pos 중심의 FEET)이 걸을 수 없는 타일(맵 밖 포함)과 겹치는가 */
+export function feetBlocked(x: number, y: number): boolean {
   const tx0 = Math.floor((x - FEET.w / 2 + EDGE_EPS) / TILE)
   const tx1 = Math.floor((x + FEET.w / 2 - EDGE_EPS) / TILE)
   const ty0 = Math.floor((y - FEET.h / 2 + EDGE_EPS) / TILE)

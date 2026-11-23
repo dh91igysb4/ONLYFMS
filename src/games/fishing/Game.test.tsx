@@ -166,12 +166,34 @@ const pointer = (type: 'down' | 'move' | 'up', el: Element, pointerId: number, x
   else fireEvent.pointerUp(el, init)
 }
 
-/** 상점 문 앞(저장 위치 없음 = SPAWN)에서 스페이스로 상점을 연다 */
+/** 상점 문 앞(저장 위치 없음 = SPAWN)에서 스페이스로 상점을 열고, 유령 클릭 방지 시간(300ms)을 넘긴다 */
 async function mountAtShop(view = makeView()) {
   const r = await mount(view, null)
   press()
   release()
+  await advance(300)
   return r
+}
+/** 마지막으로 그린 장면의 미니게임 바 */
+const lastBar = () => {
+  const bar = vi.mocked(drawWorld).mock.calls.at(-1)?.[1].bar
+  if (!bar) throw new Error('no bar drawn')
+  return bar
+}
+/** 터치: 행동 버튼으로 던지고 입질까지 기다린다 */
+async function touchCastToBite(view = makeView()) {
+  stubTouch()
+  await mount(view, PIER)
+  route({
+    cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
+    hook: () => ok(view, { species: 'anchovy', sizeCm: 10 }),
+    resolve: () => new Promise(() => {}),
+  })
+  pointer('down', actionButton(), 2)
+  await advance(300)
+  pointer('up', actionButton(), 2)
+  await flush()
+  await advance(3100)
 }
 
 /** 던지고 cast 응답까지 받은 상태(waiting)로 만든다. */
@@ -519,10 +541,11 @@ describe('fishing Game', () => {
     const { container } = await mount(makeView(), null)
     const root = container.querySelector('.fish') as HTMLElement
     fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
-    press() // 상점 문 앞: 상점이 열린다
+    press() // 상점 문 앞: 떼면 상점이 열린다
     release()
     const shop = screen.getByRole('region', { name: '상점' })
     expect(root.contains(shop)).toBe(true)
+    await advance(300)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(root).toHaveClass('fish-full')
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
@@ -726,18 +749,130 @@ describe('fishing Game', () => {
 })
 
 describe('fishing Game: walking and interaction', () => {
-  test('at the spawn spot the touch action reads 상점 and pressing it opens the shop', async () => {
+  test('at the spawn spot the touch action reads 상점; the shop opens on release, not on press', async () => {
     stubTouch()
     await mount(makeView(), null)
     expect(actionButton()).toHaveTextContent('상점')
     expect(actionButton()).toBeEnabled()
     const btn = actionButton()
-    pointer('down', btn, 2) // 누르는 순간 열린다
-    expect(screen.getByRole('region', { name: '상점' })).toBeInTheDocument()
+    pointer('down', btn, 2)
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
     pointer('up', btn, 2)
+    expect(screen.getByRole('region', { name: '상점' })).toBeInTheDocument()
     // 메뉴가 열린 동안 조작은 숨는다
     expect(screen.queryByTestId('fish-action')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '전부 팔기' })).toBeInTheDocument()
+  })
+
+  test('Space opens the shop on keyup, not keydown', async () => {
+    await mount(makeView(), null)
+    press()
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+    release()
+    expect(screen.getByRole('region', { name: '상점' })).toBeInTheDocument()
+  })
+
+  test('a click landing on a shop button within 300ms of opening does nothing (no ghost click)', async () => {
+    stubTouch()
+    const rich = makeView({ gold: 2000 })
+    await mount(rich, null)
+    route({ buyRod: () => ok({ ...rich, gold: 500, rodTier: 2 }) })
+    pointer('down', actionButton(), 2)
+    pointer('up', actionButton(), 2)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await advance(250)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(calls('buyRod')).toHaveLength(0)
+    await advance(60)
+    fireEvent.click(screen.getByRole('button', { name: '구매' }))
+    await flush()
+    expect(calls('buyRod')).toHaveLength(1)
+  })
+
+  test('releasing the shop action after walking away from the door does not open the shop', async () => {
+    await mount(makeView(), null)
+    press()
+    key('ArrowRight', true)
+    await advance(500)
+    key('ArrowRight', false)
+    release()
+    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+  })
+
+  test('touch: a press on the joystick during a bite hooks like a canvas press', async () => {
+    await touchCastToBite()
+    expect(calls('hook')).toHaveLength(0)
+    pointer('down', stick(), 5, 100, 100)
+    await flush()
+    expect(calls('hook')).toHaveLength(1)
+  })
+
+  test('touch: holding the joystick during a fight reels, and it does not walk', async () => {
+    await touchCastToBite()
+    pointer('down', stick(), 5, 100, 100) // 챔
+    await flush()
+    pointer('move', stick(), 5, 140, 100)
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    expect(lastPlayer().pos).toEqual(PIER.pos)
+    pointer('up', stick(), 5, 140, 100)
+    await advance(100)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('fight: lifting another finger does not release the bar while the action button is held', async () => {
+    await touchCastToBite()
+    pointer('down', actionButton(), 2) // 챔, 계속 누르고 있다
+    await flush()
+    await advance(50)
+    fireEvent.pointerDown(canvas(), { pointerId: 9 })
+    fireEvent.pointerUp(canvas(), { pointerId: 9 })
+    await advance(100)
+    expect(lastBar().barVel).toBeGreaterThan(0)
+    pointer('up', actionButton(), 2)
+    await advance(100)
+    expect(lastBar().barVel).toBeLessThan(0)
+  })
+
+  test('a lost pointer capture on the joystick stops walking; on the action button it ends the press', async () => {
+    stubTouch()
+    const view = makeView()
+    const p = pending()
+    const { unmount } = await mount(view, SAND)
+    pointer('down', stick(), 1, 100, 100)
+    pointer('move', stick(), 1, 160, 100)
+    await advance(200)
+    expect(lastPlayer().moving).toBe(true)
+    fireEvent(stick(), new TestPointerEvent('lostpointercapture', { bubbles: true, pointerId: 1 }))
+    await advance(50)
+    const stopped = lastPlayer().pos
+    await advance(200)
+    expect(lastPlayer().pos).toEqual(stopped)
+    unmount()
+
+    await mount(view, SHORE)
+    route({ cast: () => ok({ ...view, pending: p }, p) })
+    pointer('down', actionButton(), 2)
+    await advance(300)
+    fireEvent(actionButton(), new TestPointerEvent('lostpointercapture', { bubbles: true, pointerId: 2 }))
+    await flush()
+    expect(calls('cast')).toHaveLength(1)
+  })
+
+  test('the joystick knob is drawn from where the finger first touched', async () => {
+    stubTouch()
+    await mount(makeView(), SAND)
+    const knob = stick().querySelector('.fish-stick-knob') as HTMLElement
+    pointer('down', stick(), 1, 30, 70) // 받침 왼쪽 위 (jsdom 상자는 0,0)
+    expect(knob.style.left).toBe('30px')
+    expect(knob.style.top).toBe('70px')
+    pointer('move', stick(), 1, 50, 70)
+    expect(knob.style.left).toBe('50px')
+    pointer('move', stick(), 1, 130, 70) // 반지름(36) 넘게 밀면 손잡이는 반지름에서 멈춘다
+    expect(knob.style.left).toBe('66px')
+    pointer('up', stick(), 1, 130, 70)
+    expect(knob.style.left).toBe('')
   })
 
   test('at the pier end the action reads 낚시 and a cast sends spot pier; on the sand shore spot shore', async () => {
