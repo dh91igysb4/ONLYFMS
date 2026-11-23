@@ -2,7 +2,7 @@
 -- 테스트 게임: g-free(10/50/120), g-free2(같은 수치), g-nofree(free=false), g-hidden(숨김), g-zero(설정 0).
 -- 승인 사용자 역할로 free_plays에 넣고, 장부·지갑은 슈퍼유저로 확인한다.
 begin;
-select plan(38);
+select plan(40);
 
 \set f1 '00000000-0000-0000-0000-0000000000b1'
 \set f2 '00000000-0000-0000-0000-0000000000b2'
@@ -157,6 +157,16 @@ select is((select row(delta, raw_delta)::text from public.gold_ledger where user
 select is((select count(*)::int from public.gold_ledger where user_id = :'f4' and ref = '44444444-0000-0000-0000-000000000004'), 0,
   'f4: 그다음 판은 장부 줄 없음');
 select is((select balance from public.wallets where user_id = :'f4'), (30750 + 7 + 10 + 6)::bigint, 'f4: 잔액');
+
+-- ---------------------------------------------------------------- f6: 한 문장 여러 행 (행마다 트리거가 앞 행의 장부를 본다)
+set local role authenticated;
+set local request.jwt.claims = :'F6';
+insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count)
+select gen_random_uuid(), :'f6', 'g-free2', 1, false, 9, 1 from generate_series(1, 5);
+reset role;
+select is((select array_agg(delta order by id)::text from public.gold_ledger where user_id = :'f6' and game_id = 'g-free2'),
+  '{50,50,20}', 'f6: 한 문장 5행 → 50 + 50 + 20, 게임별 상한 120 그대로');
+select is((select count(*)::int from public.free_plays where user_id = :'f6' and game_id = 'g-free2'), 5, 'f6: 5행 모두 들어감');
 
 -- ---------------------------------------------------------------- f5: 운영 게임 수치
 set local role authenticated;

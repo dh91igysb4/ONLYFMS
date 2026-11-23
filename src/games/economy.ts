@@ -2,7 +2,10 @@
 // 순수 모듈: React·외부 의존 없음 (Edge Function도 import할 수 있다).
 // SQL이 쓰는 값은 _economy()에 사본이 있고, economy.test.ts가 마이그레이션의 마지막 정의와 비교한다.
 
-/** 기준 시간당 수입(설계 §4). 2단계 낚싯대·마을 물가 낚시의 기대값. 2단계 PR의 src/games/fishing/gold.test.ts가 ±25%로 지킨다 */
+/**
+ * 기준 시간당 수입(설계 §4). 2단계 낚싯대·마을 물가 낚시의 기대값(20,515).
+ * 이 값을 데이터로 지키는 검사는 낚시 다듬기 PR(#81)의 src/games/fishing/gold.test.ts(±25%)에 있다 — 그 PR이 머지되기 전 계보에는 없다
+ */
 export const REF = 20500
 
 /**

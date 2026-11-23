@@ -58,7 +58,10 @@ begin
       v_got := v_full;
     else
       v_room2 := greatest(v_cap2 - greatest(v_s, v_cap), 0);
-      if v_d1 * v_rate <= v_room2 then
+      -- v_rate = 0이면 둘째 구간이 차지 않으므로 v_full만 (아래 나눗셈에 닿지 않게 명시)
+      if v_rate = 0 then
+        v_got := v_full;
+      elsif v_d1 * v_rate <= v_room2 then
         v_got := v_full + floor(v_d1 * v_rate)::bigint;
       else
         v_got := v_full + v_room2 + floor((v_d1 * v_rate - v_room2) * v_rate2 / v_rate)::bigint;

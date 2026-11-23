@@ -320,6 +320,7 @@ function FreeGoldLine({ asked, got, capReached, saved }: { asked: number; got: n
   else if (got > 0 && saved === false) text = `+${got.toLocaleString('ko-KR')} G · 저장되면 골드가 들어가요`
   else if (got > 0 && got < asked) text = `+${got.toLocaleString('ko-KR')} G · 오늘 상한을 넘어 일부만`
   else if (got > 0) text = `+${got.toLocaleString('ko-KR')} G`
+  else if (asked > 0) text = '+0 G · 오늘 골드 상한을 넘었어요'
   if (!text) return null
   return <p className="free-gold" role="status">{text}</p>
 }

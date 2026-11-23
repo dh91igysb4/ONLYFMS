@@ -103,6 +103,13 @@ test('site_cap_straddle', async () => {
   await goldLine('+14 G · 오늘 상한을 넘어 일부만')
 })
 
+test('site_cap_rounds_to_zero', async () => {
+  // 게임별 남은 몫 3 → 20% 구간에서 floor(0.6) = 0
+  setWallet({ balance: 0, today: { 'test-guess': 117 }, earnedToday: 31000 })
+  await playTo(3)
+  await goldLine('+0 G · 오늘 골드 상한을 넘었어요')
+})
+
 test('save_failure_says_gold_comes_later', async () => {
   submitMock.mockResolvedValue(false)
   await playTo(3)

@@ -34,5 +34,5 @@
 /* 자유 플레이 결과의 번 골드 (설계 §7.4) */
 .free-gold {
   margin: 0; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: var(--lime);
+  color: var(--accent-strong);
 }
