@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import css from './theme.css?raw';
 import wyaCss from '../games/who-are-ya/wya.css?raw';
+import walletCss from '../platform/wallet/wallet.css?raw';
+import profileCss from '../platform/profile/profile.css?raw';
 import {
   CSS_VAR,
   PALETTES,
@@ -120,5 +122,7 @@ describe('palettes', () => {
     const re = /(^|[^-])color:\s*var\(--(lime|near|bg)\)/m;
     expect(re.test(css)).toBe(false);
     expect(re.test(wyaCss)).toBe(false);
+    expect(re.test(walletCss), 'wallet.css').toBe(false);
+    expect(re.test(profileCss), 'profile.css').toBe(false);
   });
 });
