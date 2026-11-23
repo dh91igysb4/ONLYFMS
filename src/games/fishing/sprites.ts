@@ -3601,7 +3601,88 @@ const HOLE_1 = sprite(HOLE, [
   'bbaaaaaaaaaaaaab',
 ])
 
+// ── 낚시 5부 M1: 얼음 구멍 뚫는 금(세 단계, 투명 바탕), HUD 물때 아이콘(썰물·밀물 7×7) ──
+const DRILL: Record<string, string> = { l: '#6f97ae', w: '#ffffff', k: '#7fa6bd', d: '#24506c' }
+const DRILL_0 = sprite(DRILL, [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '.......l........',
+  '......lll.......',
+  '.......ll.......',
+  '........l.......',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+const DRILL_1 = sprite(DRILL, [
+  '................',
+  '................',
+  '........l.......',
+  '....l...l.......',
+  '.....l..l....w..',
+  '......l.l..ll...',
+  '.......lll.l....',
+  '...llllllll.....',
+  '......llll......',
+  '.....l.l.lll....',
+  '..w.l..l...l....',
+  '...l...l....l...',
+  '.......l........',
+  '................',
+  '................',
+  '................',
+])
+const DRILL_2 = sprite(DRILL, [
+  '................',
+  '..w.....l.....w.',
+  '........l.......',
+  '...l....l...l...',
+  '....l...l..l....',
+  '.....lkkkkl.....',
+  '.....kdddddk....',
+  '..llkdddddddkll.',
+  '....kddddddk....',
+  '.....kdddddk.l..',
+  '....l.kkkkk...l.',
+  '...l....l.....w.',
+  '..l.....l.......',
+  '.w......l.......',
+  '................',
+  '................',
+])
+const TIDE_ICON: Record<string, string> = { w: '#ffffff', b: '#4c9dd1', B: '#a6dcf2', m: '#8a7356' }
+const ICON_TIDE_LOW = sprite(TIDE_ICON, [
+  '...w...',
+  '...w...',
+  '.w.w.w.',
+  '..www..',
+  '...w...',
+  'bBbbBbb',
+  'mmmmmmm',
+])
+const ICON_TIDE_HIGH = sprite(TIDE_ICON, [
+  '...w...',
+  '..www..',
+  '.w.w.w.',
+  '...w...',
+  'bBbbBbb',
+  'bbbbbbb',
+  'bbbbbbb',
+])
+
 export const SPRITES: Record<string, Sprite> = {
+  'drill-0': DRILL_0,
+  'drill-1': DRILL_1,
+  'drill-2': DRILL_2,
+  'icon-tide-low': ICON_TIDE_LOW,
+  'icon-tide-high': ICON_TIDE_HIGH,
   'tile-mud': TILE_MUD,
   'tile-mud-wet-0': MUD_WET_0,
   'tile-mud-wet-1': MUD_WET_1,

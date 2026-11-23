@@ -4,12 +4,12 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
-import { TILE, tileAt, type MapDef, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
+import { STATIC_DYNAMIC, TILE, tileAt, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
 import { playerSprites } from './outfit.ts'
 import type { Outfit } from './wardrobe.ts'
-import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
+import { formatClock, isSnow, nightLevel, type Conditions, type Tide } from './clock.ts'
 
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
 /** tMs: 애니메이션 시계(ms). 계속 늘어나기만 하면 된다. gauge는 0~1. camera는 화면 왼쪽 위의 월드 좌표. */
@@ -37,6 +37,12 @@ export type WorldScene = {
   teleporterOn: boolean
   /** 입은 옷. 없으면 원래 그림. 옷차림마다 15장을 한 번만 합성해 캐시한다(outfit.ts) */
   outfit?: Outfit
+  /** 맵의 움직이는 상태(물때·얼음 구멍). 없으면 STATIC_DYNAMIC */
+  dyn?: MapDynamic
+  /** 얼음 구멍을 뚫는 중: 칸과 지난 시간(ms). 없으면 null */
+  drill?: { tx: number; ty: number; ms: number } | null
+  /** 신화를 잡은 뒤 지난 시간(ms). MYTHIC_FLASH_MS 동안 캐릭터 둘레에 빛고리. 없으면 null */
+  mythicFlashMs?: number | null
 }
 
 /** 화면 좌표 사각형 */
@@ -109,6 +115,10 @@ const C = {
   clockPlate: 'rgba(20, 16, 40, 0.65)',
   rain: '#bfe6f7',
   snow: '#ffffff',
+  fog: '24, 32, 30', // 늪 안개(어두운 녹회색)
+  mythicRing: '#fff1a8',
+  mythicRingEdge: '#ffc94a',
+  tidePlate: 'rgba(20, 16, 40, 0.65)',
   surgeEdge: '#ffd23f', // 신화 용솟음 동안 트랙 테두리가 이 색과 외곽선을 번갈아
 }
 
@@ -217,9 +227,12 @@ const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
   'water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'dock',
 ])
 
-function baseGround(map: MapDef, tx: number, ty: number): Ground | null {
+function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
   const kind = tileAt(map, tx, ty)
   if (kind === null || kind === 'rock' || kind === 'cliff' || kind === 'cave-wall') return null
+  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품). 얼음은 가장자리를 주고받지 않는다
+  if (kind === 'mud') return tide === 'high' ? 'water' : 'sand'
+  if (kind === 'ice') return 'cave'
   if (WATER_GROUND.has(kind)) return 'water'
   if (kind === 'sand' || kind === 'palm') return 'sand'
   if (kind === 'cave-floor' || kind === 'cave-mouth') return 'cave'
@@ -227,10 +240,10 @@ function baseGround(map: MapDef, tx: number, ty: number): Ground | null {
 }
 
 /** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
-function rockGround(map: MapDef, tx: number, ty: number): Ground {
+function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
   const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-    const g = baseGround(map, tx + dx, ty + dy)
+    const g = baseGround(map, tx + dx, ty + dy, tide)
     if (g) count[g]++
   }
   let best: Ground = 'sand'
@@ -239,18 +252,18 @@ function rockGround(map: MapDef, tx: number, ty: number): Ground {
 }
 
 /** 맵 전체의 바탕 땅(행 우선). 맵 캐시와 함께 만들고 버린다. */
-function computeGround(map: MapDef): (Ground | null)[] {
+function computeGround(map: MapDef, tide: Tide): (Ground | null)[] {
   const ground: (Ground | null)[] = []
   for (let ty = 0; ty < map.h; ty++) {
     for (let tx = 0; tx < map.w; tx++) {
-      ground.push(tileAt(map, tx, ty) === 'rock' ? rockGround(map, tx, ty) : baseGround(map, tx, ty))
+      ground.push(tileAt(map, tx, ty) === 'rock' ? rockGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
     }
   }
   return ground
 }
 
-/** 그리기에 쓰는 맵 + 계산해 둔 땅 */
-type MapGfx = { map: MapDef; ground: readonly (Ground | null)[] }
+/** 그리기에 쓰는 맵 + 계산해 둔 땅. tide는 진흙 그림을 정한다(물때 없는 맵은 늘 'high') */
+type MapGfx = { map: MapDef; ground: readonly (Ground | null)[]; tide: Tide }
 
 function groundAt(g: MapGfx, tx: number, ty: number): Ground | null {
   if (tx < 0 || ty < 0 || tx >= g.map.w || ty >= g.map.h) return null
@@ -402,6 +415,18 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   const y = ty * TILE
   const ground = groundAt(g, tx, ty)
 
+  if (kind === 'mud') {
+    // 밀물이면 얕은 흙탕물(두 장, 물결 박자 그대로)과 물가 거품, 썰물이면 진흙
+    if (g.tide === 'high') {
+      drawSprite(ctx, `tile-mud-wet-${(k + tx + ty * 3) % 2}`, x, y, 1)
+      drawShoreEdges(ctx, g, tx, ty, k)
+    } else drawSprite(ctx, 'tile-mud', x, y, 1)
+    return
+  }
+  if (kind === 'ice') {
+    drawSprite(ctx, 'tile-ice', x, y, 1)
+    return
+  }
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
   else if (kind === 'cliff') drawSprite(ctx, 'tile-cliff', x, y, 1)
@@ -515,12 +540,19 @@ function disposeCache(c: Cache | null): void {
 export function releaseSceneCache(): void {
   disposeCache(cache)
   cache = null
+  if (fogCache) fogCache.canvas.width = fogCache.canvas.height = 0
+  fogCache = null
 }
 
-function mapCache(map: MapDef): Cache {
-  if (!cache || cache.gfx.map.id !== map.id) {
+/**
+ * 물때 맵은 물때마다 따로 만든다(바뀔 때 한 번 — 실제 4~8분에 한 번, 동시에 하나만 가진다).
+ * 물때 없는 맵은 늘 'high'로 본다(진흙이 없으니 그림은 같다).
+ */
+function mapCache(map: MapDef, tide: Tide = 'high'): Cache {
+  const t: Tide = map.tidal ? tide : 'high'
+  if (!cache || cache.gfx.map.id !== map.id || cache.gfx.map !== map || cache.gfx.tide !== t) {
     disposeCache(cache)
-    const gfx: MapGfx = { map, ground: computeGround(map) }
+    const gfx: MapGfx = { map, ground: computeGround(map, t), tide: t }
     const first = renderFrame(gfx, 0)
     cache = { gfx, frames: first ? [first] : null }
   } else if (cache.frames && cache.frames.length < 2) {
@@ -666,10 +698,10 @@ function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, cx: number, t
   }
 }
 
-/** 비·눈: tMs로만 정해지는 위치라 같은 시각이면 같은 그림. 겨울이면 눈, 아니면 비. */
-function drawPrecipitation(ctx: CanvasRenderingContext2D, cond: Conditions, tMs: number, w: number, h: number): void {
+/** 비·눈: tMs로만 정해지는 위치라 같은 시각이면 같은 그림. 겨울(또는 늘 눈 맵)이면 눈, 아니면 비. */
+function drawPrecipitation(ctx: CanvasRenderingContext2D, cond: Conditions, tMs: number, w: number, h: number, snowy = false): void {
   if (cond.weather !== 'rain') return
-  const snow = isSnow(cond)
+  const snow = snowy || isSnow(cond)
   const count = snow ? SNOW_COUNT : RAIN_COUNT
   const speed = snow ? SNOW_SPEED : RAIN_SPEED
   ctx.fillStyle = snow ? C.snow : C.rain
@@ -696,18 +728,96 @@ function drawNightTint(ctx: CanvasRenderingContext2D, cond: Conditions, w: numbe
 }
 
 /** HUD 시계: 반투명 판 위에 계절 아이콘, 날씨 아이콘, 픽셀 숫자 `14:30`(10분 단위). box는 hudLayout의 clock. */
-function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, box: Box): void {
+function drawClock(ctx: CanvasRenderingContext2D, cond: Conditions, box: Box, snowy = false): void {
   rect(ctx, box.x, box.y, box.w, box.h, C.clockPlate)
   let x = box.x + CLOCK_PAD
   drawSprite(ctx, `season-${cond.season}`, x, box.y + 2, 1)
   x += SEASON_ICON_W + CLOCK_ICON_GAP
-  drawSprite(ctx, cond.weather === 'sun' ? 'icon-sun' : isSnow(cond) ? 'icon-snow' : 'icon-rain', x, box.y + 2, 1)
+  drawSprite(ctx, cond.weather === 'sun' ? 'icon-sun' : snowy || isSnow(cond) ? 'icon-snow' : 'icon-rain', x, box.y + 2, 1)
   x += WEATHER_ICON_W + CLOCK_TEXT_GAP
   for (const ch of formatClock(cond.gameMinute)) {
     const name = ch === ':' ? 'digit-colon' : `digit-${ch}`
     drawSprite(ctx, name, x, box.y + 3, 1)
     x += SPRITES[name].w + DIGIT_GAP
   }
+}
+
+/** 물때 맵의 HUD: 시계 판 바로 아래 작은 판에 썰물·밀물 아이콘 */
+function drawTideIcon(ctx: CanvasRenderingContext2D, tide: Tide, clock: Box): void {
+  const size = SPRITES['icon-tide-low'].w + 4
+  rect(ctx, clock.x, clock.y + clock.h + 1, size, size, C.tidePlate)
+  drawSprite(ctx, `icon-tide-${tide}`, clock.x + 2, clock.y + clock.h + 3, 1)
+}
+
+// ── 안개(늪지, 장면 효과만) ───────────────────────────────────────
+/** 캐릭터 둘레 이 반지름(px)까지 맑고(전체 어둡게만), FOG_FAR까지 짙어진다 */
+const FOG_NEAR = 4 * TILE
+const FOG_FAR = 7 * TILE
+/** 맑은 둘레에도 남는 짙기 비율(화면 전체 어둡게) */
+const FOG_BASE = 0.25
+/** 비네트를 칠하는 칸 크기(px). 캐시가 없을 때(직접 그리기)도 이 크기로 칠한다 */
+const FOG_CELL = 8
+/** 안개 짙기 0~0.75: 기본 0.35 + 밤 0.25 × nightLevel + 비 0.15 */
+export function fogDensity(cond: Conditions): number {
+  return Math.min(0.75, 0.35 + 0.25 * nightLevel(cond.gameMinute) + (cond.weather === 'rain' ? 0.15 : 0))
+}
+/** 캐릭터와의 거리(px)에 따른 비네트 알파 비율(0~1) */
+function fogRamp(d: number): number {
+  if (d <= FOG_NEAR) return FOG_BASE
+  if (d >= FOG_FAR) return 1
+  return FOG_BASE + ((1 - FOG_BASE) * (d - FOG_NEAR)) / (FOG_FAR - FOG_NEAR)
+}
+/** 화면 크기(w, h)별 비네트 캔버스(2w × 2h, 가운데가 캐릭터 자리). 화면을 떠나면 releaseSceneCache가 비운다 */
+let fogCache: { w: number; h: number; canvas: HTMLCanvasElement } | null = null
+function fogCanvas(w: number, h: number): HTMLCanvasElement | null {
+  if (fogCache && fogCache.w === w && fogCache.h === h) return fogCache.canvas
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  c.width = 2 * w
+  c.height = 2 * h
+  const cx = c.getContext('2d')
+  if (!cx) {
+    c.width = c.height = 0
+    return null
+  }
+  if (fogCache) fogCache.canvas.width = fogCache.canvas.height = 0
+  for (let y = 0; y < 2 * h; y += FOG_CELL) {
+    for (let x = 0; x < 2 * w; x += FOG_CELL) {
+      const a = fogRamp(Math.hypot(x + FOG_CELL / 2 - w, y + FOG_CELL / 2 - h))
+      cx.fillStyle = `rgba(${C.fog}, ${a.toFixed(3)})`
+      cx.fillRect(x, y, FOG_CELL, FOG_CELL)
+    }
+  }
+  fogCache = { w, h, canvas: c }
+  return c
+}
+/** 안개: 밤 색조 다음·HUD 앞. 캐시 캔버스가 있으면 drawImage 한 번(globalAlpha = 짙기), 없으면 칸마다 칠한다 */
+function drawFog(ctx: CanvasRenderingContext2D, cond: Conditions, px: number, py: number, w: number, h: number): void {
+  const density = fogDensity(cond)
+  const vignette = fogCanvas(w, h)
+  if (vignette) {
+    const prev = ctx.globalAlpha
+    ctx.globalAlpha = density
+    ctx.drawImage(vignette, Math.round(px - w), Math.round(py - h))
+    ctx.globalAlpha = prev ?? 1
+    return
+  }
+  for (let y = 0; y < h; y += FOG_CELL) {
+    for (let x = 0; x < w; x += FOG_CELL) {
+      const a = density * fogRamp(Math.hypot(x + FOG_CELL / 2 - px, y + FOG_CELL / 2 - py))
+      ctx.fillStyle = `rgba(${C.fog}, ${a.toFixed(3)})`
+      ctx.fillRect(x, y, FOG_CELL, FOG_CELL)
+    }
+  }
+}
+
+/** 신화 빛고리를 보이는 시간 */
+export const MYTHIC_FLASH_MS = 1500
+/** 캐릭터 둘레로 퍼지는 빛고리 두 겹(화면 좌표 cx, cy = 캐릭터 가운데) */
+function drawMythicRing(ctx: CanvasRenderingContext2D, ms: number, cx: number, cy: number): void {
+  const t = ms / MYTHIC_FLASH_MS
+  ripple(ctx, cx, cy, 8 + t * 18, C.mythicRing)
+  ripple(ctx, cx, cy, 4 + t * 12, C.mythicRingEdge)
 }
 
 // ── 한 프레임 ───────────────────────────────────────────────────
@@ -724,7 +834,8 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   const k = waterFrame(s.tMs)
   ctx.imageSmoothingEnabled = false
 
-  const { gfx, frames } = mapCache(s.map)
+  const dyn = s.dyn ?? STATIC_DYNAMIC
+  const { gfx, frames } = mapCache(s.map, dyn.tide)
   if (frames) ctx.drawImage(frames[k] ?? frames[0], cam.x, cam.y, w, h, 0, 0, w, h)
   else {
     ctx.save()
@@ -750,19 +861,24 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   }
 
   // 실내(동굴 등)에는 비·눈이 오지 않고 밤 색조도 없다. 시계는 그대로
+  const screenX = Math.round(s.player.pos.x) - cam.x
   if (!s.map.indoor) {
-    drawPrecipitation(ctx, s.cond, s.tMs, w, h)
+    drawPrecipitation(ctx, s.cond, s.tMs, w, h, s.map.snowy)
     drawNightTint(ctx, s.cond, w, h)
   }
+  // 안개는 밤 색조 다음, HUD 앞. 캐릭터 몸 가운데를 맑은 둘레의 중심으로
+  if (s.map.fog) drawFog(ctx, s.cond, screenX, Math.round(s.player.pos.y) - cam.y - PLAYER_H / 2, w, h)
+  const flash = s.mythicFlashMs
+  if (flash != null && flash >= 0 && flash < MYTHIC_FLASH_MS) drawMythicRing(ctx, flash, screenX, Math.round(s.player.pos.y) - cam.y - PLAYER_H / 2)
 
   // HUD (화면 좌표)
-  const screenX = Math.round(s.player.pos.x) - cam.x
   const hud = hudLayout(screenX, w, h, s.hudTop)
   if (s.phase === 'charging') drawGauge(ctx, s.gauge, screenX, py - cam.y, w, h)
   if (s.phase === 'fighting' && s.bar && s.barParams) drawTrack(ctx, s.bar, s.barParams, s.tMs, hud.track)
   drawOutcome(ctx, s, screenX, py - cam.y, w)
   // 시계는 낚시 트랙의 반대쪽 위, 모든 단계에서
-  drawClock(ctx, s.cond, hud.clock)
+  drawClock(ctx, s.cond, hud.clock, s.map.snowy)
+  if (s.map.tidal) drawTideIcon(ctx, dyn.tide, hud.clock)
   // 지역 전환 페이드는 HUD까지 덮도록 맨 마지막에, 화면 전체를 한 번에
   if (s.fade > 0) {
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, s.fade)})`
@@ -801,6 +917,17 @@ function drawPlaces(ctx: CanvasRenderingContext2D, s: WorldScene, k: number, tx0
   }
 }
 
+/** 얼음 구멍(맵 캐시 밖, 매 프레임)과 뚫는 중인 금. 구멍은 방문 동안 최대 3개라 싸다 */
+function drawHoles(ctx: CanvasRenderingContext2D, s: WorldScene, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
+  for (const key of s.dyn?.holes ?? []) {
+    const [tx, ty] = key.split(',').map(Number)
+    if (tx < tx0 || tx > tx1 || ty < ty0 || ty > ty1) continue
+    drawSprite(ctx, `tile-hole-${(k + tx + ty * 3) % 2}`, tx * TILE, ty * TILE, 1)
+  }
+  const d = s.drill
+  if (d) drawSprite(ctx, `drill-${d.ms < 400 ? 0 : d.ms < 800 ? 1 : 2}`, d.tx * TILE, d.ty * TILE, 1)
+}
+
 /** 순간이동기 탑: 구조물 칸(2×2) 왼쪽 위에서 한 칸 위부터 그린다(탑 끝이 위 칸으로 솟는다). 켜져 있으면 등롱 불빛을 얹는다 */
 function drawTeleporter(ctx: CanvasRenderingContext2D, s: WorldScene, r: Rect, k: number): void {
   const x = r.tx * TILE
@@ -819,8 +946,9 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   const ty0 = Math.floor(cam.y / TILE)
   const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
 
-  // 바닥에 붙은 것(잠긴 문·배)이 맨 먼저
+  // 바닥에 붙은 것(잠긴 문·배·얼음 구멍·뚫는 금)이 맨 먼저
   drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
+  drawHoles(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 
   // 물 위 요소(물결·찌·줄)는 캐릭터보다 먼저
   if (b) {
