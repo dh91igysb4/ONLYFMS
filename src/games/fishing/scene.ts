@@ -1,4 +1,6 @@
-// 낚시터 장면 그리기(설계 §4.4, §5). 논리 해상도 160×240, fillRect만 쓴다.
+// 낚시터 장면 그리기(설계 §4.4, §5). 논리 해상도는 w×h(최소 160×240), fillRect만 쓴다(배경 캐시를 붙일 때만 drawImage).
+// 게임 요소(부두 끝·캐릭터·찌·트랙 등)는 가운데 놓인 160×240 안전 상자 안에 있고,
+// 배경(모래·물·부두·바위·물고기 그림자)은 남는 칸까지 w×h 전체를 채운다.
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import type { Bar, BarParams } from './minigame.ts'
@@ -16,19 +18,27 @@ export type SceneState = {
   caughtSpecies: string | null
 }
 
+/** 안전 상자(= 가장 작은 장면) 크기 */
 export const SCENE_W = 160
 export const SCENE_H = 240
+export type SceneSize = { w: number; h: number }
 
 const TILE = 16
 const WATER_FRAME_MS = 500
 
-// 모래톱 → 부두(위에서 내려옴) → 부두 끝에 캐릭터
+// 모래톱 → 부두(위에서 내려옴) → 부두 끝에 캐릭터. 아래 좌표는 안전 상자 기준이다.
 const SAND_H = 14
+/** 모래·젖은 띠·파도 거품 아래 첫 줄 */
+const SHORE_BOTTOM = SAND_H + 3
 const PIER_X = 64
 const PIER_W = 32
 const PIER_END = 112
 const PIER_FACE = 4
-const POST_YS = [24, 64, PIER_END - 12]
+/** 부두 끝 옆면과 그 아래 그늘까지 */
+const PIER_BOTTOM = PIER_END + PIER_FACE + 3
+const POST_W = 8
+const POST_H = 12
+const POST_GAP = 40
 
 const PLAYER_X = PIER_X + 8
 const PLAYER_Y = PIER_END - 26
@@ -124,57 +134,198 @@ function ripple(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number
   }
 }
 
-function drawWater(ctx: CanvasRenderingContext2D, tMs: number): void {
-  const frame = Math.floor(tMs / WATER_FRAME_MS)
-  for (let ty = 0; ty * TILE < SCENE_H; ty++) {
-    for (let tx = 0; tx * TILE < SCENE_W; tx++) {
+// ── 배치: 크기(w×h)마다 한 번 정한다 ──────────────────────────────
+
+/** 안전 상자의 위치와 주요 좌표(캔버스 기준) */
+export type SceneLayout = {
+  /** 안전 상자 왼쪽 위 */
+  ox: number
+  oy: number
+  /** 캐릭터 스프라이트 왼쪽 위 */
+  playerX: number
+  playerY: number
+  /** 부두 왼쪽 끝과 부두 끝(판자가 끝나는 줄) */
+  pierX: number
+  pierEnd: number
+}
+
+export function layout(w: number, h: number): SceneLayout {
+  const ox = Math.floor((w - SCENE_W) / 2)
+  const oy = Math.floor((h - SCENE_H) / 2)
+  return { ox, oy, playerX: ox + PLAYER_X, playerY: oy + PLAYER_Y, pierX: ox + PIER_X, pierEnd: oy + PIER_END }
+}
+
+type Box = { x: number; y: number; w: number; h: number }
+const overlaps = (a: Box, b: Box): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+/** 물고기 그림자가 헤엄치는 가로 줄 */
+type Lane = { y: number; speed: number; offset: number }
+type World = { w: number; h: number; L: SceneLayout; posts: number[]; rocks: [number, number][]; lanes: Lane[] }
+
+const ROCK_W = 14
+const ROCK_H = 9
+const SHADOW_H = 5
+/** 그림자 줄 하나가 차지하는 대략의 높이. 장면이 길어지면 줄이 늘어난다. */
+const LANE_SPACING = 55
+const LANE_SPEEDS = [9, 6, 7.5, 5, 8, 6.5]
+/** 바위 후보 자리(전체 영역 비율). 앞에서부터 막히지 않은 자리를 쓴다. 처음 둘은 원래 160×240 장면의 바위 자리다. */
+const ROCK_SPOTS: [number, number][] = [
+  [0.07, 0.65], [0.92, 0.85], [0.05, 0.32], [0.95, 0.45], [0.25, 0.93], [0.75, 0.62], [0.15, 0.5],
+  [0.85, 0.25], [0.35, 0.75], [0.65, 0.95], [0.03, 0.8], [0.97, 0.7], [0.3, 0.4], [0.7, 0.38],
+  [0.12, 0.2], [0.88, 0.92],
+]
+const ROCK_NUDGE = [0, -8, 8, -16, 16]
+
+/** 부두 기둥 y: 40px 간격으로 내려가고, 마지막은 늘 부두 끝 바로 위 */
+function postYs(pierEnd: number): number[] {
+  const last = pierEnd - POST_H
+  const ys: number[] = []
+  for (let y = 24; y < last - 20; y += POST_GAP) ys.push(y)
+  ys.push(last)
+  return ys
+}
+
+/** 그림자 줄은 부두 끝 아래 물에만 둔다(부두·모래 위로 지나가지 않게). */
+function laneLayout(L: SceneLayout, h: number): Lane[] {
+  const top = L.oy + PIER_BOTTOM + 8
+  const bottom = h - 6 - SHADOW_H
+  const n = Math.max(2, Math.floor((h - top) / LANE_SPACING))
+  return Array.from({ length: n }, (_, i) => ({
+    y: Math.round(top + ((i + 0.5) * (bottom - top)) / n),
+    speed: LANE_SPEEDS[i % LANE_SPEEDS.length],
+    offset: 30 + i * 90,
+  }))
+}
+
+/** 바위는 모래·부두·찌 자리·대결 트랙·그림자 줄·다른 바위와 겹치지 않는 후보 자리에 놓는다. */
+function rockLayout(w: number, h: number, L: SceneLayout, lanes: Lane[]): [number, number][] {
+  const want = Math.max(2, Math.round((w * h) / 30000))
+  const blocked: Box[] = [
+    { x: 0, y: 0, w, h: SHORE_BOTTOM + 3 },
+    { x: L.pierX - POST_W - 4, y: 0, w: PIER_W + 2 * POST_W + 8, h: L.oy + PIER_BOTTOM + 4 },
+    { x: L.ox + BOBBER_X - 14, y: L.pierEnd, w: 28, h: h - L.pierEnd },
+    { x: L.ox + TRACK_X - 3, y: L.oy + TRACK_Y - 3, w: METER_X + METER_W - TRACK_X + 6, h: TRACK_H + 6 },
+    ...lanes.map((l) => ({ x: 0, y: l.y - 3, w, h: SHADOW_H + 6 })),
+  ]
+  const rocks: [number, number][] = []
+  for (const [fx, fy] of ROCK_SPOTS) {
+    if (rocks.length >= want) break
+    const x = Math.round(fx * (w - ROCK_W))
+    for (const dy of ROCK_NUDGE) {
+      const y = Math.round(fy * (h - ROCK_H)) + dy
+      if (y + ROCK_H > h - 2) continue
+      const box = { x: x - 2, y: y - 2, w: ROCK_W + 4, h: ROCK_H + 4 }
+      if (blocked.some((b) => overlaps(box, b))) continue
+      rocks.push([x, y])
+      blocked.push(box)
+      break
+    }
+  }
+  return rocks
+}
+
+function makeWorld(w: number, h: number): World {
+  const L = layout(w, h)
+  const lanes = laneLayout(L, h)
+  return { w, h, L, posts: postYs(L.pierEnd), rocks: rockLayout(w, h, L, lanes), lanes }
+}
+
+// ── 배경 ─────────────────────────────────────────────────────────
+
+/** 물 타일 두 장 중 지금 것(0/1). 파도 거품도 같은 박자로 움직인다. */
+function waterFrame(tMs: number): number {
+  return ((Math.floor(tMs / WATER_FRAME_MS) % 2) + 2) % 2
+}
+
+function drawWater(ctx: CanvasRenderingContext2D, w: number, h: number, k: number): void {
+  for (let ty = 0; ty * TILE < h; ty++) {
+    for (let tx = 0; tx * TILE < w; tx++) {
       // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게
-      const f = (frame + tx + ty * 3) % 2
+      const f = (k + tx + ty * 3) % 2
       drawSprite(ctx, f === 0 ? 'water-0' : 'water-1', tx * TILE, ty * TILE, 1)
     }
   }
 }
 
-// 배경 장식: 바위 둘, 천천히 헤엄치는 물고기 그림자 둘(화면 밖으로 나가면 반대편에서 다시)
-const ROCKS: [number, number][] = [[10, 150], [134, 196]]
-function drawDecor(ctx: CanvasRenderingContext2D, tMs: number): void {
-  const swim = (speed: number, offset: number): number => {
-    const span = SCENE_W + 20
-    return SCENE_W - ((((tMs * speed) / 1000 + offset) % span) + span) % span
-  }
-  drawSprite(ctx, 'fish-shadow', Math.round(swim(9, 30)), 136, 1)
-  drawSprite(ctx, 'fish-shadow', Math.round(swim(6, 120)), 206, 1)
-  for (const [x, y] of ROCKS) drawSprite(ctx, 'rock', x, y, 1)
-}
+const SAND_SPECKS: [number, number][] = [[9, 3], [27, 8], [44, 4], [113, 6], [131, 2], [148, 9], [21, 11], [139, 11]]
 
-function drawShore(ctx: CanvasRenderingContext2D, tMs: number): void {
-  rect(ctx, 0, 0, SCENE_W, SAND_H, C.sand)
-  for (const [x, y] of [[9, 3], [27, 8], [44, 4], [113, 6], [131, 2], [148, 9], [21, 11], [139, 11]]) {
-    rect(ctx, x, y, 2, 1, C.sandDark)
+function drawShore(ctx: CanvasRenderingContext2D, world: World, k: number): void {
+  const { w, L } = world
+  rect(ctx, 0, 0, w, SAND_H, C.sand)
+  // 모래 알갱이 무늬는 160px마다 되풀이하고, 안전 상자 안은 원래 장면과 같게 맞춘다
+  for (let base = L.ox - Math.ceil(L.ox / SCENE_W) * SCENE_W; base < w; base += SCENE_W) {
+    for (const [x, y] of SAND_SPECKS) if (base + x >= 0 && base + x < w) rect(ctx, base + x, y, 2, 1, C.sandDark)
   }
-  rect(ctx, 0, SAND_H, SCENE_W, 2, C.sandWet)
+  rect(ctx, 0, SAND_H, w, 2, C.sandWet)
   // 파도 거품: 500ms마다 한 칸 밀린다
-  const shift = Math.floor(tMs / WATER_FRAME_MS) % 2
-  for (let x = -8 + shift * 4; x < SCENE_W; x += 8) rect(ctx, x, SAND_H + 2, 5, 1, C.foam)
+  for (let x = -8 + k * 4; x < w; x += 8) rect(ctx, x, SAND_H + 2, 5, 1, C.foam)
 }
 
-function drawPier(ctx: CanvasRenderingContext2D): void {
+function drawPier(ctx: CanvasRenderingContext2D, world: World): void {
+  const { pierX: x, pierEnd: end } = world.L
   // 부두가 물 위에 드리우는 그늘(오른쪽·아래)
-  rect(ctx, PIER_X + PIER_W, SAND_H, 3, PIER_END - SAND_H + PIER_FACE, C.shadow)
-  rect(ctx, PIER_X + 2, PIER_END + PIER_FACE, PIER_W + 1, 3, C.shadow)
-  for (const y of POST_YS) {
-    drawSprite(ctx, 'pier-post', PIER_X - 8, y, 1)
-    drawSprite(ctx, 'pier-post', PIER_X + PIER_W, y, 1)
+  rect(ctx, x + PIER_W, SAND_H, 3, end - SAND_H + PIER_FACE, C.shadow)
+  rect(ctx, x + 2, end + PIER_FACE, PIER_W + 1, 3, C.shadow)
+  for (const y of world.posts) {
+    drawSprite(ctx, 'pier-post', x - POST_W, y, 1)
+    drawSprite(ctx, 'pier-post', x + PIER_W, y, 1)
   }
-  for (let y = PIER_END - TILE; y > -TILE; y -= TILE) {
-    drawSprite(ctx, 'pier-plank', PIER_X, y, 1)
-    drawSprite(ctx, 'pier-plank', PIER_X + TILE, y, 1)
+  for (let y = end - TILE; y > -TILE; y -= TILE) {
+    drawSprite(ctx, 'pier-plank', x, y, 1)
+    drawSprite(ctx, 'pier-plank', x + TILE, y, 1)
   }
   // 부두 끝 옆면
-  rect(ctx, PIER_X, PIER_END, PIER_W, PIER_FACE, C.pierFace)
-  rect(ctx, PIER_X, PIER_END + PIER_FACE - 1, PIER_W, 1, C.pierFaceDark)
-  rect(ctx, PIER_X - 1, 0, 1, PIER_END + PIER_FACE, C.outline)
-  rect(ctx, PIER_X + PIER_W, 0, 1, PIER_END + PIER_FACE, C.outline)
+  rect(ctx, x, end, PIER_W, PIER_FACE, C.pierFace)
+  rect(ctx, x, end + PIER_FACE - 1, PIER_W, 1, C.pierFaceDark)
+  rect(ctx, x - 1, 0, 1, end + PIER_FACE, C.outline)
+  rect(ctx, x + PIER_W, 0, 1, end + PIER_FACE, C.outline)
+}
+
+/** 움직이지 않는 배경 전부(물 타일 k번 장). */
+function drawStatic(ctx: CanvasRenderingContext2D, world: World, k: number): void {
+  drawWater(ctx, world.w, world.h, k)
+  for (const [x, y] of world.rocks) drawSprite(ctx, 'rock', x, y, 1)
+  drawShore(ctx, world, k)
+  drawPier(ctx, world)
+}
+
+/** 천천히 헤엄치는 물고기 그림자(화면 밖으로 나가면 반대편에서 다시). 줄이 바위·부두와 겹치지 않아 배경 위에 그려도 된다. */
+function drawShadows(ctx: CanvasRenderingContext2D, world: World, tMs: number): void {
+  const span = world.w + 20
+  for (const lane of world.lanes) {
+    const x = world.w - ((((tMs * lane.speed) / 1000 + lane.offset) % span) + span) % span
+    drawSprite(ctx, 'fish-shadow', Math.round(x), lane.y, 1)
+  }
+}
+
+/**
+ * 크기별 배경 캐시: 물 타일 두 장 각각에 맞춘 정적 배경을 오프스크린 캔버스 두 개에 한 번 그려 둔다.
+ * 오프스크린 2D 컨텍스트를 못 얻으면(jsdom 등) frames 없이 매 프레임 직접 그린다.
+ */
+type Background = { world: World; frames: [HTMLCanvasElement, HTMLCanvasElement] | null }
+let background: Background | null = null
+
+function renderFrames(world: World): [HTMLCanvasElement, HTMLCanvasElement] | null {
+  if (typeof document === 'undefined') return null
+  const frames: HTMLCanvasElement[] = []
+  for (const k of [0, 1]) {
+    const c = document.createElement('canvas')
+    c.width = world.w
+    c.height = world.h
+    const cx = c.getContext('2d')
+    if (!cx) return null
+    cx.imageSmoothingEnabled = false
+    drawStatic(cx, world, k)
+    frames.push(c)
+  }
+  return [frames[0], frames[1]]
+}
+
+function backgroundFor(w: number, h: number): Background {
+  if (background && background.world.w === w && background.world.h === h) return background
+  const world = makeWorld(w, h)
+  background = { world, frames: renderFrames(world) }
+  return background
 }
 
 function bobberY(castPower: number): number {
@@ -243,14 +394,32 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
   }
 }
 
-export function drawScene(ctx: CanvasRenderingContext2D, s: SceneState): void {
+/**
+ * 장면 한 프레임. size는 캔버스의 논리 크기(최소 160×240)다.
+ * 배경은 w×h 전체에, 게임 요소는 가운데 160×240 안전 상자 안에 그린다.
+ */
+export function drawScene(ctx: CanvasRenderingContext2D, s: SceneState, size: SceneSize): void {
+  const w = Math.max(SCENE_W, Math.floor(size.w) || 0)
+  const h = Math.max(SCENE_H, Math.floor(size.h) || 0)
   ctx.imageSmoothingEnabled = false
-  const t = s.tMs
-  drawWater(ctx, t)
-  drawDecor(ctx, t)
-  drawShore(ctx, t)
-  drawPier(ctx)
+  const bg = backgroundFor(w, h)
+  const k = waterFrame(s.tMs)
+  if (bg.frames) ctx.drawImage(bg.frames[k], 0, 0)
+  else drawStatic(ctx, bg.world, k)
+  drawShadows(ctx, bg.world, s.tMs)
 
+  ctx.save()
+  ctx.translate(bg.world.L.ox, bg.world.L.oy)
+  try {
+    drawForeground(ctx, s)
+  } finally {
+    ctx.restore()
+  }
+}
+
+/** 안전 상자 좌표(0~160 × 0~240)로 그리는 게임 요소 */
+function drawForeground(ctx: CanvasRenderingContext2D, s: SceneState): void {
+  const t = s.tMs
   const pose = poseFor(s.phase)
   const shake = s.phase === 'fighting' ? (Math.floor(t / 90) % 2 === 0 ? -1 : 1) : 0
   const px = PLAYER_X + shake

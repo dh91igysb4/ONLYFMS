@@ -13,6 +13,9 @@ import './fishing.css'
 const AREA = AREAS[0].id
 const OUTCOME_MS = 1200
 const MAX_SCALE = 4
+/** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
+const MAX_SCENE_W = 320
+const MAX_SCENE_H = 480
 /** 무대 아래 요소를 재고도 남겨 두는 여유 높이 */
 const FIT_MARGIN = 8
 
@@ -20,6 +23,25 @@ const FIT_MARGIN = 8
 export function canvasScale(availW: number, availH: number): number {
   const fit = Math.min(Math.floor(availW / SCENE_W), Math.floor(availH / SCENE_H))
   return Math.max(1, Math.min(MAX_SCALE, fit))
+}
+
+export type SceneFit = { scale: number; w: number; h: number }
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+const sizeOrZero = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
+
+/**
+ * 쓸 수 있는 영역에 맞춘 캔버스: 정수 배율과, 그 배율로 영역을 채우는 장면 논리 크기(160~320 × 240~480).
+ * 장면은 늘이지 않고 더 넓게 그린다(scene.ts의 안전 상자 밖은 배경).
+ */
+export function fitScene(availW: number, availH: number): SceneFit {
+  const aw = sizeOrZero(availW)
+  const ah = sizeOrZero(availH)
+  const scale = canvasScale(aw, ah)
+  return {
+    scale,
+    w: clamp(Math.floor(aw / scale), SCENE_W, MAX_SCENE_W),
+    h: clamp(Math.floor(ah / scale), SCENE_H, MAX_SCENE_H),
+  }
 }
 
 /** 캔버스에 쓸 수 있는 높이: 창 높이 - 문서 맨 위에서 무대까지 - 무대 아래 요소 - 여유. 음수일 수 있다. */
@@ -88,7 +110,7 @@ export function Game({ gameId }: WorldGameProps) {
   const [menu, setMenuState] = useState<Menu | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
-  const [scale, setScale] = useState(1)
+  const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -314,7 +336,7 @@ export function Game({ gameId }: WorldGameProps) {
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
-    })
+    }, { w: fit.w, h: fit.h })
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
@@ -366,10 +388,10 @@ export function Game({ gameId }: WorldGameProps) {
     }
   }, [loaded, rt])
 
-  // 캔버스 배율: 무대 너비와 남은 화면 높이에 함께 들어가는 가장 큰 정수 배.
+  // 캔버스 크기: 무대 너비와 남은 화면 높이로 fitScene(정수 배율 + 그 배율로 채우는 장면 크기).
   // 무대 위(사이트 머리·제목·골드 줄)는 무대의 문서 위치로, 무대 아래는 늘 있는 가방·메뉴 줄과 간격만 잰다.
   // 안내 줄과 메뉴 창은 캔버스 위에 겹쳐 뜨고, 잠깐 뜨는 알림은 재지 않아 캔버스 크기가 흔들리지 않는다.
-  // 캔버스 자신의 높이는 쓰지 않으므로 배율이 바뀌어도 다시 재는 값은 그대로다.
+  // 캔버스 자신의 높이는 쓰지 않으므로 크기가 바뀌어도 다시 재는 값은 그대로다.
   useEffect(() => {
     const el = stageRef.current
     if (!loaded || !el) return
@@ -379,7 +401,8 @@ export function Game({ gameId }: WorldGameProps) {
       const gap = root ? parseFloat(getComputedStyle(root).rowGap) || 0 : 0
       const belowH = (bottom?.offsetHeight ?? 0) + gap
       const stageTop = el.getBoundingClientRect().top + window.scrollY
-      setScale(canvasScale(el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH)))
+      const next = fitScene(el.clientWidth, availableHeight(window.innerHeight, stageTop, belowH))
+      setFit((prev) => (prev.scale === next.scale && prev.w === next.w && prev.h === next.h ? prev : next))
     }
     measure()
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
@@ -463,14 +486,14 @@ export function Game({ gameId }: WorldGameProps) {
       </div>
 
       <div className="fish-stage" ref={stageRef}>
-        <div className="fish-frame" style={{ width: SCENE_W * scale, height: SCENE_H * scale }}>
+        <div className="fish-frame" style={{ width: fit.w * fit.scale, height: fit.h * fit.scale }}>
           <canvas
             ref={canvasRef}
             className="fish-canvas"
             aria-label="낚시터"
-            width={SCENE_W}
-            height={SCENE_H}
-            style={{ width: SCENE_W * scale, height: SCENE_H * scale }}
+            width={fit.w}
+            height={fit.h}
+            style={{ width: fit.w * fit.scale, height: fit.h * fit.scale }}
             onPointerDown={(e) => {
               e.preventDefault()
               try {

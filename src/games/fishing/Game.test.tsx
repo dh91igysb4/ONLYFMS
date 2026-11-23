@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { availableHeight, canvasScale, Game } from './Game.tsx'
+import { availableHeight, canvasScale, fitScene, Game } from './Game.tsx'
 import { ApiError, world } from '../../lib/api.ts'
 import { drawScene } from './scene.ts'
 import { barResult } from './minigame.ts'
@@ -85,6 +85,23 @@ afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
+
+/** 무대(.fish-stage)의 너비·높이·문서 위치와 창 높이를 정한다. 되돌리는 함수를 돌려준다. */
+function stubStage({ width, height = 0, top = 0, innerH }: { width: number; height?: number; top?: number; innerH: number }) {
+  const prevInnerH = window.innerHeight
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+  const rect = HTMLElement.prototype.getBoundingClientRect
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? new DOMRect(0, top, width, height) : rect.call(this)
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? width : 0
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains('fish-stage') ? height : 0
+  })
+  return () => Object.defineProperty(window, 'innerHeight', { configurable: true, value: prevInnerH })
+}
 
 const flush = () => act(async () => { await Promise.resolve() })
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
@@ -382,22 +399,35 @@ describe('fishing Game', () => {
     expect(screen.getByRole('button', { name: '상점' })).toBeDisabled()
   })
 
-  test('canvas scale uses the height left below the stage, not a fixed allowance', async () => {
-    const innerH = window.innerHeight
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 650 })
-    const rect = HTMLElement.prototype.getBoundingClientRect
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('fish-stage') ? new DOMRect(0, 191, 688, 0) : rect.call(this)
-    })
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.classList.contains('fish-stage') ? 688 : 0
-    })
+  test('canvas size uses the height left below the stage, not a fixed allowance', async () => {
+    const restore = stubStage({ width: 688, top: 191, innerH: 650 })
     try {
       await mount()
-      expect(canvas().style.width).toBe('160px')
-      expect(canvas().style.height).toBe('240px')
+      // 남은 높이 650 - 191 - 8 = 451 → fitScene(688, 451) = 1배, 320×451
+      expect(canvas().style.width).toBe('320px')
+      expect(canvas().style.height).toBe('451px')
     } finally {
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerH })
+      restore()
+    }
+  })
+
+  test('the canvas backing store is fitScene w×h and the scene is drawn at that size', async () => {
+    // 폰: 무대 너비 390, 남은 높이 650 - 82 - 8 = 560
+    const restore = stubStage({ width: 390, top: 82, innerH: 650 })
+    try {
+      await mount()
+      const fit = fitScene(390, 560)
+      expect(fit).toEqual({ scale: 2, w: 195, h: 280 })
+      const c = canvas() as HTMLCanvasElement
+      expect(c.width).toBe(fit.w)
+      expect(c.height).toBe(fit.h)
+      expect(c.style.width).toBe(`${fit.w * fit.scale}px`)
+      expect(c.style.height).toBe(`${fit.h * fit.scale}px`)
+      await advance(100)
+      const last = vi.mocked(drawScene).mock.calls.at(-1)
+      expect(last?.[2]).toEqual({ w: fit.w, h: fit.h })
+    } finally {
+      restore()
     }
   })
 
@@ -409,6 +439,22 @@ describe('fishing Game', () => {
     const n = vi.mocked(drawScene).mock.calls.length
     await advance(200)
     expect(vi.mocked(drawScene).mock.calls.length).toBe(n)
+  })
+})
+
+describe('fitScene', () => {
+  test('integer scale and a logical size that fills the area, within 160–320 × 240–480', () => {
+    expect(fitScene(390, 560)).toEqual({ scale: 2, w: 195, h: 280 })
+    expect(fitScene(358, 565)).toEqual({ scale: 2, w: 179, h: 282 })
+    expect(fitScene(1280, 696)).toEqual({ scale: 2, w: 320, h: 348 })
+    expect(fitScene(688, 371)).toEqual({ scale: 1, w: 320, h: 371 })
+    expect(fitScene(150, 200)).toEqual({ scale: 1, w: 160, h: 240 })
+  })
+
+  test('zero, negative and non-finite sizes give the minimum scene', () => {
+    expect(fitScene(0, 0)).toEqual({ scale: 1, w: 160, h: 240 })
+    expect(fitScene(NaN, -5)).toEqual({ scale: 1, w: 160, h: 240 })
+    expect(fitScene(Infinity, 600)).toEqual({ scale: 1, w: 160, h: 480 })
   })
 })
 
