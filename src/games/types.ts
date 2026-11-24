@@ -1,4 +1,5 @@
 // 게임 약속 타입 (설계 §4.1, §4.2). 외부 의존 없음 (Deno 호환).
+import type { FreeGold } from './economy.ts'
 
 /** 서버가 넘기는 시각 정보(밀리초). 자유 플레이에서는 브라우저 시각을 쓴다. */
 export type Ctx = { now: number; startedAt: number; deadline: number | null }
@@ -74,6 +75,11 @@ export type Manifest = {
   scoreMax?: number
   /** 자유 플레이 점수를 화면에 보일 소수 자릿수(기본 2). 거리처럼 정수 점수면 0 */
   scoreDecimals?: 0 | 1 | 2
+  /**
+   * 자유 플레이 골드(지갑 설계 §7). 판당 floor(점수 × perPoint)를 playCap까지, 하루 dailyCap(= FREE_DAILY_CAP)까지.
+   * DB game_modes.gold_*와 같아야 한다(registry.test.ts). 없으면 지급 없음. 수치는 게임별 gold.test.ts가 REF ±20%로 지킨다
+   */
+  gold?: FreeGold
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,9 +116,14 @@ export interface DuelLogic<State, Action, View> {
 export type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }
 
 // ---- 지속형(world) 게임 계약: 저장이 이어지는 게임 ----
+//
+// 지속형 게임 공통 규칙(설계 docs/superpowers/specs/2026-11-23-wallet-design.md §6):
+// 골드는 세이브에 두지 않는다. 플랫폼 지갑이 원본이고 게임은 ctx.gold를 읽고 증감만 돌려준다.
+// 지갑을 쓰는 게임은 `wallet: true`를 둔다. 없으면 world 핸들러는 지갑을 잠그지도 읽지도 않고,
+// ctx.gold는 0, 응답에 최상위 gold가 없다(지갑 이전 전의 게임이 그대로 동작하게).
 
-/** 서버가 넘기는 시각(밀리초)과 난수 함수 */
-export type WorldCtx = { now: number; rng: () => number }
+/** 서버가 넘기는 시각(밀리초), 난수 함수, 지갑 잔액(잠근 뒤 읽은 값. `wallet`이 없는 게임은 0) */
+export type WorldCtx = { now: number; rng: () => number; gold: number }
 
 /** 게임이 남기는 기록 하나. key는 manifest.records의 key와 맞는다 */
 export type WorldRecord = { key: string; value: number; detail?: string }
@@ -120,20 +131,36 @@ export type WorldRecord = { key: string; value: number; detail?: string }
 export interface WorldLogic<State, Action, View> {
   /** 규칙·저장 형식을 바꿀 때마다 1씩 올린다 */
   version: number
+  /** 플랫폼 지갑을 쓴다. true면 핸들러가 지갑을 잠그고 ctx.gold를 채우며 apply의 gold를 장부에 반영한다 */
+  wallet?: boolean
   init(): State
   /** 옛 버전 state를 현재 형식으로. 모르는 값은 기본값으로 채우고 던지지 않는다 */
   migrate(state: unknown, fromVersion: number): State
-  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
-  apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown } | { error: string }
-  /** 브라우저에 보낼 상태 */
-  view(state: State, ctx: { now: number }): View
+  /**
+   * 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다.
+   * gold: 이 행동의 골드 증감(정수). 생략하면 0. 지출은 ctx.gold로 먼저 검사해 not_enough_gold를 돌려준다.
+   */
+  apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown; gold?: number } | { error: string }
+  /** 브라우저에 보낼 상태. gold: 이 응답 시점의 지갑 잔액(`wallet`이 없는 게임은 0) */
+  view(state: State, ctx: { now: number; gold: number }): View
   records(state: State): WorldRecord[]
   /**
    * 프로필에 그릴 캐릭터 문자열(manifest `avatar`가 있는 게임만). world 함수가 행동 뒤
    * `game_records`의 키 `AVATAR_RECORD_KEY`(값 0, detail = 이 문자열)에 쓰고, 화면 `getAvatarComponent`가 읽는다.
    */
   avatar?(state: State): string
+  /** 옛 세이브 안에 들어 있던 골드(0 이상 정수). 세이브 버전이 바뀔 때 핸들러가 한 번 지갑으로 옮긴다 */
+  legacyGold?(raw: unknown, fromVersion: number): number
+  /**
+   * 이 세이브가 사이트 자유 플레이 골드에 주는 영구 보너스(%, 0 이상 정수. 지갑 설계 §7.5).
+   * world 함수가 요청마다 계산해 바뀌었으면 `game_records`의 키 `FREE_BONUS_RECORD_KEY`(값 = %)에 쓰고,
+   * DB `_free_bonus_pct`가 그 행들을 합쳐(상한 `FREE_BONUS_MAX_PCT`) 자유 플레이 지급 트리거가 판당 골드와 게임별 하루 상한에 곱한다.
+   */
+  freeBonus?(state: State): number
 }
+
+/** 자유 플레이 골드 보너스가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */
+export const FREE_BONUS_RECORD_KEY = 'free_bonus'
 
 /** 프로필 캐릭터가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */
 export const AVATAR_RECORD_KEY = 'avatar'

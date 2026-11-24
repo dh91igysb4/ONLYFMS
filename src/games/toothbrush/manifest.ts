@@ -1,3 +1,4 @@
+import { FREE_DAILY_CAP } from '../economy.ts'
 import type { Manifest } from '../types.ts'
 
 export const manifest: Manifest = {
@@ -10,4 +11,5 @@ export const manifest: Manifest = {
   dailyTimeLimitSec: null,
   options: [],
   freeStats: 'score',
+  gold: { perPoint: 64, playCap: 1860, dailyCap: FREE_DAILY_CAP },
 }

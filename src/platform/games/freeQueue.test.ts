@@ -74,7 +74,19 @@ test('localStorage_unavailable_does_not_throw', async () => {
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied') })
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied') })
   upsert.mockResolvedValue({ error: null })
-  await expect(submit(row('e'))).resolves.toBeUndefined()
+  await expect(submit(row('e'))).resolves.toBe(true)
   await expect(flush()).resolves.toBeUndefined()
   expect(upsert).toHaveBeenCalled()
+})
+
+test('submit_returns_whether_this_row_was_saved', async () => {
+  upsert.mockResolvedValueOnce({ error: null })
+  expect(await submit(row('ok'))).toBe(true)
+  upsert.mockResolvedValueOnce({ error: { message: 'offline' } })
+  expect(await submit(row('fail'))).toBe(false)
+  expect(stored().map((r) => r.client_id)).toEqual(['fail'])
+  // 앞서 남은 행이 다시 실패해도 이번 행이 들어갔으면 true
+  upsert.mockResolvedValueOnce({ error: { message: 'still' } }).mockResolvedValueOnce({ error: null })
+  expect(await submit(row('next'))).toBe(true)
+  expect(stored().map((r) => r.client_id)).toEqual(['fail'])
 })

@@ -383,8 +383,21 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('sell')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'sell' } }])
     expect(screen.getByText('1,600 G')).toBeInTheDocument()
-    expect(screen.getByText('1,500 G를 벌었어요')).toBeInTheDocument()
+    expect(screen.getByText('1,500 G어치를 팔았어요')).toBeInTheDocument()
     expect(screen.getByText('0/20')).toBeInTheDocument()
+  })
+
+  test('shop: sell over the site daily cap says what was sold and what actually came in (HUD = wallet)', async () => {
+    const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
+    await mountAtShop(view)
+    route({
+      sell: () => Promise.resolve({ view: { ...view, gold: 1700, bag: [] }, result: { earned: 40_000 }, server_now: Date.now(), gold: 1700, gold_capped: { asked: 40_000, got: 1600 } }),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
+    await flush()
+    expect(screen.getByText('40,000 G어치를 팔았어요 · 오늘 상한으로 1,600 G만 들어왔어요')).toBeInTheDocument()
+    expect(screen.getByText('1,700 G')).toBeInTheDocument()
+    expect(screen.queryByText(/벌었어요/)).toBeNull()
   })
 
   test('가방: 물고기 칸을 누르면 lock을 보내고, 응답 뒤 잠금 표시가 바뀐다', async () => {
@@ -2474,6 +2487,11 @@ describe('도전과제·순간이동기', () => {
     expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
     expect(items[2]).toHaveTextContent('0/3')
     expect(within(panel).getByText('깬 과제 1/10')).toBeInTheDocument()
+    // 도전과제 보너스(지갑 설계 §7.5): 과제마다 미니게임 골드 +N%, 지금 배율(강 20% → ×1.2)
+    expect(items[0]).toHaveTextContent('미니게임 골드 +20%')
+    expect(items[4]).toHaveTextContent('미니게임 골드 +60%')
+    expect(items[9]).toHaveTextContent('미니게임 골드 +80%')
+    expect(within(panel).getByText('지금 미니게임 골드 ×1.2')).toBeInTheDocument()
   })
 
   test('잡은 결과에 completed가 있으면 완료 알림', async () => {

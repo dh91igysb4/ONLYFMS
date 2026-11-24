@@ -93,10 +93,12 @@ export function flush(): Promise<void> {
   return p
 }
 
-export async function submit(row: FreePlayRow): Promise<void> {
+/** 대기열에 넣고 보낸다. 이번 행이 서버에 들어갔으면(대기열에서 빠짐) true. 호출부는 무시해도 된다 */
+export async function submit(row: FreePlayRow): Promise<boolean> {
   const next = [...read().filter((r) => r.client_id !== row.client_id), row]
   write(next.length > MAX_QUEUE ? next.slice(next.length - MAX_QUEUE) : next)
   await flush()
+  return !read().some((r) => r.client_id === row.client_id)
 }
 
 /** 온라인으로 돌아오면 대기열을 비운다. 해제 함수를 돌려준다. */

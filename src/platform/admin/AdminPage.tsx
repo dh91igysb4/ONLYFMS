@@ -5,6 +5,7 @@ import { now } from '../../lib/serverTime.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { listContests, type ContestRow } from '../contests/data.ts'
 import { AdminSuggestSection } from '../suggest/AdminSuggestSection.tsx'
+import { AdminGoldSection } from '../wallet/AdminGoldSection.tsx'
 import { kindLabel, kstLabel, phaseOf } from '../contests/format.ts'
 
 const BANK_WARN_BELOW = 30
@@ -34,6 +35,7 @@ export function AdminPage() {
         </div>
       </div>
       <AdminSuggestSection />
+      <AdminGoldSection />
     </div>
   )
 }

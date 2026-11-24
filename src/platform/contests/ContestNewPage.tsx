@@ -4,6 +4,11 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import { games } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { walletEnabled } from '../wallet/enabled.ts'
+import { formatGold } from '../wallet/format.ts'
+import { refreshWallet, useWallet } from '../wallet/useWallet.ts'
+import { feeProblem, parseFee } from './fee.ts'
+import { FeePicker } from './FeePicker.tsx'
 import { syncServerTime } from './clock.ts'
 import { InviteLink } from './InviteLink.tsx'
 import { validateContest, type ContestItemInput } from './validate.ts'
@@ -27,6 +32,9 @@ const FIELD_OF: Record<string, string> = {
   duration_invalid: 'durationMin',
   items_invalid: 'items',
   game_not_allowed: 'items',
+  fee_invalid: 'fee',
+  fee_not_allowed: 'fee',
+  not_enough_gold: 'fee',
 }
 
 function defaultOptions(gameId: string): Record<string, string> {
@@ -53,6 +61,13 @@ export function ContestNewPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<Created | null>(null)
+  // 참가비(지갑 5단계). 지갑 게임이 없거나 숨김 게임이 들어 있으면 입력을 숨기고 0
+  const { balance } = useWallet()
+  const [feeText, setFeeText] = useState('0')
+  const hasHidden = items.some((it) => games.find((x) => x.manifest.id === it.game_id)?.manifest.hidden)
+  const feeOn = walletEnabled() && !hasHidden
+  const fee = feeOn ? parseFee(feeText) : 0
+  const feeBad = feeOn ? feeProblem(fee, balance) : null
 
   const [startTouched, setStartTouched] = useState(false)
   // 서버 시각과 맞춘 뒤, 사용자가 건드리지 않았다면 기본 시작 시각을 다시 잡는다
@@ -77,6 +92,7 @@ export function ContestNewPage() {
       title, startsAt: parseKstInput(start), durationMin: Number(duration), visibility, items, official: isAdmin && official,
     }
     const errs = validateContest(input, now())
+    if (feeBad) errs.fee = feeBad
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
     setBusy(true)
@@ -86,8 +102,11 @@ export function ContestNewPage() {
         {
           p_title: title.trim(), p_starts_at: input.startsAt.toISOString(), p_duration_min: input.durationMin,
           p_visibility: visibility, p_items: items, p_official: input.official,
+          // 참가비 0이면 보내지 않는다(옛 DB에서도 그대로 만들어지게)
+          ...(fee ? { p_entry_fee: fee } : {}),
         },
       )
+      if (fee) void refreshWallet()
       const row = Array.isArray(res) ? res[0] : res
       setCreated({ id: row.id, code: row.invite_code ?? null })
     } catch (e2) {
@@ -195,8 +214,13 @@ export function ContestNewPage() {
         )}
       </fieldset>
 
+      {feeOn && <FeePicker text={feeText} onText={setFeeText} balance={balance} error={errors.fee} />}
+      {walletEnabled() && hasHidden && <p className="muted">숨김 게임이 든 대회는 참가비를 받을 수 없어요</p>}
+
       {formError && <p className="form-error" role="alert">{formError}</p>}
-      <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? '만드는 중…' : '대회 만들기'}</button>
+      <button className="btn btn-primary" type="submit" disabled={busy || !!feeBad}>
+        {busy ? '만드는 중…' : fee ? `참가비 ${formatGold(fee)} 내고 만들기` : '대회 만들기'}
+      </button>
     </form>
   )
 }
