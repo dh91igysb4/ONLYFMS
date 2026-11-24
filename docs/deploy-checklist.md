@@ -416,14 +416,8 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - [ ] 낚시가 지금과 똑같이 동작한다(팔기·사기·새로고침 뒤 골드 유지). 네트워크 탭의 `world` 응답에 최상위 `gold`가 없다
 - 확인 쿼리(SQL 편집기): `select count(*), sum(balance) from wallets;` `select reason, count(*), sum(delta) from gold_ledger group by 1;`
 
-### Task 4(낚시 → 지갑) 배포 때 더할 것
-Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
-- **새 마이그레이션에서 `_wallet_enabled()`를 `create or replace … select true`로 바꾼다**(5단계 대회 참가비가 이 값으로 새 참가비 대회를 막는다). `src/games/walletFlag.test.ts`가 마지막 정의와 등록부 `walletEnabled()`를 비교하므로 빠뜨리면 `npm test`가 실패한다. 순서는 DB push가 먼저라 그 사이(새 DB·옛 화면)에는 참가비 입력이 아직 없을 뿐이다.
-- 순서 동일. `world`를 낚시 지갑 버전으로 배포한 뒤에는 그 아래 버전으로 되돌리지 않는다. 옛 로직은 세이브에 gold가 없어 0으로 시작하고, 그 사이 번 골드는 다시 배포해도 **사라진다**: 이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시되기 때문이다.
-- 수동 확인: 낚시를 열기 전 헤더 `0 G`(지연 이전), 낚시를 열면 헤더와 낚시 화면 골드가 옛 골드와 같음, 새로고침해도 같음; 물고기 팔기 → 헤더가 바로 오름; 낚싯대·가방·찌·해금·순간이동·고급 장비 구매 → 헤더가 바로 내림, 모자라면 "골드가 부족해요".
-- 확인 쿼리: 아직 이전되지 않은 세이브 `select count(*) from world_saves where game_id = 'fishing' and logic_version <= <LAST_GOLD_IN_SAVE>;`, 이전 합계 `select count(*), sum(delta) from gold_ledger where reason = 'migrate';`, 이중 이전 없음 `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행).
-- 사이트 하루 상한 확인: 관리자 계정으로 낚시를 해 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림이 3초 뜨고 헤더 증가가 넘은 몫의 20%; 관리자 장부에 "(상한, 원래 …)" (2단계 PR 뒤에는 들어간 합계 41,000 위 몫은 4%).
-- 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표(`REF × 40`)를 다시 본다.
+### Task 4(낚시 → 지갑) 배포
+아래 "지갑 켜기 (Task 4 낚시 골드 → 지갑, `feat/wallet-fishing`)" 절로 옮겼다.
 
 ## 지갑 배포 (2단계 자유 플레이 지급, `feat/wallet-free`)
 설계 §5.6(2단 상한 개정)·§7, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 2단계(Task 8~12). 1단계(`feat/wallet-core`) 뒤에 쌓인 브랜치라 **1단계 PR이 먼저 머지·배포**돼야 한다. 낚시 다듬기 PR(#81)·Task 4(낚시 → 지갑)와는 독립이다(낚시 코드를 건드리지 않는다).
@@ -524,6 +518,32 @@ Task 4 PR이 아래를 이 절에 옮겨 적는다(계획 Task 7 Step 1).
   - [ ] `/admin` 골드 장부: "참가비"·"대회 상금"·"참가비 환불" 줄, 상한 표시 없음
 - 확인 쿼리: 정산·취소된 대회의 돈 보존 `select l.ref, sum(l.delta) from gold_ledger l where l.reason like 'contest\_%' and l.ref in (select id::text from contests where settled_at is not null or cancelled_at is not null) group by 1 having sum(l.delta) <> 0;`(0행. 순위에 들지 않은 사람의 계정이 지워진 경우만 예외), 진행 중 모인 돈 `select sum(-delta) from gold_ledger where reason = 'contest_fee' and ref in (select id::text from contests where settled_at is null and cancelled_at is null);`(끝난 대회는 누가 접속해 정산할 때까지 여기에 남는다).
 - 되돌리기: 화면만 문제면 Vercel 이전 배포로(옛 화면은 참가비 0으로만 만들고, 참가비 대회 참가는 `fee_mismatch` 오류 문구). DB는 되돌리지 않는다 — 이미 모인 참가비는 취소·정산이 그대로 돌려주거나 나눈다.
+
+## 지갑 켜기 (Task 4 낚시 골드 → 지갑, `feat/wallet-fishing`)
+계획 `docs/superpowers/plans/2026-11-24-wallet.md` Task 4. 낚시 `logic.version` **14**, `wallet: true`, `LAST_GOLD_IN_SAVE = 13`. 이 브랜치는 지갑 1~5단계(`feat/wallet-contest`까지)를 낚시 5부 M3(v13) 위에 합친 것이라, 그 PR들이 아직 운영에 없으면 이 절 하나로 **한꺼번에** 배포한다(각 단계 절의 마이그레이션·수동 확인은 그대로 하되 "Task 4 전에는 …" 항목은 건너뛴다). 낚시가 지갑을 쓰면 등록부 `walletEnabled()`가 true가 되어 헤더 `지갑 N G`, 프로필 골드, 자유 플레이 결과의 `+N G`, 데일리 상금 알림, 대전 판돈 고르기, 대회 참가비가 **저절로 켜진다**.
+
+순서: **DB push → `world` → `duel` → Vercel**. 진행 중 데일리가 적은 새벽(KST)에 한 번에 이어서 한다.
+
+- [ ] `npx supabase@2 db push` → 지갑 마이그레이션(`20261123181545_wallet` ~ `20261124020000_contest_fee`, 아직이면) + **`20261124030000_wallet_on.sql`**(`_wallet_enabled()` → `true`: `create_contest`가 참가비 > 0 대회를 받는다). 이 사이(새 DB·옛 함수·옛 화면)에는 옛 화면에 참가비 입력이 없을 뿐 깨지는 것은 없다
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` — **이 브랜치(PR 미리보기 확인용) 또는 머지 뒤 main에서만** 배포한다. 옛 지갑 브랜치(`feat/wallet-core` ~ `feat/wallet-contest`)에서 배포하지 않는다: 그 브랜치들의 낚시는 v13보다 옛 버전이라 옛 migrate가 산정·난파선·옷장·버프 등을 지우고, 지갑도 쓰지 않는다
+  - 배포 직후 각 사람의 **첫 낚시 요청(load든 act든)**에서 v13 세이브의 `gold`가 소수 내림으로 지갑에 한 번 들어가고(장부 `migrate`, ref `fishing`, 사이트 하루 상한과 무관), 세이브는 v14(gold 없음)로 저장된다. 그 요청이 실패한 행동이어도 이전은 커밋된다. 두 탭에서 동시에 열어도 세이브 행 잠금 + 장부 unique로 한 번뿐이다
+  - 진행 중이던 캐스트는 사라진다(v13 → v14, 설계상 허용)
+- [ ] `npx supabase@2 functions deploy duel --no-verify-jwt` — `duel` 함수가 등록부의 `walletEnabled()`를 번들하므로 다시 배포해야 판돈 > 0을 받는다(안 하면 `invalid_stake`로 판돈 0만)
+- [ ] PR 머지 → Vercel 배포. 머지 뒤 main 기준으로 `world`·`duel`을 한 번 더 배포한다(M1~M3과 같은 관례)
+- [ ] 배포가 끝나면 사용자들에게 **열어 둔 탭을 새로고침**해 달라고 알린다(옛 화면 번들은 헤더 지갑·`+N G`·판돈·참가비를 모른다. 낚시 화면은 옛 번들도 `view.gold` = 지갑 잔액을 그대로 보여 주므로 골드가 틀려 보이지는 않는다)
+- [ ] **`world`를 v14 아래(낚시 v13 이하)로 절대 되돌리지 않는다.** 옛 로직은 v14 세이브에 gold가 없어 0 G로 시작하고, 그동안 번 골드는 세이브에 쌓인다. 다시 v14를 배포하면 그 골드는 **사라진다**(이전 장부 `(user, 'migrate', 'fishing')`가 이미 있어 두 번째 이전이 무시된다). 이것을 장부 수동 정리로 고치려 하면 이미 지갑에 들어간 옛 골드가 **두 번** 들어간다. 그사이 헤더(지갑)와 낚시 화면 골드도 서로 다르게 보인다. 문제가 생기면 고쳐서 앞으로 배포한다. 화면만 문제면 Vercel 이전 배포로 되돌리는 것은 괜찮다(옛 화면은 지갑을 숨길 뿐)
+- [ ] 수동 확인(미리보기 → 운영, 폰 390px·PC):
+  - [ ] 낚시를 열기 전 헤더 `지갑 0 G`(또는 자유 플레이·상금으로 쌓인 값. 이전은 낚시를 열 때 일어난다). 낚시를 열면 헤더와 낚시 화면 골드가 **옛 낚시 골드(+ 이미 쌓인 값)**와 같고, 새로고침해도 같다. 헤더가 360px 폭에서 줄바꿈 없이 보인다
+  - [ ] 물고기 팔기 → 헤더가 바로 오른다(용왕의 여의주가 있으면 예상가 그대로 ×1.08). 낚싯대(1~6단계)·가방(50·60칸 포함)·찌·지역 해금(산정·난파선 포함, 난파선은 백골 낚싯대 이상)·순간이동 요금·옷 사기 → 헤더가 바로 내린다. 모자라면 "골드가 부족해요"이고 아무것도 바뀌지 않는다
+  - [ ] 자유 플레이 한 판 → 결과 화면 `+N G`와 헤더 증가가 같다. 다음 날 데일리 상금 알림, 대전 판돈 고르기(내 골드 표시), 대회 만들기의 참가비 입력이 보인다
+  - [ ] 관리자 장부에 `migrate`(낚시 옛 골드)·`world`(낚시) 줄
+  - [ ] 사이트 하루 상한: 관리자 계정으로 낚시를 해 들어간 합계 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림 3초, 넘은 몫은 41,000까지 20%, 그 위 4%. 관리자 장부에 "(상한, 원래 …)"
+- 확인 쿼리(SQL 편집기):
+  - 아직 이전되지 않은 세이브(낚시를 아직 안 연 사람): `select count(*) from world_saves where game_id = 'fishing' and logic_version <= 13;`
+  - 이전 합계: `select count(*), sum(delta) from gold_ledger where reason = 'migrate';` — 배포 직전 `select count(*), sum(floor((state->>'gold')::numeric)) from world_saves where game_id = 'fishing' and jsonb_typeof(state->'gold') = 'number' and (state->>'gold')::numeric > 0;`를 적어 두고, 모두 연 뒤 같아야 한다
+  - 이중 이전 없음: `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행)
+  - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
+- 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
 ## 문제가 생기면
 아래를 그대로 보내 준다.
