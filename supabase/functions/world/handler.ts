@@ -7,7 +7,7 @@
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getWorld } from '../../../src/games/index.ts'
-import { AVATAR_RECORD_KEY, type WorldLogic, type WorldModule } from '../../../src/games/types.ts'
+import { AVATAR_RECORD_KEY, FREE_BONUS_RECORD_KEY, type WorldLogic, type WorldModule } from '../../../src/games/types.ts'
 
 export type WorldDeps = {
   sql: Sql
@@ -197,6 +197,22 @@ async function run(
     const avatar = logic.avatar(state)
     if (avatarBefore === null || (isAct && avatar !== avatarBefore)) {
       await writeAvatar(tx, uid, gameId, avatar)
+    }
+  }
+  // 자유 플레이 골드 보너스(지갑 설계 §7.5): 요청마다 다시 계산해 저장된 값과 다르면 쓴다(배포 뒤 첫 요청에서도 채워진다).
+  // 자유 플레이 지급 트리거가 DB _free_bonus_pct로 이 행을 읽는다. 게임 id를 모른다: freeBonus가 있는 게임이면 같다.
+  if (logic.freeBonus) {
+    const pct = logic.freeBonus(state)
+    if (!Number.isSafeInteger(pct) || pct < 0) throw new Error(`world: freeBonus must be a non-negative integer, got ${pct}`)
+    const [cur] = await tx<{ v: string }[]>`
+      select value::text as v from public.game_records
+       where user_id = ${uid} and game_id = ${gameId} and key = ${FREE_BONUS_RECORD_KEY}`
+    if (!cur || Number(cur.v) !== pct) {
+      await tx`
+        insert into public.game_records (user_id, game_id, key, value)
+        values (${uid}, ${gameId}, ${FREE_BONUS_RECORD_KEY}, ${pct})
+        on conflict (user_id, game_id, key)
+        do update set value = excluded.value, updated_at = now()`
     }
   }
   if (!wallet) return out(200, { view: logic.view(state, { now, gold: 0 }), result, server_now: now })

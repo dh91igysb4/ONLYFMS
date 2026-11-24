@@ -172,7 +172,7 @@ select throws_ok($$select public._economy()$$, '42501', null, '_economy: authent
 select throws_ok($$select public._kst_today_start()$$, '42501', null, '_kst_today_start: authenticated 실행 불가');
 select throws_ok($$select public._earned_today(auth.uid())$$, '42501', null, '_earned_today: authenticated 실행 불가');
 
-select is(public.my_wallet() - 'prizes', '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
+select is(public.my_wallet() - 'prizes' - 'free_bonus_pct', '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
 select is(public.user_wallet('goldb'), 0::bigint, 'user_wallet: 지갑 0');
 select is(public.user_wallet(' GoldB '), 0::bigint, 'user_wallet: handle 정규화');
 select is(public.user_wallet('goldp'), null::bigint, 'user_wallet: 대기 사용자 → null');

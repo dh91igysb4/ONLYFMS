@@ -94,6 +94,8 @@ const worlds = new Map<string, WorldModule>([
   ['test-world-v2', { manifest: manifest('test-world-v2', false), logic: v2 }],
   ['test-world-hidden', { manifest: manifest('test-world-hidden', true), logic: base }],
   ['test-world-avatar', { manifest: { ...manifest('test-world-avatar', false), avatar: { label: '캐릭터' } }, logic: { ...base, avatar: (state: S) => `look-${state.n}` } }],
+  ['test-world-bonus', { manifest: manifest('test-world-bonus', false), logic: { ...base, freeBonus: (state: S) => state.n * 10 } }],
+  ['test-world-badbonus', { manifest: manifest('test-world-badbonus', false), logic: { ...base, freeBonus: () => -1 } }],
   ['test-world-avatar-fixed', { manifest: { ...manifest('test-world-avatar-fixed', false), avatar: { label: '캐릭터' } }, logic: { ...base, version: 2, avatar: () => 'same' } }],
 ])
 const registry = { getWorld: (id: string) => worlds.get(id) }
@@ -374,7 +376,43 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(tp.status, 400)
   assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
-  assert.deepEqual(rows.map((r) => r.key), ['avatar', 'biggest', 'challenges', 'dex', 'total_earned'])
+  assert.deepEqual(rows.map((r) => r.key), ['avatar', 'biggest', 'challenges', 'dex', 'free_bonus', 'total_earned'])
+})
+
+// ---------------------------------------------------------------- 자유 플레이 골드 보너스 (지갑 설계 §7.5)
+async function bonusRow(uid: string, game: string): Promise<number | null> {
+  const [r] = await sql`select value::text as v from public.game_records where user_id = ${uid} and game_id = ${game} and key = 'free_bonus'`
+  return r ? Number(r.v) : null
+}
+
+t('freeBonus: first load writes the row (0), acts update it only when it changes, load heals a wrong value', async () => {
+  const u = await user()
+  const g = 'test-world-bonus'
+  assert.equal((await load(u, g)).status, 200)
+  assert.equal(await bonusRow(u, g), 0)
+  await act(u, { type: 'inc' }, g)
+  assert.equal(await bonusRow(u, g), 10)
+  const [before] = await sql`select updated_at from public.game_records where user_id = ${u} and game_id = ${g} and key = 'free_bonus'`
+  await act(u, { type: 'echo' }, g) // 상태 그대로 → 쓰지 않는다
+  const [after] = await sql`select updated_at from public.game_records where user_id = ${u} and game_id = ${g} and key = 'free_bonus'`
+  assert.deepEqual(after.updated_at, before.updated_at)
+  await act(u, { type: 'inc' }, g)
+  assert.equal(await bonusRow(u, g), 20)
+  // 누가 값을 바꿔 놓아도(관리) 다음 요청이 세이브 기준으로 되돌린다
+  await sql`update public.game_records set value = 999 where user_id = ${u} and game_id = ${g} and key = 'free_bonus'`
+  await load(u, g)
+  assert.equal(await bonusRow(u, g), 20)
+  // freeBonus가 없는 게임은 행을 쓰지 않는다
+  await act(u, { type: 'inc' })
+  assert.equal(await bonusRow(u, 'test-world'), null)
+})
+
+t('freeBonus: negative value → 500, rolled back', async () => {
+  const u = await user()
+  const r = await act(u, { type: 'inc' }, 'test-world-badbonus')
+  assert.equal(r.status, 500)
+  assert.equal(await bonusRow(u, 'test-world-badbonus'), null)
+  assert.equal((await save(u, 'test-world-badbonus')).length, 0)
 })
 
 // 실제 낚시 등록부로 v13 세이브의 골드 이전(지갑 계획 Task 4, Review Focus 1)
@@ -426,6 +464,18 @@ t('real fishing: v13 save gold moves to the wallet once on first load (floor), s
   assert.equal(bag.status, 200)
   assert.equal(bag.body.gold, 12345 - 5000)
   assert.equal(await balance(u), 7345)
+})
+
+t('real fishing: completed challenges become the free-play bonus row on first load (cave 60 + pier 20)', async () => {
+  const u = await user('approved', true)
+  await fishingV13(u, 0)
+  await sql`update public.world_saves set state = jsonb_set(state, '{challenges}',
+    '{"pier-perfect": {"progress": 3, "done": true}, "cave-deep": {"progress": 5, "done": true}, "river-rain": {"progress": 2, "done": false}}'::jsonb)
+    where user_id = ${u} and game_id = 'fishing'`
+  assert.equal((await realCall(u, { game: 'fishing', action: 'load' })).status, 200)
+  assert.equal(await bonusRow(u, 'fishing'), 80)
+  const [p] = await sql`select public._free_bonus_pct(${u}::uuid) as p`
+  assert.equal(Number(p.p), 80)
 })
 
 t('real fishing: concurrent first loads/acts of a v13 save move the gold exactly once', async () => {
