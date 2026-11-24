@@ -419,6 +419,13 @@ npx supabase@2 functions deploy world --no-verify-jwt
 ### Task 4(낚시 → 지갑) 배포
 아래 "지갑 켜기 (Task 4 낚시 골드 → 지갑, `feat/wallet-fishing`)" 절로 옮겼다.
 
+## 미니게임 골드 1/10 (`fix/minigame-gold-quarter`)
+자유 플레이 지급률·게임별 하루 상한을 1/10로 줄이고(`FREE_REF` = 2,050), 판당 상한을 200 이하로 둔다. 서버 지급은 `game_modes.gold_*`(트리거 `_free_plays_gold`)가 정하고, 화면 미리 계산은 manifest `gold`가 정한다.
+- [ ] `npx supabase@2 db push` → `20261124050000_free_gold_tenth.sql`. 적용 즉시 서버 지급이 줄어든다. 함수 재배포는 필요 없다
+- [ ] 이어서 바로 머지·Vercel 배포. 사이에 옛 화면을 연 탭은 결과 화면의 예상 골드가 실제보다 10배로 보인다(지갑 잔액은 서버 값이라 맞다) → 새로고침 안내
+- [ ] 수동 확인: 미니게임 한 판 뒤 결과 화면 골드와 헤더 지갑 증가분이 같고, 전의 약 1/10이다
+- [ ] 이미 지급된 골드는 그대로다(잔액을 되돌리지 않는다)
+
 ## 지갑 배포 (2단계 자유 플레이 지급, `feat/wallet-free`)
 설계 §5.6(2단 상한 개정)·§7, 계획 `docs/superpowers/plans/2026-11-24-wallet.md` 2단계(Task 8~12). 1단계(`feat/wallet-core`) 뒤에 쌓인 브랜치라 **1단계 PR이 먼저 머지·배포**돼야 한다. 낚시 다듬기 PR(#81)·Task 4(낚시 → 지갑)와는 독립이다(낚시 코드를 건드리지 않는다).
 

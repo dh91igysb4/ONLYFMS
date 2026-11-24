@@ -55,8 +55,23 @@ export function softCap(amount: number, earnedToday: number): number {
 
 // ---------------------------------------------------------------- 자유 플레이 (설계 §7, 지갑 2단계)
 
-/** 자유 플레이 게임별 하루 상한(설계 §7.3). 그 게임으로 하루 1시간어치, 줄기 전 금액으로 센다 */
-export const FREE_DAILY_CAP = REF * 1 // 20,500
+/**
+ * 미니게임(자유 플레이) 기준 시간당 수입(설계 §7.3, 2026-11-24 개정). 기준 플레이로 쉬지 않고 했을 때 보너스 없이 버는 양.
+ * 처음에는 REF와 같았지만 운영에서 미니게임 수입이 너무 커서 1/10로 줄였다. 도전과제 보너스(최대 ×5)를 다 받으면 REF × 0.5.
+ */
+export const FREE_REF = REF / 10 // 2,050
+
+/** 자유 플레이 게임별 하루 상한(설계 §7.3). 그 게임으로 하루 1시간어치(FREE_REF), 줄기 전 금액으로 센다 */
+export const FREE_DAILY_CAP = FREE_REF * 1 // 2,050
+
+/**
+ * 판당 지급 상한의 최대(설계 §7.3, 2026-11-24 친구들 기준 "어떤 게임이든 한 판 200 아래, 아주 고득점 아니면 100 아래").
+ * 보너스 전 금액. 게임별 playCap = min(기준 한 판의 5배(10 단위), FREE_PLAY_CAP_MAX)
+ */
+export const FREE_PLAY_CAP_MAX = 200
+
+/** 기준 플레이 한 판 금액의 상한(보너스 전). 각 게임 gold.test.ts가 검사한다 */
+export const FREE_AVG_PLAY_MAX = 100
 
 /** 기준 플레이의 판 사이 대기(초, 설계 §7.3) */
 export const FREE_GAP_SEC = 5

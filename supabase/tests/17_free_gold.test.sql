@@ -40,8 +40,8 @@ select throws_ok($$update public.game_modes set gold_play_cap = -1 where game_id
 select has_function('public', '_free_plays_gold', 'has _free_plays_gold');
 
 -- 운영 게임 수치 (manifest gold와 같다: registry.test.ts)
-select is((select count(*)::int from public.game_modes where gold_per_point > 0 and gold_daily_cap <> 20500 and game_id not like 'g-%'), 0,
-  '운영: 모든 지급 게임 gold_daily_cap = 20,500');
+select is((select count(*)::int from public.game_modes where gold_per_point > 0 and gold_daily_cap <> 2050 and game_id not like 'g-%'), 0,
+  '운영: 모든 지급 게임 gold_daily_cap = 2,050');
 select is((select count(*)::int from public.game_modes
             where game_id in ('toothbrush', 'sneak-exam', 'ball-run', 'neon-rider', 'who-are-ya') and gold_per_point > 0), 5,
   '운영: 다섯 게임에 수치가 있다');
@@ -179,11 +179,11 @@ insert into public.free_plays (client_id, user_id, game_id, logic_version, solve
   ('55555555-0000-0000-0000-000000000003', :'f5', 'sneak-exam', 1, false, 921, 1);
 reset role;
 select is((select delta from public.gold_ledger where user_id = :'f5' and ref = '55555555-0000-0000-0000-000000000001'),
-  480::bigint, '운영: toothbrush 7.5 → 480');
+  48::bigint, '운영: toothbrush 7.5 → 48');
 select is((select delta from public.gold_ledger where user_id = :'f5' and ref = '55555555-0000-0000-0000-000000000002'),
-  990::bigint, '운영: ball-run 1000 → 판당 990');
+  100::bigint, '운영: ball-run 1000 → 판당 100');
 select is((select delta from public.gold_ledger where user_id = :'f5' and ref = '55555555-0000-0000-0000-000000000003'),
-  571::bigint, '운영: sneak-exam 921 → floor(571.02) = 571');
+  57::bigint, '운영: sneak-exam 921 → floor(57.102) = 57');
 
 select * from finish();
 rollback;
