@@ -6,6 +6,7 @@ import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
 import { getWorld } from '../index.ts'
 import { joinWorldRoom, type WorldRoom } from '../../platform/world/room.ts'
+import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../platform/world/presence.ts'
 import { syncTags, type Tag } from './peerTags.ts'
 import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
@@ -311,6 +312,9 @@ export function Game({ gameId }: WorldGameProps) {
   const roomRef = useRef<{ area: AreaId; room: WorldRoom } | null>(null)
   const tagsRef = useRef<HTMLDivElement>(null)
   const peerOutfits = useRef(new Map<string, Outfit>())
+  // 다른 지역까지 포함한 접속 중 친구(온라인 2단계-1): 게임 전체 프레즌스, 지역과 무관하게 한 번 들어간다
+  const presenceRef = useRef<WorldPresence | null>(null)
+  const [onlinePeers, setOnlinePeers] = useState<OnlinePeer[]>([])
   const [view, setView] = useState<View | null>(null)
   const opened = useMemo(() => openedOf(view), [view])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -858,6 +862,11 @@ export function Game({ gameId }: WorldGameProps) {
       roomRef.current = null
     }
     if (want && !roomRef.current && profile?.id) roomRef.current = { area: want, room: joinWorldRoom(gameId, want, profile.id) }
+    if (canOnline && viewRef.current && !presenceRef.current && profile?.id) {
+      const pres = joinWorldPresence(gameId, profile.id, false)
+      pres.onChange(() => setOnlinePeers(pres.peers()))
+      presenceRef.current = pres
+    }
     const room = roomRef.current?.room
     const tags: Tag[] = []
     const out: ScenePeer[] = []
@@ -865,6 +874,7 @@ export function Game({ gameId }: WorldGameProps) {
       const t = Date.now()
       const p = rt.player
       const act = rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' ? 'fish' : 'walk'
+      presenceRef.current?.update({ id: profile.id, handle: profile.handle, area: rt.map.id, act, ...tileOf(p.pos) }, t)
       room.tick(t, {
         id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
         outfit: JSON.stringify(outfitOf(viewRef.current)),
@@ -918,6 +928,8 @@ export function Game({ gameId }: WorldGameProps) {
   useEffect(() => () => {
     roomRef.current?.room.leave()
     roomRef.current = null
+    presenceRef.current?.leave()
+    presenceRef.current = null
   }, [])
   useEffect(() => releaseMinimapCache, [])
 
@@ -977,6 +989,9 @@ export function Game({ gameId }: WorldGameProps) {
     const leaveRoom = () => {
       roomRef.current?.room.leave()
       roomRef.current = null
+      presenceRef.current?.leave()
+      presenceRef.current = null
+      setOnlinePeers([])
     }
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
@@ -1477,6 +1492,7 @@ export function Game({ gameId }: WorldGameProps) {
                   innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
                   layers={mapLayers}
                   onLayers={setMapLayers}
+                  online={onlinePeers}
                 />
               )}
               {menu === 'teleport' && (

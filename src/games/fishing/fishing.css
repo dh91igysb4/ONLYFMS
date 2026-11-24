@@ -424,3 +424,13 @@
   translate: -50% -100%; padding: 0 5px; border-radius: 4px; font-size: 11px; line-height: 16px; white-space: nowrap;
   background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--edge);
 }
+
+/* 지도 창의 다른 지역 친구 점(온라인 2단계-1). 색은 theme 토큰 */
+.fish-map-friend {
+  position: absolute; width: 10px; height: 10px; border-radius: 50%; transform: translate(-50%, -50%);
+  background: var(--lime); box-shadow: 0 0 0 2px var(--panel); pointer-events: none;
+}
+.fish-map-friend-name {
+  position: absolute; left: 50%; bottom: 12px; translate: -50% 0; padding: 0 4px; border-radius: 4px;
+  font-size: 11px; line-height: 15px; white-space: nowrap; background: var(--panel); color: var(--ink);
+}

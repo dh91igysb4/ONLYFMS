@@ -49,6 +49,25 @@ vi.mock('../../platform/world/room.ts', async () => {
     },
   }
 })
+/** 게임 전체 프레즌스(온라인 2단계-1) */
+const presGate = vi.hoisted(() => ({
+  joins: [] as { gameId: string; self: string; listenOnly: boolean; p: { update: ReturnType<typeof import('vitest').vi.fn>; leave: ReturnType<typeof import('vitest').vi.fn> } }[],
+  peers: [] as unknown[],
+  subs: [] as (() => void)[],
+}))
+vi.mock('../../platform/world/presence.ts', async () => {
+  const { vi: v } = await import('vitest')
+  return {
+    joinWorldPresence: (gameId: string, self: string, listenOnly: boolean) => {
+      const p = {
+        update: v.fn(), leave: v.fn(), peers: () => presGate.peers,
+        onChange: (cb: () => void) => { presGate.subs.push(cb); return () => {} },
+      }
+      presGate.joins.push({ gameId, self, listenOnly, p })
+      return p
+    },
+  }
+})
 vi.mock('../index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../index.ts')>()
   return { ...orig, getWorld: (id: string) => { const w = orig.getWorld(id); return w && { ...w, manifest: { ...w.manifest, hidden: roomGate.hidden } } } }
@@ -2867,5 +2886,83 @@ describe('fishing Game: 온라인(같은 지역 친구)', () => {
     await advance(50)
     unmount()
     expect(roomGate.joins[0].room.leave).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('fishing Game: 다른 지역 친구(프레즌스)', () => {
+  const NEAR_EXIT: At = { area: 'village', pos: tileCenter(24, 1), facing: 'up' }
+  beforeEach(() => {
+    presGate.joins = []
+    presGate.peers = []
+    presGate.subs = []
+    roomGate.joins = []
+    roomGate.peers = []
+    roomGate.hidden = false
+    authGate.admin = false
+  })
+
+  test('첫 로드 뒤 게임 전체 방에 한 번 들어가고, 지역을 옮겨도 다시 들어가지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    expect(presGate.joins.map((j) => [j.gameId, j.self, j.listenOnly])).toEqual([['fishing', 'u1', false]])
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('river')
+    expect(presGate.joins).toHaveLength(1)
+  })
+
+  test('프레임마다 내 지역·하는 일·칸으로 update', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    const [me, now] = presGate.joins[0].p.update.mock.calls.at(-1)!
+    expect(me).toEqual({ id: 'u1', handle: 'kane', area: 'village', act: 'walk', tx: 5, ty: 20 })
+    expect(typeof now).toBe('number')
+  })
+
+  test('지역 전환 중에는 update 하지 않는다', async () => {
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    const before = presGate.joins[0].p.update.mock.calls.length
+    await advance(100)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    expect(presGate.joins[0].p.update.mock.calls.length).toBe(before)
+  })
+
+  test('친구 목록이 바뀌면 지도 창 탭에 친구 수', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    presGate.peers = [{ id: 'u2', handle: 'son', area: 'river', act: 'fish', tx: 3, ty: 3 }]
+    act(() => { for (const cb of presGate.subs) cb() })
+    fireEvent.keyDown(window, { key: 'm', code: 'KeyM' })
+    await flush()
+    expect(screen.getByRole('tab', { name: /^마을 강/ }).textContent).toContain('친구 1')
+  })
+
+  test('탭이 숨으면 나가고 돌아오면 다시 들어간다; 언마운트하면 나간다', async () => {
+    const { unmount } = await mount(makeView(), SAND)
+    await advance(50)
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(presGate.joins[0].p.leave).toHaveBeenCalledTimes(1)
+    vis.mockReturnValue('visible')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await advance(50)
+    expect(presGate.joins).toHaveLength(2)
+    unmount()
+    expect(presGate.joins[1].p.leave).toHaveBeenCalledTimes(1)
+  })
+
+  test('숨김 게임이고 관리자가 아니면 들어가지 않는다', async () => {
+    roomGate.hidden = true
+    await mount(makeView(), SAND)
+    await advance(50)
+    expect(presGate.joins).toHaveLength(0)
   })
 })
