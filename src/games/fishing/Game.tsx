@@ -4,11 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
+import { getWorld } from '../index.ts'
+import { joinWorldRoom, type WorldRoom } from '../../platform/world/room.ts'
+import { syncTags, type Tag } from './peerTags.ts'
 import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
-import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
+import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
 import { spriteDataUrl } from './sprites.ts'
 import {
   addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, shopSpot, STATIC_DYNAMIC, TILE, tileOf,
@@ -23,7 +26,7 @@ import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPan
 import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
 import { WardrobePanel } from './WardrobePanel.tsx'
 import { releaseMinimapCache } from './minimap.ts'
-import { normalizeOutfit } from './outfit.ts'
+import { decodeOutfit, normalizeOutfit } from './outfit.ts'
 import { DEFAULT_OUTFIT, type Outfit, type WearSlot } from './wardrobe.ts'
 import './fishing.css'
 
@@ -38,6 +41,8 @@ const MAX_SCENE_W = 320
 const MAX_SCENE_H = 480
 /** 상점·해금 창이 열린 뒤 이 시간 동안은 누르기·클릭을 받지 않는다(여는 손가락의 클릭이 구매 버튼에 떨어지지 않게) */
 const PANEL_GUARD_MS = 300
+/** 캐릭터 그림 높이(scene.ts PLAYER_H와 같다). 이름표를 머리 위에 띄울 때 쓴다 */
+const PEER_H = 24
 /** 무대 아래 요소를 재고도 남겨 두는 여유 높이 */
 const FIT_MARGIN = 8
 
@@ -301,6 +306,11 @@ export function Game({ gameId }: WorldGameProps) {
   const userId = profile?.id ?? null
   const userIdRef = useRef(userId)
   userIdRef.current = userId
+  // 온라인(같은 지역 친구, 설계 2026-11-24-fishing-online-design.md): 숨김 게임이면 관리자만 방에 들어간다
+  const canOnline = !!profile?.id && !!profile?.handle && !(getWorld(gameId)?.manifest.hidden && !profile?.is_admin)
+  const roomRef = useRef<{ area: AreaId; room: WorldRoom } | null>(null)
+  const tagsRef = useRef<HTMLDivElement>(null)
+  const peerOutfits = useRef(new Map<string, Outfit>())
   const [view, setView] = useState<View | null>(null)
   const opened = useMemo(() => openedOf(view), [view])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -809,6 +819,8 @@ export function Game({ gameId }: WorldGameProps) {
     const size = { w: fit.w, h: fit.h }
     const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
     const { pos } = rt.player
+    const camera = cameraFor(rt.map, { x: Math.round(pos.x), y: Math.round(pos.y) }, size)
+    const others = stepOnline(camera)
     drawWorld(ctx, {
       map: rt.map,
       phase: rt.phase,
@@ -816,7 +828,7 @@ export function Game({ gameId }: WorldGameProps) {
       gauge: rt.gauge,
       player: rt.player,
       // 캐릭터는 반올림한 자리에 그려지므로 카메라도 반올림한 자리를 따라간다(홀수 폭에서 1px 흔들림 방지)
-      camera: cameraFor(rt.map, { x: Math.round(pos.x), y: Math.round(pos.y) }, size),
+      camera,
       bobber: fishing ? rt.bobber : null,
       bar: rt.bar,
       barParams: rt.params,
@@ -830,7 +842,49 @@ export function Game({ gameId }: WorldGameProps) {
       dyn: dynAt(cond),
       drill: rt.drill,
       mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
+      others,
     }, size)
+  }
+
+  /**
+   * 같은 지역 친구: 지금 지역 방에 있게 맞추고(전환 중·첫 상태 전에는 방 없음), 내 상태를 보내고, 친구 목록과 이름표를 돌려준다.
+   * 실시간 값은 그리기에만 쓴다. 시계는 Date.now()(방이 받은 시각과 같은 시계).
+   */
+  function stepOnline(camera: Vec): ScenePeer[] {
+    const want = canOnline && viewRef.current && !rt.trans ? rt.map.id : null
+    const cur = roomRef.current
+    if (cur && cur.area !== want) {
+      cur.room.leave()
+      roomRef.current = null
+    }
+    if (want && !roomRef.current && profile?.id) roomRef.current = { area: want, room: joinWorldRoom(gameId, want, profile.id) }
+    const room = roomRef.current?.room
+    const tags: Tag[] = []
+    const out: ScenePeer[] = []
+    if (room && profile?.id && profile.handle) {
+      const t = Date.now()
+      const p = rt.player
+      const act = rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' ? 'fish' : 'walk'
+      room.tick(t, {
+        id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
+        outfit: JSON.stringify(outfitOf(viewRef.current)),
+      })
+      const memo = peerOutfits.current
+      for (const o of room.peers(t)) {
+        let outfit = memo.get(o.outfit)
+        if (!outfit) {
+          outfit = decodeOutfit(o.outfit)
+          if (memo.size > 64) memo.clear()
+          memo.set(o.outfit, outfit)
+        }
+        out.push({ pos: { x: o.x, y: o.y }, facing: o.facing, moving: o.moving, walkMs: o.moving ? t : 0, act: o.act, outfit })
+        const x = (Math.round(o.x) - Math.round(camera.x)) * fit.scale
+        const y = (Math.round(o.y) - PEER_H - Math.round(camera.y)) * fit.scale
+        tags.push({ id: o.id, handle: o.handle, x, y, visible: x >= 0 && x <= fit.w * fit.scale && y >= 0 && y <= fit.h * fit.scale })
+      }
+    }
+    if (tagsRef.current) syncTags(tagsRef.current, tags)
+    return out
   }
 
   // 이벤트·프레임 콜백이 늘 최신 함수를 부르게 한다
@@ -860,6 +914,11 @@ export function Game({ gameId }: WorldGameProps) {
 
   // 화면을 떠나면 장면 배경 캐시(오프스크린 캔버스)를 놓아 준다
   useEffect(() => releaseSceneCache, [])
+  // 화면을 떠나면 실시간 방을 나간다
+  useEffect(() => () => {
+    roomRef.current?.room.leave()
+    roomRef.current = null
+  }, [])
   useEffect(() => releaseMinimapCache, [])
 
   // 마지막 위치: 걸음이 멈출 때(프레임), 탭이 가려질 때, 화면을 떠날 때 저장한다.
@@ -1315,6 +1374,7 @@ export function Game({ gameId }: WorldGameProps) {
             onPointerCancel={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
             onLostPointerCapture={(e) => handlers.current.release(`canvas:${e.pointerId}`)}
           />
+          <div className="fish-peer-tags" ref={tagsRef} aria-hidden="true" />
           {touch && !menu && (
             <Controls
               onMove={(v) => {
