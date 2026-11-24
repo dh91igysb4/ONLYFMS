@@ -1,0 +1,73 @@
+import { describe, expect, test } from 'vitest'
+import { AVATAR_RECORD_KEY } from '../types.ts'
+import type { Conditions } from './clock.ts'
+import { DEFAULT_AREAS } from './data.ts'
+import { TILE } from './map.ts'
+import { VILLAGE } from './maps/village.ts'
+import { decodeOutfit } from './outfit.ts'
+import { PREVIEW_RAIN_FRAME_MS, previewScale, previewState, redrawDelayMs } from './preview.ts'
+
+const center = (tx: number, ty: number) => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
+const SPAWN = { area: 'village', pos: VILLAGE.spawn.pos, facing: VILLAGE.spawn.facing }
+const dock = VILLAGE.docks[0].entry
+const ISLAND_SPOT = { area: 'island' as const, pos: center(dock.tx, dock.ty), facing: dock.facing }
+const areas = (detail: string | null) => ({ key: 'areas', detail })
+const cond = (weather: Conditions['weather']): Conditions => ({ gameMinute: 600, gameDay: 1, season: 'spring', weather })
+
+describe('previewState', () => {
+  test('저장 위치·기록이 없으면 마을 시작 위치, 기본 지역, 기본 옷차림, 걷지 않음', () => {
+    const s = previewState(null, [])
+    expect({ area: s.area, pos: s.player.pos, facing: s.player.facing }).toEqual(SPAWN)
+    expect(s.player.moving).toBe(false)
+    expect(s.player.walkMs).toBe(0)
+    expect([...s.opened].sort()).toEqual([...DEFAULT_AREAS].sort())
+    expect(s.outfit).toEqual(decodeOutfit(''))
+  })
+
+  test('저장 위치가 잠긴 지역(섬)이고 열린 지역 기록에 없으면 마을 시작 위치', () => {
+    const s = previewState(ISLAND_SPOT, [areas('village,river,forest')])
+    expect({ area: s.area, pos: s.player.pos, facing: s.player.facing }).toEqual(SPAWN)
+  })
+
+  test('섬이 열린 지역 기록에 있으면 저장 위치 그대로', () => {
+    const s = previewState(ISLAND_SPOT, [areas('village,river,forest,island')])
+    expect({ area: s.area, pos: s.player.pos, facing: s.player.facing }).toEqual(ISLAND_SPOT)
+    expect(s.opened.has('island')).toBe(true)
+  })
+
+  test('열린 지역 기록의 모르는 id·빈 문자열·null은 무시하고 기본 지역은 항상 들어간다', () => {
+    for (const detail of ['', 'atlantis,,', null, 'island,toString']) {
+      const s = previewState(null, [areas(detail)])
+      for (const a of DEFAULT_AREAS) expect(s.opened.has(a), String(detail)).toBe(true)
+      expect(s.opened.has('atlantis' as never)).toBe(false)
+      expect(s.opened.has('toString' as never)).toBe(false)
+    }
+  })
+
+  test('옷차림 기록이 깨진 JSON이면 기본 옷차림, 정상이면 그 옷차림', () => {
+    expect(previewState(null, [{ key: AVATAR_RECORD_KEY, detail: '{oops' }]).outfit).toEqual(decodeOutfit(''))
+    const worn = decodeOutfit(JSON.stringify({ ...decodeOutfit(''), hair: 'bogus' }))
+    expect(previewState(null, [{ key: AVATAR_RECORD_KEY, detail: JSON.stringify(worn) }]).outfit).toEqual(worn)
+  })
+})
+
+describe('previewScale', () => {
+  test('한 변 ÷ 160을 내림, 1~4', () => {
+    expect(previewScale(159)).toBe(1)
+    expect(previewScale(320)).toBe(2)
+    expect(previewScale(480)).toBe(3)
+    expect(previewScale(2000)).toBe(4)
+    expect(previewScale(0)).toBe(1)
+  })
+})
+
+describe('redrawDelayMs', () => {
+  test('비(겨울엔 눈)면 100ms', () => {
+    expect(PREVIEW_RAIN_FRAME_MS).toBe(100)
+    expect(redrawDelayMs(cond('rain'), 12345)).toBe(100)
+  })
+  test('맑으면 다음 실제 10초(게임 10분) 경계까지', () => {
+    expect(redrawDelayMs(cond('sun'), 12345)).toBe(7655)
+    expect(redrawDelayMs(cond('sun'), 20000)).toBe(10000)
+  })
+})
