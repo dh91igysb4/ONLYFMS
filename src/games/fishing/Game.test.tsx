@@ -31,7 +31,28 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../lib/api.ts')>()
   return { ...orig, world: vi.fn() }
 })
-vi.mock('../../platform/auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
+const authGate = vi.hoisted(() => ({ admin: false }))
+vi.mock('../../platform/auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile: { id: 'u1', handle: 'kane', is_admin: authGate.admin } }) }))
+/** 실시간 방(온라인 1단계). 가짜 방을 돌려주고 호출을 기록한다 */
+const roomGate = vi.hoisted(() => ({
+  joins: [] as { gameId: string; area: string; self: string; room: { tick: ReturnType<typeof import('vitest').vi.fn>; leave: ReturnType<typeof import('vitest').vi.fn>; peers: () => unknown[] } }[],
+  peers: [] as unknown[],
+  hidden: false,
+}))
+vi.mock('../../platform/world/room.ts', async () => {
+  const { vi: v } = await import('vitest')
+  return {
+    joinWorldRoom: (gameId: string, area: string, self: string) => {
+      const room = { tick: v.fn(), leave: v.fn(), peers: () => roomGate.peers, count: () => 1 }
+      roomGate.joins.push({ gameId, area, self, room })
+      return room
+    },
+  }
+})
+vi.mock('../index.ts', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../index.ts')>()
+  return { ...orig, getWorld: (id: string) => { const w = orig.getWorld(id); return w && { ...w, manifest: { ...w.manifest, hidden: roomGate.hidden } } } }
+})
 vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
 /** 지역 전환 테스트가 강 맵을 없는 것처럼 만들 때 쓴다 */
 const mapGate = vi.hoisted(() => ({ hideRiver: false }))
@@ -2755,5 +2776,96 @@ describe('옷장', () => {
     await flush()
     expect(screen.getByRole('heading', { name: '옷장' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '남색 야구모자 사기' })).toBeDisabled()
+  })
+})
+
+
+describe('fishing Game: 온라인(같은 지역 친구)', () => {
+  const NEAR_EXIT: At = { area: 'village', pos: tileCenter(24, 1), facing: 'up' }
+  const peer = (over: Record<string, unknown> = {}) => ({
+    id: 'u2', handle: 'son', x: SAND.pos.x, y: SAND.pos.y, facing: 'down', moving: false, act: 'walk', outfit: '{}', ...over,
+  })
+  beforeEach(() => {
+    roomGate.joins = []
+    roomGate.peers = []
+    roomGate.hidden = false
+    authGate.admin = false
+  })
+
+  test('첫 로드 뒤 지금 지역 방에 들어간다', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    expect(roomGate.joins.map((j) => [j.gameId, j.area, j.self])).toEqual([['fishing', 'village', 'u1']])
+  })
+
+  test('프레임마다 내 상태로 tick', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    const tick = roomGate.joins[0].room.tick
+    expect(tick).toHaveBeenCalled()
+    const [now, me] = tick.mock.calls.at(-1)!
+    expect(typeof now).toBe('number')
+    expect(me).toMatchObject({ id: 'u1', handle: 'kane', x: SAND.pos.x, y: SAND.pos.y, facing: 'down', moving: false, act: 'walk' })
+    expect(JSON.parse(me.outfit)).toEqual(DEFAULT_OUTFIT)
+  })
+
+  test('방에 친구가 있으면 장면 others와 이름표', async () => {
+    roomGate.peers = [peer()]
+    const { container } = await mount(makeView(), SAND)
+    await advance(50)
+    const others = lastScene().others ?? []
+    expect(others).toHaveLength(1)
+    expect(others[0]).toMatchObject({ pos: { x: SAND.pos.x, y: SAND.pos.y }, facing: 'down', act: 'walk' })
+    const tags = [...container.querySelectorAll('span.fish-peer-tag')]
+    expect(tags.map((t) => t.textContent)).toEqual(['son'])
+  })
+
+  test('지역을 옮기면 이전 방을 나가고, 전환 중에는 친구를 그리지 않으며, 새 지역 방에 들어간다', async () => {
+    roomGate.peers = [peer()]
+    await mount(makeView(), NEAR_EXIT)
+    await advance(50)
+    key('ArrowUp', true)
+    await advance(200)
+    key('ArrowUp', false)
+    expect(lastScene().fade).toBeGreaterThan(0)
+    expect(roomGate.joins[0].room.leave).toHaveBeenCalledTimes(1)
+    expect(lastScene().others ?? []).toEqual([])
+    await advance(400)
+    expect(roomGate.joins.map((j) => j.area)).toEqual(['village', 'river'])
+  })
+
+  test('숨김 게임이고 관리자가 아니면 방에 들어가지 않는다', async () => {
+    roomGate.hidden = true
+    await mount(makeView(), SAND)
+    await advance(50)
+    expect(roomGate.joins).toHaveLength(0)
+    expect(lastScene().map.id).toBe('village')
+  })
+
+  test('숨김 게임이라도 관리자면 들어간다', async () => {
+    roomGate.hidden = true
+    authGate.admin = true
+    await mount(makeView(), SAND)
+    await advance(50)
+    expect(roomGate.joins).toHaveLength(1)
+  })
+
+  test('탭이 숨으면 방을 나가고, 돌아오면 다시 들어간다', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(roomGate.joins[0].room.leave).toHaveBeenCalledTimes(1)
+    vis.mockReturnValue('visible')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await advance(50)
+    expect(roomGate.joins.map((j) => j.area)).toEqual(['village', 'village'])
+  })
+
+  test('화면을 떠나면 방을 나간다', async () => {
+    const { unmount } = await mount(makeView(), SAND)
+    await advance(50)
+    unmount()
+    expect(roomGate.joins[0].room.leave).toHaveBeenCalledTimes(1)
   })
 })

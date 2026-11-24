@@ -4,7 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
-import { STATIC_DYNAMIC, TILE, tileAt, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
+import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
 import { playerSprites } from './outfit.ts'
@@ -43,7 +43,12 @@ export type WorldScene = {
   drill?: { tx: number; ty: number; ms: number } | null
   /** 신화를 잡은 뒤 지난 시간(ms). MYTHIC_FLASH_MS 동안 캐릭터 둘레에 빛고리. 없으면 null */
   mythicFlashMs?: number | null
+  /** 같은 지역의 다른 사람(온라인 설계 §4.3). 그리기만 하고 판정에는 쓰지 않는다 */
+  others?: ScenePeer[]
 }
+
+/** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
+export type ScenePeer = { pos: Vec; facing: Facing; moving: boolean; walkMs: number; act: 'walk' | 'fish'; outfit: Outfit }
 
 /** 화면 좌표 사각형 */
 export type Box = { x: number; y: number; w: number; h: number }
@@ -1185,6 +1190,13 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
     tall.push({ key: (tp.tiles.ty + tp.tiles.h) * TILE, draw: () => drawTeleporter(ctx, s, tp.tiles, waterFrame(t)) })
   }
   // 기준선 순으로 그린다(이동기 바로 아래 칸의 나무처럼 훑은 순서와 깊이가 다른 경우)
+  // 같은 지역 친구: 발 기준선으로 나무·탑과 함께 깊이를 맞춘다. 같은 높이면 친구가 먼저(내 캐릭터가 위)
+  for (const o of s.others ?? []) {
+    const ox = Math.round(o.pos.x) - PLAYER_W / 2
+    const oy = Math.round(o.pos.y) - PLAYER_H
+    if (ox + PLAYER_W < tx0 * TILE || ox > (tx1 + 1) * TILE || oy + PLAYER_H < ty0 * TILE || oy > (ty1 + 1) * TILE) continue
+    tall.push({ key: o.pos.y - 0.001, draw: () => drawPeer(ctx, o, ox, oy) })
+  }
   tall.sort((a, b) => a.key - b.key)
   const feet = s.player.pos.y
   for (const it of tall) if (it.key <= feet) it.draw()
@@ -1196,6 +1208,16 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
     const hop = Math.floor(t / 120) % 2
     drawSprite(ctx, 'bang', b.x + 3, b.y - 28 - hop, 2)
   }
+}
+
+/** 친구 캐릭터: 낚시 중이면 던진 자세, 아니면 내 캐릭터와 같은 대기·걷기 규칙. 찌·줄은 그리지 않는다 */
+function drawPeer(ctx: CanvasRenderingContext2D, o: ScenePeer, px: number, py: number): void {
+  const pose = poseFor(o.act === 'fish' ? 'waiting' : 'idle', o)
+  rect(ctx, px + 3, py + PLAYER_H - 2, 10, 3, C.groundShadow)
+  const flip = pose.flipX ? { flipX: true } : undefined
+  const dressed = playerSprites(o.outfit)[pose.name]
+  if (dressed) drawSpriteData(ctx, dressed, px, py, 1, flip)
+  else drawSprite(ctx, pose.name, px, py, 1, flip)
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, tip: [number, number] | null): void {

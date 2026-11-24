@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { drawSprite } from './sprites.ts'
+import { drawSprite, drawSpriteData } from './sprites.ts'
+import { decodeOutfit, playerSprites } from './outfit.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
 import { TILE, castTarget, defineMap, pierEnd, type Facing, type Opened, type Vec } from './map.ts'
@@ -11,7 +12,7 @@ import type { Conditions } from './clock.ts'
 // 그려진 스프라이트의 화면 좌표(이동 반영)를 기록하려고 drawSprite를 감싼다. 그리기 자체는 실제 함수가 한다.
 vi.mock('./sprites.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./sprites.ts')>()
-  return { ...orig, drawSprite: vi.fn(orig.drawSprite) }
+  return { ...orig, drawSprite: vi.fn(orig.drawSprite), drawSpriteData: vi.fn(orig.drawSpriteData) }
 })
 const realSprites = await vi.importActual<typeof import('./sprites.ts')>('./sprites.ts')
 
@@ -1435,5 +1436,79 @@ describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
     })
     const { ctx } = draw(m, tileCentre(2, 2))
     expect(ctx.sprites.filter((c) => c.name === 'gate-snowdrift')).toHaveLength(2)
+  })
+})
+
+describe('친구 캐릭터(others)', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+  const size = { w: 195, h: 280 }
+  const me = player(tileCentre(20, 22), 'down')
+  const outfit = decodeOutfit('')
+  const peer = (pos: Vec, act: 'walk' | 'fish' = 'walk') => ({ pos, facing: 'down' as Facing, moving: false, walkMs: 0, act, outfit })
+  /** drawSpriteData 호출을 화면 좌표와 함께 기록 */
+  function dataCalls(ctx: RecordingCtx) {
+    const calls: { data: unknown; x: number; y: number; order: number }[] = []
+    let n = 0
+    vi.mocked(drawSpriteData).mockImplementation((c, data, x, y) => {
+      const r = c as unknown as RecordingCtx
+      if (r === ctx) calls.push({ data, x: x + r.tx, y: y + r.ty, order: n++ })
+    })
+    return calls
+  }
+
+  test('others가 없으면 친구를 그리지 않는다', () => {
+    const ctx = new RecordingCtx()
+    const calls = dataCalls(ctx)
+    drawWorld(asCtx(ctx), scene('idle', me, size), size)
+    expect(calls).toHaveLength(0)
+  })
+
+  test('화면 안 친구는 발 좌표 기준으로 한 번 그린다', () => {
+    const ctx = new RecordingCtx()
+    const calls = dataCalls(ctx)
+    const s = scene('idle', me, size, { others: [peer(tileCentre(22, 22))] })
+    drawWorld(asCtx(ctx), s, size)
+    const at = tileCentre(22, 22)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].x).toBe(Math.round(at.x) - s.camera.x - 8)
+    expect(calls[0].y).toBe(Math.round(at.y) - s.camera.y - 24)
+    expect(calls[0].data).toBe(playerSprites(outfit)['player-idle-down'])
+  })
+
+  test("act 'fish'면 낚싯대를 든 자세", () => {
+    const ctx = new RecordingCtx()
+    const calls = dataCalls(ctx)
+    drawWorld(asCtx(ctx), scene('idle', me, size, { others: [peer(tileCentre(22, 22), 'fish')] }), size)
+    expect(calls[0].data).toBe(playerSprites(outfit)['player-cast'])
+  })
+
+  test('화면 밖 친구는 그리지 않는다', () => {
+    const ctx = new RecordingCtx()
+    const calls = dataCalls(ctx)
+    drawWorld(asCtx(ctx), scene('idle', me, size, { others: [peer(tileCentre(1, 1))] }), size)
+    expect(calls).toHaveLength(0)
+  })
+
+  test('내 캐릭터와의 앞뒤: 친구 발이 아래면 나중에, 위면 먼저 그린다', () => {
+    const below = new RecordingCtx()
+    dataCalls(below)
+    const sb = scene('idle', me, size, { others: [peer({ x: me.pos.x + 20, y: me.pos.y + 8 })] })
+    drawWorld(asCtx(below), sb, size)
+    const meB = players(below)[0]
+    const pxB = Math.round(me.pos.x + 20) - sb.camera.x - 8
+    const shadowB = below.rects.findIndex((r) => r.x === pxB + 3 && r.w === 10 && r.h === 3)
+    expect(shadowB).toBeGreaterThan(meB.at)
+
+    const above = new RecordingCtx()
+    dataCalls(above)
+    const s = scene('idle', me, size, { others: [peer({ x: me.pos.x + 20, y: me.pos.y - 8 })] })
+    drawWorld(asCtx(above), s, size)
+    const meA = players(above)[0]
+    const px = Math.round(me.pos.x + 20) - s.camera.x - 8
+    const shadowA = above.rects.findIndex((r) => r.x === px + 3 && r.w === 10 && r.h === 3)
+    expect(shadowA).toBeGreaterThanOrEqual(0)
+    expect(shadowA).toBeLessThan(meA.at)
   })
 })

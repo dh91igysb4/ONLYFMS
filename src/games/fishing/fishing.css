@@ -416,3 +416,11 @@
 .fish-toast-mythic { font-size: 16px; color: var(--ink); }
 .fish-toast-mythic img { width: 18px; height: 18px; image-rendering: pixelated; vertical-align: -3px; margin-right: 4px; }
 .fish-toast-buff { color: var(--accent-strong); font-weight: 700; }
+
+/* 같은 지역 친구 이름표(온라인 1단계). 캔버스 위에 겹치고 입력은 통과시킨다. 색은 theme 토큰 */
+.fish-peer-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.fish-peer-tag {
+  position: absolute; left: 0; top: 0;
+  translate: -50% -100%; padding: 0 5px; border-radius: 4px; font-size: 11px; line-height: 16px; white-space: nowrap;
+  background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--edge);
+}

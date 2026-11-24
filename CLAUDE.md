@@ -13,7 +13,7 @@
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `src/test-fixtures/` 테스트 전용 게임(`test-guess`, 숫자 맞히기)과 등록부 래퍼. 운영 등록부에 넣지 않는다. 플랫폼 테스트는 `vi.mock`으로 `withTestGame`/`withTestGameUi`를 끼워 쓴다
 - `src/platform/games/freeLogQueue.ts` + 테이블 `free_play_logs`: 자유 플레이의 시드와 행동 기록. `free_plays` 행 저장 뒤에 올린다
-- `src/platform/world/` 지속형(world) 게임 화면 `WorldPage`(라우트 `/world/:game`). 게임 화면은 `getWorldComponent`로 찾고, 상태는 서버(Edge Function `world`)가 쥔다
+- `src/platform/world/` 지속형(world) 게임 화면 `WorldPage`(라우트 `/world/:game`). 게임 화면은 `getWorldComponent`로 찾고, 상태는 서버(Edge Function `world`)가 쥔다. 같은 지역 친구 보이기는 실시간 방 `room.ts`(Supabase Realtime 공개 채널 `world:<gameId>:<areaId>`, 프레즌스 + 브로드캐스트 `pos`)와 순수 로직 `peers.ts`(보내기 간격·보간·정리). 위치는 그리기 전용이고 서버 판정에 쓰지 않는다. 설계 `docs/superpowers/specs/2026-11-24-fishing-online-design.md`
 - `src/platform/chat/` 데일리 채팅(데이터 계층·화면). 권한은 화면이 아니라 DB `can_chat`(RLS·RPC·Storage 정책)이 정한다. 사진은 비공개 Storage 버킷 `daily-chat`에 올리고 서명 주소로만 연다
 - `src/platform/suggest/` 제안 게시판(데이터 계층·화면). 읽기는 RLS, 쓰기는 RPC. 분류·진행 기록은 워커가 `supabase/functions/suggest/`로만 쓴다
 - `supabase/functions/suggest/` 제안 워커용 Edge Function. 브라우저는 부르지 않고 헤더 `x-worker-token`으로만 인증한다. 워커 절차는 `docs/suggest-worker.md`
