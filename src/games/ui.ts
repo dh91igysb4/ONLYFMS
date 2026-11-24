@@ -8,6 +8,7 @@ import { Game as BallRunGame } from './ball-run/Game.tsx'
 import { Game as SneakExamGame } from './sneak-exam/Game.tsx'
 import { Game as FishingGame } from './fishing/Game.tsx'
 import { Avatar as FishingAvatar } from './fishing/Avatar.tsx'
+import { Preview as FishingPreview } from './fishing/Preview.tsx'
 import { Game as NeonRiderGame } from './neon-rider/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
@@ -85,4 +86,23 @@ const avatarComponents: Record<string, ComponentType<AvatarProps>> = {
 
 export function getAvatarComponent(id: string): ComponentType<AvatarProps> | undefined {
   return avatarComponents[id]
+}
+
+/** 메인 화면 밸리 미리보기가 받는 props(메인 미리보기 설계 §5.1). records는 user_records 중 이 게임의 행 */
+export type WorldPreviewProps = {
+  userId: string
+  records: { key: string; detail: string | null }[]
+  /** 정사각형 한 변(CSS px) */
+  size: number
+  /** 그리기를 못 하면 한 번 부른다(부모가 대체 버튼을 그린다) */
+  onFail: () => void
+}
+
+/** 메인 미리보기 등록부(manifest `preview`가 있는 지속형 게임). 새 게임은 여기에 한 줄씩 등록한다. */
+const previewComponents: Record<string, ComponentType<WorldPreviewProps>> = {
+  fishing: FishingPreview,
+}
+
+export function getWorldPreview(id: string): ComponentType<WorldPreviewProps> | undefined {
+  return previewComponents[id]
 }

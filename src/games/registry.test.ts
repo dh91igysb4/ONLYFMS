@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { FREE_DAILY_CAP } from './economy.ts'
 import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
 import { AVATAR_RECORD_KEY, FREE_BONUS_RECORD_KEY } from './types.ts'
+import { getWorldPreview } from './ui.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -246,4 +247,9 @@ test('world previewData keys are not record, avatar or free_bonus keys', () => {
 
 test('solo and duel modules have no preview', () => {
   for (const g of [...games, ...duels]) expect(g.manifest.preview).toBeUndefined()
+})
+
+test('world preview: manifest preview ⇔ getWorldPreview', () => {
+  for (const w of worlds) expect(!!w.manifest.preview, w.manifest.id).toBe(!!getWorldPreview(w.manifest.id))
+  expect(worlds.some((w) => w.manifest.preview)).toBe(true)
 })
