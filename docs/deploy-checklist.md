@@ -553,6 +553,21 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 메인 화면 개편 배포 (`feat/home-valley`)
+
+설계 `docs/superpowers/specs/2026-11-24-home-valley-design.md`. DB 마이그레이션 없음. 낚시 `logic.version` 그대로.
+
+순서와 이유:
+1. `world` 함수 재배포: `npx -y supabase@2 functions deploy world --no-verify-jwt` — 낚시 열린 지역을 `game_records`의 `areas` 행으로 쓰기 시작한다(`previewData`). 옛 화면에는 영향 없다.
+2. PR 머지(Vercel). 순서가 바뀌어도 미리보기가 `areas` 행이 생길 때까지 기본 지역으로 그릴 뿐이다.
+
+수동 확인 (폰 폭과 데스크톱):
+- [ ] `/`에 정사각형 미리보기: 내 캐릭터가 지금 옷차림으로 마지막에 있던 자리에, HUD 시계·낮밤이 보인다. 낚시를 한 번 열고 나온 뒤 다른 지역 자리도 그대로 보인다.
+- [ ] 미리보기를 손가락으로 문질러 페이지가 스크롤된다. 누르면 `/world/fishing`.
+- [ ] 바로가기: `데일리 후알야`(안 풀었으면 ●) → 대전 → 대회 → 자유 플레이 게임. 설명 문구 없음. 진행 중 대국이 하나면 대전 버튼이 그 대국으로 간다.
+- [ ] 관리자가 아니면 숨김 게임 버튼이 없다.
+- [ ] 다른 탭으로 갔다 와도 미리보기가 다시 그려진다.
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

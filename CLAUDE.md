@@ -9,6 +9,7 @@
 - `src/app/` 라우팅·레이아웃·공통 스타일 토큰(`theme.css`)
 - `src/lib/supabase.ts` supabase 클라이언트
 - `src/platform/{auth,games,contests,duel,leaderboard,profile,admin,chat}/` 플랫폼 화면. 게임별 코드는 두지 않는다.
+- `src/platform/home/` 메인(`/`): 정사각형 밸리 미리보기(manifest `preview`가 있는 지속형 게임을 `getWorldPreview`로 찾는다) + 이름만 있는 바로가기 버튼(`shortcuts.ts`가 등록부로 목록을 만든다). 메인은 `world` 함수를 부르지 않는다. 설계 `docs/superpowers/specs/2026-11-24-home-valley-design.md`
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `src/test-fixtures/` 테스트 전용 게임(`test-guess`, 숫자 맞히기)과 등록부 래퍼. 운영 등록부에 넣지 않는다. 플랫폼 테스트는 `vi.mock`으로 `withTestGame`/`withTestGameUi`를 끼워 쓴다
 - `src/platform/games/freeLogQueue.ts` + 테이블 `free_play_logs`: 자유 플레이의 시드와 행동 기록. `free_plays` 행 저장 뒤에 올린다
@@ -46,6 +47,7 @@
 
 지속형(world) 게임은 대전과 비슷하게 추가한다:
 - manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
+- 메인 미리보기를 그리려면 manifest `preview: true` + `src/games/ui.ts`의 `getWorldPreview` 등록(`WorldPreviewProps`). 미리보기에 서버 값이 필요하면 `WorldLogic.previewData`(키마다 `game_records` 행, records·avatar·free_bonus 키와 겹치면 안 된다). 등록부 테스트가 둘을 함께 검사한다.
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
 - 골드는 세이브에 두지 않는다. 지갑을 쓰는 게임은 logic에 `wallet: true`를 두고 `ctx.gold`(잔액)를 읽어 지출을 검사한 뒤 `apply`의 `gold`(정수 증감)로 돌려준다. 옛 세이브의 골드는 `legacyGold`가 한 번 지갑으로 옮긴다(reason `migrate`). 사이트 하루 상한은 게임이 몰라도 된다(핸들러가 `gold_capped`를 응답에 넣고 `WorldPage`가 알린다).
