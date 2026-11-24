@@ -3,7 +3,7 @@ import { inHours, isNight, type Conditions, type Season, type Weather } from './
 import { SPRITES } from './sprites.ts'
 import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 import {
-  AREAS, areaHasSpecies, areaMinRod, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
+  AREAS, areaHasSpecies, areaMinRod, rodAtLeast, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
   speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, type Species,
 } from './data.ts'
 
@@ -23,9 +23,9 @@ const OLD_IDS = [
 const BEHAVIORS = ['mixed', 'smooth', 'dart', 'floater', 'sinker', 'surge']
 
 describe('fishing data', () => {
-  it('75 species, ids unique, old 12 ids kept, sizes and prices sane', () => {
-    expect(SPECIES).toHaveLength(75)
-    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(75)
+  it('94 species, ids unique, old 12 ids kept, sizes and prices sane', () => {
+    expect(SPECIES).toHaveLength(94)
+    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(94)
     for (const id of OLD_IDS) expect(SPECIES.some((s) => s.id === id)).toBe(true)
     for (const s of SPECIES) {
       expect(s.minCm).toBeLessThan(s.maxCm)
@@ -46,11 +46,18 @@ describe('fishing data', () => {
     expect(old).toMatchSnapshot()
   })
   it('기존 56종 값은 그대로(앞 56종 순서·값), 새 19종(갯벌·늪지) 스냅숏', () => {
-    const old = SPECIES.filter((s) => !['tideflat', 'swamp'].includes(s.area))
+    const old = SPECIES.filter((s) => !['tideflat', 'swamp', 'summit', 'wreck'].includes(s.area))
     expect(old).toHaveLength(56)
     expect(SPECIES.slice(0, 56)).toEqual(old)
     expect(old).toMatchSnapshot()
-    expect(SPECIES.slice(56)).toMatchSnapshot()
+    expect(SPECIES.slice(56, 75)).toMatchSnapshot()
+  })
+  it('기존 75종 값은 그대로(앞 75종 순서·값), 새 19종(산정 호수·난파선) 스냅숏', () => {
+    const old = SPECIES.filter((s) => !['summit', 'wreck'].includes(s.area))
+    expect(old).toHaveLength(75)
+    expect(SPECIES.slice(0, 75)).toEqual(old)
+    expect(SPECIES.slice(75)).toHaveLength(19)
+    expect(SPECIES.slice(75)).toMatchSnapshot()
   })
   it('모든 어종에 fish-<id> 스프라이트가 있다', () => {
     for (const s of SPECIES) expect(SPRITES[`fish-${s.id}`], s.id).toBeDefined()
@@ -78,11 +85,15 @@ describe('fishing data', () => {
     expect(byId('anchovy').behavior).toBe('dart')
   })
   it('areas and defaults', () => {
-    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp'])
+    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
   })
-  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000', () => {
-    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp'])
+  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000, 산정·난파선 120000/150000(난파선은 백골 이상)', () => {
+    expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
+    expect(UNLOCKS.summit).toEqual({ price: 120000, name: '등산 장비' })
+    expect(UNLOCKS.wreck).toEqual({ price: 150000, name: '원양 어선', minRod: 5 })
+    expect(AREAS.find((a) => a.id === 'summit')).toEqual({ id: 'summit', name: '산정 호수', spots: ['ice', 'hotspring'] })
+    expect(AREAS.find((a) => a.id === 'wreck')).toEqual({ id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 })
     expect(UNLOCKS.tideflat).toEqual({ price: 30000, name: '갯벌 장화' })
     expect(UNLOCKS.swamp).toEqual({ price: 60000, name: '늪 나무 데크' })
     expect(AREAS.find((a) => a.id === 'tideflat')).toEqual({ id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] })
@@ -121,7 +132,7 @@ const nightOnly = (s: (typeof SPECIES)[number]) =>
 
 describe('area guarantee', () => {
   it('어종이 있는 모든 지역 x 자리(열린 시각만) x 계절 x 정각 x 날씨에서 지역 최소 낚싯대로 common이 하나 이상', () => {
-    expect(SPECIES_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp'])
+    expect(SPECIES_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
     for (const area of SPECIES_AREAS) {
       for (const spot of area.spots) {
         for (const season of SEASONS) {
@@ -140,7 +151,7 @@ describe('area guarantee', () => {
 })
 
 describe('area rules', () => {
-  it.each(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp'] as const)('%s: 상시 common 2종 이상, 밤 전용·비 전용 1종 이상(동굴 제외), 행동 유형 3가지 이상, 전설 정확히 1종', (id) => {
+  it.each(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'] as const)('%s: 상시 common 2종 이상, 밤 전용·비 전용 1종 이상(동굴 제외), 행동 유형 3가지 이상, 전설 정확히 1종', (id) => {
     const list = SPECIES.filter((s) => s.area === id)
     const free = list.filter((s) => s.rarity === 'common' && !s.seasons && !s.hours && !s.weather)
     expect(free.length).toBeGreaterThanOrEqual(2)
@@ -151,9 +162,26 @@ describe('area rules', () => {
     expect(new Set(list.map((s) => s.behavior)).size).toBeGreaterThanOrEqual(3)
     expect(list.filter((s) => s.rarity === 'legend')).toHaveLength(1)
   })
-  it('지역별 어종 수: 마을 16, 강 9, 숲 8, 호수 8, 동굴 7, 섬 8, 갯벌 9, 늪지 10', () => {
+  it('지역별 어종 수: 마을 16, 강 9, 숲 8, 호수 8, 동굴 7, 섬 8, 갯벌 9, 늪지 10, 산정 9, 난파선 10', () => {
     const n = (id: string) => SPECIES.filter((s) => s.area === id).length
-    expect([n('village'), n('river'), n('forest'), n('lake'), n('cave'), n('island'), n('tideflat'), n('swamp')]).toEqual([16, 9, 8, 8, 7, 8, 9, 10])
+    expect([n('village'), n('river'), n('forest'), n('lake'), n('cave'), n('island'), n('tideflat'), n('swamp'), n('summit'), n('wreck')]).toEqual([16, 9, 8, 8, 7, 8, 9, 10, 9, 10])
+  })
+  it('산정 호수·난파선 어종은 계절 조건이 없고, 난파선 어종은 모두 낚싯대 5단계 이상(용왕은 6)', () => {
+    for (const s of SPECIES.filter((x) => x.area === 'summit' || x.area === 'wreck')) expect(s.seasons, s.id).toBeUndefined()
+    for (const s of SPECIES.filter((x) => x.area === 'wreck')) expect(s.minRod, s.id).toBeGreaterThanOrEqual(5)
+    expect(byId('dragon-king').minRod).toBe(6)
+  })
+  it('산정·난파선 전설과 신화 둘: 값이 표와 같다', () => {
+    expect(byId('snowwhite-taimen')).toMatchObject({ area: 'summit', rarity: 'legend', spots: ['ice'], hours: [5, 8], weather: 'sun', minRod: 4, legend: { power: 0.95 } })
+    expect(byId('oarfish')).toMatchObject({ area: 'wreck', rarity: 'legend', spots: ['abyss'], hours: [22, 2], minRod: 5, legend: { power: 0.95 } })
+    expect(byId('white-dragon')).toMatchObject({
+      area: 'summit', rarity: 'mythic', basePrice: 24000, minRod: 5, behavior: 'surge', spots: ['ice'], hours: [0, 4], weather: 'sun',
+      legend: { power: 0.95, needs: ['silver-king-trout', 'snowwhite-taimen'], buff: 'dragon-breath' },
+    })
+    expect(byId('dragon-king')).toMatchObject({
+      area: 'wreck', rarity: 'mythic', basePrice: 30000, minRod: 6, behavior: 'surge', spots: ['abyss'], weather: 'rain',
+      legend: { power: 0.98, needs: ['grouper', 'rainbow-marlin', 'oarfish'], buff: 'dragon-pearl' },
+    })
   })
   it('늪지: 비·밤 전용이 많다(이무기·전설을 뺀 8종 중 5종)', () => {
     const list = SPECIES.filter((s) => s.area === 'swamp' && !s.legend)
@@ -183,8 +211,15 @@ describe('신화 규칙 (동시 후보 없음)', () => {
       for (const l of legends) expect(m.legend!.needs, `${m.id} needs ${l.id}`).toContain(l.id)
     }
   })
-  it('이무기는 늪지 유일한 신화, 버프 imugi-scale', () => {
-    expect(SPECIES.filter((s) => s.rarity === 'mythic').map((s) => [s.id, s.legend!.buff])).toEqual([['imugi', 'imugi-scale']])
+  it('신화 셋(늪지 이무기·산정 천지 백룡·난파선 용왕), 버프가 셋 모두 다르다', () => {
+    expect(SPECIES.filter((s) => s.rarity === 'mythic').map((s) => [s.id, s.area, s.legend!.buff])).toEqual([
+      ['imugi', 'swamp', 'imugi-scale'], ['white-dragon', 'summit', 'dragon-breath'], ['dragon-king', 'wreck', 'dragon-pearl'],
+    ])
+  })
+  it('천지 백룡 needs ⊇ {설백 자치}, 용왕 needs ⊇ {산갈치}; needs는 모두 전설 id', () => {
+    expect(byId('white-dragon').legend!.needs).toContain('snowwhite-taimen')
+    expect(byId('dragon-king').legend!.needs).toContain('oarfish')
+    for (const m of SPECIES.filter((s) => s.rarity === 'mythic')) for (const id of m.legend!.needs!) expect(byId(id).rarity, `${m.id} → ${id}`).toBe('legend')
   })
   it('동굴 어종은 계절·시간·날씨 조건이 없고, 섬 어종은 계절 조건이 없다', () => {
     for (const s of SPECIES.filter((x) => x.area === 'cave')) {
@@ -260,12 +295,14 @@ describe('찌', () => {
 })
 
 describe('도전과제', () => {
-  it('8개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
+  it('10개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
     expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
     expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
-    expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big', 'tideflat-creek', 'swamp-rain-night'])
-    expect(CHALLENGES.at(-2)).toEqual({ id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } })
-    expect(CHALLENGES.at(-1)).toEqual({ id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } })
+    expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big', 'tideflat-creek', 'swamp-rain-night', 'summit-perfect', 'wreck-abyss-night'])
+    expect(CHALLENGES.at(-2)).toEqual({ id: 'summit-perfect', area: 'summit', title: '얼음 위의 인내', desc: '얼음 구멍에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'ice', perfect: true } })
+    expect(CHALLENGES.at(-1)).toEqual({ id: 'wreck-abyss-night', area: 'wreck', title: '심해의 밤', desc: '밤(20~5시) 심해에서 5마리 낚기', count: 5, filter: { spot: 'abyss', night: true } })
+    expect(CHALLENGES.at(-4)).toEqual({ id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } })
+    expect(CHALLENGES.at(-3)).toEqual({ id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } })
     for (const c of CHALLENGES) {
       expect(c.title.length, c.id).toBeGreaterThan(0)
       expect(c.desc.length, c.id).toBeGreaterThan(0)
@@ -321,9 +358,14 @@ describe('물때 자리·지역 최소 낚싯대', () => {
       areas.pop()
     }
   })
-  it('areaMinRod: 지금 6지역 모두 1, 모르는 지역도 1', () => {
-    for (const a of AREAS) expect(areaMinRod(a.id)).toBe(1)
+  it('areaMinRod: 난파선만 5, 나머지 지역·모르는 지역은 1', () => {
+    for (const a of AREAS) expect(areaMinRod(a.id), a.id).toBe(a.id === 'wreck' ? 5 : 1)
     expect(areaMinRod('atlantis' as never)).toBe(1)
+  })
+  it('rodAtLeast: 낚싯대 이름 + 이상, 모르는 단계는 n단계', () => {
+    expect(rodAtLeast(5)).toBe('백골 낚싯대 이상')
+    expect(rodAtLeast(6)).toBe('용왕의 낚싯대 이상')
+    expect(rodAtLeast(9)).toBe('9단계 낚싯대 이상')
   })
   it('TIDE_GRACE_MIN 10, MYTHIC_CHANCE 0.02', () => {
     expect(TIDE_GRACE_MIN).toBe(10)

@@ -58,7 +58,7 @@ const WALK_FRAME_MS = 200
 /** 나무·야자수 밑동(줄기 아래 끝)의 칸 안 y. 캐릭터 발이 이보다 위면 윗부분이 캐릭터를 가린다. */
 const TREE_BASE = 10
 /** 16×32 스프라이트로 윗칸까지 솟는 타일: 아래 16px는 정적 레이어, 위 16px는 캐릭터와 발 y 순으로 */
-const TALL_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { tree: 'tile-tree', palm: 'tile-palm', reed: 'tile-reed', deadtree: 'tile-deadtree' }
+const TALL_SPRITE: Readonly<Partial<Record<TileKind, string>>> = { tree: 'tile-tree', palm: 'tile-palm', reed: 'tile-reed', deadtree: 'tile-deadtree', snowpine: 'tile-snowpine', mast: 'tile-mast' }
 
 // 스프라이트 크기
 const PLAYER_W = 16
@@ -92,6 +92,10 @@ const C = {
   bogEdge: '#3e3a2a', // 수렁 가장자리 진흙
   sedge: '#6f9a52', // 늪 물가 풀(풀밭과 늪 사이)
   sedgeDark: '#58794a', // 물가 풀 끝 그늘
+  snowLip: '#f4f8fb', // 물가 눈 턱
+  snowShade: '#9fb8c8', // 눈 턱 그늘
+  iceRim: '#8fb4c8', // 얼음판 가장자리
+  iceShine: '#f6fbfd', // 얼음판 가장자리 빛
   grass: '#78b85c',
   grassDark: '#5f9e4a',
   pierFace: '#6e4526',
@@ -222,22 +226,25 @@ function hash(a: number, b: number): number {
 
 // ── 땅: 타일 아래 깔리는 바탕 ────────────────────────────────────
 
-/** cave: 동굴 바닥·입구. 풀 가장자리를 받지도 주지도 않고, 물에 모래 거품을 만들지 않는다 */
-type Ground = 'water' | 'sand' | 'grass' | 'cave'
+/** cave: 동굴 바닥·입구. 풀 가장자리를 받지도 주지도 않고, 물에 모래 거품을 만들지 않는다. snow: 눈 땅(물가에 눈 턱) */
+type Ground = 'water' | 'sand' | 'grass' | 'cave' | 'snow'
 
 // 땅이 물로 치는 타일: 바다·강·연못·웅덩이·폭포·호수·동굴 물·수정·용암·석호, 부두·다리·선착장(아래가 물).
 // 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
 const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
   'water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'dock',
   'creek', 'marsh', 'bog', 'boardwalk',
+  // 낚시 5부 M3: 온천·심해, 갑판·선체·돛대(난파선은 바다 위에 떠 있다 — 둘레 바다에 모래 거품이 생기지 않게)
+  'hotspring', 'deep', 'deck', 'hull', 'mast',
 ])
 
 function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
   const kind = tileAt(map, tx, ty)
   if (kind === null || kind === 'rock' || kind === 'reed' || kind === 'deadtree' || kind === 'cliff' || kind === 'cave-wall') return null
-  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품). 얼음은 가장자리를 주고받지 않는다
+  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품)
   if (kind === 'mud') return tide === 'high' ? 'water' : 'sand'
-  if (kind === 'ice') return 'cave'
+  // 얼음은 눈 땅으로 친다(얼음판 가의 바위·갈대가 눈 위에 놓이게). 얼음 칸 자체는 drawTile이 따로 그린다
+  if (kind === 'ice' || kind === 'snow' || kind === 'snowpine') return 'snow'
   if (WATER_GROUND.has(kind)) return 'water'
   if (kind === 'sand' || kind === 'palm') return 'sand'
   if (kind === 'cave-floor' || kind === 'cave-mouth') return 'cave'
@@ -249,20 +256,20 @@ const ON_NEIGHBOUR_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['rock', 'r
 
 /** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
 function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
-  const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0 }
+  const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0, snow: 0 }
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const g = baseGround(map, tx + dx, ty + dy, tide)
     if (g) count[g]++
   }
   let best: Ground = 'sand'
-  for (const g of ['grass', 'water', 'cave'] as Ground[]) if (count[g] > count[best]) best = g
+  for (const g of ['grass', 'water', 'cave', 'snow'] as Ground[]) if (count[g] > count[best]) best = g
   return best
 }
 
 /** 갈대·고사목: 이웃에 땅(풀 > 모래 > 동굴)이 하나라도 있으면 그 땅, 모두 물이면 물(늪 한가운데 갈대) */
 function tallGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
   const near = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([dx, dy]) => baseGround(map, tx + dx, ty + dy, tide))
-  for (const g of ['grass', 'sand', 'cave'] as Ground[]) if (near.includes(g)) return g
+  for (const g of ['grass', 'sand', 'cave', 'snow'] as Ground[]) if (near.includes(g)) return g
   return near.includes('water') ? 'water' : 'grass'
 }
 
@@ -400,6 +407,7 @@ const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = {
   river: 'river', pond: 'pond', basin: 'basin', bridge: 'river',
   lake: 'lake', 'cave-pool': 'cave-pool', crystal: 'crystal', lava: 'lava', lagoon: 'lagoon',
   creek: 'creek', marsh: 'marsh', bog: 'bog', boardwalk: 'marsh',
+  hotspring: 'hotspring', deep: 'deep',
 }
 
 /** 물 칸 그림 이름 앞부분. 바위는 이웃(상하좌우) 물 칸 그림 중 가장 많은 것(같으면 위·아래·왼쪽·오른쪽 순서로 먼저 센 것) */
@@ -447,6 +455,7 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   }
   if (kind === 'ice') {
     drawSprite(ctx, 'tile-ice', x, y, 1)
+    drawIceRim(ctx, g, tx, ty)
     return
   }
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
@@ -461,8 +470,12 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     const name = kind === 'marsh' && hash(tx, ty) % 9 === 0 ? 'marsh-lily' : waterSpriteAt(g.map, tx, ty)
     drawSprite(ctx, `${name}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
+    drawSnowEdges(ctx, g, tx, ty)
     if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
     if (kind === 'marsh') drawSedgeFringe(ctx, g, tx, ty)
+  } else if (ground === 'snow') {
+    // 칸 몇 곳(칸마다 고정)은 바람에 쌓인 눈더미 결
+    drawSprite(ctx, hash(tx, ty) % 6 === 0 ? 'tile-snow-drift' : 'tile-snow', x, y, 1)
   } else if (ground === 'cave') {
     drawSprite(ctx, 'tile-cave-floor', x, y, 1)
   } else if (ground === 'sand') {
@@ -473,15 +486,57 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   }
 
   const tall = TALL_SPRITE[kind]
+  // 돛대는 갑판 위에 선다
+  if (kind === 'mast') drawSprite(ctx, 'deck-plank', x, y, 1)
   if (tall) drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
   else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
-    else drawSprite(ctx, 'tile-rock', x, y, 1)
+    else drawSprite(ctx, ground === 'snow' ? 'tile-rock-snow' : 'tile-rock', x, y, 1)
   } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
   else if (kind === 'boardwalk') drawSprite(ctx, boardwalkVertical(g.map, tx, ty) ? 'boardwalk-plank-v' : 'boardwalk-plank', x, y, 1)
+  else if (kind === 'deck') drawSprite(ctx, 'deck-plank', x, y, 1)
+  else if (kind === 'hull') drawSprite(ctx, hullSide(g.map, tx, ty) ? 'tile-hull-v' : 'tile-hull', x, y, 1)
+}
+
+/** 얼음판 가장자리(얼음이 아닌 쪽 변)에 짙은 테 1px와 그 안쪽 빛 1px: 눈밭과 얼음판의 경계가 보이게 */
+function drawIceRim(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const x = tx * TILE
+  const y = ty * TILE
+  const edge = (dx: number, dy: number) => tileAt(g.map, tx + dx, ty + dy) !== 'ice'
+  if (edge(0, -1)) {
+    rect(ctx, x, y, TILE, 1, C.iceRim)
+    rect(ctx, x, y + 1, TILE, 1, C.iceShine)
+  }
+  if (edge(0, 1)) rect(ctx, x, y + TILE - 1, TILE, 1, C.iceRim)
+  if (edge(-1, 0)) rect(ctx, x, y, 1, TILE, C.iceRim)
+  if (edge(1, 0)) rect(ctx, x + TILE - 1, y, 1, TILE, C.iceRim)
+}
+
+/** 물 칸 가장자리에 눈이 닿으면 눈 턱과 그늘. 온천 둘레가 눈에 파묻혀 보이게 */
+function drawSnowEdges(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number): void {
+  const x = tx * TILE
+  const y = ty * TILE
+  const snow = (dx: number, dy: number) => groundAt(g, tx + dx, ty + dy) === 'snow'
+  // 위쪽은 물 위로 내민 눈 턱과 그늘, 나머지 변은 눈 1px + 돌 테 1px
+  if (snow(0, -1)) {
+    rect(ctx, x, y, TILE, 2, C.snowLip)
+    rect(ctx, x, y + 2, TILE, 1, C.snowShade)
+  }
+  if (snow(0, 1)) {
+    rect(ctx, x, y + TILE - 2, TILE, 1, C.snowShade)
+    rect(ctx, x, y + TILE - 1, TILE, 1, C.snowLip)
+  }
+  if (snow(-1, 0)) {
+    rect(ctx, x, y, 1, TILE, C.snowLip)
+    rect(ctx, x + 1, y, 1, TILE, C.snowShade)
+  }
+  if (snow(1, 0)) {
+    rect(ctx, x + TILE - 1, y, 1, TILE, C.snowLip)
+    rect(ctx, x + TILE - 2, y, 1, TILE, C.snowShade)
+  }
 }
 
 /**
@@ -524,6 +579,15 @@ function drawSedgeFringe(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, t
     if (!grass(dx, dy) || grass(dx, 0) || grass(0, dy)) continue
     rect(ctx, dx < 0 ? x : x + TILE - 3, dy < 0 ? y : y + TILE - 3, 3, 3, C.sedge)
   }
+}
+
+/** 선체 옆판: 왼쪽이나 오른쪽이 갑판이면 세로 판자(배 옆면), 아니면(뱃머리·선미, 위·아래가 갑판) 가로 그림 */
+function hullSide(map: MapDef, tx: number, ty: number): boolean {
+  const deck = (dx: number) => {
+    const k = tileAt(map, tx + dx, ty)
+    return k === 'deck' || k === 'mast'
+  }
+  return deck(-1) || deck(1)
 }
 
 /** 위아래로만 데크가 이어지는 칸(세로 데크 그림). 갈림길·가로 데크·외톨이는 가로 그림 */

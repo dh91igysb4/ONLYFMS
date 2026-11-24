@@ -30,7 +30,7 @@ export const SIM = {
   recastSec: 3,
 } as const
 /** 가방이 찼을 때 상점(마을)까지 다녀오는 시간(초). 마을 물가 30초는 REF 계산과 같다. 먼 곳은 걷거나 배·순간이동 */
-export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75, tideflat: 45, swamp: 90 }
+export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75, tideflat: 45, swamp: 90, summit: 90, wreck: 120 }
 
 const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
 type NormalRarity = keyof Rod['weights']
@@ -179,7 +179,7 @@ export type Purchase =
 /**
  * 시뮬레이션의 구매 순서. 기존 장비(1~4단계 낚싯대, 40칸까지 가방, 찌 5종, 지역 3곳)는 지도 진행대로
  * 수입을 올리는 것부터(화면 찌는 버는 양을 바꾸지 않아 마지막), 그다음 새 지역(갯벌 → 늪지), 고급 장비(5·6단계 낚싯대, 50·60칸 가방).
- * 새 지역이 가시 바늘 뒤라 기존 품목의 구매 시각은 바뀌지 않는다. 산정·난파선은 M3에서 백골 뒤에 끼운다.
+ * 새 지역이 가시 바늘 뒤라 기존 품목의 구매 시각은 바뀌지 않는다. 산정 호수는 백골 뒤, 난파선(백골 이상)은 50칸 뒤.
  */
 export const BUY_ORDER: readonly Purchase[] = [
   { kind: 'rod', tier: 2 },
@@ -199,7 +199,9 @@ export const BUY_ORDER: readonly Purchase[] = [
   { kind: 'unlock', area: 'tideflat' },
   { kind: 'unlock', area: 'swamp' },
   { kind: 'rod', tier: 5 },
+  { kind: 'unlock', area: 'summit' },
   { kind: 'bag', tier: 4 },
+  { kind: 'unlock', area: 'wreck' },
   { kind: 'rod', tier: 6 },
   { kind: 'bag', tier: 5 },
 ]

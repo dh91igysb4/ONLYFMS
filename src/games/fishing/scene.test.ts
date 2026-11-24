@@ -1340,3 +1340,100 @@ describe('늪지 풀밭 물가', () => {
     expect(sedge(2, 2)).toBe(0)
   })
 })
+
+describe('낚시 5부 M3 타일: 산정 호수·난파선', () => {
+  const size = { w: 195, h: 280 }
+  const inTile = (r: { x: number; y: number }, cam: Vec, tx: number, ty: number) =>
+    r.x >= tx * 16 - cam.x && r.x < (tx + 1) * 16 - cam.x && r.y >= ty * 16 - cam.y && r.y < (ty + 1) * 16 - cam.y
+  // 0 ~~~vv
+  // 1 neeen   바다·심해·선체·갑판
+  // 2 sshso   눈·온천·바위(눈 위)
+  // 3 ssiss   얼음
+  const ICY = defineMap('lake', ['~~~vv', 'neMen', 'sshso', 'ssiss', 'sssss', 'sssss'], { spots: { water: 'wreck', deep: 'abyss', hotspring: 'hotspring', hole: 'ice' } })
+  const draw = (m = ICY, at = tileCentre(1, 4)) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const p = player(at)
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    const names = (tx: number, ty: number) => ctx.sprites.filter((c) => c.x === tx * 16 - cam.x && c.y === ty * 16 - cam.y).map((c) => c.name)
+    return { ctx, cam, names }
+  }
+
+  test('온천·심해는 제 물 그림(두 장), 갑판은 판자, 선체는 선체 그림, 돛대 밑은 갑판 위', () => {
+    const { names } = draw()
+    expect(names(0, 0)).toContainEqual(expect.stringMatching(/^water-[01]$/))
+    expect(names(3, 0)).toContainEqual(expect.stringMatching(/^deep-[01]$/))
+    expect(names(2, 2)).toContainEqual(expect.stringMatching(/^hotspring-[01]$/))
+    expect(names(1, 1)).toContain('deck-plank')
+    expect(names(0, 1)).toContain('tile-hull-v')
+    expect(names(2, 1)).toContain('deck-plank')
+  })
+
+  test('선체: 옆이 갑판이면 세로 옆판(tile-hull-v), 위·아래만 갑판이면(뱃머리·선미) 가로 그림', () => {
+    const m = defineMap('lake', ['~~n~~', '~nen~', '~nen~', '~~n~~', '~~~~~', '~~~~~'], { spots: { water: 'wreck' } })
+    const { names } = draw(m, tileCentre(2, 1))
+    expect(names(1, 1)).toContain('tile-hull-v')
+    expect(names(3, 2)).toContain('tile-hull-v')
+    expect(names(2, 0)).toContain('tile-hull')
+    expect(names(2, 3)).toContain('tile-hull')
+    expect(names(2, 0)).not.toContain('tile-hull-v')
+  })
+
+  test('눈 칸은 눈 그림, 눈 사이 바위는 눈 위, 얼음은 얼음', () => {
+    const { names } = draw()
+    expect(names(0, 2)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(4, 2)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(4, 2)).toContain('tile-rock-snow')
+    expect(names(4, 2)).not.toContain('tile-rock')
+    expect(names(2, 3)).toContain('tile-ice')
+  })
+
+  test.each([['A', 'tile-snowpine'], ['M', 'tile-mast']])('%s 윗부분: 캐릭터가 밑동보다 위 줄이면 앞에, 아래 줄이면 뒤에', (ch, name) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => new RecordingCtx() as unknown as RenderingContext)
+    const ground = ch === 'M' ? 'e' : 's'
+    const row = ground.repeat(5)
+    const m = defineMap('lake', [row, row, row, `${ground}${ground}${ch}${ground}${ground}`, row, row])
+    const sp = realSprites.SPRITES[name]
+    const topColors = new Set(sp.rows.slice(0, 16).flatMap((r) => [...r].filter((c) => c !== '.').map((c) => sp.palette[c])))
+    const bottomColors = new Set(sp.rows.slice(16).flatMap((r) => [...r].filter((c) => c !== '.').map((c) => sp.palette[c])))
+    const only = [...topColors].filter((c) => !bottomColors.has(c))
+    expect(only.length).toBeGreaterThan(0)
+    const tops = (c: RecordingCtx, cam: Vec) => c.rects.map((r, i) => ({ r, i })).filter(({ r }) => only.includes(r.color) && inTile(r, cam, 2, 2))
+    const above = { ...scene('idle', player(tileCentre(2, 2), 'down'), size), map: m }
+    above.camera = cameraFor(m, above.player.pos, size)
+    const a = new RecordingCtx()
+    drawWorld(asCtx(a), above, size)
+    const ta = tops(a, above.camera)
+    expect(ta.length).toBeGreaterThan(0)
+    expect(ta.every(({ i }) => i >= players(a)[0].at)).toBe(true)
+    const below = { ...scene('idle', player(tileCentre(2, 4), 'up'), size), map: m }
+    below.camera = cameraFor(m, below.player.pos, size)
+    const b = new RecordingCtx()
+    drawWorld(asCtx(b), below, size)
+    const tb = tops(b, below.camera)
+    expect(tb.length).toBeGreaterThan(0)
+    expect(tb.every(({ i }) => i < players(b)[0].at)).toBe(true)
+  })
+
+  test('눈밭 몇 칸은 눈더미 결(칸마다 고정), 얼음판 가 갈대는 눈 위에', () => {
+    const row = 's'.repeat(12)
+    const m = defineMap('lake', [row, row, row, row, row, row, row, row, 'ssRiiiiiiiii', row])
+    const { ctx, names } = draw(m, tileCentre(5, 5))
+    const drift = ctx.sprites.filter((c) => c.name === 'tile-snow-drift').length
+    const plain = ctx.sprites.filter((c) => c.name === 'tile-snow').length
+    expect(drift).toBeGreaterThan(0)
+    expect(plain).toBeGreaterThan(drift * 2)
+    expect(names(2, 8)).toContainEqual(expect.stringMatching(/^tile-snow(-drift)?$/))
+    expect(names(2, 8)).not.toContain('tile-cave-floor')
+  })
+
+  test('잠긴 눈더미 문은 gate-snowdrift를 그린다', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    const m = defineMap('lake', ['sssss', 'sssss', 'sssss'], {
+      gates: [{ area: 'cave', tiles: { tx: 1, ty: 0, w: 2, h: 1 }, look: 'snowdrift', front: { tx: 1, ty: 1, facing: 'up' } }],
+    })
+    const { ctx } = draw(m, tileCentre(2, 2))
+    expect(ctx.sprites.filter((c) => c.name === 'gate-snowdrift')).toHaveLength(2)
+  })
+})

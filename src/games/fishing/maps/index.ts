@@ -6,12 +6,14 @@ import { FOREST } from './forest.ts'
 import { ISLAND } from './island.ts'
 import { LAKE } from './lake.ts'
 import { RIVER } from './river.ts'
+import { SUMMIT } from './summit.ts'
 import { SWAMP } from './swamp.ts'
 import { TIDEFLAT } from './tideflat.ts'
 import { VILLAGE } from './village.ts'
+import { WRECK } from './wreck.ts'
 
 export const MAPS: Readonly<Partial<Record<AreaId, MapDef>>> = {
-  village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP,
+  village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP, summit: SUMMIT, wreck: WRECK,
 }
 
 /** 지역의 맵. 맵이 없는 지역이면 null. */

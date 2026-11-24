@@ -27,9 +27,9 @@ describe('teleportFee', () => {
     expect(teleportFee('village', 'village')).toBe(TP_BASE)
   })
 
-  it('이웃 지역은 싸고(마을↔강 ≤ 40), 섬과의 요금은 섬이 아닌 쌍의 최대 요금의 세 배 이상', () => {
+  it('이웃 지역은 싸고(마을↔강 ≤ 40), 섬(과 그 너머 난파선)과의 요금은 뭍 쌍의 최대 요금의 세 배 이상', () => {
     expect(teleportFee('village', 'river')).toBeLessThanOrEqual(40)
-    const land = IDS.filter((id) => id !== 'island')
+    const land = IDS.filter((id) => id !== 'island' && id !== 'wreck')
     const maxLand = Math.max(...pairs(land).map(([a, b]) => teleportFee(a, b)))
     for (const id of land) expect(teleportFee(id, 'island'), id).toBeGreaterThanOrEqual(3 * maxLand)
   })
