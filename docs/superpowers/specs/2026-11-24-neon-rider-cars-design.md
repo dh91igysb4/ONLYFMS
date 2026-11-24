@@ -79,7 +79,7 @@
 
 ### 7.4 기록
 
-- `free_play_logs`에 `options jsonb`(null 허용, 크기 상한 4 KB) 열을 더하고 `freeLogQueue`가 그 판의 옵션을 함께 올린다. 그래서 어느 차로 달렸는지 재현된다. insert 권한 목록에 `options`를 더한다.
+- 자유 플레이의 옵션은 이미 `free_plays.options`(jsonb)에 저장되고, `free_play_logs`는 같은 `client_id`로 이어진다. 그래서 어느 차로 달렸는지는 새 열 없이 재현된다: `free_plays.options` + `free_play_logs.seed`로 `pickPuzzle(rngFromSeed(seed), options)`. 옵션이 비어 있는 옛 기록은 기본값(쿠페). (설계 처음에는 `free_play_logs.options` 열을 더하려 했으나, 계획을 쓰며 이미 있는 열을 찾아 뺐다.)
 
 ## 8. 신뢰 모델
 
@@ -103,7 +103,7 @@
 - **첫 판과 로그인 상태**: `FreePage`는 `shop` 옵션이 있는 게임이면 `my_items`를 받은 뒤 첫 판을 시작한다(받는 동안 "불러오는 중"). 실패하면 기본값으로 시작한다. 비로그인·미승인 사용자와 `_wallet_enabled()`가 false일 때는 가격 0 품목만 고를 수 있고 "상점" 버튼을 숨긴다.
 - **선택의 저장**: 선택 상자에서 바꾸면 매번 `equip_item`을 부른다. "장착" = 마지막으로 고른 것. 기기가 여럿이면 마지막에 저장한 것이 이긴다.
 - **가격·품목 변경**: 가격을 바꾸려면 새 마이그레이션에서 `update public.shop_items set price = …`로 바꾸고 manifest도 함께 바꾼다(`registry.test.ts`는 마이그레이션의 최종 상태와 비교한다: 처음 insert 문장 뒤의 update 문장도 고정 형식 `update public.shop_items set price = N where game_id = '…' and item_id = '…';`로 읽는다). 이미 산 사람은 그대로 가진다. 품목 삭제는 다루지 않는다(비목표). 가격이 0이 된 품목의 기존 `user_items` 행은 그대로 두고, 화면은 가격 0이거나 행이 있으면 가진 것으로 본다.
-- **기록의 옵션**: `free_play_logs.options`에는 그 판의 옵션 전체(manifest 옵션 key 전부)를 넣는다. 재현은 지금처럼 `pickPuzzle(rngFromSeed(seed), options ?? 기본값)`으로 퍼즐을 다시 만든다. 옛 로그(null)는 기본값(쿠페). 4 KB는 DB CHECK(`octet_length(options::text) <= 4096`).
+- **기록의 옵션**: §7.4대로 `free_plays.options`를 쓴다. 옛 기록(빈 옵션)은 기본값(쿠페).
 - **장부 표시**: 지갑·관리자 장부의 reason 목록·한국어 표기에 `shop`("상점")을 더한다. 지출이므로 "오늘 들어온 골드" 합계에는 들어가지 않는다(지금 `earned_today`가 수입 reason만 세는 것과 같다).
 - **차를 쓰는 모든 곳**: 지붕·차대·보석 판정과 렌더러는 `carById(s.car)`를 쓴다. 넓은 범위 상수(`REACH` 등 판정 후보를 거르는 여유값)는 `CARS` 전체의 최댓값으로 잡는다. 시험: 쿠페가 아닌 차 하나(픽업)로 위험물·블록·보석이 있는 짧은 코스를 끝까지 달려 차의 값이 쓰였는지(같은 입력에서 쿠페와 다른 판정이 나는 막대 하나) 확인한다.
 - **숨김 게임**: 네온 라이더는 공개(`hidden: false`)라 바로 살 수 있다. 숨김 게임의 품목은 사지 못한다.
