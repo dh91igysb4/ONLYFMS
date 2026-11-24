@@ -1,8 +1,13 @@
 // SQL _wallet_enabled()는 등록부 walletEnabled()의 사본이다(지갑 설계 §10, 5단계 리뷰 I1).
 // create_contest가 이 값이 false면 새 참가비 대회를 거절한다(duel 함수의 invalid_stake와 같은 규칙).
-// 낚시를 지갑으로 옮기는(wallet: true) PR은 새 마이그레이션에서 `select true`로 바꿔야 이 테스트가 통과한다.
+// 낚시를 지갑으로 옮긴(wallet: true, 낚시 logic.version 14) 지갑 Task 4가 20261124030000_wallet_on에서 `select true`로 바꿨다.
 import { expect, test } from 'vitest'
-import { walletEnabled } from './index.ts'
+import { getWorld, walletEnabled } from './index.ts'
+
+test('지갑이 켜져 있다: 낚시가 wallet: true (헤더 골드·자유 플레이 +N G·상금 알림·판돈·참가비 화면이 보인다)', () => {
+  expect(getWorld('fishing')?.logic.wallet).toBe(true)
+  expect(walletEnabled()).toBe(true)
+})
 
 /** 마이그레이션을 이름순으로 읽어 가장 마지막 _wallet_enabled() 정의의 true/false를 꺼낸다 */
 function lastWalletFlag(files: Record<string, string>): boolean | null {

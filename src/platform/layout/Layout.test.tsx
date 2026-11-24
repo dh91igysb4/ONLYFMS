@@ -227,7 +227,7 @@ test('경로가 바뀐 뒤 조회가 실패하면 조용히 이전 배지를 유
 
 test('로드 때 my_wallet을 한 번 읽고 헤더에 잔액을 보여 준다', async () => {
   mount()
-  expect(await screen.findByLabelText('내 골드 1,234 G')).toBeTruthy()
+  expect(await screen.findByLabelText('지갑 1,234 G')).toBeTruthy()
   expect(fetchMyWallet).toHaveBeenCalledTimes(1)
 })
 
@@ -235,7 +235,7 @@ test('승인되지 않은 사용자에게는 배지가 없고 my_wallet도 부�
   auth.status = 'pending'
   mount()
   await vi.waitFor(() => expect(upsert).toHaveBeenCalled())
-  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(screen.queryByLabelText(/^지갑 /)).toBeNull()
   expect(fetchMyWallet).not.toHaveBeenCalled()
 })
 
@@ -250,7 +250,7 @@ test('지갑을 쓰는 게임이 없어도(낚시 이전 전) my_wallet은 불�
   })
   mount()
   await vi.waitFor(() => expect(fetchMyWallet).toHaveBeenCalledTimes(1))
-  expect(screen.queryByLabelText(/내 골드/)).toBeNull()
+  expect(screen.queryByLabelText(/^지갑 /)).toBeNull()
   expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
 })
 

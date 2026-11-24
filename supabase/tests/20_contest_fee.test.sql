@@ -140,7 +140,10 @@ select ok(position('soft_cap' in pg_get_functiondef('public._contest_payouts(uui
 -- ---------------------------------------------------------------- 지갑이 보이기 전: 참가비 0만
 select ok(not has_function_privilege('authenticated', 'public._wallet_enabled()', 'execute'),
   '_wallet_enabled는 authenticated에 실행 권한 없음');
-select is(public._wallet_enabled(), false, '이 브랜치의 _wallet_enabled()는 false (등록부에 wallet 게임 없음)');
+select is(public._wallet_enabled(), true, '_wallet_enabled()는 true (낚시 wallet: true, 마이그레이션 20261124030000_wallet_on)');
+-- 꺼진 동안의 규칙은 지갑을 켜기 전 배포(옛 DB)를 위해 그대로 지킨다: 트랜잭션 안에서만 끈다(롤백됨)
+create or replace function public._wallet_enabled() returns boolean
+language sql immutable security definer set search_path = public as $$ select false $$;
 set local role authenticated;
 set local request.jwt.claims = :'F1';
 select throws_ok($$select pg_temp.mk('cf-off', 1000)$$, 'P0001', 'fee_invalid',
