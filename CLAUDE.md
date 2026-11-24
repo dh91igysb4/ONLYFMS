@@ -34,6 +34,7 @@
 
 점수로 겨루는 게임은 manifest에 `freeStats: 'score'`를 둔다. 자유 플레이 리더보드가 플레이·평균·최고만 보여 주고 최고 점수 순으로 고정되며, 홈 블록도 최고 점수를 보여 준다.
 점수 상한이 10이 아닌 자유 플레이 점수 게임은 manifest `scoreMax`·`scoreDecimals`와 마이그레이션의 `game_modes.score_max`를 맞춘다 (`registry.test.ts`가 `scoreMax`와 `score_max`를 비교한다).
+자유 플레이 골드에는 도전과제 보너스가 곱해진다(지갑 설계 §7.5): 지속형 게임의 `WorldLogic.freeBonus`(%)를 `world` 함수가 `game_records` 키 `free_bonus`(`FREE_BONUS_RECORD_KEY`, manifest records에 쓰지 않는다)에 쓰고, 트리거가 `_free_bonus_pct`(합, 상한 `FREE_BONUS_MAX_PCT` 400)로 판당 금액과 게임별 하루 상한에 곱한다. 사이트 하루 상한·상금·판돈·참가비에는 곱하지 않는다. 화면 미리 계산은 `freeGold(…, bonusPct)`.
 자유 플레이 점수 게임에 골드를 주려면 manifest `gold: { perPoint, playCap, dailyCap: FREE_DAILY_CAP }`과 새 마이그레이션의 고정 형식 한 줄 `update game_modes set gold_per_point = X, gold_play_cap = Y, gold_daily_cap = 20500 where game_id = '…';`을 맞춘다(`registry.test.ts`가 비교, 없으면 지급 없음). 수치는 `src/games/<id>/gold.test.ts`로 기준 플레이(평균 점수·한 판 시간, 출처 주석) 시간당 골드가 `REF` ±20%, `playCap`은 기준 한 판의 5배(10 단위), 봇이 있으면 봇 평균 점수도 검사한다(지갑 설계 §7.3). 지급은 `free_plays` 트리거가 하고 숨김·`free = false` 게임은 주지 않는다.
 
 대전(1대1) 게임은 다음이 다르다 (설계 `docs/superpowers/specs/2026-11-01-duel-platform-design.md`):

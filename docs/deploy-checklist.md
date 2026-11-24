@@ -528,6 +528,7 @@ npx supabase@2 functions deploy world --no-verify-jwt
 - [ ] `npx supabase@2 functions deploy world --no-verify-jwt` — **이 브랜치(PR 미리보기 확인용) 또는 머지 뒤 main에서만** 배포한다. 옛 지갑 브랜치(`feat/wallet-core` ~ `feat/wallet-contest`)에서 배포하지 않는다: 그 브랜치들의 낚시는 v13보다 옛 버전이라 옛 migrate가 산정·난파선·옷장·버프 등을 지우고, 지갑도 쓰지 않는다
   - 배포 직후 각 사람의 **첫 낚시 요청(load든 act든)**에서 v13 세이브의 `gold`가 소수 내림으로 지갑에 한 번 들어가고(장부 `migrate`, ref `fishing`, 사이트 하루 상한과 무관), 세이브는 v14(gold 없음)로 저장된다. 그 요청이 실패한 행동이어도 이전은 커밋된다. 두 탭에서 동시에 열어도 세이브 행 잠금 + 장부 unique로 한 번뿐이다
   - 진행 중이던 캐스트는 사라진다(v13 → v14, 설계상 허용)
+- [ ] 같은 `db push`에 **`20261124040000_free_bonus.sql`**(도전과제 보너스, 설계 §7.5)도 들어간다: `_free_bonus_pct`, 자유 플레이 트리거가 판당·게임별 하루 상한에 × (100 + 보너스)/100, `my_wallet().free_bonus_pct`, `user_free_bonus`. 새 `world`가 배포되기 전에는 `free_bonus` 행이 없어 보너스 0(지금과 같음)이고, `world` 배포 뒤 각 사람이 낚시를 한 번 열면 깬 과제만큼 채워진다
 - [ ] `npx supabase@2 functions deploy duel --no-verify-jwt` — `duel` 함수가 등록부의 `walletEnabled()`를 번들하므로 다시 배포해야 판돈 > 0을 받는다(안 하면 `invalid_stake`로 판돈 0만)
 - [ ] PR 머지 → Vercel 배포. 머지 뒤 main 기준으로 `world`·`duel`을 한 번 더 배포한다(M1~M3과 같은 관례)
 - [ ] 배포가 끝나면 사용자들에게 **열어 둔 탭을 새로고침**해 달라고 알린다(옛 화면 번들은 헤더 지갑·`+N G`·판돈·참가비를 모른다. 낚시 화면은 옛 번들도 `view.gold` = 지갑 잔액을 그대로 보여 주므로 골드가 틀려 보이지는 않는다)
@@ -537,6 +538,7 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - [ ] 물고기 팔기 → 헤더가 바로 오른다(용왕의 여의주가 있으면 예상가 그대로 ×1.08). 낚싯대(1~6단계)·가방(50·60칸 포함)·찌·지역 해금(산정·난파선 포함, 난파선은 백골 낚싯대 이상)·순간이동 요금·옷 사기 → 헤더가 바로 내린다. 모자라면 "골드가 부족해요"이고 아무것도 바뀌지 않는다
   - [ ] 자유 플레이 한 판 → 결과 화면 `+N G`와 헤더 증가가 같다. 다음 날 데일리 상금 알림, 대전 판돈 고르기(내 골드 표시), 대회 만들기의 참가비 입력이 보인다
   - [ ] 관리자 장부에 `migrate`(낚시 옛 골드)·`world`(낚시) 줄
+  - [ ] 도전과제 보너스: 낚시 "과제" 창에 과제마다 "미니게임 골드 +N%"와 "지금 미니게임 골드 ×N", 프로필 요약에 "미니게임 골드 ×N"(같은 값). 과제를 깬 계정으로 낚시를 한 번 연 뒤 앱을 새로고침하고 자유 플레이 한 판 → `+N G (도전과제 보너스 ×N)`이고 장부 `free` 줄 금액이 같다. 확인 쿼리 `select user_id, value from game_records where key = 'free_bonus' order by value desc;`
   - [ ] 사이트 하루 상한: 관리자 계정으로 낚시를 해 들어간 합계 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림 3초, 넘은 몫은 41,000까지 20%, 그 위 4%. 관리자 장부에 "(상한, 원래 …)"
 - 확인 쿼리(SQL 편집기):
   - 아직 이전되지 않은 세이브(낚시를 아직 안 연 사람): `select count(*) from world_saves where game_id = 'fishing' and logic_version <= 13;`
