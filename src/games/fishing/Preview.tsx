@@ -9,11 +9,11 @@ import { conditionsAt, tideAt } from './clock.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { loadPosition } from './position.ts'
-import { previewScale, previewState, redrawDelayMs } from './preview.ts'
+import { onlineSummary, previewScale, previewState, redrawDelayMs } from './preview.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
 import { cameraFor } from './walk.ts'
 
-export function Preview({ userId, records, size, onFail }: WorldPreviewProps) {
+export function Preview({ userId, records, size, onFail, online }: WorldPreviewProps) {
   const ref = useRef<HTMLCanvasElement>(null)
   const st = useMemo(() => previewState(loadPosition(userId), records), [userId, records])
   const scale = previewScale(size)
@@ -103,14 +103,18 @@ export function Preview({ userId, records, size, onFail }: WorldPreviewProps) {
     }
   }, [st, side, scale])
 
+  const summary = onlineSummary(online ?? [])
   return (
-    <canvas
+    <>
+      {summary && <p className="home-valley-online">{summary}</p>}
+      <canvas
       ref={ref}
       className="fish-preview-canvas"
       width={side}
       height={side}
       style={{ width: side * scale, height: side * scale, imageRendering: 'pixelated', display: 'block' }}
       aria-hidden="true"
-    />
+      />
+    </>
   )
 }

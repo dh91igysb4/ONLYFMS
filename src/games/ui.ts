@@ -9,6 +9,7 @@ import { Game as SneakExamGame } from './sneak-exam/Game.tsx'
 import { Game as FishingGame } from './fishing/Game.tsx'
 import { Avatar as FishingAvatar } from './fishing/Avatar.tsx'
 import { Preview as FishingPreview } from './fishing/Preview.tsx'
+import type { OnlinePeer } from '../platform/world/presence.ts'
 import { Game as NeonRiderGame } from './neon-rider/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
@@ -96,6 +97,8 @@ export type WorldPreviewProps = {
   size: number
   /** 그리기를 못 하면 한 번 부른다(부모가 대체 버튼을 그린다) */
   onFail: () => void
+  /** 접속 중 친구(나 제외, 온라인 2단계-1). 요약 문구는 게임이 만든다 */
+  online: OnlinePeer[]
 }
 
 /** 메인 미리보기 등록부(manifest `preview`가 있는 지속형 게임). 새 게임은 여기에 한 줄씩 등록한다. */

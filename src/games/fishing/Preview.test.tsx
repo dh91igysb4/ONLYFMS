@@ -63,9 +63,18 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const mount = (size = 320) => render(<Preview userId="u1" records={[]} size={size} onFail={onFail} />)
+const mount = (size = 320, online: { id: string; handle: string; area: string; act: 'walk' | 'fish'; tx: number; ty: number }[] = []) =>
+  render(<Preview userId="u1" records={[]} size={size} onFail={onFail} online={online} />)
 
 describe('Preview', () => {
+  test('접속 중 친구가 있으면 요약 문구, 없으면 없음', () => {
+    const { container, unmount } = mount(320, [{ id: 'u2', handle: 'son', area: 'forest', act: 'fish', tx: 1, ty: 1 }])
+    expect(container.querySelector('.home-valley-online')?.textContent).toBe('접속 중 1명 · son 숲에서 낚시 중')
+    unmount()
+    const again = mount(320, [])
+    expect(again.container.querySelector('.home-valley-online')).toBeNull()
+  })
+
   test('마운트하면 대기 장면을 한 번 그린다', () => {
     mount()
     expect(draws()).toBe(1)

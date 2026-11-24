@@ -5,7 +5,7 @@ import { DEFAULT_AREAS } from './data.ts'
 import { TILE } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { decodeOutfit } from './outfit.ts'
-import { PREVIEW_RAIN_FRAME_MS, previewScale, previewState, redrawDelayMs } from './preview.ts'
+import { PREVIEW_RAIN_FRAME_MS, onlineSummary, previewScale, previewState, redrawDelayMs } from './preview.ts'
 
 const center = (tx: number, ty: number) => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
 const SPAWN = { area: 'village', pos: VILLAGE.spawn.pos, facing: VILLAGE.spawn.facing }
@@ -69,5 +69,22 @@ describe('redrawDelayMs', () => {
   test('맑으면 다음 실제 10초(게임 10분) 경계까지', () => {
     expect(redrawDelayMs(cond('sun'), 12345)).toBe(7655)
     expect(redrawDelayMs(cond('sun'), 20000)).toBe(10000)
+  })
+})
+
+describe('onlineSummary', () => {
+  const p = (handle: string, area: string, act: 'walk' | 'fish' = 'walk') => ({ id: handle, handle, area, act, tx: 1, ty: 1 })
+  test('없으면 null', () => {
+    expect(onlineSummary([])).toBeNull()
+  })
+  test('한 명, 낚시 중', () => {
+    expect(onlineSummary([p('son', 'forest', 'fish')])).toBe('접속 중 1명 · son 숲에서 낚시 중')
+  })
+  test('세 명이면 두 명까지 쓰고 외 n명', () => {
+    expect(onlineSummary([p('kim', 'river'), p('son', 'forest', 'fish'), p('zed', 'cave')]))
+      .toBe('접속 중 3명 · kim 마을 강, son 숲에서 낚시 중 외 1명')
+  })
+  test('모르는 지역이면 아이디만', () => {
+    expect(onlineSummary([p('son', 'atlantis', 'fish')])).toBe('접속 중 1명 · son')
   })
 })
