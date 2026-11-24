@@ -11,3 +11,15 @@
 /* 블록 안 목록 */
 .home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .home-list .me { color: var(--accent-strong); font-weight: 700; }
+
+/* 메인 바로가기 버튼(메인 미리보기 설계 §4.2). 이름만, 오른쪽 끝에 할 일 표시. 폰 2열, 900px 이상 3열 */
+.home-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 900px) { .home-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.home-shortcut {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 48px; padding: 10px 14px;
+  border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--ink);
+  text-decoration: none; font-weight: 600;
+}
+.home-shortcut:hover, .home-shortcut:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-edge); }
+.home-shortcut-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-shortcut-mark { flex: none; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--lime); color: var(--on-accent); font-size: 13px; text-align: center; }
