@@ -13,5 +13,5 @@ export const manifest: Manifest = {
   freeStats: 'score',
   scoreMax: 1600,
   scoreDecimals: 0,
-  gold: { perPoint: 0.155, playCap: 710, dailyCap: FREE_DAILY_CAP },
+  gold: { perPoint: 0.062, playCap: 200, dailyCap: FREE_DAILY_CAP },
 }
