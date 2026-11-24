@@ -298,8 +298,13 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       else command(['x'])
     }
 
-    const KEY_TOOL: Record<string, 1 | 2 | 3> = { Digit1: 1, Digit2: 2, Digit3: 3, Numpad1: 1, Numpad2: 2, Numpad3: 3 }
-    const KEY_MARK: Record<string, number> = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3, KeyT: 4 }
+    const KEY_TOOL: Record<string, 1 | 2 | 3> = { KeyU: 1, KeyI: 2, KeyO: 3 }
+    const KEY_MARK: Record<string, number> = {
+      Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
+      Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4,
+    }
+    const KEY_PREV = new Set(['ArrowLeft', 'KeyA', 'KeyJ'])
+    const KEY_NEXT = new Set(['ArrowRight', 'KeyD', 'KeyL'])
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !scene) return
@@ -320,8 +325,8 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
       if (!live()) return
       if (code in KEY_TOOL) command(toolCmd(KEY_TOOL[code]))
       else if (code in KEY_MARK) command(markCmd(KEY_MARK[code]))
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); if (cur.q > 0) command(['q', cur.q - 1]) }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); if (cur.q < N_Q - 1) command(['q', cur.q + 1]) }
+      else if (KEY_PREV.has(code)) { e.preventDefault(); if (cur.q > 0) command(['q', cur.q - 1]) }
+      else if (KEY_NEXT.has(code)) { e.preventDefault(); if (cur.q < N_Q - 1) command(['q', cur.q + 1]) }
       else if (e.key === 'Enter') { e.preventDefault(); submit() }
     }
 
@@ -619,7 +624,7 @@ export function Game({ publicState, finished, score: finalScore, error, onAction
             </tbody>
           </table>
           <p className="se-proctor">{`오늘의 감독관: ${proctor.name} — ${proctor.hint}`}</p>
-          <p className="se-keys">PC: 1·2·3 도구, ←/→ 문제, Q~T 마킹, Enter 제출, Space 일시정지</p>
+          <p className="se-keys">PC: U·I·O 도구, A/D·←/→·J/L 문제, 1~5 마킹, Enter 제출, Space 일시정지</p>
           <button type="button" className="btn btn-primary se-start" onClick={() => engine.current?.start()}>시작</button>
         </div>
       )}
