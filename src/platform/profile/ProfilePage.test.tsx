@@ -387,6 +387,30 @@ test('profile_gold: 지갑을 쓰는 게임이 없으면 user_wallet을 부르�
   expect(screen.queryByLabelText(/^골드/)).toBeNull()
 })
 
+test('profile_free_bonus: 미니게임 골드 배율(도전과제 보너스), 0이면 ×1, null이거나 지갑이 꺼져 있으면 줄 없음', async () => {
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 140 })
+  const v = renderAt('messi')
+  expect(await screen.findByLabelText('미니게임 골드 ×2.4')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('user_free_bonus', { p_handle: 'messi' })
+  v.unmount()
+  setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 0 })
+  const v2 = renderAt('messi')
+  expect(await screen.findByLabelText('미니게임 골드 ×1')).toBeTruthy()
+  v2.unmount()
+  setup({ user_stats: emptyStats, user_wallet: 5000 })
+  const v3 = renderAt('messi')
+  await screen.findByLabelText('골드 5,000 G')
+  expect(screen.queryByLabelText(/미니게임 골드/)).toBeNull()
+  v3.unmount()
+  rpcMock.mockClear()
+  wallet.enabled = false
+  setup({ user_stats: emptyStats, user_free_bonus: 140 })
+  renderAt('messi')
+  await screen.findByRole('heading', { name: 'messi' })
+  expect(rpcMock).not.toHaveBeenCalledWith('user_free_bonus', expect.anything())
+  expect(screen.queryByLabelText(/미니게임 골드/)).toBeNull()
+})
+
 test('profile_prize: 데일리 상금 누적 (지갑 3단계)', async () => {
   setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 12300 })
   renderAt('messi')

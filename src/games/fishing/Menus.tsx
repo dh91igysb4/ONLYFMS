@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { sellPrice, teleporterOpen, type View } from './logic.ts'
+import { freeBonus, sellPrice, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -352,7 +352,8 @@ export function ChallengePanel({ view }: { view: View }) {
   return (
     <section className="fish-panel-body" aria-label="도전과제">
       <p className="muted">{`깬 과제 ${done}/${CHALLENGES.length}`}</p>
-      <p className="muted">과제를 깨면 그 지역 순간이동기가 켜져요</p>
+      <p className="muted">과제를 깨면 그 지역 순간이동기가 켜지고, 미니게임(자유 플레이) 골드가 영구히 늘어요</p>
+      <p className="fish-shop-note">{`지금 미니게임 골드 ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>
       <ul className="fish-rods" aria-label="도전과제 목록">
         {CHALLENGES.map((c) => {
           const finished = progress[c.id]?.done === true
@@ -361,6 +362,7 @@ export function ChallengePanel({ view }: { view: View }) {
               <div className="fish-rod-info">
                 <strong>{`${areaName(c.area)} · ${c.title}`}</strong>
                 <span className="muted">{c.desc}</span>
+                <span className="muted">{`미니게임 골드 +${c.freeBonusPct}%`}</span>
                 {finished
                   ? <span className="fish-rod-state">완료 · 순간이동기 켜짐</span>
                   : <span className="muted">{progressLabel(view, c.id, c.count)}</span>}
@@ -372,6 +374,9 @@ export function ChallengePanel({ view }: { view: View }) {
     </section>
   )
 }
+
+/** 도전과제 보너스 배율 표기(지갑 화면 formatMultiplier와 같은 모양): 140 → "×2.4" */
+const bonusMultiplier = (pct: number) => `×${((100 + pct) / 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}`
 
 type TeleportProps = { view: View; area: AreaId; busy: boolean; onTeleport(to: AreaId): void }
 

@@ -4,7 +4,7 @@ import { getWallet, resetWallet, setBalance, setWallet, subscribeWallet } from '
 afterEach(() => resetWallet())
 
 test('처음에는 잔액을 모른다', () => {
-  expect(getWallet()).toEqual({ balance: null, today: {}, earnedToday: 0 })
+  expect(getWallet()).toEqual({ balance: null, today: {}, earnedToday: 0, freeBonusPct: 0 })
 })
 
 test('setWallet은 구독자를 부르고 값을 바꾼다', () => {
@@ -12,7 +12,7 @@ test('setWallet은 구독자를 부르고 값을 바꾼다', () => {
   const off = subscribeWallet(fn)
   setWallet({ balance: 1234, today: { a: 10 }, earnedToday: 500 })
   expect(fn).toHaveBeenCalledTimes(1)
-  expect(getWallet()).toEqual({ balance: 1234, today: { a: 10 }, earnedToday: 500 })
+  expect(getWallet()).toEqual({ balance: 1234, today: { a: 10 }, earnedToday: 500, freeBonusPct: 0 })
   off()
   setWallet({ balance: 1, today: {}, earnedToday: 0 })
   expect(fn).toHaveBeenCalledTimes(1)
@@ -22,7 +22,7 @@ test('setBalance는 today·earnedToday를 그대로 둔다', () => {
   setWallet({ balance: 10, today: { a: 3 }, earnedToday: 7 })
   const before = getWallet()
   setBalance(77)
-  expect(getWallet()).toEqual({ balance: 77, today: { a: 3 }, earnedToday: 7 })
+  expect(getWallet()).toEqual({ balance: 77, today: { a: 3 }, earnedToday: 7, freeBonusPct: 0 })
   expect(getWallet()).not.toBe(before) // useSyncExternalStore가 바뀐 것을 알도록 새 객체
 })
 
@@ -40,7 +40,7 @@ test('resetWallet은 처음 상태로 되돌리고 알린다', () => {
   subscribeWallet(fn)
   resetWallet()
   expect(fn).toHaveBeenCalledTimes(1)
-  expect(getWallet()).toEqual({ balance: null, today: {}, earnedToday: 0 })
+  expect(getWallet()).toEqual({ balance: null, today: {}, earnedToday: 0, freeBonusPct: 0 })
 })
 
 test('상한 알림 구독', async () => {

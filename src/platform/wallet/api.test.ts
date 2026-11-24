@@ -13,7 +13,7 @@ vi.mock('../../lib/supabase.ts', () => ({
 import { getPrizes, getWallet, resetWallet, setBalance } from '../../lib/walletStore.ts'
 import { world, type ApiError } from '../../lib/api.ts'
 import {
-  adminGoldAdjust, adminGoldLedger, fetchContestPrizes, fetchMyWallet, fetchUserPrizeTotal, fetchUserWallet,
+  adminGoldAdjust, adminGoldLedger, fetchContestPrizes, fetchMyWallet, fetchUserFreeBonus, fetchUserPrizeTotal, fetchUserWallet,
 } from './api.ts'
 import { refreshWallet } from './useWallet.ts'
 
@@ -27,13 +27,27 @@ test('fetchMyWallet: my_wallet 결과로 저장소를 채운다', async () => {
   rpcMock.mockResolvedValue({ data: { balance: 1234, today: { a: 100 }, earned_today: 31000 }, error: null })
   const w = await fetchMyWallet()
   expect(rpcMock).toHaveBeenCalledWith('my_wallet', undefined)
-  expect(w).toEqual({ balance: 1234, today: { a: 100 }, earnedToday: 31000 })
-  expect(getWallet()).toEqual({ balance: 1234, today: { a: 100 }, earnedToday: 31000 })
+  expect(w).toEqual({ balance: 1234, today: { a: 100 }, earnedToday: 31000, freeBonusPct: 0 })
+  expect(getWallet()).toEqual({ balance: 1234, today: { a: 100 }, earnedToday: 31000, freeBonusPct: 0 })
+})
+
+test('fetchMyWallet: free_bonus_pct(도전과제 보너스)를 저장소에 넣는다(문자열 숫자 포함)', async () => {
+  rpcMock.mockResolvedValue({ data: { balance: 1, free_bonus_pct: '140' }, error: null })
+  expect((await fetchMyWallet()).freeBonusPct).toBe(140)
+  expect(getWallet().freeBonusPct).toBe(140)
+})
+
+test('fetchUserFreeBonus: user_free_bonus, null은 null', async () => {
+  rpcMock.mockResolvedValueOnce({ data: 220, error: null })
+  expect(await fetchUserFreeBonus('kim')).toBe(220)
+  expect(rpcMock).toHaveBeenCalledWith('user_free_bonus', { p_handle: 'kim' })
+  rpcMock.mockResolvedValueOnce({ data: null, error: null })
+  expect(await fetchUserFreeBonus('nobody')).toBeNull()
 })
 
 test('fetchMyWallet: earned_today·today가 없으면 0·{}', async () => {
   rpcMock.mockResolvedValue({ data: { balance: 5 }, error: null })
-  expect(await fetchMyWallet()).toEqual({ balance: 5, today: {}, earnedToday: 0 })
+  expect(await fetchMyWallet()).toEqual({ balance: 5, today: {}, earnedToday: 0, freeBonusPct: 0 })
 })
 
 test('refreshWallet: 실패는 삼키고 이전 값을 유지한다', async () => {
@@ -91,8 +105,8 @@ test('fetchMyWallet: 요청 중 world 잔액이 들어오면 늦은 my_wallet이
   const p = fetchMyWallet()
   setBalance(500) // world 응답(지연 이전 뒤 잔액)이 먼저 도착
   resolve({ data: { balance: 0, today: { a: 1 }, earned_today: 7 }, error: null })
-  expect(await p).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
-  expect(getWallet()).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7 })
+  expect(await p).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7, freeBonusPct: 0 })
+  expect(getWallet()).toEqual({ balance: 500, today: { a: 1 }, earnedToday: 7, freeBonusPct: 0 })
 })
 
 // ---- 받은 상금 (지갑 3단계) ----
@@ -104,7 +118,7 @@ test('fetchMyWallet: prizes를 상금 저장소에 넣는다(문자열 숫자 �
     error: null,
   })
   const w = await fetchMyWallet()
-  expect(w).toEqual({ balance: 1, today: {}, earnedToday: 0 })
+  expect(w).toEqual({ balance: 1, today: {}, earnedToday: 0, freeBonusPct: 0 })
   expect(getPrizes()).toEqual([
     { id: 12, reason: 'daily_prize', contestId: 'c1', gameId: 'who-are-ya', amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' },
   ])

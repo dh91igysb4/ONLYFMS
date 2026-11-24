@@ -2,7 +2,8 @@
 import { rpc } from '../../lib/api.ts'
 import { getWallet, setPrizes, setWallet, walletVersion, type Prize } from '../../lib/walletStore.ts'
 
-export type MyWallet = { balance: number; today: Record<string, number>; earnedToday: number }
+/** freeBonusPct: 도전과제 보너스(%, 지갑 설계 §7.5). free_bonus_pct가 없는 옛 DB면 0 */
+export type MyWallet = { balance: number; today: Record<string, number>; earnedToday: number; freeBonusPct: number }
 
 export type LedgerReason =
   | 'migrate' | 'world' | 'free' | 'daily_prize' | 'duel_stake' | 'duel_payout' | 'duel_refund'
@@ -31,11 +32,12 @@ const num = (v: unknown): number => (typeof v === 'number' ? v : Number(v ?? 0))
 export async function fetchMyWallet(): Promise<MyWallet> {
   const started = walletVersion()
   const d = await rpc<{
-    balance: number | string; today?: Record<string, number | string>; earned_today?: number | string; prizes?: RawPrize[]
+    balance: number | string; today?: Record<string, number | string>; earned_today?: number | string
+    free_bonus_pct?: number | string; prizes?: RawPrize[]
   }>('my_wallet')
   const today: Record<string, number> = {}
   for (const [k, v] of Object.entries(d?.today ?? {})) today[k] = num(v)
-  const fresh = { balance: num(d?.balance), today, earnedToday: num(d?.earned_today) }
+  const fresh = { balance: num(d?.balance), today, earnedToday: num(d?.earned_today), freeBonusPct: num(d?.free_bonus_pct) }
   const kept = getWallet().balance
   const w = walletVersion() !== started && kept !== null ? { ...fresh, balance: kept } : fresh
   setWallet(w)
@@ -70,6 +72,12 @@ export async function fetchUserPrizeTotal(handle: string): Promise<number | null
 /** 프로필용 잔액. 승인된 대상이 아니면 null */
 export async function fetchUserWallet(handle: string): Promise<number | null> {
   const v = await rpc<number | string | null>('user_wallet', { p_handle: handle })
+  return v === null || v === undefined ? null : num(v)
+}
+
+/** 프로필용 도전과제 보너스(%). 승인된 대상이 아니면 null */
+export async function fetchUserFreeBonus(handle: string): Promise<number | null> {
+  const v = await rpc<number | string | null>('user_free_bonus', { p_handle: handle })
   return v === null || v === undefined ? null : num(v)
 }
 

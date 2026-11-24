@@ -11,8 +11,8 @@ import { useAuth } from '../auth/AuthProvider.tsx'
 import { AppearanceSettings } from './AppearanceSettings.tsx'
 import { Avatar } from './Avatar.tsx'
 import { pct } from '../leaderboard/LeaderboardPage.tsx'
-import { fetchUserPrizeTotal, fetchUserWallet } from '../wallet/api.ts'
-import { formatGold } from '../wallet/format.ts'
+import { fetchUserFreeBonus, fetchUserPrizeTotal, fetchUserWallet } from '../wallet/api.ts'
+import { formatGold, formatMultiplier } from '../wallet/format.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
 import '../leaderboard/leaderboard.css'
 import './profile.css'
@@ -66,6 +66,8 @@ export function ProfilePage() {
   const [gold, setGold] = useState<number | null>(null)
   // 데일리 상금 누적 (지갑 3단계). 0·null이면 줄을 그리지 않는다
   const [prizeTotal, setPrizeTotal] = useState<number | null>(null)
+  // 도전과제 보너스(%, 지갑 설계 §7.5). null이면 줄을 그리지 않는다
+  const [freeBonus, setFreeBonus] = useState<number | null>(null)
   const uid = useId()
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({})
 
@@ -94,6 +96,16 @@ export function ProfilePage() {
     if (!walletEnabled()) return
     fetchUserWallet(handle)
       .then((g) => { if (alive) setGold(g) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [handle, attempt])
+
+  useEffect(() => {
+    let alive = true
+    setFreeBonus(null)
+    if (!walletEnabled()) return
+    fetchUserFreeBonus(handle)
+      .then((n) => { if (alive) setFreeBonus(n) })
       .catch(() => {})
     return () => { alive = false }
   }, [handle, attempt])
@@ -188,6 +200,12 @@ export function ProfilePage() {
         {gold !== null && (
           <p className="pf-gold" aria-label={`골드 ${formatGold(gold)}`}>
             골드 <strong>{formatGold(gold)}</strong>
+          </p>
+        )}
+        {freeBonus !== null && (
+          <p className="pf-gold" aria-label={`미니게임 골드 ${formatMultiplier(freeBonus)}`}>
+            미니게임 골드 <strong>{formatMultiplier(freeBonus)}</strong>
+            <span className="muted"> · 낚시 도전과제 보너스</span>
           </p>
         )}
         {prizeTotal !== null && prizeTotal > 0 && (

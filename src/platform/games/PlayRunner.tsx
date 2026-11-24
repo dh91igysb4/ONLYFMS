@@ -4,7 +4,8 @@ import { now, syncFromView } from '../../lib/serverTime.ts'
 import { getGame } from '../../games/index.ts'
 import { getGameComponent } from '../../games/ui.ts'
 import type { Ctx } from '../../games/types.ts'
-import { freeGold } from '../../games/economy.ts'
+import { freeGold, withBonus } from '../../games/economy.ts'
+import { formatMultiplier } from '../wallet/format.ts'
 import { getWallet } from '../../lib/walletStore.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
 import { refreshWallet } from '../wallet/useWallet.ts'
@@ -237,7 +238,7 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
   const [error, setError] = useState<string | null>(null)
   const submitted = useRef(false)
   // 이번 판 골드 미리 계산(서버 트리거와 같은 식, 설계 §7.4). saved: null 저장 중, false 대기열에 남음
-  const [earned, setEarned] = useState<{ asked: number; got: number; capReached: boolean; saved: boolean | null } | null>(null)
+  const [earned, setEarned] = useState<{ asked: number; got: number; capReached: boolean; saved: boolean | null; bonusPct: number } | null>(null)
 
   if (!mod || !Game || !init) return <p className="form-error" role="alert">{errorMessage('unknown_game')}</p>
 
@@ -268,8 +269,8 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
       if (g) {
         const w = getWallet()
         const used = w.today[gameId] ?? 0
-        const { asked, got } = freeGold(final, g, used, w.earnedToday)
-        setEarned({ asked, got, capReached: asked === 0 && used >= g.dailyCap, saved: null })
+        const { asked, got } = freeGold(final, g, used, w.earnedToday, w.freeBonusPct)
+        setEarned({ asked, got, capReached: asked === 0 && used >= withBonus(g.dailyCap, w.freeBonusPct), saved: null, bonusPct: w.freeBonusPct })
       }
       const p = freeQueue.submit({
         client_id: clientId,
@@ -314,7 +315,7 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
 }
 
 /** 자유 플레이 결과의 번 골드 한 줄 (설계 §7.4). 게임 id를 모른다: manifest gold로만 정해진다 */
-function FreeGoldLine({ asked, got, capReached, saved }: { asked: number; got: number; capReached: boolean; saved: boolean | null }) {
+function FreeGoldLine({ asked, got, capReached, saved, bonusPct }: { asked: number; got: number; capReached: boolean; saved: boolean | null; bonusPct: number }) {
   let text: string | null = null
   if (capReached) text = '오늘 이 게임 골드는 다 벌었어요'
   else if (got > 0 && saved === false) text = `+${got.toLocaleString('ko-KR')} G · 저장되면 골드가 들어가요`
@@ -322,5 +323,7 @@ function FreeGoldLine({ asked, got, capReached, saved }: { asked: number; got: n
   else if (got > 0) text = `+${got.toLocaleString('ko-KR')} G`
   else if (asked > 0) text = '+0 G · 오늘 골드 상한을 넘었어요'
   if (!text) return null
+  // 도전과제 보너스(지갑 설계 §7.5): 골드가 들어오는 줄에만 배율을 붙인다
+  if (bonusPct > 0 && got > 0) text += ` (도전과제 보너스 ${formatMultiplier(bonusPct)})`
   return <p className="free-gold" role="status">{text}</p>
 }

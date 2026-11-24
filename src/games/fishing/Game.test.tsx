@@ -2474,6 +2474,11 @@ describe('도전과제·순간이동기', () => {
     expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
     expect(items[2]).toHaveTextContent('0/3')
     expect(within(panel).getByText('깬 과제 1/10')).toBeInTheDocument()
+    // 도전과제 보너스(지갑 설계 §7.5): 과제마다 미니게임 골드 +N%, 지금 배율(강 20% → ×1.2)
+    expect(items[0]).toHaveTextContent('미니게임 골드 +20%')
+    expect(items[4]).toHaveTextContent('미니게임 골드 +60%')
+    expect(items[9]).toHaveTextContent('미니게임 골드 +80%')
+    expect(within(panel).getByText('지금 미니게임 골드 ×1.2')).toBeInTheDocument()
   })
 
   test('잡은 결과에 completed가 있으면 완료 알림', async () => {

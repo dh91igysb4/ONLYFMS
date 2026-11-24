@@ -9,9 +9,11 @@ export type WalletSnapshot = {
   today: Record<string, number>
   /** 오늘(KST) 사이트 하루 상한에 세는 실제 수입 합계 (my_wallet earned_today) */
   earnedToday: number
+  /** 도전과제 보너스(%, my_wallet free_bonus_pct). 자유 플레이 골드 ×(100 + 이 값)/100. 모르면 0 */
+  freeBonusPct: number
 }
 
-const EMPTY: WalletSnapshot = { balance: null, today: {}, earnedToday: 0 }
+const EMPTY: WalletSnapshot = { balance: null, today: {}, earnedToday: 0, freeBonusPct: 0 }
 let snap: WalletSnapshot = EMPTY
 /** 잔액을 바꿀 때마다 1씩. 늦게 도착한 my_wallet()이 더 새 world 잔액을 덮지 않게 비교한다 */
 let version = 0
@@ -40,8 +42,8 @@ export function setBalance(n: number): void {
   emit({ ...snap, balance: n })
 }
 
-export function setWallet(w: { balance: number; today: Record<string, number>; earnedToday: number }): void {
-  emit({ balance: w.balance, today: { ...w.today }, earnedToday: w.earnedToday })
+export function setWallet(w: { balance: number; today: Record<string, number>; earnedToday: number; freeBonusPct?: number }): void {
+  emit({ balance: w.balance, today: { ...w.today }, earnedToday: w.earnedToday, freeBonusPct: w.freeBonusPct ?? 0 })
 }
 
 export function subscribeWallet(fn: () => void): () => void {

@@ -110,6 +110,27 @@ test('site_cap_rounds_to_zero', async () => {
   await goldLine('+0 G · 오늘 골드 상한을 넘었어요')
 })
 
+test('challenge_bonus_multiplies_and_shows_multiplier', async () => {
+  // 도전과제 보너스 140% (×2.4): 30 → 72
+  setWallet({ balance: 0, today: {}, earnedToday: 0, freeBonusPct: 140 })
+  await playTo(3)
+  await goldLine('+72 G (도전과제 보너스 ×2.4)')
+})
+
+test('challenge_bonus_raises_play_and_daily_caps', async () => {
+  // 판당 상한 50 × 2.4 = 120. 게임별 하루 상한 120 × 2.4 = 288에서 오늘 200을 받았으면 남은 88
+  setWallet({ balance: 0, today: { 'test-guess': 200 }, earnedToday: 0, freeBonusPct: 140 })
+  await playTo(9)
+  await goldLine('+88 G (도전과제 보너스 ×2.4)')
+})
+
+test('challenge_bonus_daily_cap_reached_uses_bonus_cap', async () => {
+  // 하루 상한 288에 닿으면 다 벌었다고 한다 (보너스 없는 120이 아니라)
+  setWallet({ balance: 0, today: { 'test-guess': 288 }, earnedToday: 0, freeBonusPct: 140 })
+  await playTo(3)
+  await goldLine('오늘 이 게임 골드는 다 벌었어요')
+})
+
 test('save_failure_says_gold_comes_later', async () => {
   submitMock.mockResolvedValue(false)
   await playTo(3)
