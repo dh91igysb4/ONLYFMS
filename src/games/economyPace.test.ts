@@ -1,116 +1,79 @@
 // 사이트 하루 상한 모양의 진행 속도 검사 (지갑 설계 §4.1, §5.6, 2026-11-24 2단 상한 개정).
 //
-// 목표(사용자 결정): 하루 1시간 → 낚시 장비·해금을 다 사는 데 약 30일. 오래 하는 사람은 빠르되
+// 목표(사용자 결정): 하루 1시간 → 낚시 장비·해금을 다 사는 데 약 한 달. 낚시 5부(설계 2026-11-24-fishing-world-5 §8)가
+// 새 지역 해금 넷을 더해 목표를 약 34일(±20%, 27~41일)로 고쳤다. 오래 하는 사람은 빠르되
 // 하루 3시간 ≥ 약 18일, 하루 5시간 ≥ 약 21일(사용자가 위임한 결정의 기준, 2026-11-24).
 //
-// 수입 곡선은 낚시 다듬기 PR(#81, origin/feat/fishing-polish c2afd73)의 src/games/fishing/econSim.ts를
-// 그 브랜치 데이터로 돌려 얻은 값을 그대로 옮긴 것이다(이 브랜치에는 고급 장비 데이터가 없어 import할 수 없다).
-//   - START: 처음(대나무·20칸·기본 지역)의 가장 좋은 자리 시간당 수입 bestSpot(...).income
-//   - CURVE: BUY_ORDER 순서의 [가격, 산 뒤 시간당 수입 incomeAfter] (simulate()의 Milestone)
-//   econSim의 가정(지갑 설계 §4 REF 계산과 같음): 계절·시각·날씨 균등 평균, 성공률 80%, 싸움 8초, 다시 던지기 3초,
-//   퍼펙트 20%, 전설 제외, 가방이 차면 상점 왕복. 살 수 있게 되는 순간 바로 산다.
-// 아래 simulateDays는 econSim.simulate(order, { hoursPerDay, cap, rate })의 하루 루프를 그대로 옮기되,
-// 상한 계산만 SOFT_CAP_TIERS(구간 적분, 내림 없음)로 일반화했다. 낚시 다듬기 PR이 머지되면 econSim과
-// fishing/gold.test.ts의 "하루 여러 시간" 기록 값도 이 상한 모양으로 바꾼다(그때는 econSim을 직접 import해도 된다).
-// 검산: 옛 모양(30,750 + 넘은 몫 20%)으로 돌리면 다듬기 PR이 기록한 29.4 / 16.4 / 11.4일이 나온다.
+// 지갑 Task 4(낚시 logic.version 14)부터 낚시 시뮬레이션(src/games/fishing/econSim.ts)을 직접 쓴다.
+// econSim.simulate는 day.tiers를 생략하면 이 파일과 같은 SOFT_CAP_TIERS(실제 _gold_move와 같은 상한)로 잰다.
+// 그래서 이 검사와 fishing/gold.test.ts는 같은 수치를 본다(예전에는 다듬기 PR 곡선을 손으로 옮긴 사본이었다).
+// econSim의 가정(지갑 설계 §4 REF 계산과 같음): 계절·시각·날씨 균등 평균, 성공률 80%, 싸움 8초, 다시 던지기 3초,
+// 퍼펙트 20%, 전설 제외, 가방이 차면 상점 왕복. 살 수 있게 되는 순간 바로 산다.
 import { describe, expect, it } from 'vitest'
-import { DAILY_SOFT_CAP, SOFT_CAP_RATE, SOFT_CAP_TIERS } from './economy.ts'
+import { DAILY_SOFT_CAP, DAILY_SOFT_CAP_2, SOFT_CAP_RATE, SOFT_CAP_RATE_2, SOFT_CAP_TIERS } from './economy.ts'
+import { BUY_ORDER, simulate, totalSinks, type CapTiers } from './fishing/econSim.ts'
 
-const START = 11_499
-const CURVE: readonly (readonly [price: number, incomeAfter: number])[] = [
-  [1_500, 21_700], // 유리섬유 낚싯대
-  [800, 22_258], // 가방 30칸
-  [5_000, 22_258], // 산 호수 해금
-  [8_000, 25_746], // 카본 낚싯대
-  [1_500, 27_754], // 회전 찌
-  [15_000, 53_652], // 동굴 해금
-  [5_000, 55_739], // 가방 40칸
-  [5_000, 60_929], // 호기심 찌
-  [40_000, 75_771], // 명장의 낚싯대
-  [50_000, 75_771], // 섬 해금
-  [1_000, 75_771], // 코르크 찌
-  [1_500, 75_771], // 함정 찌
-  [2_000, 75_771], // 가시 바늘
-  [280_000, 80_848], // 백골 낚싯대
-  [50_000, 82_880], // 가방 50칸
-  [620_000, 87_867], // 용왕의 낚싯대
-  [100_000, 89_381], // 가방 60칸
-]
-
-type Tiers = readonly (readonly [upTo: number, rate: number])[]
-
-/** 오늘 들어간 합계 s에서 원래 금액 raw가 실제로 들어갈 양(구간 적분, 내림 없음) */
-function capped(raw: number, s: number, tiers: Tiers): number {
-  let got = 0
-  let left = raw
-  for (const [upTo, rate] of tiers) {
-    if (left <= 0) break
-    const use = Math.min(left, Math.max(upTo - s - got, 0) / rate)
-    got += use * rate
-    left -= use
-  }
-  return got
+// 시뮬레이션 한 번이 수 초라 (시간, 상한) 조합마다 한 번만 돌린다
+const memo = new Map<string, number>()
+const daysFor = (hoursPerDay: number, tiers: CapTiers = SOFT_CAP_TIERS) => {
+  const key = `${hoursPerDay}|${tiers === SOFT_CAP_TIERS ? 'now' : JSON.stringify(tiers)}`
+  if (!memo.has(key)) memo.set(key, simulate(BUY_ORDER, { hoursPerDay, tiers }).at(-1)!.atDay)
+  return memo.get(key)!
 }
-
-/** econSim.simulate의 하루 루프(0.01시간 단위, 하루 hoursPerDay시간 뒤 오늘 합계 초기화). 다 사기까지 날짜 */
-function simulateDays(hoursPerDay: number, tiers: Tiers): number {
-  const STEP_H = 0.01
-  let gold = 0
-  let steps = 0
-  let earnedToday = 0
-  let income = START
-  for (const [price, after] of CURVE) {
-    while (gold < price) {
-      const got = capped(income * STEP_H, earnedToday, tiers)
-      earnedToday += got
-      gold += got
-      steps++
-      if (Math.round(steps * STEP_H * 1e6) % Math.round(hoursPerDay * 1e6) === 0) earnedToday = 0
-    }
-    gold -= price
-    income = after
-  }
-  return (steps * STEP_H) / hoursPerDay
-}
-
-const OLD: Tiers = [
+const OLD: CapTiers = [
   [DAILY_SOFT_CAP, 1],
   [Infinity, SOFT_CAP_RATE],
 ]
 const near = (v: number, want: number, tol = 0.02) => expect(Math.abs(v - want) / want, `${v} vs ${want}`).toBeLessThan(tol)
 
-describe('검산: 낚시 다듬기 PR 시뮬레이션 재현 (옛 1단 상한)', () => {
-  it('곡선 총액 = 다듬기 PR totalSinks 1,186,300', () => {
-    expect(CURVE.reduce((a, [p]) => a + p, 0)).toBe(1_186_300)
+describe('상한 표', () => {
+  it('SOFT_CAP_TIERS = [30,750 다] → [41,000까지 20%] → [그 위 4%]', () => {
+    expect(SOFT_CAP_TIERS).toEqual([
+      [DAILY_SOFT_CAP, 1],
+      [DAILY_SOFT_CAP_2, SOFT_CAP_RATE],
+      [Infinity, SOFT_CAP_RATE_2],
+    ])
   })
-  it('하루 1·3·5시간 = 29.4 / 16.4 / 11.4일', () => {
-    near(simulateDays(1, OLD), 29.38)
-    near(simulateDays(3, OLD), 16.38)
-    near(simulateDays(5, OLD), 11.41)
+  it('econSim이 상한을 생략하면 SOFT_CAP_TIERS로 잰다(짧은 구매 목록으로 비교)', () => {
+    const head = BUY_ORDER.slice(0, 10)
+    expect(simulate(head, { hoursPerDay: 1 })).toEqual(simulate(head, { hoursPerDay: 1, tiers: SOFT_CAP_TIERS }))
+    expect(simulate(head, { hoursPerDay: 1 })).not.toEqual(simulate(head, { hoursPerDay: 1, tiers: [[1000, 1], [Infinity, 0.5]] }))
+  })
+})
+
+describe('검산: 낚시 5부 설계 표 재현 (옛 1단 상한)', () => {
+  it('총액 = 낚시 5부 totalSinks 1,546,300', () => {
+    expect(totalSinks()).toBe(1_546_300)
+  })
+  it('하루 1·3·5시간 = 34.3 / 18.1 / 12.4일', () => {
+    near(daysFor(1, OLD), 34.28)
+    near(daysFor(3, OLD), 18.06)
+    near(daysFor(5, OLD), 12.41)
   })
 })
 
 describe('지금 상한 모양(SOFT_CAP_TIERS)의 진행 속도', () => {
-  const d1 = simulateDays(1, SOFT_CAP_TIERS)
-  const d3 = simulateDays(3, SOFT_CAP_TIERS)
-  const d5 = simulateDays(5, SOFT_CAP_TIERS)
-  it('하루 1시간 ≈ 30일 (±10%)', () => {
-    expect(Math.abs(d1 - 30) / 30, `${d1}`).toBeLessThan(0.1)
+  const d1 = daysFor(1)
+  const d3 = daysFor(3)
+  const d5 = daysFor(5)
+  const d10 = daysFor(10)
+  it('하루 1시간 ≈ 34일 목표 범위(±20%, 27~41일) 안', () => {
+    expect(d1, `${d1}`).toBeGreaterThan(34 * 0.8)
+    expect(d1, `${d1}`).toBeLessThan(34 * 1.2)
   })
   it('하루 3시간 ≥ 18일, 하루 5시간 ≥ 21일', () => {
     expect(d3, `${d3}`).toBeGreaterThanOrEqual(18)
     expect(d5, `${d5}`).toBeGreaterThanOrEqual(21)
   })
   it('오래 할수록 여전히 빠르다 (1시간 > 3시간 > 5시간 > 10시간)', () => {
-    const d10 = simulateDays(10, SOFT_CAP_TIERS)
     expect(d1).toBeGreaterThan(d3)
     expect(d3).toBeGreaterThan(d5)
     expect(d5).toBeGreaterThan(d10)
   })
-  it('기록 값 (설계 §4.1 효과 표): 1·3·5·10시간 = 29.6 / 25.0 / 22.0 / 17.0일', () => {
-    near(simulateDays(1, SOFT_CAP_TIERS), 29.6)
-    near(simulateDays(3, SOFT_CAP_TIERS), 25.0)
-    near(simulateDays(5, SOFT_CAP_TIERS), 22.0)
-    near(simulateDays(10, SOFT_CAP_TIERS), 17.0)
+  it('기록 값: 1·3·5·10시간 = 37.3 / 30.2 / 26.0 / 19.3일', () => {
+    near(d1, 37.26)
+    near(d3, 30.18)
+    near(d5, 26.03)
+    near(d10, 19.32)
   })
 })

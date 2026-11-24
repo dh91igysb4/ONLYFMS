@@ -4,19 +4,25 @@
 // 기존 장비 가격은 그대로 두고 고급 장비(5·6단계 낚싯대, 50·60칸 가방)로 늘린다(사용자 결정 2026-11-24).
 // 낚시 5부(설계 2026-11-24-fishing-world-5 §8): 새 지역 해금이 쓸 곳을 늘려 목표가 약 34일(M3 뒤)로 늘어난다.
 // M3(산정 호수·난파선)까지 다 넣은 최종 목표는 하루 1시간 + 상한으로 약 34일(±20%, 27~41일).
+// 지갑 Task 4(낚시 logic.version 14)부터 상한은 실제 사이트 상한(economy.ts SOFT_CAP_TIERS, 2단)으로 잰다.
+// 2단 상한(들어간 합계 41,000 위는 4%)은 하루 1시간 하는 사람의 끝 무렵(시간당 수입 80,000 G 이상)도 조금 늦춰
+// 하루 1시간 값이 34.3일(옛 1단 상한) → 37.3일이 된다. 목표 범위(27~41일) 안이라 가격은 그대로 둔다
+// (34일에 더 붙이려면 낚시 5부 설계 §판단 8의 산정·난파선 해금 가격을 내린다).
 import { describe, expect, it } from 'vitest'
+import { DAILY_SOFT_CAP, REF, SOFT_CAP_RATE, softCap } from '../economy.ts'
 import { BAGS, RODS, SPECIES, TACKLES, UNLOCKS, type AreaId, type TackleId } from './data.ts'
-import { BUY_ORDER, buffsAt, hourlyIncome, openFraction, simulate, totalSinks } from './econSim.ts'
+import { BUY_ORDER, buffsAt, cappedIncome, hourlyIncome, openFraction, simulate, totalSinks, type CapTiers } from './econSim.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
-/** 지갑 설계 §4의 기준 시간당 수입(2단계 낚싯대·마을 물가·20칸). 지갑 1단계에서 src/games/economy.ts로 옮긴다 */
-const REF = 20_500
-/** 지갑 설계 §5.6 사이트 하루 상한(지갑 1단계에서 구현 예정). 하루 1시간 진행 속도를 재는 데 쓴다 */
-const DAILY_SOFT_CAP = REF * 1.5
-const SOFT_CAP_RATE = 0.2
+/** 지갑 2단 상한 개정 전의 1단 상한(30,750 + 넘은 몫 20%). 기록 값 검산용 */
+const ONE_TIER: CapTiers = [
+  [DAILY_SOFT_CAP, 1],
+  [Infinity, SOFT_CAP_RATE],
+]
 
 const plain = simulate()
-const capped = simulate(BUY_ORDER, { hoursPerDay: 1, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE })
+/** 하루 1시간 + 실제 사이트 하루 상한(SOFT_CAP_TIERS) */
+const capped = simulate(BUY_ORDER, { hoursPerDay: 1 })
 const at = (ms: typeof plain, label: string) => ms.find((m) => m.label === label)!
 
 describe('REF (지갑 설계 §4)', () => {
@@ -101,16 +107,41 @@ describe('하루 1시간 + 사이트 하루 상한(지갑 §5.6)', () => {
   })
 })
 
-// 오래 하는 사람: 지금 상한 모양(하루 30,750 + 넘은 몫 20%)으로는 늦은 시간당 수입(76,000~89,000 G)의 20%만으로도
-// 시간당 약 15,000 G가 들어와 하루 여러 시간이면 2주 안에 끝난다(지갑 §2 실패 조건 "하루 여러 시간 → 2주 안"에 걸린다).
-// 장비 가격으로는 하루 1시간 한 달을 깨지 않고 고칠 수 없어 지갑 상한 모양(SOFT_CAP_RATE, 2단 상한 등)의 결정으로 남긴다.
-// 아래 값은 지금 상태를 기록해 지갑 PR이 바꿀 때 보이게 한다(±10%).
-describe('하루 여러 시간 + 사이트 하루 상한 (지금 값 기록)', () => {
-  const daysFor = (hoursPerDay: number) => simulate(BUY_ORDER, { hoursPerDay, cap: DAILY_SOFT_CAP, rate: SOFT_CAP_RATE }).at(-1)!.atDay
+// 오래 하는 사람: 옛 1단 상한(하루 30,750 + 넘은 몫 20%)으로는 늦은 시간당 수입의 20%만으로도 하루 여러 시간이면
+// 2주 안에 끝났다(지갑 §2 실패 조건). 지갑 2단 상한(SOFT_CAP_TIERS, 들어간 합계 41,000 위는 4%)이 이것을 고쳤다.
+// 사용자 기준(2026-11-24): 하루 3시간 ≥ 약 18일, 하루 5시간 ≥ 약 21일. economyPace.test.ts도 같은 시뮬레이션으로 본다.
+describe('하루 여러 시간 + 사이트 하루 상한 (기록, ±10%)', () => {
+  const memo = new Map<string, number>()
+  const daysFor = (hoursPerDay: number, tiers?: CapTiers) => {
+    const key = `${hoursPerDay}|${JSON.stringify(tiers ?? null)}`
+    if (!memo.has(key)) memo.set(key, simulate(BUY_ORDER, { hoursPerDay, tiers }).at(-1)!.atDay)
+    return memo.get(key)!
+  }
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.1)
-  it('하루 3시간: 약 18.1일', () => near(daysFor(3), 18.06))
-  it('하루 5시간: 약 12.4일 (2주 안 — 지갑 상한 모양 결정 필요)', () => near(daysFor(5), 12.41))
-  it('상한이 없으면(지갑 1단계 전) 하루 1시간: 약 16.6일', () => near(plain[plain.length - 1].atHours, 16.58))
+  it('실제 2단 상한: 하루 3시간 약 30.2일, 5시간 약 26.0일 (3시간 ≥ 18, 5시간 ≥ 21)', () => {
+    near(daysFor(3), 30.18)
+    near(daysFor(5), 26.03)
+    expect(daysFor(3)).toBeGreaterThanOrEqual(18)
+    expect(daysFor(5)).toBeGreaterThanOrEqual(21)
+  })
+  it('옛 1단 상한(검산): 하루 3시간 약 18.1일, 5시간 약 12.4일', () => {
+    near(daysFor(3, ONE_TIER), 18.06)
+    near(daysFor(5, ONE_TIER), 12.41)
+  })
+  it('상한이 없으면 하루 1시간: 약 16.6일', () => near(plain[plain.length - 1].atHours, 16.58))
+})
+
+describe('시뮬레이션 상한 = 실제 사이트 상한(economy.softCap)', () => {
+  it('cappedIncome(내림 없음)과 softCap(정수 내림)이 1 G 안에서 같다(오늘 합계·금액 여러 값)', () => {
+    for (const s of [0, 10_000, 30_000, 30_750, 35_000, 40_999, 41_000, 60_000]) {
+      for (const d of [1, 500, 5_000, 20_000, 80_000, 300_000]) {
+        const want = softCap(d, s)
+        const got = cappedIncome(d, s)
+        expect(got - want, `s ${s} d ${d}`).toBeGreaterThan(-1e-6)
+        expect(got - want, `s ${s} d ${d}`).toBeLessThan(1)
+      }
+    }
+  })
 })
 
 // ---------------------------------------------------------------- 낚시 5부 M1: 물때 자리·지역 최소 낚싯대·신화 버프
@@ -194,8 +225,14 @@ describe('산정 호수·난파선 수입과 최종 진행 (40칸, 회전+호기
   it('구매 순서: 기존 13개 → 갯벌 → 늪지 → 백골 → 산정 → 50칸 → 난파선 → 용왕 → 60칸', () => {
     expect(plain.slice(13).map((m) => m.label)).toEqual(['갯벌 해금', '늪지 해금', '백골 낚싯대', '산정 호수 해금', '가방 50칸', '난파선 앞바다 해금', '용왕의 낚싯대', '가방 60칸'])
   })
-  it('하루 1시간 + 상한 전부 다 사기 지금 값(34.3일)과 시험 계산(약 34일)이 ±5% 안', () => {
-    const d = capped[capped.length - 1].atDay
+  it('하루 1시간 + 옛 1단 상한 전부 다 사기(34.3일)는 시험 계산(약 34일)과 ±5% 안 — 설계 표의 값', () => {
+    const d = simulate(BUY_ORDER, { hoursPerDay: 1, tiers: ONE_TIER }).at(-1)!.atDay
     expect(Math.abs(d - 34) / 34).toBeLessThan(0.05)
+  })
+  it('하루 1시간 + 실제 2단 상한 전부 다 사기 지금 값 약 37.3일(±5%), 목표 범위 27~41일 안', () => {
+    const d = capped[capped.length - 1].atDay
+    expect(Math.abs(d - 37.26) / 37.26).toBeLessThan(0.05)
+    expect(d).toBeGreaterThan(27)
+    expect(d).toBeLessThan(41)
   })
 })

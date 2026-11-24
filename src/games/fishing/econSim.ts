@@ -1,6 +1,7 @@
 // 낚시 경제 시뮬레이션(결정적). 실제 어종·낚싯대·찌 데이터와 price()로 시간당 수입과
 // "장비·해금을 다 사기까지 걸리는 플레이 시간"을 계산한다. 테스트(gold.test.ts)가 이 값을 고정해
-// 데이터·가격이 바뀌어 진행 속도가 목표(지갑 설계 §4.1: 하루 1시간 + 사이트 하루 상한으로 약 30일)에서 벗어나면 실패한다.
+// 데이터·가격이 바뀌어 진행 속도가 목표(지갑 설계 §4.1·낚시 5부 §8: 하루 1시간 + 사이트 하루 상한으로 약 34일)에서 벗어나면 실패한다.
+// 사이트 하루 상한은 economy.ts의 SOFT_CAP_TIERS(실제 _gold_move와 같은 2단 상한)를 그대로 쓴다.
 // 서버·화면 어디서도 import하지 않는다(world 번들에 들어가지 않는다). 순수 함수만.
 //
 // 가정은 지갑 설계 §4의 REF 계산과 같다.
@@ -21,6 +22,7 @@ import {
   type AreaId, type BagTier, type BuffId, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { pickPool, price } from './logic.ts'
+import { SOFT_CAP_TIERS } from '../economy.ts'
 
 export const SIM = {
   power: 0.8,
@@ -243,8 +245,29 @@ export function totalSinks(): number {
 }
 
 export type Milestone = { label: string; price: number; atHours: number; atDay: number; incomeAfter: number; where: string }
-/** 하루 플레이 시간과 사이트 하루 상한(지갑 설계 §5.6: 하루 cap까지는 다, 넘은 몫은 rate만). 없으면 상한 없이 이어서 플레이 */
-export type DayPlan = { hoursPerDay: number; cap: number; rate: number }
+/** 사이트 하루 상한 구간: [들어간 합계 상한, 그 구간의 지급률] (economy.ts SOFT_CAP_TIERS 모양) */
+export type CapTiers = readonly (readonly [upTo: number, rate: number])[]
+/**
+ * 하루 플레이 시간과 사이트 하루 상한(지갑 설계 §5.6). tiers를 생략하면 실제 사이트 상한(economy.ts SOFT_CAP_TIERS, 2단).
+ * day를 아예 넘기지 않으면 상한 없이 이어서 플레이
+ */
+export type DayPlan = { hoursPerDay: number; tiers?: CapTiers }
+
+/**
+ * 오늘 이미 들어간 합계 earnedToday에서 원래 금액 raw가 실제로 들어갈 양. 구간마다 남은 칸을 지급률로 채우는 적분이다
+ * (_gold_move·economy.softCap과 같은 식이되 시뮬레이션이라 내림하지 않는다).
+ */
+export function cappedIncome(raw: number, earnedToday: number, tiers: CapTiers = SOFT_CAP_TIERS): number {
+  let got = 0
+  let left = raw
+  for (const [upTo, rate] of tiers) {
+    if (left <= 0) break
+    const use = Math.min(left, Math.max(upTo - earnedToday - got, 0) / rate)
+    got += use * rate
+    left -= use
+  }
+  return got
+}
 
 /**
  * 처음(대나무·20칸·기본 지역·0 G)부터 order대로 산다. 살 수 있게 되는 순간 바로 산다.
@@ -267,8 +290,7 @@ export function simulate(order: readonly Purchase[] = BUY_ORDER, day?: DayPlan):
     while (gold < cost) {
       const raw = now.income * STEP_H
       if (day) {
-        const room = Math.max(day.cap - earnedToday, 0)
-        const got = Math.min(raw, room) + Math.max(raw - room, 0) * day.rate
+        const got = cappedIncome(raw, earnedToday, day.tiers)
         earnedToday += got
         gold += got
       } else gold += raw
