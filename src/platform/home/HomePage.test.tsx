@@ -83,10 +83,10 @@ afterEach(() => {
 describe('HomePage', () => {
   test('미리보기는 preview가 있는 지속형 게임으로 들어가는 링크 안에 있다', async () => {
     view()
+    expect(await screen.findByTestId('preview')).toBeTruthy()
     const a = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
     expect(a.getAttribute('href')).toBe('/world/fishing')
     expect(a.textContent).toContain('들어가기')
-    expect(screen.getByTestId('preview')).toBeTruthy()
     expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
   })
 
@@ -104,15 +104,14 @@ describe('HomePage', () => {
   test('user_records가 실패해도 빈 기록으로 미리보기를 그린다', async () => {
     rpcMock.mockReset().mockRejectedValue(new Error('x'))
     view()
-    await waitFor(() => expect(rpcMock).toHaveBeenCalled())
-    expect(screen.getByTestId('preview')).toBeTruthy()
+    expect(await screen.findByTestId('preview')).toBeTruthy()
     expect(lastProps().records).toEqual([])
   })
 
-  test('미리보기가 onFail을 부르면 같은 자리에 들어가기 버튼, 바로가기는 그대로', () => {
+  test('미리보기가 onFail을 부르면 같은 자리에 들어가기 버튼, 바로가기는 그대로', async () => {
     previewMode = 'fail'
     view()
-    fireEvent.click(screen.getByRole('button', { name: '실패시키기' }))
+    fireEvent.click(await screen.findByRole('button', { name: '실패시키기' }))
     const a = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
     expect(a.getAttribute('href')).toBe('/world/fishing')
     expect(a.className).toContain('btn')
@@ -120,12 +119,23 @@ describe('HomePage', () => {
     expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
   })
 
-  test('미리보기가 렌더 중 던지면 대체 버튼, 바로가기는 그대로', () => {
+  test('미리보기가 렌더 중 던지면 대체 버튼, 바로가기는 그대로', async () => {
     previewMode = 'throw'
     view()
-    const a = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
-    expect(a.className).toContain('btn')
+    await waitFor(() => expect(screen.getByRole('link', { name: '펨타듀 낚시 들어가기' }).className).toContain('btn'))
     expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
+  })
+
+  test('user_records가 오기 전에는 미리보기를 그리지 않고 같은 크기의 빈 자리만 둔다', async () => {
+    let resolve!: (v: unknown) => void
+    rpcMock.mockReset().mockReturnValue(new Promise((r) => { resolve = r }))
+    view()
+    expect(previewProps).not.toHaveBeenCalled()
+    const a = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
+    expect(a.getAttribute('href')).toBe('/world/fishing')
+    await act(async () => { resolve([{ game_id: 'fishing', key: 'avatar', value: 0, detail: 'x' }]) })
+    expect(previewProps).toHaveBeenCalled()
+    expect(previewProps.mock.calls.every((c) => (c[0] as { records: unknown[] }).records.length === 1)).toBe(true)
   })
 
   test('메인에서 world 함수를 부르지 않는다', async () => {
@@ -141,8 +151,9 @@ describe('HomePage', () => {
     expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
   })
 
-  test('미리보기 크기: 폭 360 → 360, 폭 1200 → 480', () => {
+  test('미리보기 크기: 폭 360 → 360, 폭 1200 → 480', async () => {
     view()
+    await screen.findByTestId('preview')
     resize(360)
     expect(lastProps().size).toBe(360)
     resize(1200)

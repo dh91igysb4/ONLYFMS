@@ -17,7 +17,7 @@ vi.mock('../contests/clock.ts', () => ({ syncServerTime: () => Promise.resolve()
 
 import { now } from '../../lib/serverTime.ts'
 import { kstDate } from '../../shared/kst.ts'
-import { buildShortcuts, loadDailyDone, loadMyActiveContests, loadMyActiveDuels, shortcutTarget } from './shortcuts.ts'
+import { buildShortcuts, loadDailyDone, loadMyOpenDuels, loadOpenContests, shortcutTarget } from './shortcuts.ts'
 
 function m(id: string, modes: Manifest['modes'], extra: Partial<Manifest> = {}): { manifest: Manifest } {
   return {
@@ -84,22 +84,23 @@ describe('loaders', () => {
     await expect(loadDailyDone('wya', 'u1')).resolves.toBe(false)
   })
 
-  test('loadMyActiveDuels: duel_list().mine 중 active만', async () => {
+  test('loadMyOpenDuels: duel_list().mine 중 active·waiting(내 대기 방 포함)', async () => {
     rpcMock.mockResolvedValueOnce({
       lobby: [], recent: [], due: [],
       mine: [{ id: 'w', status: 'waiting' }, { id: 'a', status: 'active' }, { id: 'f', status: 'finished' }],
     })
-    const r = await loadMyActiveDuels()
+    const r = await loadMyOpenDuels()
     expect(rpcMock).toHaveBeenCalledWith('duel_list')
-    expect(r.map((d) => d.id)).toEqual(['a'])
+    expect(r.map((d) => d.id)).toEqual(['w', 'a'])
   })
 
-  test('loadMyActiveContests: 참가했고 취소 아니고 진행 중이거나 24시간 안에 시작', async () => {
+  test('loadOpenContests: 공개이거나 참가했고, 취소 아니고, 진행 중이거나 24시간 안에 시작', async () => {
     const t = now()
     const iso = (ms: number) => new Date(t + ms).toISOString()
     const H = 3_600_000
     listMock.mockResolvedValueOnce([
       { id: 'pub-live', starts_at: iso(-H), ends_at: iso(H), cancelled_at: null, visibility: 'public' },
+      { id: 'inv-live', starts_at: iso(-H), ends_at: iso(H), cancelled_at: null, visibility: 'invite' },
       { id: 'live', starts_at: iso(-H), ends_at: iso(H), cancelled_at: null, visibility: 'public' },
       { id: 'soon', starts_at: iso(23 * H), ends_at: iso(30 * H), cancelled_at: null, visibility: 'invite' },
       { id: 'later', starts_at: iso(25 * H), ends_at: iso(30 * H), cancelled_at: null, visibility: 'public' },
@@ -107,8 +108,8 @@ describe('loaders', () => {
       { id: 'ended', starts_at: iso(-3 * H), ends_at: iso(-H), cancelled_at: null, visibility: 'public' },
     ])
     mineMock.mockResolvedValueOnce(new Set(['live', 'soon', 'later', 'cancelled', 'ended']))
-    const r = await loadMyActiveContests('u1')
+    const r = await loadOpenContests('u1')
     expect(mineMock).toHaveBeenCalledWith('u1')
-    expect(r.map((c) => c.id)).toEqual(['live', 'soon'])
+    expect(r.map((c) => c.id)).toEqual(['pub-live', 'live', 'soon'])
   })
 })

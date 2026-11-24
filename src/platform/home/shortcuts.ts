@@ -37,19 +37,19 @@ export async function loadDailyDone(gameId: string, userId: string): Promise<boo
   return (rows ?? []).some((r) => r.user_id === userId)
 }
 
-/** 진행 중인 내 대국 */
-export async function loadMyActiveDuels(): Promise<DuelListItem[]> {
+/** 끝나지 않은 내 대국: 진행 중 + 상대를 기다리는 내 방(옛 홈 대전 블록이 바로 링크하던 범위, 설계 §2 클릭 수) */
+export async function loadMyOpenDuels(): Promise<DuelListItem[]> {
   const r = await rpc<DuelList | null>('duel_list')
-  return (r?.mine ?? []).filter((d) => d.status === 'active')
+  return (r?.mine ?? []).filter((d) => d.status === 'active' || d.status === 'waiting')
 }
 
-/** 내가 참가했고 취소되지 않았으며 진행 중이거나 24시간 안에 시작하는 대회 */
-export async function loadMyActiveContests(userId: string): Promise<ContestRow[]> {
+/** 공개이거나 내가 참가했고, 취소되지 않았으며 진행 중이거나 24시간 안에 시작하는 대회(옛 홈 대회 블록과 같은 범위) */
+export async function loadOpenContests(userId: string): Promise<ContestRow[]> {
   await syncServerTime()
   const t = now()
   const [all, mine] = await Promise.all([listContests(t), getMyContestIds(userId)])
   return all.filter((c) => {
-    if (!mine.has(c.id)) return false
+    if (c.visibility !== 'public' && !mine.has(c.id)) return false
     const p = phaseOf(c, t)
     return p === 'live' || (p === 'lobby' && Date.parse(c.starts_at) - t <= DAY_MS)
   })

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { games } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import {
-  buildShortcuts, loadDailyDone, loadMyActiveContests, loadMyActiveDuels, shortcutTarget, type Shortcut,
+  buildShortcuts, loadDailyDone, loadMyOpenDuels, loadOpenContests, shortcutTarget, type Shortcut,
 } from './shortcuts.ts'
 
 type Ids = { id: string }[]
@@ -25,8 +25,8 @@ export function Shortcuts() {
     for (const id of dailyIds ? dailyIds.split(',') : []) {
       loadDailyDone(id, uid).then((done) => { if (alive) setUndone((p) => ({ ...p, [id]: !done })) }, () => {})
     }
-    loadMyActiveDuels().then((d) => { if (alive) setDuels(d) }, () => {})
-    loadMyActiveContests(uid).then((c) => { if (alive) setContests(c) }, () => {})
+    loadMyOpenDuels().then((d) => { if (alive) setDuels(d) }, () => {})
+    loadOpenContests(uid).then((c) => { if (alive) setContests(c) }, () => {})
     return () => { alive = false }
   }, [uid, dailyIds])
 
@@ -39,7 +39,7 @@ export function Shortcuts() {
       const items = (s.badge === 'duels' ? duels : contests) ?? []
       const base = s.badge === 'duels' ? '/duel' : '/contests'
       const to = shortcutTarget(s.to, items, (id) => `${base}/${id}`)
-      const word = s.badge === 'duels' ? '진행 중' : '참가 중'
+      const word = s.badge === 'duels' ? '내 대국' : '진행·예정'
       return items.length > 0
         ? { to, mark: String(items.length), name: `${s.label}, ${word} ${items.length}개` }
         : { to, mark: null, name: s.label }

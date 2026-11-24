@@ -26,8 +26,8 @@ vi.mock('../../games/index.ts', () => ({
 vi.mock('./shortcuts.ts', async (orig) => ({
   ...(await orig<typeof import('./shortcuts.ts')>()),
   loadDailyDone: (...a: unknown[]) => daily(...a),
-  loadMyActiveDuels: () => duels(),
-  loadMyActiveContests: (...a: unknown[]) => contests(...a),
+  loadMyOpenDuels: () => duels(),
+  loadOpenContests: (...a: unknown[]) => contests(...a),
 }))
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
@@ -74,18 +74,18 @@ describe('Shortcuts', () => {
     expect(link('데일리 후알야').textContent).not.toContain('●')
   })
 
-  test('진행 중 대국 1개면 그 대국으로 바로, 표시 1', async () => {
-    duels.mockResolvedValue([{ id: 'm1', status: 'active' }])
+  test('내 대국(진행·대기) 1개면 그 대국으로 바로, 표시 1', async () => {
+    duels.mockResolvedValue([{ id: 'm1', status: 'waiting' }])
     view()
-    const a = await screen.findByRole('link', { name: '대전, 진행 중 1개' })
+    const a = await screen.findByRole('link', { name: '대전, 내 대국 1개' })
     expect(a.getAttribute('href')).toBe('/duel/m1')
     expect(a.textContent).toContain('1')
   })
 
-  test('진행 중 대국 2개면 목록으로, 표시 2; 0개면 표시 없음', async () => {
+  test('내 대국 2개면 목록으로, 표시 2; 0개면 표시 없음', async () => {
     duels.mockResolvedValue([{ id: 'm1', status: 'active' }, { id: 'm2', status: 'active' }])
     const { unmount } = view()
-    const a = await screen.findByRole('link', { name: '대전, 진행 중 2개' })
+    const a = await screen.findByRole('link', { name: '대전, 내 대국 2개' })
     expect(a.getAttribute('href')).toBe('/duel')
     unmount()
     duels.mockResolvedValue([])
@@ -95,10 +95,10 @@ describe('Shortcuts', () => {
     expect(link('대전').textContent).toBe('대전')
   })
 
-  test('참가 중 대회 1개면 그 대회로 바로', async () => {
+  test('열린 대회 1개면 그 대회로 바로', async () => {
     contests.mockResolvedValue([{ id: 'c1' }])
     view()
-    const a = await screen.findByRole('link', { name: '대회, 참가 중 1개' })
+    const a = await screen.findByRole('link', { name: '대회, 진행·예정 1개' })
     expect(a.getAttribute('href')).toBe('/contests/c1')
   })
 

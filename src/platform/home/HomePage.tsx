@@ -35,7 +35,8 @@ export function HomePage() {
   const isAdmin = !!profile?.is_admin
   const target = worlds.find((w) => w.manifest.preview && getWorldPreview(w.manifest.id) && (!w.manifest.hidden || isAdmin))
   const Preview = target ? getWorldPreview(target.manifest.id) : undefined
-  const [records, setRecords] = useState<PreviewRecord[]>([])
+  // null = user_records를 기다리는 중. 기본 옷차림·기본 지역으로 먼저 그렸다가 바꿔 그리지 않게 기다린다
+  const [records, setRecords] = useState<PreviewRecord[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [size, setSize] = useState(FALLBACK_SIZE)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -43,14 +44,19 @@ export function HomePage() {
   const handle = profile?.handle
 
   useEffect(() => {
-    if (!gameId || !handle) return
+    if (!gameId) return
+    if (!handle) {
+      setRecords([])
+      return
+    }
     let alive = true
+    setRecords(null)
     rpc<RecordRow[] | null>('user_records', { p_handle: handle })
       .then((rows) => {
         if (!alive) return
         setRecords((rows ?? []).filter((r) => r.game_id === gameId).map((r) => ({ key: r.key, detail: r.detail })))
       })
-      .catch(() => { /* 기본 옷차림·기본 지역으로 그린다 */ })
+      .catch(() => { if (alive) setRecords([]) /* 기본 옷차림·기본 지역으로 그린다 */ })
     return () => { alive = false }
   }, [gameId, handle])
 
@@ -79,7 +85,7 @@ export function HomePage() {
         {target && Preview && (failed ? fallback : (
           <PreviewBoundary fallback={fallback}>
             <Link className="home-valley" to={`/world/${target.manifest.id}`} aria-label={name} style={{ width: size, height: size }}>
-              <Preview userId={profile?.id ?? ''} records={records} size={size} onFail={() => setFailed(true)} />
+              {records && <Preview userId={profile?.id ?? ''} records={records} size={size} onFail={() => setFailed(true)} />}
               <span className="home-valley-enter" aria-hidden="true">들어가기</span>
             </Link>
           </PreviewBoundary>
