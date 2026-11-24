@@ -560,6 +560,18 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 펨타듀 밸리 온라인 1단계 (`feat/fishing-online`)
+
+설계 `docs/superpowers/specs/2026-11-24-fishing-online-design.md`. DB 마이그레이션·Edge Function 배포 없음, Vercel만. `feat/home-valley` 위의 브랜치라 그 PR이 먼저 머지돼야 한다.
+
+수동 확인 (두 계정을 두 브라우저·기기로):
+- [ ] 같은 지역에 있으면 서로의 캐릭터가 지금 옷차림으로 보이고, 머리 위에 아이디 이름표가 붙는다.
+- [ ] 걷는 모습이 끊기지 않고 따라오고, 낚시를 시작하면 낚싯대를 든 자세가 된다.
+- [ ] 한쪽이 다른 지역으로 가면 사라지고, 같은 지역으로 오면 다시 보인다.
+- [ ] 한쪽이 탭을 닫으면 10초 안에 사라진다.
+- [ ] 실시간이 막혀도(네트워크 끊김 등) 혼자 낚시는 그대로 된다.
+- [ ] 배포 뒤 1주일 동안 Supabase 대시보드의 Realtime 메시지 수를 확인한다(무료 월 200만, 초당 100).
+
 ## 메인 화면 개편 배포 (`feat/home-valley`)
 
 설계 `docs/superpowers/specs/2026-11-24-home-valley-design.md`. DB 마이그레이션 없음. 낚시 `logic.version` 그대로.
