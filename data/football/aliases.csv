@@ -270,6 +270,8 @@ Q1024463,CS 콘코르디아 키아지나,ko
 Q1024468,CS Fola Esch,en
 Q1024468,CS 폴라 에슈,ko
 Q1024474,Miramar Misiones,en
+Q1024476,CS Petange,en
+Q1024476,CS Pétange,en
 Q1024482,CS Sfaxien,en
 Q1024482,CS 스팍시앙,ko
 Q102566182,Marko Lazetić,en
@@ -908,11 +910,8 @@ Q10522919,Paul Digby,en
 Q10522919,폴 디그비,ko
 Q10522919,폴 앤드루 디그비,ko
 Q1052316,Alma Juventus Fano 1906,en
-Q1052365,Acireale,en
-Q1052365,Acireale Calcio,en
-Q1052365,Acireale Calcio 1946,mul
+Q1052365,Acireale,mul
 Q1052365,Acireale Football Club,en
-Q1052365,Citta di Acireale 1946,en
 Q10523871,Natalia Pablos,en
 Q10523871,나탈리아 파블로스,ko
 Q10523871,나탈리아 파블로스 산촌,ko
@@ -1266,10 +1265,8 @@ Q105856564,Kang Seongjin,en
 Q105856564,Seong-Jin Kang,en
 Q105856564,姜成進,ko
 Q105856564,강성진,ko
-Q105861,Die Unabsteigbaren,en
-Q105861,The Unrelegatables,en
 Q105861,VfL Bochum,en
-Q105861,VfL Bochum 1848,en
+Q105861,VfL Bochum 1848,mul
 Q105861,VfL 보쿰,ko
 Q105861,VfL 보훔,ko
 Q1058649,S.S.C. Giugliano,en
@@ -1579,6 +1576,7 @@ Q107035469,Luca Sirch,en
 Q107035595,Aritz Aldasoro,en
 Q107035595,Aritz Aldasoro Sarriegi,en
 Q107036068,Iñaki Recio,en
+Q107041297,Forte Virtus FC,en
 Q107046836,Alex Suarez Cardero,en
 Q107046836,Álex Suárez,en
 Q107046836,Álex Suárez Cardero,en
@@ -1736,9 +1734,9 @@ Q107457323,Arbnor Muja,en
 Q107478844,Abdul Kader Keïta,en
 Q107478844,Kader Keïta,en
 Q107481656,Rafael Núñez,en
+Q1074980,Club Olimpo,en
 Q1074980,Club Olimpo de Bahia Blanca,en
 Q1074980,Olimpo de Bahia Blanca,en
-Q1074980,Sarmiento,en
 Q1074980,올림포,ko
 Q107501473,Jorge Martínez-Losa,en
 Q107505758,Axel Henriksson,en
@@ -1914,6 +1912,7 @@ Q108114747,Santiago Castro,en
 Q108114747,Santiago Tomás Castro,mul
 Q108114747,산티아고 카스트로,ko
 Q108114747,산티아고 토마스 카스트로,ko
+Q108120357,Roberto,mul
 Q108120357,Roberto Fernández Jaén,en
 Q108128945,Théo Gécé,en
 Q108128947,Levi Smans,en
@@ -2031,6 +2030,7 @@ Q108616460,Alessandro Zanoli,en
 Q108639388,Amine El Ouazzani,en
 Q108639653,Jeffrey Quarshie,en
 Q108639773,A.C. Chapelain,en
+Q108640897,P.V.F.C. Oyonnax,en
 Q108643175,DOMTAC,en
 Q1086492,Christopher Avevor,en
 Q1086492,Christopher Salon Avevor,en
@@ -2128,6 +2128,7 @@ Q1092271,Marc Tierney,en
 Q109255453,Mario Gila,en
 Q109255453,Mario Gila Fuentes,en
 Q109255453,마리오 힐라,ko
+Q109266159,Kanchanaburi F.C.,en
 Q109280289,Binga FC,en
 Q109282703,Rubén Sánchez,en
 Q109282705,Oğuz Aydın,en
@@ -2155,6 +2156,10 @@ Q109380452,Javier Serrano,en
 Q109380452,Javier Serrano Martínez,en
 Q1093851,Maximilian Arnold,en
 Q1093851,막시밀리안 아르놀트,ko
+Q1093969,Georgi Dzhikiya,en
+Q1093969,Georgi Tamazovich Dzhikiya,en
+Q1093969,Georgiy Dzhikiya,en
+Q1093969,게오르기 지키야,ko
 Q109397,Claudio Miguel Pizarro Bosio,en
 Q109397,Claudio Pizarro,en
 Q109397,El bombardero,en
@@ -2182,6 +2187,7 @@ Q1094814,Craig Noone,en
 Q1094814,Craig Stephen Noone,en
 Q1094814,크레이그 눈,ko
 Q1094814,크레이그 스티븐 눈,ko
+Q109507588,F.C. Albères-Argelès,en
 Q109507609,F.C. Ouest Tourangeau,en
 Q109507609,Union Foot de Touraine,en
 Q109507638,Le Mée Sports,en
@@ -2237,6 +2243,10 @@ Q110063088,Charly Keita,en
 Q110070377,Ferran Jutglà,en
 Q110070377,Ferran “Jutgol”,en
 Q110070377,Ferrán Jutglà Blanch,en
+Q1100867,Francisco Calvo,en
+Q1100867,Francisco Javier Calvo Quesada,ko
+Q1100867,Gringo,ko
+Q1100867,프란시스코 칼보,ko
 Q1100891,Coruxo,en
 Q1100891,Coruxo FC,en
 Q110114075,Kevin Carlos,en
@@ -2272,6 +2282,7 @@ Q110278175,지한 차나크,ko
 Q110289769,Simone Giordano,en
 Q1102931,Almirante Brown de Isidro Casanova,en
 Q1102931,Club Almirante Brown,en
+Q1102931,VIRGEN DE LA B,en
 Q1102931,클루브 알미란테 브론,ko
 Q1102935,Club Almagro,en
 Q1102935,클루브 알마그로,ko
@@ -2284,8 +2295,8 @@ Q110299200,Carlo Adriano,en
 Q1103101,Plaza Colonia,en
 Q1103101,플라사 콜로니아,ko
 Q1103140,CS Hammam-Lif,en
+Q1103168,Club Tijuana,en
 Q1103168,Club Tijuana Xoloitzcuintles de Caliente Baja Californiia,en
-Q1103168,Tijuana opossums,en
 Q1103168,클루브 티후아나,ko
 Q110320890,Jon Rowe,en
 Q110320890,Jonathan Rowe,en
@@ -2320,7 +2331,6 @@ Q11047010,Nei Mongol Zhongyou Football Club,en
 Q11047010,Taiyuan Zhongyou Jiayi F.C.,en
 Q110483835,Jobe Bellingham,en
 Q110483835,Jobe Samuel Patrick Bellingham,en
-Q110483835,en una relación con melina maldonado,en
 Q110483835,조브 벨링엄,ko
 Q110486192,Nestor Irankunda,en
 Q110486192,네스토리 이란쿤다,ko
@@ -2451,7 +2461,7 @@ Q111311250,Moustapha Cissé,en
 Q111311250,Moustapha Elhadji Cissé,en
 Q111336227,Noa Dundas,en
 Q111336539,Nico Paz,en
-Q111336539,Nicolás Paz Martínez,en
+Q111336539,Nicolás Paz Martínez,mul
 Q111336539,니코 파스,ko
 Q111344591,Matija Frigan,en
 Q1113452,Thomas James Eaves,en
@@ -2563,7 +2573,7 @@ Q112133063,Tibo Herbots,en
 Q112150902,F.C. St Helens,en
 Q112159292,Beñat Gerenabarrena,en
 Q112164399,Pedro Lubamba,en
-Q112164399,Pedro Paulo Kasanzi Lubamba,en
+Q112164399,Pedro Paulo Kasanzi Lubamba,mul
 Q112166574,Sidi Bane,en
 Q112170256,Desire Doue,en
 Q112170256,Desire Nonka-Maho Doue,en
@@ -2650,6 +2660,8 @@ Q112813857,Jarell Amorin Quansah,en
 Q112813857,Jarell Quansah,en
 Q112813857,저렐 아모린 콴사,ko
 Q112813857,저렐 콴사,ko
+Q11283587,Azul Claro Numazu,en
+Q11283587,아술 클라로 누마즈,ko
 Q112840839,UFB Jàbac i Terrassa,en
 Q112862568,Stav Lamkin,en
 Q112862568,Stav Lemkin,en
@@ -2873,6 +2885,8 @@ Q113515002,마이크 펜더르스,ko
 Q113515004,Mika Godts,en
 Q113515004,미카 호츠,ko
 Q113516868,Théo Leoni,en
+Q113532157,Derry Lionel Scherhant,en
+Q113532157,Derry Scherhant,en
 Q113547044,Ashley Phillips,en
 Q113547044,애슐리 필립스,ko
 Q113548114,Louis Torres,en
@@ -2902,6 +2916,8 @@ Q113572629,Andreas Kristoffer Jungdal,en
 Q113572844,Quilindschy Hartman,en
 Q113572844,크빌린치 하르트만,ko
 Q1135735,FC Corvinul Hunedoara,en
+Q113575,Magomed Ozdoyev,en
+Q113575,마고메트 오즈도예프,ko
 Q113575312,Joel Voelkerling Persson,en
 Q113575357,Maissa Ndiaye,en
 Q113578056,Hugo Bueno,en
@@ -2917,6 +2933,8 @@ Q113632482,Bobby Clark,en
 Q113632482,Bobby Lamont Clark,en
 Q113648535,Diego López,mul
 Q113648535,Diego López Noguerol,en
+Q113650998,2DROTS,en
+Q113650998,FC 2DROTS,en
 Q113652626,Ahmet Hasan Göcen,en
 Q113653321,Carlos Romero,en
 Q113653321,Carlos Romero Serrano,en
@@ -3026,6 +3044,7 @@ Q114037405,Kepa Uriarte,en
 Q1140392,Stenhousemuir F.C.,en
 Q1140392,Stenhousemuir Football Club,en
 Q1140392,스텐하우스뮤어 FC,ko
+Q114049774,FC Aschheim,en
 Q1140538,Knattspyrnufélagið Víkingur,en
 Q1140538,Víkingur Reykjavík,en
 Q1140538,비킹귀르 레이캬비크,ko
@@ -3117,7 +3136,7 @@ Q114627695,Mikel Mendibe,en
 Q114627806,Unai Egiluz,en
 Q114628070,Alejandro Rego,en
 Q114645552,Hugo Pérez,en
-Q114647602,Andrei Coubis,mul
+Q114647602,Andrei Coubis,en
 Q114647602,Andrei Coubiș,en
 Q1146623,Alexander Scholz,en
 Q1146623,알렉산더 숄츠,ko
@@ -3250,7 +3269,7 @@ Q115492033,Clarissa Larisey,en
 Q115564801,Lovro Stubljar,mul
 Q115564801,Lovro Štubljar,en
 Q11557367,Asano Takuma,en
-Q11557367,Takuma ano,en
+Q11557367,Takuma Asano,en
 Q11557367,아사노 타쿠마,ko
 Q1155815,Koen Van Langendonck,en
 Q115582103,Pablo Valencia,en
@@ -3326,6 +3345,7 @@ Q115859,Zdravko Kuzmanović,en
 Q115859,즈드라브코 쿠즈마노비치,ko
 Q115879,Ogenyi Eddy Onazi,en
 Q115879,Ogenyi Onazi,en
+Q115879,오게니 에디 오나지,ko
 Q115879,오게니 오나지,ko
 Q1159077,Dan Harding,en
 Q115920013,Patrick Brouwer,en
@@ -3351,6 +3371,7 @@ Q116054089,Alan Minda,en
 Q116054089,알란 민다,ko
 Q116054089,알란 스티브 민다 가르시아,ko
 Q116060328,George Ilenikhena,en
+Q116060328,조지 일레니케나,ko
 Q1161275,Daniel Candeias,en
 Q1161275,Daniel João Santos Candeias,en
 Q116136785,Thom van Bergen,en
@@ -3486,6 +3507,8 @@ Q116908746,Nathan Saliba,en
 Q116908746,Nathan-Dylan Saliba,en
 Q116908746,나탈딜란 살리바,ko
 Q116908746,나탕 살리바,ko
+Q116909695,NK Zrinski Jurjevac Punitovački,en
+Q116909695,NK Zrinski Osječko 1664,en
 Q116923606,Samu Aghehowa,en
 Q116923606,Samuel Omorodion Aghehowa,en
 Q116923606,사무 아게오와,ko
@@ -3607,6 +3630,7 @@ Q117996,알쇼르타,ko
 Q118108336,Lukas Ullrich,en
 Q118108336,루카스 울리히,ko
 Q118151312,Hugo Bolin,en
+Q11820419,Podlasie Biała Podlaska,en
 Q118206666,Anan Khalaili,en
 Q118206666,Anan Khalaily,en
 Q118206666,Anan Khlaili,en
@@ -3689,6 +3713,8 @@ Q1188299,Muktijoddha Sangsad KC,en
 Q1188299,무크티조다 상사드 KS,ko
 Q1188407,Jardel Nivaldo Vieira,en
 Q1188407,자르데우 니바우두 비에이라,ko
+Q11885519,Omar Colley,en
+Q11885519,오마르 콜리,ko
 Q11886211,PK-35 Vantaa,en
 Q118867746,Emmanuel Addai,en
 Q118876123,Jon Martín,en
@@ -3799,7 +3825,7 @@ Q1193120,Macky Frank Bagnack Mouegni,en
 Q1193120,마키 바그나크,ko
 Q1193428,Louis Schaub,en
 Q11938,Eindhoven Football Club,en
-Q11938,PSV,ko
+Q11938,PSV,mul
 Q11938,PSV Eindhoven,en
 Q11938,PSV 에인트호번,ko
 Q11938,Philips Sport Vereniging,en
@@ -3872,7 +3898,12 @@ Q11948,미하엘 발라크,ko
 Q11948,미하엘 발락,ko
 Q119517997,Gustav Lindgren,en
 Q119517997,Gustav Willy Lindgren,en
+Q119519237,Berre SC,en
+Q119519383,SC Montredon Bonneveine,en
+Q119519491,Six-Fours-Le Brusc Foot,en
 Q119519557,Albi Marssac TF ASPTT,en
+Q119519598,Espérance Chartres-de-Bretagne,en
+Q119519697,Olympique Salaise Rhodia,en
 Q119519739,AAS Sarcelles,en
 Q1195376,Ciudad de Murcia,en
 Q11954,Dries Mertens,en
@@ -4000,6 +4031,8 @@ Q1208841,CD 플라텐세,ko
 Q1208841,Platense F.C.,en
 Q1208841,Platense Football Club S.A. de C.V.,en
 Q1208841,클럽 데포르티보 플라텐세,ko
+Q120937222,FC Málaga City,en
+Q120937222,FC Málaga City Academy,en
 Q1209669,Toronto Lynx,en
 Q1209669,토론토 링크스,ko
 Q120970447,Lucas Lavallée,en
@@ -4072,6 +4105,9 @@ Q121829403,Luc de Fougerolles,en
 Q121829403,뤼크 드 푸주롤,ko
 Q121829403,뤼크 드푸주롤,ko
 Q121841643,Mohamed Guindo,en
+Q121903982,Patrick Chinazaekpere Dorgu,en
+Q121903982,Patrick Dorgu,en
+Q121903982,파트리크 도르구,ko
 Q121943745,Gerard Martín,en
 Q121943745,제라르드 마르틴,ko
 Q121944083,Álvaro Cortés,en
@@ -4089,8 +4125,6 @@ Q1220527,디에고 마리뇨,ko
 Q1220623,Diego Angelo de Oliveira,en
 Q1220623,Diego Ângelo de Oliveira,en
 Q122075105,Enso González,en
-Q12208555,FIGC,en
-Q12208555,Hachim Mastour,en
 Q122160026,Henok Teklab,en
 Q12217,Castilla,en
 Q12217,Castilla C.F.,en
@@ -4161,8 +4195,6 @@ Q12260,CE 사바델,ko
 Q12260,Centre d'Esports Sabadell Futbol Club,en
 Q12260,"Centre d'Esports Sabadell Futbol Club, S.A.D.",en
 Q12260,Sabadell FC,en
-Q12260547,Jonathan Nanizayamo,en
-Q12260547,조나탕 나니자야모,ko
 Q122609919,Alberto Sánchez,en
 Q122609919,Alberto Sánchez Vivas,en
 Q12261110,Julen Castañeda,en
@@ -4282,6 +4314,7 @@ Q12318944,야코브 부스크,ko
 Q123197958,Xabier Mayordomo,en
 Q123201041,Angered MBIK,en
 Q123202380,Mehmet Burak Tarlabölen,en
+Q123202420,Süleyman Enes Karakaş,en
 Q123202823,Uğur Adem Gezer,en
 Q123203666,Ibrahim Sabrah,en
 Q123224454,Jamie Knight-Lebel,en
@@ -4291,6 +4324,8 @@ Q123245856,Ties Wieggers,en
 Q123281002,Ali Jasim,en
 Q123281002,Ali Jasim Elaibi Al-Tameemi,en
 Q123281002,알리 자심,ko
+Q123283162,A.S. Anagennisi Karditsas (football),en
+Q123283162,Anagennisi Karditsa F.C.,en
 Q123289726,Franco Mastantuono,en
 Q123289726,Mastantuono,en
 Q123289726,프랑코 마스탄투오노,ko
@@ -4504,7 +4539,7 @@ Q1252167,Horoya AC,en
 Q1252167,호로야 AC,ko
 Q125216774,United F.C. (Dubai),en
 Q125216774,United Football Club,en
-Q125264756,Club Gimnàstic de Manresa,en
+Q125264756,Club Gimnàstic de Manresa,mul
 Q125264756,Gimnàstic Manresa,mul
 Q125264756,Gimnàstic de Manresa,en
 Q125264756,Nàstic Manresa,mul
@@ -4560,9 +4595,13 @@ Q1256895,James McFarlane McArthur,en
 Q1256895,제임스 매카서,ko
 Q1257196,Facundo Ferreyra,en
 Q1257196,파쿤도 페레이라,ko
+Q1257402,Hallam F.C.,en
+Q1257402,Hallam Football Club,en
 Q125805788,Bazoumana Toure,en
 Q125805788,Bazoumana Touré,en
 Q125805788,바주마나 투레,ko
+Q125822693,Jesse Bisiwu,en
+Q125822693,Jessi Bisiwu,en
 Q12585526,Koo Ja-ryong,en
 Q12585526,Ku Ja-ryong,en
 Q12585526,구자룡,ko
@@ -4757,7 +4796,6 @@ Q127271770,Aimar Collante,en
 Q127271992,Álex Jimenez,en
 Q127273307,Vince Chijioke Osuji,en
 Q127273307,Vince Osuji,en
-Q12741391,Steaua,en
 Q1274296,Esporte Clube Santo Andre,en
 Q1274296,Esporte Clube Santo André,en
 Q12743003,Valentin Alexandru Cojocaru,en
@@ -4952,6 +4990,7 @@ Q128722,Serigne Fallou Diagne,en
 Q128722,팔루 디아네,ko
 Q128725,Hidetoshi Nakata,en
 Q128725,나카타 히데토시,ko
+Q12872831,AEZ Zakakiou,en
 Q12875294,Yuri Lodygin,en
 Q12875294,Yuri Vladimirovich Lodygin,en
 Q12875294,유리 로디긴,ko
@@ -5498,6 +5537,7 @@ Q1332314,Jamie Ashdown,en
 Q1332314,Jamie Lawrence Ashdown,en
 Q133248014,Ewen Jaouen,en
 Q133273246,Genesis Antwi,en
+Q133277034,Zachar Dračoŭ,en
 Q133299248,Reno Morris Münz,en
 Q133299248,Reno Münz,en
 Q1333016,Pablo Batalla,en
@@ -5579,7 +5619,7 @@ Q133832511,Jeremy Ngola Monga,mul
 Q133849194,Uchenna Ogundu,en
 Q133849212,Jerolldino Bergraaf,en
 Q13385,Ars et Labor Ferrara Calcio,en
-Q13385,S.P.A.L.,mul
+Q13385,S.P.A.L.,ko
 Q13385,S.P.A.L. Ferrara,mul
 Q13385,SPAL,mul
 Q13385,SPAL Ferrara,mul
@@ -5703,11 +5743,6 @@ Q13418257,Fernando Pacheco Flores,en
 Q13418257,페르난도 파체코 플로레스,ko
 Q1341836,Alexander Farnerud,en
 Q1341836,알렉산데르 파르네루드,ko
-Q1342155,Fujieda MYFC,en
-Q1342155,Fujieda Nelson,en
-Q1342155,Shizuoka Fujieda MYFC,en
-Q1342155,shizuoka.Fujieda MYFC,en
-Q1342155,후지에다 MYFC,ko
 Q13422031,Guillermo Varela,en
 Q13422031,Guillermo Varela Olivera,en
 Q13422031,Varela,en
@@ -5748,7 +5783,6 @@ Q13434645,Baptiste Schmisser,en
 Q13435487,Bart Vriends,en
 Q1343596,G.D. Tourizense,en
 Q134393608,Iuri Tabatadze,en
-Q1343949,Titi Buengo,en
 Q1344097,TuS Glane,en
 Q1344302,Baniyas SC,en
 Q1344302,바니야스 SC,ko
@@ -5850,7 +5884,7 @@ Q134961488,Jasmine McQuade,en
 Q134961593,Grace Boyes,en
 Q134976,Lukas Josef Podolski,en
 Q134976,Lukas Podolski,en
-Q134976,Łukasz Józef Podolski,en
+Q134976,Łukasz Józef Podolski,mul
 Q134976,Łukasz Podolski,en
 Q134976,루카스 포돌스키,ko
 Q134976,우카스 포돌스키,ko
@@ -5933,6 +5967,8 @@ Q1353982,Erik Israelsson,en
 Q1354055,Erik Endel Paartalu,mul
 Q1354055,Erik Paartalu,en
 Q1354055,에릭 파르탈루,ko
+Q135415841,Union Brescia,en
+Q135415841,우니온 브레시아,ko
 Q135422413,Alessandro Debenedetti,en
 Q1354322,Grzegorz Krychowiak,en
 Q1354322,그제고시 크리호비아크,ko
@@ -6156,8 +6192,6 @@ Q136221128,차비 에스파르트,ko
 Q136226145,Mikel Ansó,en
 Q136226153,Bruno Pérez,en
 Q1362439,Ertaç Özbir,en
-Q1362545,Alejandro Bedoya,en
-Q1362545,알레한드로 베도야,ko
 Q1362594,Maxime Christophe Lestienne,en
 Q1362594,Maxime Lestienne,en
 Q1362594,막심 레스티엔,ko
@@ -6216,6 +6250,7 @@ Q136297628,Efehan Pekdemir,en
 Q136297629,Emircan Çiçek,en
 Q136297630,Hüseyin İşlek,en
 Q136297631,Yusuf Erata,en
+Q136297652,Ömer Arda Kara,en
 Q136297661,Demir Mermerci,en
 Q136297662,Enes Köseoğlu,en
 Q136297665,Ertuğrul Sandıkçı,en
@@ -6284,11 +6319,14 @@ Q136547035,Tuna Baran Demir,en
 Q136547036,Berke Can Evli,en
 Q136547037,Güven Atalay,en
 Q136547038,İsmail Esat Buğa,en
+Q136547039,Ali Şahin,en
+Q136547040,Yiğit Baran Karaoğlan,en
 Q1365474,Kevin Amuneke,en
 Q1365474,Kevin Onyekachi Amuneke,en
 Q136549427,Mathijs Marschalk,en
 Q136557086,Adam Tahaui,en
 Q136558732,Naoufal Bohamdi-Kamoni,en
+Q136559570,Evren Çelik,en
 Q136565471,Hüseyin Şen,en
 Q1365656,Neill Collins,en
 Q1365656,Neill William Collins,en
@@ -6389,6 +6427,7 @@ Q137199887,Aly Kall Doumbia,en
 Q137204695,Iwan Henstra,en
 Q137204696,Kian Visser,en
 Q137204698,Daan Visser,en
+Q137205107,CA Central,en
 Q137211300,Pablo García,en
 Q137211300,Pablo García Taboada,en
 Q137216344,Mauro Lenaerts,en
@@ -6476,6 +6515,8 @@ Q137770347,Lushendry Martes,en
 Q137779987,Joan Oleaga,en
 Q1377801,Alloa Athletic F.C.,en
 Q1377801,Alloa Athletic Football Club,en
+Q137794,Helder Barbosa,en
+Q137794,Hélder Barbosa,en
 Q137799253,Karamba Gassama,en
 Q137799254,Victor Gidado,en
 Q137799254,Victor Ntino-emo Gidado,en
@@ -6589,6 +6630,7 @@ Q138248,Sint-Truidense VV,en
 Q138248,신트트라위던 VV,ko
 Q1382643,Evren Avşar,en
 Q138296476,Mahmut Can Kara,en
+Q138296477,Almamy Traore,en
 Q138302606,Teddy Bouriaud,en
 Q138317076,Adjani Mujangi Bia,en
 Q138328477,Ethan Meichtry,en
@@ -6612,7 +6654,7 @@ Q1386177,Richard Hughes,en
 Q138635581,Rio Robbemond,en
 Q138638210,Luca Schelfhout,en
 Q13865408,Joshua Kimmich,en
-Q13865408,Joshua Walter Kimmich,en
+Q13865408,Joshua Walter Kimmich,mul
 Q13865408,요주아 키미히,ko
 Q138656289,Ibrahima Cissé,en
 Q138656289,Ibrahima Cissé (2007),mul
@@ -6749,6 +6791,8 @@ Q1388862,FK Donji Srem,en
 Q1388862,FK 도니 스렘,ko
 Q1388875,Fatih Serkan Kurtuluş,en
 Q1388875,Serkan Kurtuluş,en
+Q1388889,FC Fakel Voronezh,en
+Q1388889,Fakel Voronezh Logo,en
 Q1388893,FC Etar 1924 Veliko Tarnovo,en
 Q1388907,FK Igman Konjic,en
 Q1388917,FK Jedinstvo Ub,en
@@ -6789,7 +6833,7 @@ Q13919702,피에르이브 니콜라 폴로마,ko
 Q13919702,피에르이브 폴로마,ko
 Q1392226,Sportivo Carapegua,en
 Q1392226,Sportivo Carapeguá,en
-Q1392235,Anthony Lopez,en
+Q1392235,Anthony Lopes,en
 Q1392235,안토니 로페스,ko
 Q139244033,Samuel Wiafe,en
 Q1392500,Wes Morgan,en
@@ -6800,7 +6844,6 @@ Q139268857,Tino Jukic,en
 Q139268857,Tino Jukić,en
 Q1392781,Eric Bautheac,en
 Q1392781,Éric Bauthéac,en
-Q1392845,Nacional Esporte Clube,en
 Q1392925,Ryan Mendes,en
 Q1392925,Ryan Mendes da Graça,mul
 Q1392925,리안 멘드스,ko
@@ -6872,6 +6915,7 @@ Q139948869,Mika de Jonge,en
 Q139953577,Joel Febas,en
 Q1399910,Marlon Krause,en
 Q140045242,Tom Frayssinous,en
+Q140052906,Miguel Fernandes Gonçalves,en
 Q140054570,Youssouf Kanouté,en
 Q140071488,Silvan Bröker,en
 Q140073898,Alina Kerschbaumer,en
@@ -6932,6 +6976,7 @@ Q140592669,Jeong Hyeon-woo,en
 Q140592669,정현우,ko
 Q1406254,Ferhat Odabaşı,en
 Q140626308,UJA Alfortville,en
+Q140633732,Maël Gernigon,en
 Q1406339,Ferit Cömert,en
 Q140698586,Hong Jin-hyeok,en
 Q140698586,홍진혁,ko
@@ -7337,7 +7382,7 @@ Q1460053,Panetolikos,en
 Q1460053,Panetolikos F.C.,en
 Q1460053,파네톨리코스 FC,ko
 Q14602686,Gabriel Armando de Abreu,en
-Q14602686,gabriel putita del leon,en
+Q14602686,Gabriel Paulista,en
 Q14602686,가브리엘 파울리스타,ko
 Q146063,Zanaco F.C.,en
 Q14609886,Edu,en
@@ -7549,6 +7594,9 @@ Q14927453,Yu Sang-hun,en
 Q14927453,유상훈,ko
 Q1492962,Gambia Ports Authority F.C.,en
 Q1493562,Ganiyu Shittu,en
+Q1493831,Thiago Cionek,en
+Q1493831,Thiago Rangel Cionek,mul
+Q1493831,치아구 시오네크,ko
 Q1493925,Garath James McCleary,en
 Q1493925,Garath McCleary,en
 Q14942000,Ido's Football Club,en
@@ -7589,6 +7637,7 @@ Q14948183,Theo Bongonda,en
 Q14948183,테오 봉곤다,ko
 Q14951576,Bruno Petković,en
 Q14951576,브루노 페트코비치,ko
+Q1496713,Gaetan Bussmann,en
 Q1496713,Gaëtan Bussmann,en
 Q1496713,가에탕 뷔스만,ko
 Q1498622,Süleyman Koç,en
@@ -7759,6 +7808,8 @@ Q1510813,사우스 멜버른 FC,ko
 Q15110613,Gonzalo Escalante,en
 Q15110678,Cristian Ceballos,en
 Q15110678,Cristian Ceballos Prieto,en
+Q15113326,Vladimír Coufal,en
+Q15113326,블라디미르 초우팔,ko
 Q15113616,Andre Miguel Valente da Silva,en
 Q15113616,Andre Silva,en
 Q15113616,André Miguel Valente da Silva,en
@@ -7766,7 +7817,7 @@ Q15113616,André Silva,en
 Q15113616,안드레 실바,ko
 Q15117644,Lucas Olaza,en
 Q1511793,Marco Ureña,en
-Q1511793,Marcos Danilo Ureña Porras,ko
+Q1511793,Marcos Danilo Ureña Porras,en
 Q1511793,마르코 우레냐,ko
 Q15118145,Jordi Bitter,en
 Q15118820,Léo Lacroix,en
@@ -7823,6 +7874,8 @@ Q1513377,Town,en
 Q15140971,S.S.D. Puteolana 1902 Internapoli,en
 Q1514387,Simba Sports Club,en
 Q1514387,심바 SC,ko
+Q1514453,Gernot Trauner,en
+Q1514453,게르노트 트라우너,ko
 Q15146137,Franck Honorat,en
 Q15146137,프랑크 오노라,ko
 Q1514695,Konkola Blades F.C.,en
@@ -7893,6 +7946,9 @@ Q1520422,Società Sportiva Cavese 1919,en
 Q1520422,U.S.D. Cavese 1919,en
 Q1520422,U.S.D. Pro Cavese 1394,en
 Q1520422,USD Pro Cavese 1394,en
+Q152067,Oscar Hiljemark,en
+Q152067,Oscar Karl Niclas Hiljemark,mul
+Q152067,오스카르 힐리에마르크,ko
 Q15214308,OCSC,en
 Q15214308,Orlando City,en
 Q15214308,Orlando City SC,en
@@ -7931,9 +7987,6 @@ Q152377,마르코 로이스,ko
 Q1524118,Josef de Souza,en
 Q1524118,Josef de Souza Dias,mul
 Q1524118,조세프 지 소우자,ko
-Q15241424,Julian Green,en
-Q15241424,Julian Wesley Green,en
-Q15241424,줄리언 그린,ko
 Q152424,East Germany national football team,en
 Q152424,독일 민주 공화국 축구 국가대표팀,ko
 Q152424,독일민주공화국 축구 국가대표팀,ko
@@ -8083,6 +8136,7 @@ Q153786,에딘 드제코,ko
 Q153786,에딘 제코,ko
 Q15378711,Jordan Graham,en
 Q15378711,Jordan Tyler Graham,en
+Q15384017,FC Krasnodar-2,en
 Q1538737,Internazionale F.C. Torino,en
 Q15390934,Lee Hoo-kwon,en
 Q15390934,李厚權,ko
@@ -8244,6 +8298,8 @@ Q15534391,Sergio Carlos Strandberg,en
 Q15534391,칼로스 스트란드베리,ko
 Q1553875,Guillaume Gauclin,en
 Q1554303,SC Schiltigheim,en
+Q15543156,Niclas Eliasson,en
+Q15543156,Per Niclas Eliasson Santana,en
 Q15543431,Jérôme Guihoata,en
 Q155452,TuS Koblenz,en
 Q155452,TuS 코블렌츠,ko
@@ -8260,10 +8316,10 @@ Q1556977,Tomáš Vaclík,en
 Q1556977,토마시 바츨리크,ko
 Q155730,1. FC Magdeburg,en
 Q155730,1. FC 마그데부르크,ko
-Q155730,1. FCM,mul
+Q155730,1. FCM,en
 Q155730,Der Club,en
 Q155730,Die Blau-Weißen,en
-Q155730,F.C. Magdeburg,mul
+Q155730,F.C. Magdeburg,en
 Q15584432,Hyundai Mipo Dockyard Dolphin Football Club,en
 Q15584432,Ulsan Hyundai Mipo Dockyard Dolphin FC,en
 Q15584432,Ulsan Hyundai Mipo Dockyard Dolphin Football Club,en
@@ -8415,8 +8471,6 @@ Q15690350,Samuel Radlinger,en
 Q15690382,Wallace Fortuna dos Santos,en
 Q15690382,월러스,ko
 Q15690951,Petar Golubović,en
-Q15694381,Hans Hateboer,en
-Q15694381,한스 하테부르,ko
 Q15694467,Lucas Woudenberg,en
 Q15695544,Simon Deli,en
 Q15695544,시몽 델리,ko
@@ -8678,12 +8732,14 @@ Q15834051,Marko Dabro,en
 Q15834051,마르코 다브로,ko
 Q15835035,Michael Heinloth,en
 Q15835779,Muhammet Emre Kalkan,en
+Q15835919,Mustafa Kemal Küçük,en
 Q158367,Kevin Grosskreutz,en
 Q158367,Kevin Großkreutz,en
 Q158367,케빈 그로스크로이츠,ko
 Q15836846,Niko Gießelmann,en
 Q15836846,니코 기셀만,ko
 Q15837610,Onur Alkan,en
+Q15837718,Orhun Öztürk,en
 Q15838887,Oğulcan Çağlayan,en
 Q15839429,Kenan Karisik,en
 Q15839429,Kenan Karışık,en
@@ -8951,6 +9007,8 @@ Q15978836,Duane Octavious Holmes,en
 Q15980269,Patrick John Joseph Roberts,en
 Q15980269,Patrick Roberts,en
 Q15980269,패트릭 로버츠,ko
+Q15980615,Luis Rafael Soares Alves,en
+Q15980615,Luís Rafael Soares Alves,en
 Q15980625,Reiner Ferreira,en
 Q15980625,Reiner Ferreira Correa Gomes,en
 Q15980625,헤이네르 페헤이라,ko
@@ -8992,6 +9050,8 @@ Q15999945,닉 포프,ko
 Q16000020,Ben Wilson,en
 Q160057,Indiana Invaders,en
 Q160057,인디애나 인배더즈,ko
+Q16007952,Borneo F.C. Samarinda,en
+Q16007952,보르네오 FC,ko
 Q16010041,Jordan Adeoti,en
 Q16010041,Jordan Souleymane Adeoti,en
 Q16010041,조르당 아데오티,ko
@@ -9058,6 +9118,9 @@ Q16063674,에밀 베르그렌,ko
 Q16064225,Dennes De Kegel,en
 Q16064225,Dennes de Kegel,en
 Q16064288,Miguel Van Damme,en
+Q16064486,Lukas Lerager,en
+Q16064486,Lukas Reiff Lerager,en
+Q16064486,루카스 레라게르,ko
 Q1606529,John Paul Kissock,en
 Q16069223,Sean Klaiber,en
 Q16069232,Selman Sevinç,en
@@ -9126,7 +9189,6 @@ Q16110505,NK 쿠스토시야 자그레브,ko
 Q1611303,Episkopi F.C.,en
 Q16115059,Filip Bradarić,en
 Q16115059,필리프 브라다리치,ko
-Q16121558,Nahdat Zemamra,en
 Q1612225,Marco Cellini,en
 Q1613741,Nicolo Cherubin,en
 Q1613741,Nicolò Cherubin,en
@@ -9305,6 +9367,8 @@ Q16211837,Srđan Babić,en
 Q16211837,스르잔 바비치,ko
 Q16211932,Femi Balogun,en
 Q16211932,Femi Emmanuel Balogun,en
+Q16211932,페미 발로군,ko
+Q16211932,페미 이매뉴얼 발로군,ko
 Q16212191,Hugo Basto,en
 Q16212191,Hugo Cerqueira Pinto Basto,en
 Q16212278,Andriy Batsula,en
@@ -9489,6 +9553,8 @@ Q16234195,Alexandre Miguel Barros Soares,en
 Q16234201,Song Chi-hoon,en
 Q16234201,Song Chi-hun,en
 Q16234201,송치훈,ko
+Q16234212,Renato Steffen,en
+Q16234212,레나토 슈테펜,ko
 Q16234247,Tijane Freitas Reis,en
 Q16234247,Tijane Reis,en
 Q16234273,Tyronne Gustavo del Pino Ramos,en
@@ -9541,6 +9607,8 @@ Q16234878,Mislav Oršić,en
 Q16234878,미슬라브 오르시치,ko
 Q162349,1. FC Normannia Gmünd,en
 Q162349,1. FC Normannia Schwabisch Gmund,en
+Q16234906,Aleksandar Pešić,en
+Q16234906,알렉산다르 페시치,ko
 Q16234913,Daniel Pinillos,en
 Q16234930,Jack Alexander Price,en
 Q16234930,Jack Price,en
@@ -9677,12 +9745,10 @@ Q16236076,George Davies,en
 Q16236076,George Kweku Davies,en
 Q16236076,조지 데이비스,ko
 Q16236076,조지 퀘쿠 데이비스,ko
-Q16236083,Cyriel Dessers,en
-Q16236083,Cyriel Kolawole Dessers,en
-Q16236083,시릴 데서스,ko
 Q16236092,Christopher Dilo,en
 Q16236092,Christopher Jean-Louis Dilo,en
 Q16236097,Bocar Djumo,en
+Q16236100,Christos Donis,en
 Q16236103,Michael Drennan,en
 Q16236113,Charni Ekangamene,en
 Q16236115,Caleb Ekuban,en
@@ -9695,6 +9761,8 @@ Q16236134,Rafael Floro,en
 Q16236134,Rafael da Silva Floro,en
 Q16236138,Francisco Miguel Varela Martín,en
 Q16236138,Francisco Varela,en
+Q16236140,Nico,en
+Q16236140,Nicolás Freire,en
 Q16236147,Adel Gafaiti,en
 Q16236147,Adel Mohamed Nourredine Gafaiti,en
 Q16236151,Louis Garner,en
@@ -9959,13 +10027,15 @@ Q16264162,Yosuke Ideguchi,en
 Q16264162,Yousuke Ideguchi,en
 Q16264162,Yōsuke Ideguchi,en
 Q16264162,이데구치 요스케,ko
+Q16265104,Caio Lucas,en
+Q16265104,카이우 루카스 페르난지스,ko
 Q1626557,Timmy Dennis Mario Thiele,en
 Q1626557,Timmy Thiele,en
 Q16269664,FC Thalwil,en
 Q1628465,TKİ Tavşanlı Linyitspor,en
 Q162923,Club Atletico Tiro Federal Argentino,en
+Q162923,Tiro Federal,en
 Q162923,Tiro Federal de Rosario,en
-Q162923,Tiro al aire,en
 Q16292944,Robin Krauße,en
 Q16292944,로빈 크라우세,ko
 Q1629342,NK Zagorje,en
@@ -10031,6 +10101,7 @@ Q1632278,Stephen McPhail,en
 Q1632278,스티븐 맥페일,ko
 Q16323062,Ayron Verkindere,en
 Q1632362,Maccabi Herzliya F.C.,en
+Q1632576,Hrvoje Milić,en
 Q1632704,Corinthians Alagoano,en
 Q1632704,SC 코린치앙스 알라고아누,ko
 Q1632704,Sport Club Corinthians Alagoano,en
@@ -10104,6 +10175,8 @@ Q1636019,Alanyaspor,en
 Q1636019,알라니아스포르,ko
 Q16363590,Youssouf Koné,en
 Q16363590,유수프 코네,ko
+Q163645,Berliner SC,en
+Q163645,Berliner Sport-Club,en
 Q163666,Jose Manuel Reina Paez,en
 Q163666,José Manuel Reina Páez,en
 Q163666,Pepe Reina,en
@@ -10120,6 +10193,7 @@ Q16374651,Iberia 1999,en
 Q16374651,Saburtalo Tbilisi,en
 Q16375173,FC Sasco Tbilisi,en
 Q1637856,IFK Eskilstuna,en
+Q16382614,A.S. Saint-Ouen-l'Aumône,en
 Q1638392,KF Trepça,en
 Q1638649,Melbourne Knights Football Club,en
 Q163974,Rafael Ferdinand van der Vaart,en
@@ -10299,6 +10373,10 @@ Q166317,파울로 디발라,ko
 Q16632351,İbrahim Demir,en
 Q16632974,Saman Ghoddos,en
 Q16632974,사만 고도스,ko
+Q16633101,Alexander Jeremejeff,en
+Q16633101,Alexander Thomas Jeremejeff,en
+Q16633101,알렉산데르 예레메예프,ko
+Q16633101,알렉산데르 토마스 예레메예프,ko
 Q16633258,Adnan Marić,en
 Q16636551,Edvinas Gertmonas,en
 Q16647727,Wanderers Special Club,en
@@ -10345,6 +10423,10 @@ Q1668203,Lommel SK,en
 Q1668203,Lommel United,en
 Q1668605,Kahramanmaraş Spor Kulübü,en
 Q1668605,Kahramanmaraşspor,en
+Q166974,Arnaldo Edi Lopes da Silva,en
+Q166974,Edinho,en
+Q166974,아르날두 이디 로페스 다실바,ko
+Q166974,이디뉴,ko
 Q1669821,Rosemary Eleanor Florence White,en
 Q1669821,Rosie White,en
 Q1669821,로즈메리 엘리너 플로렌스 화이트,ko
@@ -10542,7 +10624,7 @@ Q1681210,제임스 톰킨스,ko
 Q16820654,Rhode Island Rams men's soccer,en
 Q16820654,Rhode Island Rams men's soccer team,en
 Q1682343,Jan Washausen,en
-Q16826766,Al Wahda S.C.,en
+Q16826766,Al Wahda S.C.,mul
 Q16826766,Al-Wahda SC,en
 Q1682741,Janik Haberer,en
 Q16828126,Gilles Ruyssen,en
@@ -10573,6 +10655,8 @@ Q168364,광주 축구단,ko
 Q168364,광주FC,ko
 Q168364,광주시민프로축구단,ko
 Q16836782,Moreno Beretta,en
+Q16837101,Bunkeflo FF,en
+Q16837101,Bunkeflo Fotbollförening,en
 Q16837339,Cercle Mbéri Sportif,en
 Q16837911,Ante Ćorić,en
 Q16837911,안테 초리치,ko
@@ -10627,6 +10711,9 @@ Q16842333,Joshua Edward Doherty,en
 Q16842502,Kampaniakos F.C.,en
 Q16842552,FC Karelia Petrozavodsk,en
 Q16842552,FC 카렐리아 페트로자보츠크,ko
+Q16842735,Chania City F.C.,en
+Q16842735,Chania F.C.,en
+Q16842735,하니아 FC,ko
 Q16842784,KBFC,en
 Q16842784,Kerala,en
 Q16842784,Kerala Blasters,en
@@ -10749,7 +10836,7 @@ Q16873338,Racine Coly,en
 Q16873338,라신 콜리,ko
 Q168740,Juan Manuel Mata Garcia,en
 Q168740,Juan Manuel Mata García,en
-Q168740,Juan Mata Pata,en
+Q168740,Juan Mata,en
 Q168740,후안 마누엘 마타,ko
 Q168740,후안 마타,ko
 Q16875894,Paweł Bochniewicz,en
@@ -10797,8 +10884,6 @@ Q16902219,Martin Ødegaard,en
 Q16902219,마르틴 외데가르드,ko
 Q16905853,Andrew Bruno Teixeira Monteiro,en
 Q16905853,Andrew Monteiro,en
-Q1690771,Joan Oumari,en
-Q1690771,조안 우마리,ko
 Q16908483,Muhammed Akarslan,en
 Q16908994,Yunus Emre Yalçın,en
 Q16910143,Luca Mazzitelli,en
@@ -11069,7 +11154,7 @@ Q17070837,Mehdi Taremi,en
 Q17070837,Mehdi Taromi,en
 Q17070837,메디 타레미,ko
 Q17074511,Ederson,en
-Q17074511,Ederson Santana de Moraes,mul
+Q17074511,Ederson Santana de Moraes,en
 Q17074511,에데르송,ko
 Q17074511,에데르송 모라이스,ko
 Q17074511,에데르송 산타나 지 모라이스,ko
@@ -11138,6 +11223,8 @@ Q1714975,Jeremy Grimm,en
 Q1714975,Jérémy Grimm,en
 Q1714982,Jérémy Louis Perbet,en
 Q1714982,Jérémy Perbet,en
+Q17150744,Mattia Caldara,en
+Q17150744,마티아 칼다라,ko
 Q17151098,Djavan da Silva Ferreira,en
 Q17152630,Gjoko Zajkov,en
 Q17152630,조코 자이코프,ko
@@ -11350,6 +11437,8 @@ Q173009,츠베르나 즈베즈다,ko
 Q173009,크르베나 즈베즈다,ko
 Q17305717,Breno Lorran,en
 Q17305717,Breno Lorran da Silva Talvares,en
+Q17305774,Charilaos Charisis,en
+Q17305774,Charis Charisis,en
 Q17305785,Tim Chow,en
 Q17305785,Timothy Alexander Chow,en
 Q17305785,조우딩양,ko
@@ -11377,6 +11466,9 @@ Q173139,George Manneh Oppong Weah,en
 Q173139,George Weah,en
 Q173139,조지 웨아,ko
 Q173139,조지 웨어,ko
+Q17317546,Manchester 62,en
+Q17317546,Manchester 62 F.C.,en
+Q17317546,Manchester 62 Football Club,en
 Q17319873,Anthony Walongwa,en
 Q17322047,Gökhan Meral,en
 Q17325280,Naby Keita,en
@@ -11384,6 +11476,7 @@ Q17325280,Naby Keïta,en
 Q17325280,Naby Laye Keita,en
 Q17325280,Naby Laye Keïta,en
 Q17325280,나비 케이타,ko
+Q17326161,Serdar Deniz,en
 Q17327541,Wanderson,en
 Q17327541,Wanderson Maciel Sousa Campos,en
 Q17335434,Bruno González Cabrera,en
@@ -11970,6 +12063,7 @@ Q17627796,우나이 로페스,ko
 Q17627817,Óscar Fernández González,en
 Q17628109,Cristian Espinoza,en
 Q17628109,Cristian Omar Espinoza,en
+Q17628438,GFA Rumilly-Vallières,en
 Q176304,Mathew Allan Leckie,en
 Q176304,Mathew Leckie,en
 Q176304,매슈 레키,ko
@@ -12096,6 +12190,9 @@ Q177686,Maicon Douglas Sisenando,en
 Q177686,마이콩,ko
 Q177686,마이콩 도글라스,ko
 Q177686,마이콩 도글라스 시제난두,ko
+Q1777142,Jakob Johansson,en
+Q1777142,야코브 요한손,ko
+Q1777142,야콥 요한손,ko
 Q1777174,America,en
 Q1777174,America Futebol Clube,en
 Q1777174,América,en
@@ -12103,6 +12200,7 @@ Q1777174,América Futebol Clube,en
 Q1777557,Cefn Druids A.F.C.,en
 Q1777557,Cefn Druids Association Football Club,en
 Q1777557,NEWI Cefn Druids F.C.,en
+Q17778052,Baptiste Santamaria,en
 Q177806,Cihan Kaan Kaptan,en
 Q177806,Cihan Kaptan,en
 Q1778378,James John O'Brien,en
@@ -12165,6 +12263,7 @@ Q1787955,미겔 앙헬 페레르,ko
 Q1788015,MKE Kırıkkalespor,en
 Q1788225,Real de Banjul F.C.,en
 Q1788225,Real de Banjul FC,en
+Q1788968,Wallidan F.C.,en
 Q1789289,Kristin Demann,en
 Q1789289,Kristin Marion Demann,en
 Q179024,Andrew Stuart Dawson,en
@@ -12378,6 +12477,9 @@ Q18045127,Cheikh Ndoye,en
 Q18045127,Cheikh Tidiane Ndoye,en
 Q18045127,셰이크 은도예,ko
 Q18045246,Brian Oliván Herrero,en
+Q18045362,Cong Phuong Nguyen,en
+Q18045362,Nguyễn Công Phượng,en
+Q18045362,응우옌꽁프엉,ko
 Q180462,Salomon Armand Magloire Kalou,en
 Q180462,Salomon Kalou,en
 Q180462,살로몬 아르망 마글루아르 칼루,ko
@@ -12413,6 +12515,8 @@ Q18062338,무니르 모하메디,ko
 Q18062375,Pedro Nuno,en
 Q18062375,Pedro Nuno Fernandes Ferreira,en
 Q1806407,Larvik Turn & IF,en
+Q18066870,Patrick Berg,en
+Q18066870,파트리크 베르그,ko
 Q1806838,Lateef Elford-Alliyu,en
 Q1807026,FC Rosengård,en
 Q1807026,FC 로셍오르드,ko
@@ -12466,6 +12570,14 @@ Q180939,Peter Crouch,en
 Q180939,Peter James Crouch,en
 Q180939,크라우치,ko
 Q180939,피터 크라우치,ko
+Q180941,Jeong U-yeong,en
+Q180941,Jung Woo Young,en
+Q180941,Jung Woo-young,en
+Q180941,Woo-Young Jung,en
+Q180941,Woo-young Jung,en
+Q180941,Wooyoung Jung,en
+Q180941,鄭又榮,ko
+Q180941,정우영,ko
 Q1809423,Layvin Kurzawa,en
 Q1809423,Layvin Marc Kurzawa,en
 Q1809423,레뱅 퀴르자와,ko
@@ -12777,6 +12889,8 @@ Q18224489,Orbelín Pineda,en
 Q18224489,Orbelín Pineda Alvarado,en
 Q18224489,오르벨린 피네다,ko
 Q1822470,Leça F.C.,en
+Q18224850,Guido Rodríguez,en
+Q18224850,귀도 로드리게스,ko
 Q18225037,Tolgahan Çiçek,en
 Q18225040,Rigino Cicilia,en
 Q18225079,Rick Dekker,en
@@ -12826,9 +12940,6 @@ Q182459,Júlio César Soares Espíndola,en
 Q182459,줄리우 세자르,ko
 Q182459,줄리우 세자르 소아레스 에스핀돌라,ko
 Q182459,줄리우 세자르 소아리스 이스핀돌라,ko
-Q182482,Álvaro Domínguez,en
-Q182482,Álvaro Domínguez Soto,en
-Q182482,알바로 도밍게스 소토,ko
 Q18249267,Ola Adeyemo,en
 Q18249267,Olajuwon Bamidele Adeyemo,en
 Q1824989,FC Berghuizen,en
@@ -12867,6 +12978,7 @@ Q18280,Kirkham & Wesham,en
 Q18280,Kirkham & Wesham F.C.,en
 Q18280,Kirkham & Wesham Football Club,en
 Q18280,The Coasters,en
+Q1828020,Al-Nasser SC,en
 Q18283,AUFC,en
 Q18283,Ashton,en
 Q18283,Ashton United,en
@@ -13238,6 +13350,7 @@ Q18411591,Europa Point F.C.,en
 Q18411591,Europa Point Football Club,en
 Q18411750,Mücahit Ceylan,en
 Q18412828,Safa Serbest,en
+Q1841321,Willem II,en
 Q18413465,Umut Sönmez,en
 Q18415943,Taha Kenanoğlu,en
 Q18415953,Yasin Ozan,en
@@ -13831,6 +13944,10 @@ Q18616995,Ruben Ira Loftus-Cheek,en
 Q18616995,Ruben Loftus-Cheek,en
 Q18616995,루빈 로프터스치크,ko
 Q18616995,루빈 아이라 로프터스치크,ko
+Q18617137,Gerson,en
+Q18617137,Gerson Santos Putin,en
+Q18617137,Gérson,en
+Q18617137,제르송 산투스 다 시우바,ko
 Q18619158,Adam Buksa,en
 Q18619158,아담 북사,ko
 Q18619215,Marvin Diop,en
@@ -13999,7 +14116,7 @@ Q18638086,Francisco Manuel Tena Jaramillo,en
 Q18638086,Francisco Tena,en
 Q18638090,Kwame Blair Thomas,en
 Q18638090,Kwame Thomas,en
-Q18638102,Harry Stefano Toffolo,en
+Q18638102,Harry Stefano Toffolo,mul
 Q18638102,Harry Toffolo,en
 Q18638116,Aaron Patrick Tumwa,en
 Q18638116,Aaron Tumwa,en
@@ -14162,6 +14279,8 @@ Q18692851,Jordi van Stappershoef,en
 Q18692852,Bart Straalman,en
 Q18692861,Daryl Werker,en
 Q18692906,Vahid Hambo,en
+Q18700901,Masaya Okugawa,en
+Q18700901,오쿠가와 마사야,ko
 Q18703,West Didsbury & Chorlton A.F.C.,en
 Q18704871,Wes Atkinson,en
 Q18704871,Wesley Atkinson,en
@@ -14404,6 +14523,8 @@ Q187528,Royal Sporting Club Anderlecht,en
 Q18753,Roberto Trashorras,en
 Q18753,Roberto Trashorras Gayoso,en
 Q18763776,Clifford Aboagye,en
+Q18763924,João António Antunes Carvalho,en
+Q18763924,João Carvalho,en
 Q18763967,Zach Clough,en
 Q18763967,Zach Paul John Clough,en
 Q18763980,Jack Cowgill,en
@@ -14577,6 +14698,8 @@ Q188841,Fortaleza,en
 Q188841,Fortaleza E.C.,en
 Q188841,Fortaleza Esporte Clube,en
 Q188841,포르탈레자 EC,ko
+Q18891568,Vitor Hugo,en
+Q18891568,Vitor Hugo Franchescoli de Souza,en
 Q1889697,VDZ,en
 Q188983,Georgios Karagkounis,en
 Q188983,Giorgos Karagounis,en
@@ -15242,6 +15365,13 @@ Q193000,브루노 알베스,ko
 Q193000,브루누 아우비스,ko
 Q193000,브루누 알베스,ko
 Q1930437,Kristof D'haene,en
+Q1930695,Paul Jose M'Poku,en
+Q1930695,Paul Jose MPoku,en
+Q1930695,Paul Mpoku,en
+Q1930695,Paul-Jose M'Poku,en
+Q1930695,Paul-José M'Poku,en
+Q1930695,Paul-José M'Poku Ebunge,en
+Q1930695,폴조제 음포쿠 에분기,ko
 Q19309279,SpVg Schonnebeck,en
 Q1931,Cedric Carrasso,en
 Q1931,Cedric Pascal Regis Carrasso,en
@@ -15680,10 +15810,9 @@ Q19509,Stade Rennais Football Club,en
 Q19509,렌,ko
 Q19509,스타드 렌,ko
 Q19509,스타드 렌 FC,ko
-Q19509544,Fede Valverde,en
-Q19509544,Federico Santiago Valverde Dipetta,en
+Q19509544,Fede Valverde,mul
+Q19509544,Federico Santiago Valverde Dipetta,mul
 Q19509544,Federico Valverde,en
-Q19509544,put,en
 Q19509544,페데리코 발베르데,ko
 Q19509874,Calvin Ronald Verdonk,en
 Q19509874,Calvin Verdonk,en
@@ -15902,6 +16031,7 @@ Q19576917,Janio Bikel Figueiredo da Silva,en
 Q19577036,Dreams FC,en
 Q19577036,Dreams Football Club,en
 Q19577036,드림즈 FC,ko
+Q19577311,Mons Calpe S.C.,en
 Q19577390,Dragoș Ionuț Nedelcu,en
 Q19577390,Dragoș Nedelcu,en
 Q19577397,Sid Nelson,en
@@ -16124,7 +16254,7 @@ Q19609825,George William Byers,en
 Q196107,Caps,en
 Q196107,Vancouver Caps,en
 Q196107,Vancouver Caps FC,en
-Q196107,Vancouver Whitecaps,mul
+Q196107,Vancouver Whitecaps,en
 Q196107,Vancouver Whitecaps FC,en
 Q196107,Vancouver Whitecaps Football Club,en
 Q196107,Whitecaps,en
@@ -16174,6 +16304,7 @@ Q196179,Abel Tamata,en
 Q196179,Abel Tezzy Tamata,en
 Q196179,아벨 타마타,ko
 Q196179,아벨 테지 타마타,ko
+Q19618820,U.S. de Lège-Cap-Ferret,en
 Q196219,Henrikh Mkhitaryan,en
 Q196219,"Mkhitaryan, Henrikh",en
 Q196219,헨리흐 므히타랸,ko
@@ -16279,6 +16410,8 @@ Q1966238,Wadi Degla SC,en
 Q19662444,Ivan Sunjic,mul
 Q19662444,Ivan Šunjić,en
 Q19662444,이반 슈니치,ko
+Q19662767,Karol Świderski,en
+Q19662767,카롤 시비데르스키,ko
 Q19662815,Lucas Possignolo,en
 Q19662853,Giannis Mystakidis,en
 Q19662853,Yannis Mystakidis,en
@@ -16350,6 +16483,9 @@ Q19698526,James Davis,en
 Q19708656,Gabriel Fernando de Jesus,en
 Q19708656,Gabriel Jesus,en
 Q19708656,가브리에우 제주스,ko
+Q19709176,Gustavo Henrique Furtado Scarpa,en
+Q19709176,Gustavo Scarpa,en
+Q19709176,구스타부 스카르파,ko
 Q197093,Zeytinburnuspor,en
 Q1971820,Sharks F.C.,en
 Q1971820,Sharks Football Club,en
@@ -16364,6 +16500,7 @@ Q1973081,Mervue United A.F.C.,en
 Q1974480,FC Gubkin,en
 Q19748527,Nicolas Abdat,en
 Q1975129,FC Dynamo GTS Stavropol,en
+Q1975138,FC Sibiryak Bratsk,en
 Q19754212,Moussa Marega,en
 Q19754212,무사 마레가,ko
 Q19757096,Jose Antonio Miranda,en
@@ -16379,6 +16516,9 @@ Q19758599,Shaquille Alphonso McDonald,en
 Q19758599,Shaquille McDonald,en
 Q19760517,Sergi Palencia,en
 Q19760517,Sergi Palencia Hurtado,en
+Q197697,Alex Manninger,en
+Q197697,Alexander Manninger,mul
+Q197697,알렉스 마닝거,ko
 Q19773058,Lorenzo Pellegrini,en
 Q19773058,로렌초 펠레그리니,ko
 Q197769,Lam Zhi Gin,en
@@ -16514,6 +16654,8 @@ Q1988686,Douglas Pereira dos Santos,mul
 Q1988686,도글라스 페레이라 두스 산투스,ko
 Q1988767,Accra Great Olympics F.C.,en
 Q1988767,Great Olympics,en
+Q19888012,Kieran Tierney,en
+Q19888012,키어런 티어니,ko
 Q19888442,Dries Wouters,en
 Q19888567,Lukas Fröde,en
 Q1988873,Jasmin Kurtic,mul
@@ -16810,6 +16952,7 @@ Q2005608,프레드리크 울베스타,ko
 Q20056548,Kingsley Fobi,en
 Q20056621,Musa Auwal Yahaya,en
 Q20056621,Musa Yahaya,en
+Q20056621,무사 야하야,ko
 Q20056623,Yaw Yeboah,en
 Q20058788,Joe Wilkinson,en
 Q20058788,Joseph Francis Wilkinson,en
@@ -16849,6 +16992,8 @@ Q20089305,Nicolas Jean-Paul Noel Janvier,en
 Q20089305,Nicolas Jean-Paul Noël Janvier,en
 Q2008976,SVV Scheveningen,en
 Q20090069,Ruben Aguilar,en
+Q20090180,Fredrik Aursnes,en
+Q20090180,프레드리크 아우르스네스,ko
 Q20090219,Mattia Bani,en
 Q20090225,Nicolò Barella,en
 Q20090225,니콜로 바렐라,ko
@@ -17094,6 +17239,7 @@ Q202645,Adrian Mutu,en
 Q202645,무투,ko
 Q202645,아드리안 무투,ko
 Q2027156,FC Poltava,en
+Q2027265,Knattspyrnufélag Vesturbæjar,en
 Q2027718,Al-Khaleej Club of Saihat,en
 Q2027718,Al-Khaleej FC,en
 Q2027718,Khaleej FC,en
@@ -17482,7 +17628,7 @@ Q20631010,시모네 엠마누엘로,ko
 Q20631125,Telmo Gonçalves,en
 Q2063279,Piedra,ko
 Q2063279,Óscar Duarte,en
-Q2063279,Óscar Esaú Duarte Gaitán,ko
+Q2063279,Óscar Esaú Duarte Gaitán,en
 Q2063279,오스카르 두아르테,ko
 Q206350,Chipolopo Boys,en
 Q206350,Zambia men's national football team,en
@@ -17530,6 +17676,8 @@ Q20641406,Simone Rosso,en
 Q20641409,Emanuele Rovini,en
 Q20641415,Ruca,en
 Q20641415,Rui Pedro Coimbra Chaves,en
+Q20641434,Diadie Samassékou,en
+Q20641434,디아디 사마세쿠,ko
 Q20641441,Bruno Araújo dos Santos,en
 Q20641448,Jérôme Scolan,en
 Q20641488,Fadil Sido,en
@@ -17625,6 +17773,7 @@ Q20675980,사네르 베르게,ko
 Q20676057,Florencia Bonsegundo,en
 Q20676057,플로렌시아 본세군도,ko
 Q20676495,Laros Duarte,en
+Q20676495,Laros Michael D'Encarnação Duarte,en
 Q20676721,Gelson,en
 Q20676721,Gelson Dala,en
 Q20676721,Jacinto Muondo Dala,en
@@ -17691,6 +17840,9 @@ Q2071136,세르지우 올리베이라,ko
 Q20711980,Ohio State Buckeyes men's soccer,en
 Q207157,Zlatko Junuzović,en
 Q207157,즐라트코 유누조비치,ko
+Q207158,Zlatko Dedić,en
+Q207158,Zlatko Dedič,mul
+Q207158,즐라트코 데디치,ko
 Q20716703,Wesley,en
 Q20716703,Wesley Moraes Ferreira da Silva,en
 Q20716740,Billal Sebaihi,en
@@ -17798,6 +17950,9 @@ Q20744994,Dylan Louiserre,en
 Q20745021,Răzvan Gabriel Marin,en
 Q20745021,Răzvan Marin,en
 Q20745021,러즈반 마린,ko
+Q20745027,Giannis Masouras,en
+Q20745027,Ioannis Masouras,en
+Q20745027,Yannis Masouras,en
 Q20745071,Nordi Mukiele,en
 Q20745071,Nordi Mukiele Mulere,en
 Q20745071,노르디 무키엘레,ko
@@ -17806,6 +17961,8 @@ Q20745226,Martin Regali,en
 Q20745226,Martin Regáli,en
 Q20745237,Yann Rolim,en
 Q20745237,Yann del Pino Rolim,en
+Q20745286,Alexander Schlager,en
+Q20745286,알렉산더 슐라거,ko
 Q207462,F.C. Metalist Kharkiv,en
 Q207462,F.C. Metalist Kharkov,en
 Q207462,FC Metalist Kharkiv,en
@@ -17838,6 +17995,11 @@ Q2075390,Peter Hackenberg,en
 Q2075390,페터 하켄베르크,ko
 Q2075500,Michel Herrero,en
 Q2075500,Miguel Alfonso Herrero,en
+Q207647,Lawrence Siphiwe Tshabalala,en
+Q207647,Siphiwe Tshabalala,en
+Q207647,시피웨 차발랄라,ko
+Q20767912,Borna Barišić,en
+Q20767912,보르나 바리시치,ko
 Q2076838,James Musa,en
 Q2076838,James Mzamo Musa,en
 Q2076838,제임스 무사,ko
@@ -17926,6 +18088,9 @@ Q2081225,Julio Arca,en
 Q2081399,Richard Chaplow,en
 Q2081399,Richard David Chaplow,en
 Q2081540,Thanasis Karagounis,en
+Q20816441,César Montes,en
+Q20816441,San Roge,en
+Q20816441,세사르 몬테스,ko
 Q2081716,Sam Baldock,en
 Q2081716,"Samuel Edward Thomas ""Sam"" Baldock",en
 Q2081716,샘 볼독,ko
@@ -18145,6 +18310,7 @@ Q208933,Philip Nikodem Jagielka,en
 Q208933,필 야기엘카,ko
 Q208933,필 자기엘카,ko
 Q208933,필립 니코뎀 야기엘카,ko
+Q20894677,Leonardo Koutris,en
 Q20895039,Marc Caballé,en
 Q20895094,Lynden Gooch,en
 Q20895094,Lynden Jack Gooch,en
@@ -18250,6 +18416,8 @@ Q2096265,Yoni Buyens,en
 Q209640,MŠK Žilina,en
 Q209640,MŠK 질리나,ko
 Q209640,ŠK Žilina,en
+Q2096473,Al Jahra SC,en
+Q2096473,알자라 SC,ko
 Q209650,Jari Litmanen,ko
 Q209650,Jari Olavi Litmanen,mul
 Q209650,리트마넨,ko
@@ -18356,6 +18524,7 @@ Q20991512,Jordan Leborgne,en
 Q20992981,Benjamin Henrichs,en
 Q20992981,Benjamin Paa Kwesi Henrichs,en
 Q20992981,베냐민 헨릭스,ko
+Q20993793,Qazim Laçi,en
 Q20993931,Thierry Ambrose,en
 Q20993931,Thierry Winston Jordan Ambrose,en
 Q20994052,Lionel Enguene,en
@@ -18471,6 +18640,8 @@ Q21033476,Asil Kaan Güler,en
 Q21033648,Park In-hyeok,en
 Q21033648,朴仁赫,ko
 Q21033648,박인혁,ko
+Q21034826,Ádám Nagy,en
+Q21034826,너지 아담,ko
 Q21034911,Mustafa Öztürk,en
 Q21035853,Yannick Deichmann,en
 Q21039358,Rubén Palomeque,en
@@ -18492,7 +18663,7 @@ Q21043072,Azat Filiz,en
 Q21044405,Gabriel Alonso Suazo Urbina,en
 Q21044405,Gabriel Suazo,en
 Q21044763,Michele Rocca,en
-Q210453,Thiago Emiliano da Silva,en
+Q210453,Thiago Emiliano da Silva,mul
 Q210453,Thiago Silva,en
 Q210453,치아구 시우바,ko
 Q210453,티아구 실바,ko
@@ -18880,6 +19051,11 @@ Q212229,안드레아 폴리,ko
 Q212269,Valenciennes F.C.,en
 Q212269,Valenciennes FC,en
 Q212269,발랑시엔 FC,ko
+Q212363,Silvio Proto,en
+Q212363,실비오 프로토,ko
+Q2123766,Fräntorps IF,en
+Q2123766,Qviding FIF,en
+Q2123766,Qviding Fräntorps Idrottsförening,en
 Q2124104,C.S. Vise,en
 Q2124104,C.S. Visé,en
 Q212490,Tromsø IL,en
@@ -19097,6 +19273,8 @@ Q214903,Diego Godín,en
 Q214903,Diego Roberto Godín Leal,en
 Q214903,디에고 고딘,ko
 Q2149108,Brecht Capon,en
+Q21493759,Aleksandr Filin,en
+Q21493759,Oleksandr Filin,en
 Q21493767,Iñaki Olaortua,en
 Q214940,Club Estudiantes de La Plata,en
 Q214940,Estudiantes LP,en
@@ -19174,6 +19352,10 @@ Q215522,Guillermo Ochoa,en
 Q215522,Memo Ochoa,en
 Q215522,Memorándum de Paco,en
 Q215522,기예르모 오초아,ko
+Q215527,Domenico Criscito,en
+Q215527,Mimmo Criscito,en
+Q215527,도메니코 크리스키토,ko
+Q215527,도메니코 크리시토,ko
 Q2155470,ASOA Valence,en
 Q2155488,Theo Zwarthoed,en
 Q21554897,Fabian Reese,en
@@ -19284,7 +19466,7 @@ Q21621168,Rúben Dias,en
 Q21621168,Rúben dos Santos Gato Alves Dias,mul
 Q21621168,후벵 디아스,ko
 Q21621174,Diego Johannesson,en
-Q21621180,Issa Diop,en
+Q21621180,Issa Dioo,en
 Q21621180,Issa Laye Lucas Jean Diop,mul
 Q21621180,이사 디오프,ko
 Q21621183,Célestin Djim,en
@@ -19369,6 +19551,7 @@ Q21622556,Jarrett Anthony Rivers,en
 Q21622556,Jarrett Rivers,en
 Q21622566,Roberto Suárez Pier,en
 Q21622566,Róber,en
+Q21622574,Pedro Filipe Figueiredo Rodrigues,en
 Q21622687,Bassala Sambou,en
 Q21622759,Christian Scales,en
 Q21622759,Christian Stephen Scales,en
@@ -19570,8 +19753,8 @@ Q218372,스타드 브레스트,ko
 Q218372,스타드 브레스트 29,ko
 Q218394,Frederic Kanoute,en
 Q218394,Frederic Oumar Kanoute,en
+Q218394,Frédéric Kanouté,en
 Q218394,Frédéric Oumar Kanouté,en
-Q218394,Frédéric baldi,en
 Q218394,프레데리크 카누테,ko
 Q218394,프레데릭 카누테,ko
 Q218394,프레드릭 카누테,ko
@@ -19631,9 +19814,6 @@ Q218987,Enda Stevens,en
 Q218987,엔다 스티븐스,ko
 Q218987,엔다 존 스티븐스,ko
 Q219025,Miquel Nelom,en
-Q219026,Zoltan Stieber,en
-Q219026,Zoltán Stieber,en
-Q219026,슈티에베르 졸탄,ko
 Q219030,Joe Bennett,en
 Q219030,Joe Bennett (footballer),en
 Q219030,"Joseph ""Joe"" Bennett",en
@@ -20030,12 +20210,12 @@ Q221695,Grêmio FBPA,en
 Q221695,Grêmio Foot-Ball Porto Alegrense,en
 Q221695,Grêmio Football Porto Alegrense,en
 Q221695,그레미우,ko
-Q221702,KR,en
+Q221702,KR,mul
 Q221702,KR Reykjavík,en
 Q221702,KR 레이캬비크,ko
 Q221702,KR-ingar,en
 Q221702,Knattspyrnufelag Reykjavikur,en
-Q221702,Knattspyrnufélag Reykjavíkur,en
+Q221702,Knattspyrnufélag Reykjavíkur,mul
 Q2217136,Şamil Çinaz,en
 Q221752,F91 Diddeleng,en
 Q221752,F91 Dudelange,en
@@ -20048,7 +20228,7 @@ Q221882,Newells Old Boys,en
 Q221882,Newell’s Old Boys,mul
 Q221882,뉴웰스 올드 보이스,ko
 Q221927,De Graafschap,en
-Q221927,Vereniging Betaald Voetbal De Graafschap,mul
+Q221927,Vereniging Betaald Voetbal De Graafschap,en
 Q221927,더 그라프샤프,ko
 Q221927,더 흐라프샤프,ko
 Q221927,더 흐라프스합,ko
@@ -20079,7 +20259,7 @@ Q2220788,UDA Gramenet,en
 Q2220831,RKVVL/Polaris,en
 Q2221281,Sandro Sirigu,en
 Q222151,João Filipe Iria Santos Moutinho,mul
-Q222151,João Moutinh0,en
+Q222151,João Moutinho,en
 Q222151,주앙 모티뉴,ko
 Q222151,주앙 무티뉴,ko
 Q222151,주앙 무팅요,ko
@@ -20315,6 +20495,9 @@ Q2254067,A.C. Mezzocorona,en
 Q2254295,Tomasz Hołota,en
 Q2254507,Josemar Makiavala,en
 Q2255709,Rovigo Calcio,en
+Q225583,Mikkel Morgenstar Pålssønn Diskerud,mul
+Q225583,Mix Diskerud,en
+Q225583,미켈 디스케루트,ko
 Q2256026,Steef Nieuwendaal,en
 Q2257778,RKSV Sittardia,en
 Q225825,Fabian Klos,en
@@ -20405,6 +20588,7 @@ Q2272518,André Filipe Bernardes Santos,mul
 Q2273244,Sergiu Buș,en
 Q2273244,세르지우 부슈,ko
 Q2273305,Serhat Çağlar,en
+Q2273307,Serhat Akyüz,en
 Q2273765,Serkan Yanık,en
 Q2273813,Tritium Calcio 1908,en
 Q2274029,Sertan Vardar,en
@@ -20487,6 +20671,9 @@ Q2294839,Smail Morabit,en
 Q22949002,Karim Achahbar,en
 Q22951255,Marcus Rashford,en
 Q22951255,마커스 래쉬포드,ko
+Q22951388,Maximilian Wober,en
+Q22951388,Maximilian Wöber,en
+Q22951388,막시밀리안 뵈버,ko
 Q22955421,Levi Opdam,en
 Q22958386,Jean Ambrose,en
 Q22958457,Chidozie Awaziem,en
@@ -20547,6 +20734,8 @@ Q2300455,Jefferson Antonio Montero Vite,mul
 Q2300455,Jefferson Montero,en
 Q2300455,제퍼슨 몬테로,ko
 Q2300455,헤페르손 몬테로,ko
+Q23005609,Tomoki Iwata,en
+Q23005609,이와타 도모키,ko
 Q23005911,Génération Foot,en
 Q2300744,Manuel Ortiz Toribio,en
 Q2300762,Matthew Anthony Briggs,en
@@ -20770,7 +20959,6 @@ Q2332493,보타포구 FC,ko
 Q2334684,A.O. Trikala,en
 Q2334684,Trikala F.C.,en
 Q2334855,Khaleem Hyland,en
-Q2335020,FK Sloga Kraljevo,en
 Q2335382,Rob Schoofs,en
 Q2335382,롭 스호프스,ko
 Q2335607,Excelsior Maassluis,en
@@ -21259,8 +21447,6 @@ Q2404765,Jimmy De Jonghe,en
 Q2404765,Jimmy Ronie Rudy De Jonghe,en
 Q2404765,지미 더용어,ko
 Q2404765,지미 로니 뤼디 더용어,ko
-Q240492,Marco Storari,en
-Q240492,마르코 스토라리,ko
 Q24050378,Kevin Oghenetega Tamaraebi Bakumo-Abraham,en
 Q24050378,Tammy Abraham,en
 Q24050378,태미 에이브러햄,ko
@@ -21282,6 +21468,8 @@ Q24061178,캘럼 스타일스,ko
 Q24061870,Steffen Tigges,en
 Q2406354,Yohann Eudeline,en
 Q2406451,AS Mangasport,en
+Q24068400,Patrick Pentz,en
+Q24068400,파트리크 펜츠,ko
 Q24068577,Fikayo Tomori,en
 Q24068577,Oluwafikayomi Oluwadamilola Tomori,en
 Q24068577,피카요 토모리,ko
@@ -21319,6 +21507,13 @@ Q2408560,Funso Ojo,en
 Q2408705,US Senart-Moissy,en
 Q2408705,US Sénart-Moissy,en
 Q24089506,Lukas Mühl,en
+Q2409513,Youssef Msakni,en
+Q2409513,유세프 므사크니,ko
+Q2409638,Ahmed Elsayed Ali Elsayed Hegazi,en
+Q2409638,Ahmed Elsayed Ali Elsayed Hegazy,en
+Q2409638,Ahmed Hegazi,en
+Q2409638,Ahmed Hegazy,en
+Q2409638,아흐메드 헤가지,ko
 Q2410944,Academico de Viseu,en
 Q2410944,Academico de Viseu FC,en
 Q2410944,Académico de Viseu FC,en
@@ -21468,6 +21663,7 @@ Q2440999,마르틴 브레이스웨이트,ko
 Q2441844,Toni Andreas Leistner,en
 Q2441844,Toni Leistner,en
 Q2441976,Tonia Tisdell,en
+Q2442210,FC Hlučín,en
 Q2442242,Nicola Rigoni,en
 Q2442746,Nebojša Pavlović,en
 Q244317,FC Pyunik,en
@@ -21841,6 +22037,7 @@ Q2481331,아르투르 이오니처,ko
 Q248141,Maya Yoshida,en
 Q248141,Yoshida Maya,en
 Q248141,요시다 마야,ko
+Q2481758,Yevhen Yevhenovych Shakhov,en
 Q2481812,Salvador Agra,en
 Q2481829,Scott Allan,en
 Q2481829,스콧 앨런,ko
@@ -21862,6 +22059,9 @@ Q248228,Luis Alberto Romero Alconchel,en
 Q248228,루이스 알베르토 로메로,ko
 Q24827177,Carlos Pomares,en
 Q24827177,Carlos Pomares Rayo,en
+Q24828730,Sporting,en
+Q24828730,Sporting Football Club,en
+Q24828730,albos,en
 Q2482986,VV Haarsteeg,en
 Q24831872,Jiangsu L.F.C.,en
 Q24831872,Jiangsu Suning L.F.C,en
@@ -21967,6 +22167,9 @@ Q249612,CS 에멜레크,ko
 Q249612,Club Sport Emelec,en
 Q249612,Emelec,en
 Q249612,Tricampeones,en
+Q24961840,Tahith Chong,en
+Q24961840,Tahith Jose Girigorio Djorkaef Chong,mul
+Q24961840,타히트 총,ko
 Q24961842,Oriana Altuve,en
 Q24961842,Oriana Yoselyn Altuve Mancilla,en
 Q249633,CD El Nacional,en
@@ -22026,7 +22229,6 @@ Q2504228,CF Badalona Futur,en
 Q2504228,UE 랴고스테라,ko
 Q2505672,FK Srem,en
 Q2505717,FK Dinamo Vranje,en
-Q2505780,FK Proleter Novi Sad,en
 Q2506413,EC Pelotas,en
 Q2506413,Esporte Clube Pelotas,en
 Q2506413,Pelotas,en
@@ -22203,6 +22405,8 @@ Q2534570,Alassane Tambe,en
 Q2534570,Alassane També,en
 Q2534570,알라산 탐베,ko
 Q25349789,Younes Bnou Marzouk,en
+Q25350200,Georgios Masouras,en
+Q25350200,Giorgos Masouras,en
 Q253576,Dániel Tőzsér,en
 Q253576,퇴제르 다니엘,ko
 Q2536648,Corinthians Paranaense,en
@@ -22355,7 +22559,6 @@ Q256875,케빈 필립스,ko
 Q2569908,Omonia Aradippou,en
 Q2570033,Brisbane Strikers,en
 Q2570033,브리즈번 스트라이커스 FC,ko
-Q257025,Marcel Schäfer,en
 Q257078,Pordenone Calcio,en
 Q257078,Pordenone F.C.,en
 Q257078,Pordenone FC,en
@@ -22441,6 +22644,9 @@ Q259247,Ernesto Javier Chevantón,en
 Q259247,Ernesto Javier Chevantón Espinosa,en
 Q259247,에르네스토 하비에르 체반톤 에스피노사,ko
 Q259247,하비에르 체반톤,ko
+Q25935553,Sebastian Szymański,en
+Q25935553,sebo,en
+Q25935553,세바스티안 시만스키,ko
 Q2595427,Lawrence Ian Vigouroux,en
 Q2595427,Lawrence Vigouroux,en
 Q2597433,German Pacheco,en
@@ -22459,7 +22665,7 @@ Q2600317,Yilmaz Örtülü,en
 Q26004790,Jacob Lungi Sørensen,en
 Q26004790,Jacob Sørensen,en
 Q2600544,Yohan Croizet,en
-Q26007180,Emmanuel Bonaventure Dennis,en
+Q26007180,Emmanuel Bonaventure Dennis,mul
 Q26007180,Emmanuel Dennis,en
 Q26007180,엠마누엘 데니스,ko
 Q2601626,Ilioupoli S.C.,en
@@ -22768,6 +22974,8 @@ Q2631275,David Wright,en
 Q2631312,Esporte Clube XV de Novembro,en
 Q2631312,XV de Piracicaba,en
 Q2631312,XV 지 노벰브루,ko
+Q2631531,Roderick,en
+Q2631531,Roderick Jefferson Gonçalves Miranda,mul
 Q2631577,FC Volga Ulyanovsk,en
 Q2632013,Jamie Ness,en
 Q2632013,제이미 네스,ko
@@ -23304,6 +23512,10 @@ Q2699470,Benjamin Moukandjo,en
 Q2699470,Benjamin Moukandjo Bile,en
 Q2699470,Benjamin Moukandjo Bilé,en
 Q2699470,벵자맹 무칸조,ko
+Q2699502,Fernando Lopes dos Santos Varela,mul
+Q2699502,Fernando Varela,en
+Q2699502,페르난두 로페스 두스산투스 바렐라,ko
+Q2699502,페르난두 바렐라,ko
 Q2699666,Alejandro Arribas,en
 Q2699666,알레한드로 아리바스,ko
 Q2699666,알레한드로 아리바스 가리도,ko
@@ -23336,6 +23548,10 @@ Q270080,자이르 축구 국가대표팀,ko
 Q270080,콩고 민주 공화국 축구 국가대표팀,ko
 Q2701276,Jay Tabb,en
 Q2701348,Anthony Gerrard,en
+Q2701361,Fyodor Kudryashov,en
+Q2701361,Fyodor Vasilievich Kudryashov,en
+Q2701361,Fyodor Vasilyevich Kudryashov,en
+Q2701361,표도르 쿠드랴쇼프,ko
 Q2701593,Borja Bastón,en
 Q2701593,Borja González Tomás,en
 Q2701593,보르하 바스톤,ko
@@ -23609,6 +23825,7 @@ Q274304,Edouard Duplan,en
 Q274304,Édouard Duplan,en
 Q2743097,CF Talavera de la Reina,en
 Q2743097,CF 탈라베라데라레이나,ko
+Q2743725,Futbol Club Penya d'Andorra,en
 Q2744247,Kalamata F.C.,en
 Q2744301,Lower Hutt City AFC,en
 Q2744301,로어허트 시티 AFC,ko
@@ -23756,6 +23973,7 @@ Q2757426,FK 두클라 프라하,ko
 Q27576606,Shayon Adam Harrison,en
 Q27576606,Shayon Harrison,en
 Q2757678,Danny Butterfield,en
+Q2757703,Zymer Bytyqi,en
 Q27580592,Korka Fall,en
 Q27580592,코르카 팔,ko
 Q2758078,Darwin Daniel Machis Marcan,en
@@ -24013,6 +24231,10 @@ Q27859514,에드손 알바레스,ko
 Q27859514,에드손 알바레즈,ko
 Q27861550,Jasper Van Heertum,en
 Q27861550,Jasper van Heertum,en
+Q2786592,Boubacar Mansaly,en
+Q27870147,ATSV Stadl-Paura,en
+Q27870147,ATSV 슈타들-파우라,ko
+Q27870147,Arbeiter-Turn- und Sportverein Stadl-Paura,en
 Q27870240,FC Admira Wacker Mödling Amateure,en
 Q27870240,FCM Traiskirchen,en
 Q27881421,Riccardo Orsolini,en
@@ -24093,6 +24315,9 @@ Q27957334,니콜라 카티치,ko
 Q27960175,Manuel Ugarte,en
 Q27960175,Manuel Ugarte Ribeiro,en
 Q27960175,마누엘 우가르테,ko
+Q27963346,Chiangmai United F.C.,en
+Q27963346,JL Chiangmai United F.C.,en
+Q27963346,치앙마이 유나이티드 FC,ko
 Q2796363,Benjamin Lambot,en
 Q27964149,Ceramica Cleopatra FC,en
 Q27964149,Ceramica Cleopatra Football Club,en
@@ -24255,6 +24480,7 @@ Q2819143,A.E.K.,en
 Q2819143,AEK,en
 Q2819319,Proodeftiki Neolaia F.C.,en
 Q2819494,AS Dakar Sacré-Cœur,en
+Q2819504,AS Excelsior,en
 Q28195113,U.S. Siracusa,en
 Q28195113,US Siracusa,en
 Q28195113,Unione Sportiva Siracusa,en
@@ -24422,6 +24648,11 @@ Q28451187,Real Betis C,en
 Q2845537,Anastasios Bakasetas,en
 Q2845537,Tasos Bakasetas,mul
 Q2846400,Andrea Pisani,en
+Q284668,Al-Zawra'a SC,en
+Q284668,알 자우라,ko
+Q284668,알 자우라 SC,ko
+Q284668,알자우라,ko
+Q284668,알자우라 SC,ko
 Q28474392,Anastasios Chatzigiovanis,en
 Q28474392,Tasos Chatzigiovanis,en
 Q284784,James Joseph McClean,en
@@ -24479,9 +24710,16 @@ Q28561068,알레산드로 바스토니,ko
 Q2856175,Riccardo Saponara,en
 Q2856175,리카르도 사포나라,ko
 Q2856376,Düzcespor,en
+Q285649,Al-Wehdat SC,en
+Q285649,알웨흐닷,ko
 Q285684,Marten Elco de Roon,en
 Q285684,Marten de Roon,en
 Q285684,마르턴 더 론,ko
+Q285685,Ramazan Özcan,en
+Q285685,라마잔 외즈잔,ko
+Q285702,Al-Faisaly SC,en
+Q285702,Al-Faisaly Sports Club,en
+Q285702,알파이살리,ko
 Q285722,Gaziantepspor,en
 Q285722,가지안테프스포르,ko
 Q2857737,AS Pelican,en
@@ -24775,7 +25013,7 @@ Q289289,AC Legnano,en
 Q289289,AC 레냐노,ko
 Q289289,Associazione Calcio Legnano,mul
 Q289289,Associazione Football Legnano,en
-Q289289,Football Club Legnano,mul
+Q289289,Football Club Legnano,en
 Q289289,Legnano Calcio,en
 Q289289,Legnano Football,en
 Q2892950,CS Mureșul Deva,en
@@ -24803,6 +25041,24 @@ Q289407,Atlético Club Mineros de Guayana,en
 Q289407,Club Deportivo Mineros de Guayana,en
 Q289407,Mineros,en
 Q289407,Mineros de Guayana,en
+Q289432,AC Minerven Bolivar,en
+Q289432,AC Minerven Bolivar FC,en
+Q289432,AC Minervén Bolivar,en
+Q289432,AC Minervén Bolívar FC,en
+Q289432,Asociacion Civil Minerven Bolivar Futbol Club,en
+Q289432,Asociacion Civil Minerven Futbol Club,en
+Q289432,Asociación Civil Minervén Bolívar Fútbol Club,en
+Q289432,Asociación Civil Minervén Fútbol Club,en
+Q289432,Minerven,en
+Q289432,Minerven Bolivar,en
+Q289432,Minerven F.C.,en
+Q289432,Minerven FC,en
+Q289432,Minerven Futbol Club,en
+Q289432,Minervén,en
+Q289432,Minervén Bolívar,en
+Q289432,Minervén F.C.,en
+Q289432,Minervén FC,en
+Q289432,Minervén Fútbol Club,en
 Q289482,A C Monza Brianza 1912,en
 Q289482,A. C. Monza Brianza 1912,en
 Q289482,A.C. Monza,en
@@ -25041,12 +25297,23 @@ Q290854,Associação Desportiva «Os Limianos»,en
 Q290860,A.D. Fafe,en
 Q290860,AD Fafe,en
 Q290860,Fafe,en
+Q290878,Guerreros del Sur,en
+Q290878,Municipal Pérez Zeledón,en
+Q290878,PZ,en
+Q290878,Pezeteros,en
+Q290878,Pérez Zeledón,en
+Q290878,Sureños,en
 Q290881,Aguilas CF,en
 Q290881,Águilas CF,en
 Q290884,A.D. Ovarense,en
 Q290884,AD Ovarense,en
 Q290884,Associacao Desportiva Ovarense,en
 Q290884,Associação Desportiva Ovarense,en
+Q290891,AD San Carlos,en
+Q290891,AD 산카를로스,ko
+Q290891,Asociación Deportiva San Carlos,en
+Q290891,Sancarleños,en
+Q290891,Toros del Norte,en
 Q290893,Guapileños,en
 Q290893,La Marea Roja,en
 Q290893,Rojiblancos,en
@@ -25464,6 +25731,9 @@ Q296222,Huaso,en
 Q296222,Mauricio Aníbal Isla Isla,en
 Q296222,Mauricio Isla,en
 Q296222,마우리시오 이슬라,ko
+Q296225,"Chinedu ""Edu"" Obasi Ogbuke",en
+Q296225,Chinedu Obasi,en
+Q296225,치네두 오바시,ko
 Q2962265,Chemelil Sugar F.C.,en
 Q2962265,Chemelil Sugar Football Club,en
 Q296228,APOP Kinyras FC,en
@@ -25479,12 +25749,12 @@ Q29624459,Scott Francis McTominay,en
 Q29624459,Scott McTominay,en
 Q29624459,스콧 맥토미니,ko
 Q296266,A.P.R.,en
-Q296266,APR FC,mul
+Q296266,APR FC,en
 Q296266,APR FC Kigali,en
 Q296266,Armee Patriotique Rwandaise F.C.,en
 Q296266,Armee Patriotique Rwandaise FC,en
 Q296266,Armée Patriotique Rwandaise F.C.,en
-Q296266,Armée Patriotique Rwandaise FC,mul
+Q296266,Armée Patriotique Rwandaise FC,en
 Q296266,Armée Patriotique Rwandaise Football Club,en
 Q2962908,Redbridge F.C.,en
 Q2962908,Redbridge Football Club,en
@@ -25514,6 +25784,7 @@ Q296416,Jermaine Lloyd Pennant,en
 Q296416,Jermaine Pennant,en
 Q296416,저메인 페넌트,ko
 Q296452,Theodoros Zagorakis,en
+Q296452,Thodoris Zagorakis,en
 Q296452,테오도로스 자고라키스,ko
 Q2964666,Chris Brown,en
 Q2964666,Christopher Alan Brown,en
@@ -25688,6 +25959,7 @@ Q2979954,CD Azkoyen,en
 Q2979982,CS Avion,en
 Q2980011,Sportivo Trinidense,en
 Q2980011,Triqui,en
+Q2980045,CA Lisieux,en
 Q2980052,Club athlétique bizertin,en
 Q2980226,CMS Oissel,en
 Q2980231,CO Chalons,en
@@ -25814,9 +26086,6 @@ Q298458,Association Salé,en
 Q298466,Kojo Kwadwo Asamoah,en
 Q298466,Kwadwo Asamoah,en
 Q298466,콰도 아사모아,ko
-Q298470,Simon Busk Poulsen,en
-Q298470,Simon Poulsen,en
-Q298470,시몬 포울센,ko
 Q298480,William Kvist,en
 Q298480,William Vitved Kvist,en
 Q298480,빌리암 비트베 크비스트,ko
@@ -25974,8 +26243,8 @@ Q30075256,Matthew Anthony Willock,en
 Q30075256,Matty Willock,en
 Q30080273,Romano Schmid,en
 Q30080273,로마노 슈미트,ko
+Q30089624,Lucas Paquetá,en
 Q30089624,Lucas Tolentino Coelho de Lima,mul
-Q30089624,Valentín morón,en
 Q30089624,루카스 파케타,ko
 Q3009011,Kenny van der Weg,en
 Q30092677,Bel Durel Avounou,en
@@ -26137,6 +26406,8 @@ Q303121,예니 말라티아스포르,ko
 Q30317774,Valentin Andre Henri Rosier,en
 Q30317774,Valentin André Henri Rosier,en
 Q30317774,Valentin Rosier,en
+Q3031940,A.P.O. Thermaikos Thermis,en
+Q3031940,Thermaikos Thermi S.C.,en
 Q30320323,Houboulang Mendes,en
 Q30320323,우불랑 멘데스,ko
 Q30320350,Yanis Merdji,en
@@ -26317,6 +26588,7 @@ Q3076595,FC Versailles,en
 Q3076604,FC Mantes,en
 Q3076666,FC Flers,en
 Q3076666,Flers,en
+Q3076667,FC Bassin d'Arcachon,en
 Q3076693,FF Issy,en
 Q3076693,Paris So Cœur,en
 Q3076700,FF Yzeure Allier Auvergne,en
@@ -26337,12 +26609,6 @@ Q307899,Özkan Karabulut,en
 Q3079005,Adrian Dumitru Popa,en
 Q3079005,Adrian Popa,en
 Q3079005,아드리안 포파,ko
-Q307958,Abdel Kader Ghezzal,en
-Q307958,Abdelkader Ghezzal,en
-Q307958,Abdelkader Mohamed Ghezzal,en
-Q307958,Kader Ghezzal,en
-Q307958,Mohamed Ghezzal,en
-Q307958,압델카데르 게잘,ko
 Q3079744,Fostiras Tavros F.C.,en
 Q3080299,Shillong Lajong F.C.,en
 Q3080299,Shillong Lajong Football Club,en
@@ -26543,6 +26809,7 @@ Q309890,마누슈 곤살베스,ko
 Q309890,마누초,ko
 Q309890,마누초 곤칼베스,ko
 Q309890,마테우스 아우베르투 콘트레이라스 곤살베스,ko
+Q309894,Diego Cavalieri,en
 Q3099126,Sociedade Esportiva e Recreativa Juventude,en
 Q3099240,Gaston Alexis Silva Perdomo,en
 Q3099240,Gaston Silva,en
@@ -26562,6 +26829,9 @@ Q3099791,사바 FC,ko
 Q3099905,Gaëtan Belaud,en
 Q3099905,가에탕 벨로,ko
 Q3099908,Wouter Gudde,en
+Q310007,Pedro León,en
+Q310007,Pedro León Sánchez Gil,en
+Q310007,페드로 레온,ko
 Q310022,Fernando Navarro,en
 Q310022,Fernando Navarro Corbacho,en
 Q310022,Fernando Navarro i Corbacho,en
@@ -26677,12 +26947,17 @@ Q310712,Michalis Sifakis,en
 Q310712,미할리스 시파키스,ko
 Q310713,Al-Najma,en
 Q310713,알나즈마,ko
+Q310723,Gojko Kačar,en
+Q310723,고이코 카차르,ko
+Q310723,고이코 카카르,ko
 Q310733,Simon Davies,en
 Q310733,사이먼 데이비스,ko
 Q310830,Al-Talaba SC,en
 Q310830,Talaba SC,en
 Q310830,알 탈라바,ko
 Q310830,알탈라바,ko
+Q3108385,Glacis United F.C.,en
+Q3108385,Glacis United Football Club,en
 Q3109914,Goiatuba Esporte Clube,en
 Q3110047,Southern Miss,en
 Q3110047,Southern Miss Golden Eagles,en
@@ -26773,6 +27048,8 @@ Q3117572,Groupe Sportif Consolat,en
 Q31179611,Lee Jung-moon,en
 Q31179611,李政文,ko
 Q31179611,이정문,ko
+Q31181880,FK IMT,en
+Q31181880,FK IMT Belgrade,en
 Q3118231,GD Bragança,mul
 Q3118624,Gremio Esportivo Jaciara,en
 Q3118624,Grêmio Esportivo Jaciara,en
@@ -26789,6 +27066,7 @@ Q3119201,Shahin Bushehr F.C.,en
 Q3119201,Shahin Pars Junubi Bushehr Football Club,en
 Q31192116,Esenler Erokspor,en
 Q31192131,Yeni Altındağ Belediyespor,en
+Q31193518,Hillerød Fodbold,en
 Q311941,Sebastian Coates,en
 Q311941,Sebastian Coates Nion,en
 Q311941,Sebastián Coates,en
@@ -26856,8 +27134,8 @@ Q312317,Maximiliano Gastón López,en
 Q312317,막시 로페즈,ko
 Q312360,Lisburn Distillery F.C.,en
 Q312360,Lisburn Distillery Football Club,en
-Q312374,Aleksandar Luković,en
-Q312374,알렉산다르 루코비치,ko
+Q312377,Georgios Tzavellas,en
+Q312377,예오르요스 차벨라스,ko
 Q312379,Jonas Olsson,ko
 Q312379,요나스 올손,ko
 Q312400,Alessandro Gamberini,en
@@ -26881,6 +27159,8 @@ Q312534,Kostas Mitroglou,en
 Q312534,콘스탄디노스 미트로글루,ko
 Q312659,Pierre van Hooijdonk,en
 Q312659,피에르 판호이동크,ko
+Q3126623,Hamza Younes,en
+Q3126623,Hamza Younés,en
 Q312886,Lucas Moura,en
 Q312886,Lucas Rodrigues Moura da Silva,en
 Q312886,루카스 모우라,ko
@@ -26995,11 +27275,14 @@ Q3135153,Hibernian L.F.C.,en
 Q313518,Alen Bokšić,en
 Q313518,알렌 보크시치,ko
 Q313518,알렌 복시치,ko
+Q313520,Naldo,en
+Q313520,Ronaldo Aparecido Rodrigues,en
+Q313520,나우두,ko
+Q313520,호나우두 아마레시두 로드리게스,ko
+Q313520,호나우두 아마레시두 호드리게스,ko
 Q313575,Marko Arnautovic,en
 Q313575,Marko Arnautović,en
 Q313575,마르코 아르나우토비치,ko
-Q313580,Kerlon,en
-Q313580,Kerlon Moura Souza,en
 Q313582,Javier Garrido,en
 Q313582,Javier Garrido Behobide,en
 Q313582,하비에르 가리도,ko
@@ -27132,6 +27415,7 @@ Q314661,Jaroslav Drobny,en
 Q314661,Jaroslav Drobný,en
 Q314661,야로슬라프 드로브니,ko
 Q3146651,IFK Malmö Fotboll,en
+Q3146752,INF Vichy,en
 Q314722,Halliche,en
 Q314722,Rafik Halliche,en
 Q314722,라피크 할리시,ko
@@ -27208,8 +27492,8 @@ Q316487,빅토르 산체스 마타,ko
 Q316540,Oussama Assaidi,en
 Q316540,bouwalouz,en
 Q316540,오사마 아사이디,ko
-Q316573,Paolo De Ceglie,en
-Q316573,파올로 데 첼리에,ko
+Q316586,Radosav Petrović,en
+Q316586,라도사브 페트로비치,ko
 Q31660,Foolad Mobarakeh Sepahan Football Club,en
 Q31660,Sepahan,en
 Q31660,Sepahan Esfahan,en
@@ -27287,9 +27571,6 @@ Q316932,미카엘 루스티그,ko
 Q316935,Paul David McShane,en
 Q316935,Paul McShane,en
 Q316935,폴 맥셰인,ko
-Q316989,Kew Jaliens,en
-Q316989,Kew Raffique Jaliens,en
-Q316989,케브 얄린스,ko
 Q317347,Abdul Majeed Waris,en
 Q317347,압둘 마지드 와리스,ko
 Q317389,Abdul Rahman Baba,en
@@ -27311,9 +27592,6 @@ Q3175004,Sporting Clube da Praia,en
 Q317511,Abdulkadir Özdemir,en
 Q317518,Abdul Özgen,en
 Q317518,Abdulkadir Özgen,en
-Q31760,Jussiê,en
-Q31760,Jussiê Ferreira Vieira,en
-Q31760,주시에 페헤이라 비에이라,ko
 Q317605,Abdullah Durak,en
 Q3176205,JA Drancy,en
 Q31763164,Robson Alves de Barros,en
@@ -27378,7 +27656,7 @@ Q318243,곤살로 하비에르 로드리게스,ko
 Q318307,CA Rosario Central,mul
 Q318307,Club Atletico Rosario Central,en
 Q318307,Club Atlético Rosario Central,en
-Q318307,Rosario Central,mul
+Q318307,Rosario Central,en
 Q318307,로사리오 센트랄,ko
 Q3183279,Jonas Asvedo Mendes,en
 Q3183279,Jonas Mendes,en
@@ -27395,9 +27673,9 @@ Q3183681,Jordan Clarke,en
 Q3183681,Jordan Lee Clarke,en
 Q3183681,조던 리 클라크,ko
 Q3183681,조던 클라크,ko
-Q318383,Bryan Jafet Ruiz González,en
+Q318383,Bryan Jafet Ruiz González,ko
 Q318383,Bryan Ruiz,en
-Q318383,Comadreja,en
+Q318383,Comadreja,ko
 Q318383,브리안 루이스,ko
 Q3183928,Joris van Overeem,en
 Q3183928,요리스 판 오버레임,ko
@@ -27405,6 +27683,9 @@ Q318456,Abel Hernandez,en
 Q318456,Abel Hernández,en
 Q318456,Abel Mathías Hernández Platero,en
 Q318456,아벨 에르난데스,ko
+Q318524,Jan Durica,en
+Q318524,Ján Ďurica,en
+Q318524,얀 주리차,ko
 Q3185369,Joseph Mills,en
 Q318539,Sebastien Bassong,en
 Q318539,Sébastien Bassong,en
@@ -27587,6 +27868,7 @@ Q321649,자멜 압둔,ko
 Q32171739,Shamar Amaro Nicholson,en
 Q32171739,Shamar Nicholson,en
 Q32171739,샤마르 니컬슨,ko
+Q3217285,Langon Football Club,en
 Q3218448,William Owusu,en
 Q3218448,William Owusu Acheampong,en
 Q322333,Thorsten Kirschbaum,en
@@ -27606,6 +27888,8 @@ Q322865,Erdal Kılıçaslan,en
 Q322865,에르달 클르차슬란,ko
 Q3228763,Lecsinel Jean-François,en
 Q3228763,Lescinel Jean-Francois,en
+Q322879,SCC,mul
+Q322879,SCC Berlin,en
 Q3228868,Lee Frecklington,en
 Q323045,Christopher Nöthe,en
 Q323046,Jefferey Schlupp,en
@@ -27694,6 +27978,8 @@ Q32556,Antonio Candreva,en
 Q32556,안토니오 칸드레바,ko
 Q3258775,Lola Wajnblum,en
 Q3258775,롤라 바인블륌,ko
+Q325899,Jakub Słowik,en
+Q325899,야쿱 스워빅,ko
 Q325997,Bryan Josué Oviedo Jiménez,ko
 Q325997,Bryan Oviedo,en
 Q325997,브리안 오비에도,ko
@@ -27888,6 +28174,10 @@ Q328687,Namibia national football team,en
 Q328687,나미비아 축구 국가대표팀,ko
 Q3288415,Marc Stendera,en
 Q3288415,마르크 슈텐데라,ko
+Q328869,Ruben Micael,en
+Q328869,Rúben Micael,en
+Q328869,후벵 미카엘,ko
+Q328869,후벵 미카엘 프레이타스 다 헤수레이상,ko
 Q328882,Yaroslav Rakitskiy,en
 Q328882,Yaroslav Rakitskyi,en
 Q328882,야로슬라우 라키츠키,ko
@@ -27895,6 +28185,7 @@ Q328911,Dedryck Anga Boyata,en
 Q328911,Dedryck Boyata,en
 Q328911,데드리크 보야타,ko
 Q328911,데드리크 앙가 보야타,ko
+Q3289869,IFK Klagshamn,en
 Q3290215,Marcos David Painter,en
 Q3290215,Marcos Painter,en
 Q3290306,Marcus Vincent Williams,en
@@ -28104,6 +28395,10 @@ Q332642,NOAD ADVENDO Combinatie,en
 Q332642,Nooit Opgeven Altijd Doorzetten Aangenaam Door Vermaak En Nuttig Door Ontspanning Combinatie Breda,en
 Q332661,Atlético Huila,en
 Q332661,아틀레티코 우일라,ko
+Q332664,Willem II,en
+Q332664,Willem II Tilburg,en
+Q332664,빌럼 II 틸뷔르흐,ko
+Q332664,빌렘 II 틸뷔르흐,ko
 Q332668,Club Deportivo La Equidad Seguros,en
 Q332668,La Equidad,en
 Q332668,라 에키다드,ko
@@ -28144,8 +28439,6 @@ Q3331395,레알 오비에도 베투스타,ko
 Q3331966,Marcio Sousa,en
 Q3331966,Márcio Sousa,en
 Q33323099,Florin Ștefan,en
-Q3335491,Nampalys Mendy,en
-Q3335491,남팔리스 멘디,ko
 Q3337356,NLFC,en
 Q3337356,Naxxar,en
 Q3337356,Naxxar Lions,en
@@ -28262,7 +28555,9 @@ Q3373985,올레 크리스티안 셀네스,ko
 Q3374050,Pedro Filipe Teodósio Mendes,en
 Q3374050,Pedro Mendes,en
 Q3374050,페드루 필리프 멘드스,ko
+Q3374089,Pedrinho,en
 Q3374089,Pedro Miguel Silva Rocha,en
+Q3374089,Pedro Miguel da Silva Rocha,en
 Q337448,Henri George Lansbury,mul
 Q337448,Henri Lansbury,en
 Q33748,H96,en
@@ -28285,6 +28580,8 @@ Q337639,Felipe Mattioni Rohde,en
 Q337639,펠리페 마티오니,ko
 Q337646,Marco Motta,en
 Q337646,마르코 모타,ko
+Q3379222,Mohamed Amine Elyounoussi,en
+Q3379222,Mohamed Elyounoussi,en
 Q3379641,Fredrik Midtsjø,en
 Q3379704,Zlatko Tripic,en
 Q338156,David Hollwitz,en
@@ -28398,12 +28695,14 @@ Q34120,디나모 티라나,ko
 Q34120,디나모 티라너,ko
 Q3414049,Queensy Menig,en
 Q3414049,Queensy Miquel Saymon Wensley Menig,en
+Q3415104,RCS La Chapelle,en
+Q3415104,Reunion des Cheminots et des Sportifs de la Chapelle Saint-Luc,en
 Q3416260,RCO Agde,en
 Q3416270,RC Grasse,en
 Q3416270,Racing Club de Grasse,en
 Q3416271,R.C. Joinville,en
-Q3416282,La chispa FC,en
 Q3416282,RC Epernay Champagne,en
+Q3416282,RC Épernay Champagne,en
 Q3418515,Ramon Azeez,en
 Q3418515,Ramon Olamilekan Azeez,en
 Q3420586,Rayan Frikeche,en
@@ -28456,14 +28755,15 @@ Q343030,Ħamrun Spartans F.C.,en
 Q343030,함룬 스파르탄스 FC,ko
 Q3431011,Martin Linnes,en
 Q3431011,마르틴 린네스,ko
-Q3431767,Riechedly Bazoer,en
-Q3431767,Riechedly Guillermo Bazoer,mul
-Q3431767,리헤들리 바주르,ko
+Q343106,Boubacar Barry,en
+Q343106,부바카르 바리,ko
 Q3432281,Rio Sport d'Anyama,en
 Q343234,Ibrahim Akın,en
 Q343234,İbrahim Akın,en
 Q343278,İbrahim Ferdi Coşkun,en
 Q343404,İbrahim Öztürk,en
+Q3434146,CF Andorinha,en
+Q3434146,CF 안도리냐,ko
 Q3436280,Torgeir Børven,en
 Q3436587,Stian Lunder Ringstad,en
 Q3436587,Stian Ringstad,en
@@ -28485,9 +28785,6 @@ Q344068,İskenderun Demir Çelikspor,en
 Q3440726,Romain Metanire,en
 Q3440726,Romain Métanire,en
 Q3440761,Romain Salin,en
-Q3440768,Romain Ghanem Paul Saïss,en
-Q3440768,Romain Saïss,en
-Q3440768,로맹 사이스,ko
 Q344156,Dinler,en
 Q344156,Ismail Dinler,en
 Q344156,İsmail Dinler,en
@@ -28504,6 +28801,11 @@ Q3444038,Filippo Boniperti,en
 Q3444038,필리포 보니페르티,ko
 Q344525,Izzet Yıldırım,en
 Q344525,İzzet Yıldırım,en
+Q34479193,F.C. Noah,en
+Q34479193,FC Artsakh,en
+Q34479193,FC Noah,en
+Q34479193,FC 노아,ko
+Q34479193,Football Club Noah,en
 Q345142,ŁKS Łódź,en
 Q345142,ŁKS 우치,ko
 Q3452972,Rui Dolores,en
@@ -28689,6 +28991,8 @@ Q3493858,SU Sintrense,en
 Q3494142,SU Agen Football,en
 Q3494142,SUA,en
 Q3494142,Sporting Union Agenais,en
+Q3494181,SR Saint-Die,en
+Q3494181,SR Saint-Dié,en
 Q349447,Bart Schenkeveld,en
 Q3495530,Stade Bandjoun,en
 Q3495691,Stade Lausanne,en
@@ -28736,8 +29040,6 @@ Q350383,애덤 제임스 매슈스,ko
 Q35039261,Reiss Luke Nelson,en
 Q35039261,Reiss Nelson,en
 Q35039261,리스 넬슨,ko
-Q350396,Slobodan Rajković,en
-Q350396,슬로보단 라이코비치,ko
 Q3504460,Boys' Town F.C.,en
 Q3504460,Boys' Town Football Club,en
 Q350466,Xisco,en
@@ -28890,9 +29192,11 @@ Q3550531,US Ivry Football,en
 Q3550532,US Concarneau,en
 Q3550532,US Concarnoise,en
 Q3550532,Union Sportive Concarnoise,en
+Q3550541,US Chantilly,en
 Q3550553,US Lesquin,en
 Q3550555,Marignane Gignac Football Club,en
 Q3550555,US Marignane,en
+Q3550574,USFAS Bamako,en
 Q3550595,Mondeville,en
 Q3550595,USON Mondeville,en
 Q3550633,U.S. Borgo a Buggiano 1920,en
@@ -29157,6 +29461,11 @@ Q3603066,Aaron Cresswell,en
 Q3603066,Aaron William Cresswell,mul
 Q3603066,에런 크레스웰,ko
 Q3603081,Aaron McLean,en
+Q3603354,Abdelkarim Hassan,en
+Q3603354,Abdelkarim Hassan Al Haj Fadlalla,en
+Q3603354,Abdelkarim Hassan Fadlalla,en
+Q3603354,Abdulkarim Hassan,en
+Q3603354,압델카림 하산,ko
 Q3604973,Adam Barton,en
 Q3604973,Adam James Barton,en
 Q3604988,Adam David Henley,mul
@@ -29179,6 +29488,11 @@ Q3610030,Alessandro Frara,en
 Q3610092,Alessandro Longhi,en
 Q3610725,Alex Smithies,en
 Q3610725,Alexander Smithies,mul
+Q361153,Haris Medunjanin,en
+Q361153,하리스 메두냐닌,ko
+Q361199,Sejad Salihovic,en
+Q361199,Sejad Salihović,en
+Q361199,세야드 살리호비치,ko
 Q3612407,Robert Beric,mul
 Q3612407,Robert Berić,en
 Q3612407,Robert Berič,mul
@@ -29540,6 +29854,8 @@ Q3699363,Juan Carlos García Barahona,mul
 Q3699363,후안 카를로스 가르시아,ko
 Q3699995,Cassio Albuquerque dos Anjos,en
 Q3699995,Cássio Albuquerque dos Anjos,en
+Q370005,Ismaïl Aissati,en
+Q370005,이스마일 아이사티,ko
 Q37007722,Jack Lahne,en
 Q3701055,Dalibor Volaš,en
 Q3701299,Damian Musto,en
@@ -29693,7 +30009,7 @@ Q372599,시바스스포르,ko
 Q372605,Nico Gaitan,en
 Q372605,Nico Gaitán,en
 Q372605,Nicolas Gaitan,en
-Q372605,nisola gaitani,en
+Q372605,Nicolás Gaitán,en
 Q372605,니콜라스 가이탄,ko
 Q372624,Jack Robinson,en
 Q372624,잭 로빈슨,ko
@@ -30054,6 +30370,8 @@ Q3821691,Alberto Cifuentes Martínez,en
 Q3821691,Alicante,en
 Q38217836,Diogo Lucas Queirós,en
 Q38217836,Diogo Queirós,en
+Q3822716,Brian Sarmiento,en
+Q3822716,Brian Óscar Sarmiento,en
 Q382291,Nico Pulzetti,en
 Q382291,니코 풀체티,ko
 Q382324,KUPS,en
@@ -30277,12 +30595,6 @@ Q3884280,모이 고메스,ko
 Q388487,Şanlıurfaspor,en
 Q388487,샨르우르파스포르,ko
 Q388687,Şehmus Özer,en
-Q3887042,Otavio,en
-Q3887042,Otavio Edmilson Da Silva Monteiro,en
-Q3887042,Otávio,en
-Q3887042,Otávio Edmilson Da Silva Monteiro,en
-Q3887042,Otávio Edmilson da Silva Monteiro,mul
-Q3887042,오타비우,ko
 Q388746,FC Fredericia,en
 Q388746,FC 프레데리시아,ko
 Q388746,Fodbold Club Fredericia af 1991,en
@@ -30440,6 +30752,7 @@ Q39170064,Ignatius Ganago,en
 Q39170064,이냐시오 가나고,ko
 Q391722,Chikeluba Ofoedu,en
 Q391722,치케루바 오포에두,ko
+Q3917413,FC Minsk-2,en
 Q391789,GAIS,en
 Q391789,Göteborgs Atlet- och Idrottssällskap,en
 Q391790,Mosta F.C.,en
@@ -30530,6 +30843,9 @@ Q3932646,Angolana,en
 Q3932646,RC Angolana,en
 Q3932646,Renato Curi Angolana,en
 Q393286,Gudja United F.C.,en
+Q3932901,Adebayo Akinfenwa,en
+Q3932901,Saheed Adebayo Akinfenwa,mul
+Q3932901,아데바요 아킨펜와,ko
 Q3933354,Resende Futebol Clube,en
 Q3933827,SD Retuerto Sport,en
 Q393411,Žarko Tomašević,en
@@ -30546,8 +30862,7 @@ Q3934832,Richard Anthony Lee,en
 Q3934832,Richard Lee,en
 Q3934903,Richard Mark Wood,en
 Q3934903,Richard Wood,en
-Q393641,Željko Brkić,en
-Q393641,젤코 브르키치,ko
+Q3935209,Ridge Munsy,en
 Q3938349,Robert Emmanuel Maah,en
 Q3938349,Robert Maah,en
 Q3939881,Roderick Alonso Miller Molina,en
@@ -30671,8 +30986,6 @@ Q3973800,스톨레 디미트리에프스키,ko
 Q39746,Jonathan Ayité,en
 Q39746,Jonathan Serge Folly Ayité,en
 Q39746,조나탕 아이테,ko
-Q39751,Richard Soumah,en
-Q39751,리샤르 수마,ko
 Q397515,Agrotikos Asteras,en
 Q397515,Agrotikos Asteras F.C.,en
 Q39752,Johan Martial,en
@@ -30734,7 +31047,6 @@ Q4004981,Unione Sportiva Altamura,en
 Q4004986,Valle d'Aosta Calcio,en
 Q4004989,U.S. Angri Calcio 1927 A.S.D.,en
 Q4005040,U.S. Bitonto,en
-Q4005167,Unione Sportiva Ladispoli,en
 Q4005457,U.S. Tolentino,en
 Q4006951,San Frediano Rondinella S.S.,en
 Q4008377,Valtteri Moren,en
@@ -30850,6 +31162,8 @@ Q4068565,Arapongas Esporte Clube,en
 Q4068627,Andre Almeida Pinto,en
 Q4068627,André Almeida Pinto,en
 Q40695173,Kino Delorge,en
+Q4069670,Stuart Armstrong,en
+Q4069670,스튜어트 암스트롱,ko
 Q4072168,Atlético Sorocaba,en
 Q4072168,Atlético de Sorocaba,en
 Q4072168,Clube Atlético Sorocaba,en
@@ -31052,7 +31366,8 @@ Q417685,Akhisar Belediye ve Gençlik Spor,en
 Q417685,Akhisar Belediyespor,en
 Q417685,Akhisarspor,en
 Q417685,아크히사르 벨레디예스포르,ko
-Q41779982,Ludovit Reis,en
+Q41779982,Ludovit Reis,mul
+Q41779982,Ľudovít Reis,en
 Q41791240,Adama Sarr,en
 Q41791648,Christopher Opéri,en
 Q41791648,크리스토페르 오페리,ko
@@ -31311,7 +31626,7 @@ Q42728914,Rodrygo,en
 Q42728914,Rodrygo Goes,en
 Q42728914,Rodrygo Silva de Goes,en
 Q42728914,호드리구 고이스,ko
-Q42731,Fernando José Torres Sanz,mul
+Q42731,Fernando José Torres Sanz,en
 Q42731,Fernando Torres,en
 Q42731,페르난도 토레스,ko
 Q42731,페르난도 호세 토레스 산스,ko
@@ -31360,6 +31675,9 @@ Q4285478,Beypazarı Şekerspor,en
 Q4285478,Etimesgut Şekerspor,en
 Q4285478,Çamlıdere Şekerspor,en
 Q4285478,Şekerspor,en
+Q428603,Luís Carlos Novo Neto,mul
+Q428603,Luís Neto,en
+Q428603,루이스 네토,ko
 Q428782,Paradou AC,en
 Q4290247,Eduard Sobol,en
 Q4290247,에두아르드 소볼,ko
@@ -31389,12 +31707,14 @@ Q429630,알자지라 클럽,ko
 Q429789,Al Kharaitiyat SC,en
 Q429789,알카라이티야트 SC,ko
 Q4299023,Jarno Molenberghs,en
+Q4299628,FC Mozdok,en
 Q4300768,Gebzespor,en
 Q430107,Samsunspor FC,en
 Q430107,삼순스포르,ko
 Q430307,Liaoning F.C.,en
 Q430307,Liaoning Whowin F.C.,en
 Q430307,랴오닝 훙윈,ko
+Q43032630,Al Bataeh Club,en
 Q43064072,Luís Manuel Arantes Maximiano,en
 Q43064072,Luís Maximiano,en
 Q4306437,Quentin Beunardeau,en
@@ -31498,6 +31818,7 @@ Q43384100,파우 토레스,ko
 Q43387229,Mert Çetin,en
 Q43387229,Yıldırım Mert Çetin,en
 Q43387229,메르트 체틴,ko
+Q43402334,Sandro Crivellari Tonali,en
 Q43402334,Sandro Tonali,en
 Q43402334,산드로 토날리,ko
 Q434136,Ashkan Dejagah,en
@@ -31555,7 +31876,7 @@ Q43682,필리프람,ko
 Q43682,필립 람,ko
 Q43682,필립람,ko
 Q436987,David Ospina,en
-Q436987,David Ospina Ramírez,mul
+Q436987,David Ospina Ramírez,en
 Q436987,다비드 오스피나,ko
 Q43710,Antalyaspor,en
 Q43710,Antalyaspor Kulübü,en
@@ -31592,6 +31913,9 @@ Q438081,Morgan Henri René Amalfitano,en
 Q438081,모르강 아말피타노,ko
 Q438235,Luca Antonelli,en
 Q438235,루카 안토넬리,ko
+Q438340,Diego Perotti,en
+Q438340,Diego Perotti Almeira,mul
+Q438340,디에고 페로티,ko
 Q4383877,Stourbridge F.C.,en
 Q4383877,Stourbridge Football Club,en
 Q4384416,TBFC,en
@@ -31609,6 +31933,9 @@ Q4384885,푸슈차 니에포워미체,ko
 Q438606,Bakary Kone,en
 Q438606,Bakary Koné,en
 Q438606,바카리 코네,ko
+Q438677,David Fuster,en
+Q438677,David Fuster Torrijos,en
+Q438677,다비드 푸스테르,ko
 Q438796,Mapou Nzapali Yanga-Mbiwa,en
 Q438796,Mapou Yanga-Mbiwa,en
 Q438796,마푸 양가음비와,ko
@@ -31676,9 +32003,6 @@ Q4399878,Rui Miguel Melo Rodrigues,en
 Q4399878,Rui Miguel Rodrigues,en
 Q440031,Luca Cigarini,en
 Q440031,루카 치가리니,ko
-Q440277,Carlos Augusto Zambrano Ochandarte,mul
-Q440277,Carlos Zambrano,en
-Q440277,카를로스 삼브라노,ko
 Q440431,Bruno Saltor,en
 Q440431,Bruno Saltor Grau,mul
 Q440431,브루노,ko
@@ -31730,6 +32054,7 @@ Q440904,Rasmus Lindgren,en
 Q440904,라스무스 린드그렌,ko
 Q44097,Marco Borriello,en
 Q44097,마르코 보리엘로,ko
+Q44103645,UD San Fernando,en
 Q44118,Hamit Altintop,en
 Q44118,Hamit Altıntop,en
 Q44118,하미트 알튼토프,ko
@@ -31818,7 +32143,7 @@ Q44296,초르노모레츠 오데사,ko
 Q44297797,El Tiburón,en
 Q44297797,Ferran Torres,en
 Q44297797,Ferran Torres Garcia,en
-Q44297797,Ferran Torres García,en
+Q44297797,Ferran Torres García,mul
 Q44297797,페란 토레스,ko
 Q44298,Bastian Schweinsteiger,en
 Q44298,바스티안 슈바인슈타이거,ko
@@ -31849,8 +32174,6 @@ Q443447,하비에르 치카,ko
 Q443603,Jaime Gavilan,en
 Q443603,Jaime Gavilán,en
 Q443603,하이메 가빌란,ko
-Q443684,Modeste Mbami,en
-Q443684,모데스트 음바미,ko
 Q443691,Jack Hobbs,en
 Q443720,Lee Ho,en
 Q443720,이호,ko
@@ -31988,7 +32311,7 @@ Q448420,리언 클라크,ko
 Q44888,Yannick Anister Sagbo Latte,en
 Q44888,Yannick Sagbo,en
 Q4489033,USV Hercules,en
-Q4489033,Utrechtse Sportvereniging Hercules,en
+Q4489033,Utrechtse Sportvereniging Hercules,mul
 Q44897,ES Tunis,en
 Q44897,EST,en
 Q44897,Espérance Sportive de Tunis,en
@@ -32026,6 +32349,7 @@ Q4497224,Hendon FC,en
 Q4497224,Hendon Football Club,en
 Q4497224,The Greens,en
 Q4497224,헨던 FC,ko
+Q4497682,FC Khimik Dzerzhinsk,en
 Q44977,Pierre-Emerick Aubameyang,en
 Q44977,Pierre-Emerick Emiliano Francois Aubameyang,en
 Q44977,Pierre-Emerick Emiliano François Aubameyang,en
@@ -32078,6 +32402,7 @@ Q452337,Amadou Sidibe,en
 Q452337,Amadou Sidibé,en
 Q452337,아마두 시디베,ko
 Q452476,Yakubu Alfa,en
+Q452476,야쿠부 알파,ko
 Q45274631,David Tijanic,mul
 Q45274631,David Tijanić,en
 Q45274631,David Tijanič,mul
@@ -32232,7 +32557,7 @@ Q457118,Stanislav Lyubenov Manolev,en
 Q457118,Stanislav Manolev,en
 Q457118,스타니슬라프 마놀레프,ko
 Q457163,Columbus Crew,en
-Q457163,Columbus Crew SC,ko
+Q457163,Columbus Crew SC,mul
 Q457163,Columbus Crew Soccer Club,en
 Q457163,Columbus SC,en
 Q457163,Columbus Soccer Club,en
@@ -32297,7 +32622,7 @@ Q458998,Frederick David Sears,mul
 Q45900,Fabio Quagliarella,en
 Q45900,Quagliarella,en
 Q45900,파비오 콸리아렐라,ko
-Q45901,Thierry Daniel Henry,en
+Q45901,Thierry Daniel Henry,mul
 Q45901,Thierry Henry,en
 Q45901,티에리 다니엘 앙리,ko
 Q45901,티에리 앙리,ko
@@ -32328,6 +32653,9 @@ Q459148,EA 갱강,ko
 Q459148,EAG,en
 Q459148,En Avant de Guingamp,en
 Q459148,Guingamp,en
+Q459184,Mario Gavranovic,en
+Q459184,Mario Gavranović,en
+Q459184,마리오 가브라노비치,ko
 Q459218,FC Spartak Trnava,en
 Q459218,FC 스파르타크 트르나바,ko
 Q459218,Spartak Trnava,en
@@ -32586,7 +32914,8 @@ Q4673512,Acharnaikos,en
 Q4673512,Acharnaikos F.C.,en
 Q4674044,Hwang Jin-sung,en
 Q4674044,황진성,ko
-Q46748781,Aitor Ruibal Ñarcia,en
+Q46748781,Aitor Ruibal,en
+Q46748781,Aitor Ruibal García,en
 Q467587,Raffael,en
 Q467587,Raffael Caetano de Araujo,en
 Q467587,하파에우 카에타누 지 아라우주,ko
@@ -32659,6 +32988,10 @@ Q46951844,Aurélien Tchouaméni,en
 Q46951844,오렐리앵 추아메니,ko
 Q4695287,Ahmad Benali,en
 Q4695287,Ahmed Benali,en
+Q469534,Vladimir Borisovich Gabulov,en
+Q469534,Vladimir Gabulov,en
+Q469534,블라디미르 가불로프,ko
+Q469534,블라디미르 보리소비치 가불로프,ko
 Q469582,Johannes van den Bergh,en
 Q469582,요하너스 판덴베르흐,ko
 Q469582,요하네스 판 덴 베르크,ko
@@ -32696,6 +33029,7 @@ Q47015833,Dinos Mavropanos,en
 Q47015833,Konstantinos Mavropanos,en
 Q47015833,콘스탄티노스 마브로파노스,ko
 Q4701707,Akron Zips men's soccer,en
+Q4702217,Al-Arabi,en
 Q4702627,Al-Jazeera,en
 Q4702627,Al-Jazeera Club (Jordan),en
 Q4702627,알자지라,ko
@@ -32751,6 +33085,10 @@ Q47088780,Jaka Bijol,en
 Q47088780,야카 비욜,ko
 Q47091011,Kevin Varga,en
 Q4710043,Albert Dorca,en
+Q47105682,Yazan Abu Al-Arab,en
+Q47105682,Yazan Abu Arab,en
+Q47105682,야잔,ko
+Q47105682,야잔 알아라브,ko
 Q4711075,Albert Rafetraniaina,en
 Q4711075,Albert Tokinirina Rafetraniaina,en
 Q4711922,Alberto Almici,en
@@ -32887,6 +33225,7 @@ Q473090,Davy De Beule,en
 Q473136,Montrose F.C.,en
 Q4732,Yassine Benzia,en
 Q4732,야신 벤지아,ko
+Q4733635,Almada A.C.,en
 Q47339469,Ragnar Oratmangoen,en
 Q47339469,라그나르 오랏망운,ko
 Q4734072,Alnwick Town F.C.,en
@@ -33047,6 +33386,8 @@ Q4759899,André Filipe Brás André,en
 Q4759899,앙드레 앙드레,ko
 Q4760001,Andre Micael,en
 Q4760001,André Micael,en
+Q4760066,Andre Simoes,en
+Q4760066,André Simões,en
 Q4760071,Andre Sousa,en
 Q4760071,André Sousa,en
 Q4760621,Andy Drury,en
@@ -33081,6 +33422,12 @@ Q476880,Football Club Lahti,en
 Q477067,Mauritania men's national football team,en
 Q477067,Mauritania national football team,en
 Q477067,모리타니 축구 국가대표팀,ko
+Q477073,FC Leon Saturn,en
+Q477073,FC Saturn Moscow Oblast,en
+Q477073,FC 사투른 모스크바 오블라스트,ko
+Q477073,FC 사투른 모스크바 오블라스티,ko
+Q477073,FC 새턴 모스크바 오블라스트,ko
+Q477073,사투른 모스크바 오블라스트,ko
 Q477079,Samoa men's national football team,en
 Q477079,Samoa national association football team,en
 Q477079,Samoa national football team,en
@@ -33168,6 +33515,9 @@ Q478436,Pitt Panthers,en
 Q478436,Pittsburgh Panthers,en
 Q478436,피츠버그 팬서스,ko
 Q4785570,Archange Nkumu,en
+Q478941,Aaron Frank Mooy,en
+Q478941,Aaron Mooy,en
+Q478941,에런 무이,ko
 Q4789546,Arghus,en
 Q4789546,Arghus Soares Bordignon,mul
 Q4791073,Aristote Nsiala,en
@@ -33492,6 +33842,8 @@ Q483152,전북현대모터스,ko
 Q483152,전북현대모터스에프씨,ko
 Q4831538,Ayo Obileye,en
 Q4831538,Stephen Ayomide Oluwagbenga Obileye,en
+Q483206,Sergio Escudero,en
+Q483206,세르히오 에스쿠데로,ko
 Q483309,Sergio Ramos,en
 Q483309,Sergio Ramos García,mul
 Q483309,세르히오 라모스,ko
@@ -33733,7 +34085,6 @@ Q4862073,Baroka,en
 Q4862073,Baroka F.C.,en
 Q4862073,Baroka FC,en
 Q4863250,Barras Futebol Club,en
-Q4863629,FK Loznica,en
 Q4864180,Barry Douglas,en
 Q4864180,Barry James Douglas,en
 Q48646,Montevideo City Torque,en
@@ -34118,6 +34469,7 @@ Q491904,이호승,ko
 Q492159,US Creteil-Lusitanos,en
 Q492159,US Créteil-Lusitanos,en
 Q492159,US 크레테유-뤼시타노,ko
+Q492212,Hwang Soon-Min,en
 Q492212,Hwang Soon-min,en
 Q492212,黄順旻,ko
 Q492212,황순민,ko
@@ -34175,6 +34527,7 @@ Q493342,Jeon Kwang-hwan,en
 Q493342,전광환,ko
 Q493464,SV Bergisch Gladbach 09,en
 Q493589,Andrea Caracciolo,en
+Q4942527,Bonnyrigg White Eagles FC,en
 Q494266,Lee Keun-ho,en
 Q494266,이근호,ko
 Q494286,Cho Won-hee,en
@@ -34461,6 +34814,8 @@ Q5010136,CD Sondika,en
 Q5010136,Sondika Kirol Elkartea,en
 Q5010137,CD Soledad,en
 Q5010137,Soledad,en
+Q5010140,CD Tedeon EF,en
+Q5010140,CD Tedeón EF,en
 Q5010144,CD Torrijos,en
 Q5010144,Club Deportivo Torrijos,en
 Q5010402,CE Sabadell,en
@@ -34781,6 +35136,11 @@ Q508440,산타크루스 FC,ko
 Q5084755,"Charles John ""Charlie"" Daniels",en
 Q5084755,Charles John Daniels,en
 Q5084755,Charlie Daniels,en
+Q508512,Bogdan Butko,en
+Q508512,Bogdan Yevgenyevich Butko,en
+Q508512,Bohdan Butko,en
+Q508512,Bohdan Yevhenovych Butko,en
+Q508512,보흐단 부트코,ko
 Q5085599,Charles James Taylor,en
 Q5085599,Charlie Taylor,en
 Q5085599,찰리 테일러,ko
@@ -35409,6 +35769,9 @@ Q5216809,Daniel Ciofani,en
 Q5217136,Daniel Filipe Faria Coelho,en
 Q5217698,Daniel Anthony Johnson,en
 Q5217698,Daniel Johnson,en
+Q5218462,Daniel Podence,en
+Q5218462,Jugo en america de México,en
+Q5218462,다니엘 포덴스,ko
 Q5218551,Daniel Redmond,en
 Q5218697,Daniel Santos Martins,en
 Q52192222,Pol Lozano,en
@@ -35507,7 +35870,8 @@ Q52398837,Daniel Martins Guimaraes,en
 Q5240644,David Viana,en
 Q524086,Oluwaseyi George Olofinjana,en
 Q524086,Seyi Olofinjana,en
-Q524086,세이 올로핀자나,ko
+Q524086,셰이 올로핀자나,ko
+Q524086,올루와셰이 조지 올로핀자나,ko
 Q5241535,Davide Agazzi,en
 Q5241539,Davide Bertolucci,en
 Q5241540,Davide Borin,en
@@ -35601,6 +35965,7 @@ Q5277644,Dimitrios Kolovos,en
 Q5277644,Dīmítrīs Kolovós,en
 Q527807,Robert Braber,en
 Q527886,FC Borjomi,en
+Q5279198,Diogo Figueiras,en
 Q5279203,Diogo Lamelas,en
 Q5279207,Diogo Lezico da Silva,en
 Q5279207,Diogo Lézico da Silva,en
@@ -35869,6 +36234,10 @@ Q5371332,Emil Krafth,en
 Q5371332,에밀 크라프트,ko
 Q5371729,Emiliano Velazquez,en
 Q5371729,Emiliano Velázquez,en
+Q537201,Malavan Bandar Anzali,en
+Q537201,Malavan F.C.,en
+Q537201,Malavan Sport and Cultural Club,en
+Q537201,말라반 FC,ko
 Q53723911,Nora Clausen,en
 Q5372912,Emma Mitchell,en
 Q5372912,Emma Mukandi,en
@@ -35905,6 +36274,7 @@ Q538878,Nathan Clement Kabasele Mwamba,en
 Q538878,Nathan Kabasele,en
 Q538878,나탕 카바셀레,ko
 Q538878,나탕 클레망 카바셀레 므왐바,ko
+Q5388814,Erik Sabo,en
 Q5388875,Erik Tonne,en
 Q5388875,Erik Tønne,en
 Q538891,Centre Salif Keita,en
@@ -36034,6 +36404,7 @@ Q5425354,FELDA United Football Club,en
 Q5425354,FELDA 유나이티드 FC,ko
 Q5426108,FK Cement Beočin,en
 Q5426131,GFK Dubočica,en
+Q5426146,FK Gostivar,en
 Q5426154,FK Hajduk Veljko,en
 Q5426158,FK Rakovica,en
 Q5426167,FK Iskra Danilovgrad,en
@@ -36046,7 +36417,6 @@ Q5426202,FK Kolín,en
 Q5426202,SK 스파르타 콜린,ko
 Q5426296,FK Palilulac Beograd,en
 Q5426300,FK Palić,en
-Q5426374,FK Remont Čačak,en
 Q5426404,FK Slavoj Trebišov,en
 Q5426448,FC Košice,en
 Q5426448,FC 코시체,ko
@@ -36267,6 +36637,12 @@ Q54988,FK Baku,en
 Q54988,FK 바쿠,ko
 Q5499238,Frederico Venancio,en
 Q5499238,Frederico Venâncio,en
+Q5499311,Frederik Riis Ronnow,en
+Q5499311,Frederik Riis Rønnow,en
+Q5499311,Frederik Ronnow,en
+Q5499311,Frederik Rønnow,en
+Q5499311,프레데리크 뢰노,ko
+Q5499311,프레데리크 리스 뢰노,ko
 Q550007,Ibrahima Faye,en
 Q550007,이브라히마 파이,ko
 Q550251,Djoliba AC,en
@@ -36358,6 +36734,8 @@ Q55216389,SCM Gloria Buzău,en
 Q552171,Kyle Bartley,en
 Q552171,Kyle Louis Bartley,en
 Q552171,카일 바틀리,ko
+Q552239,Paulo Machado,en
+Q552239,파울루 마샤두,ko
 Q552253,Kerim Frei,en
 Q552253,Kerim Frei Koyunlu,en
 Q552253,Kerim Koyunlu,en
@@ -36503,6 +36881,7 @@ Q5550103,Gerard Moreno Balagueró,mul
 Q5550103,Gerard Moreno i Balagueró,en
 Q5550103,제라르 모레노,ko
 Q5550269,Gerardo Flores Zúñiga,en
+Q555091,Engin Baytar,en
 Q555287,Manuel Schmiedebach,en
 Q555287,마누엘 슈미데바흐,ko
 Q555296,Raphael Wolf,en
@@ -36700,6 +37079,13 @@ Q56025745,Juventus U23,en
 Q56025745,Juventus Under-23,en
 Q56025745,유벤투스 넥스트 젠,ko
 Q56033749,Sofiane Diop,en
+Q560392,Hanoi FC,en
+Q560392,Hanoi T&T F.C.,en
+Q560392,Hà Nội F.C.,en
+Q560392,Hà Nội Football Club,en
+Q560392,Hà Nội T&T Football Club,en
+Q560392,하노이 FC,ko
+Q560392,하노이 T&T FC,ko
 Q560396,Lukas Isaac Paul Jutkiewicz,en
 Q560396,Lukas Jutkiewicz,en
 Q560396,루카스 주키에비츠,ko
@@ -36750,6 +37136,8 @@ Q561081,Dudley Campbell,en
 Q561081,Dudley Junior Campbell,en
 Q561081,디제이 캠벨,ko
 Q561087,Mauro Boselli,en
+Q5612030,Iwate Grulla Morioka,en
+Q5612030,그루자 모리오카,ko
 Q56122064,ATB (women),en
 Q56122064,Atlètic Balears (women),en
 Q56122064,Atlético Baleares (women),en
@@ -36914,6 +37302,10 @@ Q56282611,Youssouf Fofana,en
 Q56282611,유수프 포파나,ko
 Q56283819,Sergio Moreno,en
 Q56283819,Sergio Moreno Martínez,en
+Q562840,Raul Bobadilla,en
+Q562840,Raúl Bobadilla,en
+Q562840,Raúl Marcelo Bobadilla,en
+Q562840,라울 보바디야,ko
 Q56289593,Pedro António Pereira Gonçalves,en
 Q56289593,Pedro Goncalves,en
 Q56289593,Pedro Gonçalves,en
@@ -37399,8 +37791,8 @@ Q5773971,Padura,mul
 Q5773971,Padura Club,en
 Q5774165,CD Utrera,en
 Q5774165,Club Deportivo Utrera,en
-Q577471,Christian Esteban Gamboa Luna,ko
-Q577471,Correcaminos,ko
+Q577471,Christian Esteban Gamboa Luna,en
+Q577471,Correcaminos,en
 Q577471,Cristian Gamboa,en
 Q577471,크리스티안 감보아,ko
 Q577481,Duván Esteban Zapata Banguero,en
@@ -37533,8 +37925,6 @@ Q5829876,Eloi Amagat Aridany,en
 Q5829876,Eloi Amagat Arimany,en
 Q583000,Christopher Trimmel,en
 Q583000,크리스토퍼 트리멜,ko
-Q5830311,Emanuel Insua,en
-Q5830311,Emanuel Insúa,en
 Q58303188,Haissem Hassan,en
 Q58303188,하이셈 하산,ko
 Q58323172,Bruno Guimaraes,en
@@ -37574,6 +37964,7 @@ Q584316,다누비오 FC,ko
 Q584357,Victor Vazquez,en
 Q584357,Víctor Vázquez Solsona,en
 Q584357,빅토르 바스케스,ko
+Q58436702,Stjarnan,en
 Q58441,Robinho,en
 Q58441,Robson de Souza,en
 Q58441,Róbson de Souza,en
@@ -37702,6 +38093,8 @@ Q59108,Kyle Walker,en
 Q59108,카일 워커,ko
 Q591103,Chris Maguire,en
 Q591103,Christopher Patrick Joseph Maguire,en
+Q5911525,Stelios Kitsiou,en
+Q5911525,Stylianos Kitsiou,en
 Q591230,CS Constantine,en
 Q59131563,Cintra Yaoundé,en
 Q591339,Differdange 03,en
@@ -37938,6 +38331,7 @@ Q59645,FC 류큐,ko
 Q59649459,Lucas Beltrán,en
 Q59649459,Lucas Ezequiel Beltrán,en
 Q59649459,루카스 벨트란,ko
+Q5965017,Hüsnü Zeybekoğlu,en
 Q59655998,Randal Kolo Muani,en
 Q59655998,랑달 콜로 무아니,ko
 Q59656064,Federico Valietti,en
@@ -38002,6 +38396,9 @@ Q598083,K.R.C. Mechelen,en
 Q598083,KRC Mechelen,en
 Q598083,Racing Mechelen,en
 Q59812045,Filip Marchwiński,en
+Q5981833,Larva,en
+Q5981833,Lucas Alario,en
+Q5981833,Lukass Alario,en
 Q5981954,El Expreso de La Coruña,en
 Q5981954,Lucas Vazquez,en
 Q5981954,Lucas Vázquez,en
@@ -38066,6 +38463,8 @@ Q5995855,Iker Undabarrena,en
 Q59962,CA 벨그라노,ko
 Q59962,Club Atletico Belgrano,en
 Q59962,Club Atlético Belgrano,en
+Q5998415,Ilisiakos A.O.,en
+Q5998415,Ilisiakos S.C.,en
 Q599963,Thomas James Carroll,en
 Q599963,Tom Carroll,en
 Q599963,토머스 제임스 캐럴,ko
@@ -38116,6 +38515,7 @@ Q6021526,Luke Marcus O'Neill,en
 Q6021526,Luke O'Neill,en
 Q6023905,Indy Eleven,en
 Q6023905,인디 일레븐,ko
+Q602397,Cusco FC,en
 Q602436,Ajaxcucho,en
 Q602436,Ayacucho FC,en
 Q602436,Los zorros,en
@@ -38199,7 +38599,7 @@ Q60360,마르틴 하르니크,ko
 Q603633,Liberty Professionals F.C.,en
 Q603633,Liberty Professionals FC,en
 Q603633,리버티 프로페셔널스 FC,ko
-Q603681,Antonio Mirante el flecheiro,en
+Q603681,Antonio Mirante,en
 Q603681,안토니오 미란테,ko
 Q6037529,Nahuel Valentini,en
 Q60396,Fabrice Nsakala,en
@@ -38214,8 +38614,7 @@ Q60418,Maxime Colin,en
 Q60418,Maxime Jean-Yves Colin,mul
 Q60418,막심 장이브 콜랭,ko
 Q60418,막심 콜랭,ko
-Q60421,Mounir Obbadi,en
-Q60421,무니르 오바디,ko
+Q6043375,Erhan Kırcı,en
 Q60447,Georges Gope-Fenepej,en
 Q60447,조지스 고페-페네페즈,ko
 Q60452442,Yael Damaris Oviedo,en
@@ -38244,6 +38643,8 @@ Q60482,Étienne Didot,en
 Q60482,에티엔 디도,ko
 Q60493223,Mohammed Kamara,en
 Q60493223,Mohammed Kesselly Kamara,en
+Q60495,Flamurtari Vlorë,en
+Q60495,KS 플라무르타리 블로러,ko
 Q6049910,Sürmenespor,en
 Q605044,Club Guarani,en
 Q605044,Club Guaraní,en
@@ -38510,8 +38911,6 @@ Q608988,CS Sedan Ardennes,en
 Q608988,CS 스당 아르덴,ko
 Q608988,Club Sportif Sedan Ardennes,en
 Q6089917,Bursa Merinosspor,en
-Q609141,Tarik Elyounoussi,en
-Q609141,타릭 엘유누시,ko
 Q6092071,Berat Ali Genç,en
 Q6092071,Berat Genç,en
 Q609246,Radzymin,en
@@ -38774,7 +39173,7 @@ Q6153865,장학영,ko
 Q6153927,Jang Suk-won,en
 Q6153927,장석원,ko
 Q615668,Rafael Cabral,en
-Q615668,Rafael Cabral Barbosa,en
+Q615668,Rafael Cabral Barbosa,mul
 Q615668,하파에우 카브라우,ko
 Q6156943,UCD Burladés,en
 Q6156990,Los padres del florida,en
@@ -38854,6 +39253,8 @@ Q61762234,Salma Celeste Paralluelo,en
 Q61762234,Salma Celeste Paralluelo Ayingono,en
 Q61762234,Salma Paralluelo,en
 Q61762234,Salma Paralluelo Ayingono,en
+Q6176406,Jefte Betancor,en
+Q6176406,Jefté Betancor,en
 Q617659,FC Svendborg,en
 Q617680,Erman Kilic,en
 Q617680,Erman Kılıç,en
@@ -38865,6 +39266,8 @@ Q61780902,흐비차 크바라츠헬리아,ko
 Q61792,Tim Hoogland,en
 Q61792,Tim Klaus Hoogland,en
 Q61792,팀 후글란트,ko
+Q6179721,Jens Jønsson,en
+Q6179721,Jønne,en
 Q61799,Raphael Schafer,en
 Q61799,Raphael Schäfer,en
 Q61799,라파엘 섀퍼,ko
@@ -39140,6 +39543,7 @@ Q624792,Korea Electric Power Corporation Football Club,en
 Q624792,Korea Hydro and Nuclear Power Football Club,en
 Q624792,경주 한국수력원자력 FC,ko
 Q624792,경주 한국수력원자력 축구단,ko
+Q624792,경주 한수원 FC,ko
 Q624792,대전 한국수력원자력,ko
 Q624792,대전 한국수력원자력 FC,ko
 Q624792,대전 한국수력원자력 축구단,ko
@@ -39198,7 +39602,7 @@ Q626249,Ha Dae-sung,en
 Q626249,하대성,ko
 Q62629839,Ben Waine,en
 Q62629839,Benjamin Peter Waine,mul
-Q62629839,Benjamin Waine,mul
+Q62629839,Benjamin Waine,en
 Q62629839,벤 웨인,ko
 Q62629839,벤저민 피터 웨인,ko
 Q626562,Hongcheon Idu FC,en
@@ -39307,6 +39711,8 @@ Q62802,슈테파노 첼로치,ko
 Q6285509,Joseph Mendes,en
 Q628601,Miguel Oliveira,en
 Q628601,Pedro Miguel dos Santos Oliveira,en
+Q62869,Mounir El Hamdaoui,en
+Q62869,무니르 엘 함다우이,ko
 Q628763,F.C. Bunyodkor,en
 Q628763,FC Bunyodkor,en
 Q628763,FC 부뇨드코르,ko
@@ -39633,6 +40039,9 @@ Q63687,Darko Lazović,en
 Q63687,다르코 라조비치,ko
 Q63699748,Sacha Boey,en
 Q63699748,사샤 보이,ko
+Q63720,Serdar Taşçı,en
+Q63720,세르다르 타슈츠,ko
+Q63720,제르다어 타스키,ko
 Q6372099,Karl Augustus Munroe,en
 Q6372099,Karl Munroe,en
 Q6372489,Karleigh Osborne,en
@@ -39687,6 +40096,8 @@ Q638959,Benjamin Köhler,en
 Q639046,ACS Dacia Unirea Brăila,en
 Q639046,AFC Dacia Unirea Brăila,en
 Q639091,FCM Bacău,en
+Q63922581,Ilisiakos A.O. (football),en
+Q63922581,Ilisiakos F.C.,en
 Q63928290,Sergio Camello,en
 Q63928290,Sergio Camello Pérez,en
 Q63928290,세르히오 카메요,ko
@@ -39733,6 +40144,13 @@ Q639723,Häcken Gothenburg,en
 Q639803,Willem Janssen,en
 Q6398739,Kgosi Ntlhe,en
 Q6398739,Kgosietsile Ntlhe,en
+Q63994855,A.S.D. Valgobbiazanano,en
+Q63994855,F.C. Lumezzane V.G.Z. A.S.D.,en
+Q63994855,FC Lumezzane S.S.D.,en
+Q63994855,FC 루메차네 VGZ ASD,ko
+Q63994855,Football Club Lumezzane,en
+Q63994855,Football Club Lumezzane V.G.Z. Associazione Sportiva Dilettantistica,en
+Q63994855,ValgobbiaZanano,en
 Q64005114,João Pedro,mul
 Q64005114,João Pedro Junqueira de Jesus,en
 Q64005114,או מלכישוע בן צרויה,en
@@ -40077,6 +40495,9 @@ Q643678,세바스티안 랑캄프,ko
 Q6438734,Flaco,en
 Q6438734,Gaston Pereiro,en
 Q6438734,Gastón Pereiro,en
+Q6439494,Giovanni Pablo Simeone Baldini,en
+Q6439494,Giovanni Simeone,en
+Q6439494,히오바니 시메오네,ko
 Q6441103,Kuantan FA,en
 Q644157,KFF,en
 Q644157,Kalmar FF,en
@@ -40240,6 +40661,8 @@ Q647948,Gyirmót FC Győr,en
 Q6481836,P.A.S. Lamia 1964,en
 Q6481836,P.A.S. Lamia 1964 F.C.,en
 Q6481836,PAS 라미아 FC,ko
+Q6482429,Lamphun Warrior F.C.,en
+Q6482429,람푼 워리어스 FC,ko
 Q64825285,Tarik Cetin,en
 Q64825285,Tarık Çetin,en
 Q64828338,Jordi Martin Emmanuel Osei-Tutu,en
@@ -40295,7 +40718,7 @@ Q65029821,웨슬리 포파나,ko
 Q65029955,Kaishu Sano,en
 Q65029955,사노 가이슈,ko
 Q65030995,Igor Jesus,en
-Q65030995,Igor Jesus Maciel da Cruz,en
+Q65030995,Igor Jesus Maciel da Cruz,mul
 Q65030995,이고르 제주스,ko
 Q650365,Carrarese Calcio,en
 Q650365,Carrarese Calcio S.r.l.,en
@@ -40428,6 +40851,8 @@ Q6519167,Leicester City W.F.C.,en
 Q6519167,Leicester City Women Football Club,en
 Q651954,Olcan Adın,en
 Q651966,Stomil Olsztyn,en
+Q651967,Ognjen Vranjes,en
+Q651967,Ognjen Vranješ,en
 Q651989,Javi Flano,en
 Q651989,Javi Flaño,en
 Q651989,Javier Flano,en
@@ -40605,6 +41030,7 @@ Q65925174,Xavi Quentin Shay Simons,en
 Q65925174,Xavi Simons,en
 Q65925174,차비 시몬스,ko
 Q65925174,차비에르 크벤틴 샤이 시몬스,ko
+Q6592551,NK Tabor Sežana,en
 Q65938771,Antoine Bernier,en
 Q65948503,Flavius Daniliuc,en
 Q65948503,Flavius David Daniliuc,en
@@ -40759,6 +41185,9 @@ Q66391676,Munir Levent Mercan,en
 Q66391676,Munir Mercan,en
 Q66391676,Münir Levent Mercan,en
 Q663918,Deniz Naki,en
+Q6640756,PT Prachuap F.C.,en
+Q6640756,PT 쁘라쭈압 FC,ko
+Q6640756,Prachuap F.C.,en
 Q6641,A.S. Bari,en
 Q6641,AS Bari,en
 Q6641,AS 바리,ko
@@ -40827,8 +41256,6 @@ Q665197,라르스 슈틴들,ko
 Q665197,라스 슈틴들,ko
 Q66528894,Jon Moncayola,en
 Q66528894,Jon Moncayola Tollar,en
-Q665550,Ranko Despotović,en
-Q665550,란코 데스포토비치,ko
 Q665690,Fortitudo-Pro Roma S.G.S.,en
 Q66572593,Sergio Castel,en
 Q665835,CD Llanes,en
@@ -41004,6 +41431,9 @@ Q6680760,Lorenzo Marchionni,en
 Q668112,Gliwicki Klub Sportowy Piast Gliwice,en
 Q668112,Piast Gliwice,en
 Q668112,피아스트 글리비체,ko
+Q66816187,SC Delhi,en
+Q66816187,Sporting Club Delhi,en
+Q66816187,하이데라바드 FC,ko
 Q66817265,Ege Özkayimoglu,en
 Q66817265,Ege Özkayımoğlu,en
 Q66817415,Doğan Alemdar,en
@@ -41060,9 +41490,6 @@ Q6696078,Lucas Aveldaño,en
 Q6696078,Pela Aveldaño,en
 Q6696190,Klysman Lucas Lopes Silva,en
 Q6696190,Lucas Klysman,en
-Q6696318,Lucas Silva,en
-Q6696318,Lucas Silva Borges,en
-Q6696318,루카스 시우바 보르헤스,ko
 Q6696885,Luciano Mendes Teixeira,en
 Q6696885,Luciano Teixeira,en
 Q66972720,Abdoul Kader Bamba,en
@@ -41432,6 +41859,8 @@ Q6794678,Max Crocombe,en
 Q6794678,Max Croxombe,en
 Q6794678,Maxime Teremoana Crocombe,en
 Q6794678,맥스 크로컴,ko
+Q679530,Michael Lang,en
+Q679530,미하엘 랑,ko
 Q6795685,Maxime Rousseau,en
 Q679638,CR Belouizdad,en
 Q679638,CR 벨루이즈다드,ko
@@ -41439,6 +41868,9 @@ Q679638,CRB,en
 Q679638,Chabab Riadhi Belouizdad,en
 Q67964,Roberto Baggio,en
 Q67964,로베르토 바조,ko
+Q6799321,Robin Olsen,en
+Q6799321,Robin Patrick Olsen,en
+Q6799321,로빈 올센,ko
 Q680336,UD Melilla,en
 Q680336,UD 멜리야,ko
 Q68060,Buffon,mul
@@ -41476,8 +41908,6 @@ Q6828868,Michael Brown,en
 Q6831053,Michael Hefele,en
 Q6831053,Michael Martin Hefele,en
 Q6831577,Michael Jacobs,en
-Q6833229,Michael Olaitan,en
-Q6833229,Michael Olaitan Oyeneye,en
 Q683335,Jonathan Rivierez,en
 Q683351,Suryoyo SK,en
 Q683351,Syrianska F.C.,en
@@ -41527,11 +41957,12 @@ Q685579,리 제임스 바너드,ko
 Q68575006,Rafa Miranda,en
 Q68575006,Rafael Miranda,en
 Q68575006,Ricardo Rafael da Costa Miranda,en
+Q68593365,Luka Gugeshashvili,en
 Q6860599,Miloš Jojić,en
 Q6860599,밀로시 요이치,ko
 Q6860610,Miloš Kosanović,en
 Q68607008,Charles De Ketelaere,en
-Q68607008,Charles Marc S. De Ketelaere,mul
+Q68607008,Charles Marc S. De Ketelaere,en
 Q68607008,샤를 드 케텔라에,ko
 Q686197,Gerhard Martin Tremmel,en
 Q686197,Gerhard Tremmel,en
@@ -41606,6 +42037,8 @@ Q6891089,Mohamed Bengali,en
 Q6891089,Razak Mohammed Bengali,en
 Q6894876,Moises Costa Ferreira,en
 Q6894876,Moisés Costa Ferreira,en
+Q689503,Jakob Jantscher,en
+Q689503,야코프 얀처,ko
 Q6897138,Nong Bua Lamphu F.C.,en
 Q6897138,Nongbua Pitchaya F.C.,en
 Q6897138,농부아 피치야 FC,ko
@@ -41632,8 +42065,10 @@ Q6907507,文記韓,ko
 Q6907507,문기한,ko
 Q6907560,Moon Sang-yun,en
 Q6907560,문상윤,ko
+Q690884,FC Solothurn,en
 Q690915,CS Chenois,en
 Q690915,CS Chênois,en
+Q690929,FC Red Star Zürich,en
 Q691136,Niklas Hult,en
 Q6911830,Morgan Sanson,en
 Q6911830,Morgan Stephane Sanson,en
@@ -41735,6 +42170,7 @@ Q695340,TP 엥글베르,ko
 Q695340,Tout Puissant Mazembe,en
 Q695340,앵글베르,ko
 Q695340,투 퓌상 마젬베,ko
+Q6954491,NK BSK Bijelo Brdo,en
 Q6954532,Football club Krka,en
 Q6954532,NK Krka,en
 Q6954532,NK 크르카,ko
@@ -41742,6 +42178,7 @@ Q6954556,NK Novalja,en
 Q6954558,NK Olimpija Osijek,en
 Q6954580,NK Radomlje,en
 Q6954589,NK Rudeš,en
+Q6954602,NK Trnje,en
 Q6954607,NK Veržej,en
 Q6954613,NK Zavrč,en
 Q6954613,NK 자브르치,ko
@@ -41851,6 +42288,12 @@ Q698702,SK Admira Wien,en
 Q699094,Michael Gregoritsch,en
 Q699094,미하엘 그레고리치,ko
 Q6990957,Nemanja Radoja,en
+Q699184,Austria Klagenfurt,en
+Q699184,Austria Klagenfurt FuÃŸball,en
+Q699184,Klagenfurt,en
+Q699184,SK Austria Klagenfurt,en
+Q699184,SK 아우스트리아 클라겐푸르트,ko
+Q699184,SKAK,en
 Q699429,Atdhe Nuhiu,en
 Q69949474,Anthony Rouault,en
 Q69965,Phil Bardsley,en
@@ -41862,6 +42305,7 @@ Q69968896,Vinicius de Souza Costa,en
 Q69968896,Vinícius de Souza Costa,mul
 Q69968896,비니시우스 소자,ko
 Q699718,Martin Amedick,en
+Q699732,SK Vorwärts Steyr,en
 Q699746,Hartberg,en
 Q699746,TSV Hartberg,en
 Q699746,TSV 하르트베르크,ko
@@ -41956,13 +42400,11 @@ Q704500,Franck Signorino,en
 Q704500,프랑크 시뇨리노,ko
 Q704500,프랑크 에디 시뇨리노,ko
 Q704725,Tonel,en
+Q704857,SP Tre Penne,en
 Q704857,SP 트레 펜네,ko
-Q704857,gil paja,en
 Q704857,los pajeros asociason,en
 Q704951,Luca Marrone,en
 Q704951,루카 마로네,ko
-Q705220,Marko Baša,en
-Q705220,마르코 바샤,ko
 Q705264,Stephan Fürstner,en
 Q7054634,North Carolina Tar Heels men's soccer,en
 Q7054634,UNC men's soccer,en
@@ -41971,6 +42413,7 @@ Q70550,Big Fucking German,mul
 Q70550,Big German,mul
 Q70550,Per Mertesacker,en
 Q70550,페어 메르테자커,ko
+Q7055473,North Geelong Warriors,en
 Q706218,Allan James McGregor,mul
 Q706218,Allan McGregor,en
 Q706218,앨런 맥그레거,ko
@@ -42854,6 +43297,8 @@ Q7347914,Robert Mühren,en
 Q73480,Willian,en
 Q73480,Willian Borges da Silva,en
 Q73480,윌리안 보르제스 다 실바,ko
+Q734877,Asociacion Deportiva Municipal Puntarenas,en
+Q734877,Asociación Deportiva Municipal Puntarenas,en
 Q735068,Alexandre Cuvillier,en
 Q7351696,Roberto Floriano,en
 Q7351854,Roberto Porfirio Maximiano Rodrigo,en
@@ -42863,6 +43308,8 @@ Q7351925,Roberto Torres Morales,en
 Q7355020,Rockdale Ilinden FC,en
 Q735624,FC Hoverla Uzhhorod,en
 Q735624,FC 호베를라 우지호로드,ko
+Q7357337,Rodrigo Galo,en
+Q7357337,Rodrigo Galo Brito,mul
 Q7357424,Rodrigo Thiago Aparecido da Silva,en
 Q7358599,Rogelio,en
 Q7358599,Roger Martí Salvador,en
@@ -43035,6 +43482,8 @@ Q73965,알 힐랄,ko
 Q73965,알 힐랄 FC,ko
 Q73965,알힐랄,ko
 Q73965,알힐랄 리야드,ko
+Q7396557,Sacachispas FC,en
+Q7396557,Sacachispas Fútbol Club,en
 Q739684,Martinique national football team,en
 Q739684,마르티니크 축구 국가대표팀,ko
 Q739701,AD 콘피안사,ko
@@ -43049,6 +43498,10 @@ Q73971,Clube Náutico Capibaribe,en
 Q73971,Náutico,en
 Q73971,나우치쿠,ko
 Q73971,나우치쿠 카피바리비,ko
+Q7398276,Saeid Ezatolahi Afagh,en
+Q7398276,Saeid Ezzatollahi,en
+Q7398276,사이드 에자톨라히,ko
+Q7398276,사이드 에자톨라히 아파그,ko
 Q73996,KF Skënderbeu,en
 Q73996,KF 스컨데르베우 코르처,ko
 Q7399978,Saido Berahino,en
@@ -43060,6 +43513,8 @@ Q74030,FC Bourg-Peronnas,en
 Q74030,FC Bourg-Péronnas,en
 Q74030,Football Bourg-en-Bresse Péronnas 01,en
 Q74030,부르캉브레스 01,ko
+Q7403527,Salam Zgharta,en
+Q7403527,살람 즈가르타,ko
 Q74047102,Amjhad Nazih,en
 Q74047936,Timothée Joseph Pembélé,en
 Q74047936,Timothée Pembélé,en
@@ -43137,6 +43592,8 @@ Q742583,Khaled Adénon,en
 Q742685,San Marino Calcio,en
 Q742685,Victor San Marino,en
 Q742685,산마리노 칼초,ko
+Q742867,Stefan Schwab,en
+Q742867,슈테판 슈바프,ko
 Q742953,UE Figueres,en
 Q7430259,Athletic,en
 Q7430259,SAFC,en
@@ -43229,6 +43686,9 @@ Q746486,Tiago da Silva Dutra,en
 Q746764,FK Jagodina,en
 Q746764,FK 야고디나,ko
 Q746764,Fudbalski klub Jagodina,en
+Q74681,Carlos Arturo Bacca Ahumada,en
+Q74681,Carlos Bacca,en
+Q74681,카를로스 바카,ko
 Q74681891,Arseniy Batahov,en
 Q74682140,Tobe Leysen,en
 Q74684256,Steven Ako van der Sloot,en
@@ -43368,7 +43828,9 @@ Q752483,AlbinoLeffe,en
 Q752483,U.C. AlbinoLeffe,en
 Q752483,UC 알비노레페,ko
 Q752483,Unione Calcio AlbinoLeffe,en
+Q752504,Bunkeflo IF,en
 Q75257,Çorumspor,en
+Q7530160,Sirens F.C.,en
 Q753135,Atacan Öztürk,en
 Q753207,Atakan Cangöz,en
 Q753462,FC Universitatea Cluj,en
@@ -43411,6 +43873,8 @@ Q7560997,Song Ho-young,en
 Q7560997,송호영,ko
 Q7561006,Song Je-heon,en
 Q7561006,송제헌,ko
+Q7561031,Cangzhou Mighty Lions F.C.,en
+Q7561031,창저우 슝스,ko
 Q7562010,Sonny Bradley,en
 Q7562105,Sonny Stevens,en
 Q756236,Aras Klaipėda,en
@@ -43757,6 +44221,8 @@ Q7689786,Tayfur Bingöl,en
 Q769047,Alex Martins Ferreira,en
 Q769047,알렉스 마르틴스,ko
 Q769498,Luka Krajnc,en
+Q76955,Michihiro Yasuda,en
+Q76955,야스다 미치히로,ko
 Q769566,Rodolph Austin,en
 Q769566,Rodolph William Austin,en
 Q769566,로돌프 오스틴,ko
@@ -43964,6 +44430,9 @@ Q7815334,Thomas Clarke,en
 Q7815334,Tom Clarke,en
 Q7816230,Thomas Edward Hopper,en
 Q7816230,Tom Hopper,en
+Q7816609,Thomas Alun Lockyer,mul
+Q7816609,Tom Lockyer,en
+Q7816609,톰 로키어,ko
 Q7817037,Tom Andrew Nichols,en
 Q7817037,Tom Nichols,en
 Q781755,Aron Einar Gunnarsson,en
@@ -43971,8 +44440,6 @@ Q781755,Aron Einar Malmquist Gunnarsson,en
 Q781755,Aron Gunnarsson,en
 Q781755,Aron Malmquist Gunnarsson,en
 Q781755,아론 귄나르손,ko
-Q7818846,Tomi Juric,en
-Q7818846,토미 유리치,ko
 Q7819393,Tommy Elphick,en
 Q7819393,타미 엘픽,ko
 Q7819760,Tommy O'Sullivan,en
@@ -44228,6 +44695,9 @@ Q796170,BK Forward,en
 Q7963247,Wallsend Boys Club,en
 Q797165,BV Cloppenburg,en
 Q7972164,Washington Santana da Silva,en
+Q797521,Fajr Sepasi F.C.,en
+Q797521,Fajr Sepasi Shiraz,en
+Q797521,Fajr Shahid Sepasi Shiraz Football Club,en
 Q797530,F.C. Istres Ouest Provence,en
 Q797530,FC Istres,en
 Q797530,FC 이스트르,ko
@@ -44408,6 +44878,7 @@ Q8066577,Zaragoza CD,en
 Q80712,Michael Keane,en
 Q80712,Michael Vincent Keane,en
 Q80712,마이클 킨,ko
+Q80722063,Club Atlético Palmaflor,en
 Q8075651,Zweigen Kanazawa,en
 Q8075651,츠바이겐 가나자와,ko
 Q80761,Dante,en
@@ -44681,7 +45152,7 @@ Q821646,슈테판 오르테가,ko
 Q82196,Josip Radošević,en
 Q82196,요시프 라도셰비치,ko
 Q822021,Tours F.C.,en
-Q822021,Tours FC.,en
+Q822021,Tours FC,en
 Q822021,Tours Football Club,en
 Q822021,투르 FC,ko
 Q822693,Edisson Jordanov,en
@@ -45038,6 +45509,7 @@ Q844271,빗셀 고베,ko
 Q844271,빗셀 코베,ko
 Q844323,C.F. União de Lamas,en
 Q844323,União de Lamas,en
+Q844498,FC Schifflange 95,en
 Q844574,Savio Fútbol Club,en
 Q84462730,Ivor Pandur,en
 Q84462730,이보르 판두르,ko
@@ -45516,6 +45988,10 @@ Q867245,Saphir Sliti Taïder,mul
 Q867245,Saphir Taider,en
 Q867245,Saphir Taïder,en
 Q867245,사피르 타이데르,ko
+Q86729529,Amazonas,en
+Q86729529,Amazonas FC,en
+Q86729529,Amazonas Futebol Clube,en
+Q86729529,아마조나스 FC,ko
 Q867320,F.C. Rouen 1899,en
 Q867320,FC Rouen,en
 Q867320,FC 루앙,ko
@@ -46036,6 +46512,7 @@ Q9137944,Aaron Martin,en
 Q914086,Cerro,en
 Q914086,Cerro Porteño,en
 Q914086,세로 포르테뇨,ko
+Q91501746,SC Schöftland,en
 Q91531,Odysseas Vlachodimos,en
 Q91531,오디세아스 블라호디모스,ko
 Q915352,Paksi FC,en
@@ -46105,12 +46582,6 @@ Q918473,Emmanuel Emenike,en
 Q918473,The Beast,en
 Q918473,야수,ko
 Q918473,이매뉴얼 에메니케,ko
-Q918609,Football Association of Penang,en
-Q918609,Penang F.C.,en
-Q918609,Penang FA,en
-Q918609,Pulau Pinang FA,en
-Q918609,피낭 FA,ko
-Q918609,피낭 FC,ko
 Q9186186,NK Radnik Sesvete,en
 Q9186186,NK Sesvete,en
 Q9186186,NK 세스베테,ko
@@ -46123,7 +46594,6 @@ Q918930,Mickaël Zidro Tavares,en
 Q919182,Christian Atsu,en
 Q919182,Christian Atsu Twasam,mul
 Q919182,크리스티안 아츠,ko
-Q919421,Diego Biseswar,en
 Q9195070,Staveley Miners Welfare F.C.,en
 Q9195329,NK Križevci,en
 Q9195913,União Bandeirante Futebol Clube,en
@@ -46192,9 +46662,6 @@ Q922689,Knowledge Musona,en
 Q922689,놀리지 무소나,ko
 Q923106,Elliott Ward,en
 Q923106,엘리엇 워드,ko
-Q923206,Panagiotis Giorgios Kone,en
-Q923206,Panagiotis Kone,en
-Q923206,파나요티스 코네,ko
 Q923225,Baba Diawara,en
 Q923225,Papa Babacar Diawara,en
 Q923238,Ungmennafélagið Afturelding,en
@@ -46303,10 +46770,10 @@ Q929697,Moghreb Athletic Tétouan,en
 Q929697,Moghreb Atletico Tetouan,en
 Q929697,Moghreb Atlético Tetuán,en
 Q929697,모그레브 테투안,ko
-Q929753,SD Compostela,en
+Q929753,SD Compostela,mul
 Q929753,SD 콤포스텔라,ko
 Q929753,Sociedad Deportiva Compostela,en
-Q929753,Sociedade Deportiva Compostela,en
+Q929753,Sociedade Deportiva Compostela,mul
 Q930072,En avant Guingamp,en
 Q930346,Vincenzo Fiorillo,en
 Q930346,빈첸조 피오릴로,ko
@@ -46382,6 +46849,7 @@ Q933945,Mohamed Fofana,en
 Q934005,Mariano Izco,en
 Q934005,Mariano Julio Izco,en
 Q934005,마리아노 훌리오 이스코,ko
+Q9340055,Sparta Szamotuły,en
 Q934259,Hernan Barcos,en
 Q934259,Hernán Barcos,en
 Q93429329,Kirill Zinovich,en
@@ -46514,10 +46982,14 @@ Q941863,el Lewandowski de Usurbil,en
 Q941863,이마놀 아기레체,ko
 Q941983,Ali Turan,en
 Q942151,Serdar Aziz,en
+Q942164,Daniel Vukovic,mul
+Q942164,Danny Vukovic,en
+Q942164,대니 부코비치,ko
 Q942248,Joe Lewis,en
 Q942248,Joseph Peter Lewis,mul
 Q942248,조 루이스,ko
 Q942248,조지프 피터 루이스,ko
+Q942443,FC Trollhättan,en
 Q9426,SBFC,en
 Q9426,SFC,en
 Q9426,Stevenage,en
@@ -46632,6 +47104,8 @@ Q949198,마크 번,ko
 Q94948231,Ismaël Kandouss,en
 Q949582,Luca Caldirola,en
 Q949582,루카 칼디롤라,ko
+Q949702,Cong An Ho Chi Minh City FC,en
+Q949702,호찌민 시티 FC,ko
 Q949762,Joel John Lynch,en
 Q949762,Joel Lynch,en
 Q949762,조엘 린치,ko
@@ -46644,8 +47118,8 @@ Q950564,Jose Filipe Correia Semedo,en
 Q950564,José Filipe Correia Semedo,en
 Q950564,조제 세메두,ko
 Q950564,조제 필리프 코헤이아 세메두,ko
-Q950835,Betis,en
-Q950835,FC barcelona,en
+Q950835,Sevilla Atletic,en
+Q950835,Sevilla Atlético,en
 Q950835,세비야 아틀레티코,ko
 Q951211,Mehmet Topuz,en
 Q951342,Samuel Kuffour,en
@@ -46726,6 +47200,7 @@ Q959661,NK Kamen Ingrad,en
 Q959723,Nathan Doyle,en
 Q959723,네이선 도일,ko
 Q95995476,Naomi Piqué,en
+Q959978,Gevorg Ghazaryan,en
 Q960173,Issia Wazi FC,en
 Q96040600,Josep María Chavarría Pérez,en
 Q96040600,Pep Chavarría,en
@@ -47006,6 +47481,8 @@ Q97158493,Caleb Wiley,en
 Q97160227,Ottawa South United,en
 Q97166158,Nanjing City,en
 Q97166158,Nanjing City F.C.,en
+Q971671,Jaiba Brava,en
+Q971671,Tampico Madero,mul
 Q971732,Danilo Avelar,en
 Q971732,Danilo Fernando Avelar,en
 Q971732,다닐루 페르난두 아벨라르,ko
@@ -47134,6 +47611,8 @@ Q978508,페드루 파체쿠,ko
 Q978606,Luke Martin McCormick,en
 Q978606,Luke McCormick,en
 Q978779,Ajesaia,en
+Q978923,Odise Roshi,en
+Q978923,오디세 로시,ko
 Q97905874,1. FC Kaiserslautern,en
 Q97905884,1. FSV Mainz 05,en
 Q97905900,VfL Borussia Mönchengladbach,en
@@ -47141,13 +47620,14 @@ Q97905916,FC Augsburg,en
 Q97905933,Hannover 96,en
 Q97905936,FC Hansa Rostock,en
 Q97905939,Hertha BSC Berlin,en
+Q97905944,KFC Uerdingen 05,en
 Q97905954,RB Leipzig,en
+Q97905964,SC Freiburg,en
 Q97905970,SG Wattenscheid 09,en
 Q97905978,SpVgg Unterhaching,en
-Q97906009,VfL Bochum,en
 Q97906010,VfL Wolfsburg,en
 Q979064,Rubin Dantschotter,en
-Q97927360,1. FC Union Berlin,en
+Q97927365,FC Erzgebirge Aue,en
 Q97927381,SV Eintracht 05 Trier,en
 Q97941158,Lucas Ribeiro Costa,en
 Q979669,Vincent Gragnic,en
@@ -47171,6 +47651,8 @@ Q98035956,Davor Matijaš,en
 Q980573,Club Atlético River Plate,en
 Q980573,River Plate Montevideo,en
 Q980573,리버 플레이트 몬테비데오,ko
+Q980653,Mubarak Wakaso,en
+Q980653,와카소 무바라크,ko
 Q98068062,Megan Mackey,en
 Q98068062,메건 매키,ko
 Q98071345,Mar Segarra Casanova,en
@@ -47229,8 +47711,6 @@ Q98198106,Adrien Truffert,en
 Q98198106,아드리앵 트뤼페르,ko
 Q981986,Luca Antei,en
 Q981986,루카 안테이,ko
-Q982124,Chikashi Masuda,en
-Q982124,마스다 치카시,ko
 Q982163,Genki Haraguchi,en
 Q982163,하라구치 겐키,ko
 Q982220,Jiloan Hamad,en
@@ -47245,8 +47725,8 @@ Q98270427,David Mindombe,en
 Q982889,R.C. France Football 92,en
 Q982889,RC Paris,en
 Q982889,RCF Paris,en
-Q982889,Racing Club de France,en
 Q982889,Racing Club de France Colombes 92,en
+Q982889,Racing Club de France Football,en
 Q982889,Racing Club de Paris,en
 Q982889,Racing Paris,en
 Q982889,라싱 클럽 드 프랑스,ko
@@ -47256,8 +47736,6 @@ Q982975,케빈 아크포구마,ko
 Q983415,Luciano Becchio,en
 Q983415,Luciano Héctor Becchio,en
 Q983415,루시아노 베치오,ko
-Q983674,Miloš Marić,en
-Q983674,밀로시 마리치,ko
 Q983931,Michael Duff,en
 Q983931,Michael James Duff,en
 Q983931,마이클 더프,ko
@@ -47268,6 +47746,7 @@ Q983975,기에드리우스 아를라우스키스,ko
 Q98407521,Ruben Geeraerts,en
 Q98407806,Dragan Lausberg,en
 Q984140,Marek Štěch,en
+Q984298,Fatih Gül,en
 Q98431704,Nemanja Tošić,en
 Q98442702,Diego Fuoli,en
 Q984689,Alfred John Momar N'Diaye,en

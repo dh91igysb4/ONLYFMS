@@ -13,9 +13,10 @@
 | `players.csv` | 선수 | 위키데이터 (+ `manual/names_ko.csv`) |
 | `aliases.csv` | 검색용 이름(한/영) | 위키데이터 |
 | `external_ids.csv` | 다른 출처 ID (지금은 Transfermarkt ID만, 위키데이터 P2446) | 위키데이터 |
-| `spells.csv` | 클럽 경력 | 위키데이터 |
+| `spells.csv` | 클럽 경력 | 위키데이터 (+ `manual/spells.csv`) |
 | `caps.csv` | 국가대표 경력 | 위키데이터 |
 | `honours.csv` | 리그 우승(대상 리그만), 축구 개인상 | 위키데이터 |
+| `season_memberships.csv` | 시즌별 소속 팀(주 소속·머문 날·추정 여부) | `spells.csv`에서 계산(`npm run football:seasons`) |
 | `openfootball/team_competitions.csv` | openfootball 경기 일정에서 뽑아 우리 ID로 이은 참가팀 | openfootball (퍼블릭 도메인) |
 | `openfootball/seasons.csv`, `remap.csv`, `unmatched.csv` | 시즌별 연결 수, 옮길 옛 ID, 못 이은 이름 | 생성 파일 |
 | `manual/*.csv` | 직접 입력 | 우리 |
@@ -28,14 +29,15 @@
 
 ```bash
 npm run football:fetch                                  # 대상 리그 전체 (40분~1시간)
-npm run football:fetch -- --leagues Q9448 --limit-teams 5   # 시험 실행 (1~2분)
-npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~2025로 (시즌 = 시작 연도)
+npm run football:fetch -- --leagues Q9448 --limit-teams 5   # 시험 실행 (1~2분, 결과는 .cache/football-trial/)
+npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~2025로 (시험, 결과는 .cache/football-trial/)
 ```
 
 - 리그와 리그별 수집 시즌 수는 `scripts/football/leagues.ts`에 있다(프리미어리그 최근 15시즌, 나머지 최근 10시즌, 현재 시즌 포함). 현재 시즌은 7월 이후면 올해, 아니면 작년이다. `--seasons N`은 모든 리그를 N시즌으로 바꾸는 시험용 옵션이다(옛 `--from`은 없어짐).
 - 팀마다 선수를 찾는 시작 연도는 그 팀이 창 안에서 속했던 리그(또는 지금 소속 리그)의 창 시작 중 가장 이른 해다.
+- `--leagues`·`--limit-teams`·`--seasons`를 쓰면 시험 실행이라 결과를 `.cache/football-trial/`에 쓴다(본 데이터 `data/football/`은 그대로). 직접 입력(`manual/`)·openfootball 결과는 `data/football/`에서 읽는다. 본 폴더에 쓰려면 `--out data/football`.
 - 위키데이터 공식 질의 서비스만 쓴다. 한 번에 한 요청, 요청 사이 1초.
-- 응답은 `.cache/wikidata/`에 보관된다(커밋 안 함). 중간에 멈추면 다시 돌려 이어 간다. 새로 받으려면 `--no-cache` 또는 그 폴더를 지운다.
+- 응답은 `.cache/wikidata/`에 보관된다(커밋 안 함). 중간에 멈추면 다시 돌려 이어 간다. 새로 받으려면 `--no-cache`(캐시를 읽지 않고 새로 받아 캐시도 갱신한다. 그 뒤 실행은 갱신된 캐시를 쓴다). 단 `--no-cache`로 돌리다 멈췄을 때 옵션 없이 이어 돌리면 아직 못 받은 부분은 옛 캐시를 쓴다. 중간에 멈출 수 있으면 `.cache/wikidata/` 폴더를 지우고 옵션 없이 돌리는 편이 안전하다.
 - `User-Agent`는 `WIKIDATA_UA` 환경 변수로 바꿀 수 있다(위키미디어 정책상 연락처 포함 권장).
 - 끝나면 리그·시즌별 참가팀 수 표가 나온다. `--`(없음)나 `!`(리그 정원 `teams` 미만) 칸은 `manual/team_competitions.csv`에 채운다.
 - ONLYFMS 클라우드 개발 환경은 네트워크 정책이 `query.wikidata.org`를 막고 있다. 로컬 PC에서 돌리거나 환경의 허용 도메인에 추가한 뒤 돌린다.
@@ -54,6 +56,22 @@ npm run football:openfootball -- --merge # 지금 team_competitions.csv·honours
 - 못 이은 이름은 `openfootball/unmatched.csv`에 후보와 함께 남는다. `manual/openfootball_teams.csv`(`competition_id,name,team_id`)에 ID를 적고 다시 돌린다. 팀이 `teams.csv`에 아예 없으면 위키데이터에서 QID를 확인해 적는다(다음 `football:fetch`가 그 팀을 받는다).
 - 응답은 `.cache/openfootball/`에 보관된다. 새로 받으려면 `--no-cache`.
 
+## 시즌 소속 (`season_memberships.csv`)
+
+"몇 시즌에 어느 팀"은 게임마다 따로 판정하지 않고 이 파일을 쓴다. 규칙은 설계 2026-11-01 §3.6.
+
+```bash
+npm run football:seasons                       # 수집·openfootball 반영 뒤에 (몇 초, 네트워크 없음)
+npm run football:seasons -- --as-of 2026-11-05 # 열린 경력을 이 날까지로
+```
+
+- 시즌 = 시작 연도. 가을–봄 시즌은 7/1~다음 해 7/1, 한국·일본·미국 등(`leagues.ts`의 `CALENDAR_YEAR_NATIONS`)은 달력 연도.
+- 개막 이적시장(가을–봄 9/1까지, 단일 연도 3/31까지) 안에서 끝난 경력은 그 시즌 소속이 아니다(출전 전 이적으로 본다). 겨울 이적·임대는 두 팀 모두.
+- 연도만 있는 날짜는 여름 이적으로 본다. 종료일이 빈 경력은 그 뒤 다른 팀 완전 이적 시작일로 닫는다. 원 소속 경력에서 임대 나간 기간은 뺀다. 시즌과 7일 미만 겹치면 치지 않는다.
+- `primary`: 그 시즌 머문 날이 가장 많은 팀(같으면 늦게 온 팀). "그 시즌 스쿼드"는 전체, "그 시즌 그 선수의 팀"은 `primary`.
+- `estimated = true`: 연도 단위 날짜나 열린 경력 닫기로 나온 소속(지금 약 91%).
+- 한계: 시즌 초 출전 뒤 9/1 전에 떠난 선수는 옛 팀에서 빠진다. 연도 단위 겨울 이적은 한 시즌 어긋난다. 뒤 경력이 원본에 없는 열린 경력(예: 이헤아나초의 맨시티)과 남자 클럽에 붙은 여자 선수는 그대로 남는다. 이런 경우는 `manual/spells.csv`로 고친다.
+
 ## 직접 입력 (`manual/`)
 
 다시 수집해도 지워지지 않는다. 수집 때마다 위키데이터 값 위에 덮어쓴다.
@@ -64,6 +82,13 @@ npm run football:openfootball -- --merge # 지금 team_competitions.csv·honours
 - `ballon_dor_nominees.csv` (`name,nation_ko,years,best_rank,player_id`): 레전드 원본. 발롱도르 후보 2000~2025년 전원 + 1990~1999년 연도별 상위 5위(381명). `npm run football:legends`가 이름을 위키데이터 ID로 바꿔 `legends.csv`에 `[발롱도르]` 줄로 넣고, 판정을 `ballon_dor_resolved.csv`에 쓴다. 확인 필요·못 찾음은 이 파일의 `player_id` 칸에 ID를 적고 다시 돌린다.
 - `ballon_dor_resolved.csv`: 위 도구의 판정 결과(생성 파일, 손으로 고치지 않음).
 - `openfootball_teams.csv` (`competition_id,name,team_id`): openfootball 팀 이름을 우리 ID로 직접 지정. `competition_id`가 비면 모든 리그.
+- `spells.csv` (`action,player_id,team_id,source_ref,start_date,end_date,loan,source_url,note`): 경력 추가·수정·삭제. 설계 2026-11-01 §5.3.
+  - `add`: 빠진 이적. `source_ref`는 비운다. `player_id`·`team_id`·`start_date`·`source_url` 필수.
+  - `fix`: 기존 경력(`spells.csv`의 `source_ref`)의 날짜·임대 여부를 고친다. 채운 칸만 바뀐다. 연도 단위 경력을 일 단위로 고치려면 시작·종료를 둘 다 적는다. `source_url` 필수.
+  - `delete`: 잘못된 경력(남자 클럽에 붙은 여자 팀 경력 등). `note`에 사유.
+  - 근거는 구단 공식 발표·리그 기록 URL. 나무위키·위키백과는 단서로만 쓰고 크롤링하지 않는다.
+  - 고친 뒤 `npm run football:seasons`를 돌리면 `spells.csv`와 `season_memberships.csv`에 바로 반영된다(다시 수집할 필요 없음). 오류가 있으면 줄 번호와 함께 멈춘다.
+  - 예: `fix,Q15506789,,Q15506789-6E0BE90E-3141-4B62-81C8-DE4BE13349A4,2015-08-01,2017-08-03,,https://…,맨시티 → 레스터`
 
 ## 알려진 한계
 

@@ -1,5 +1,6 @@
 // 위키데이터 공식 질의 서비스(query.wikidata.org) 호출과 응답 캐시. fetch-wikidata.ts와 resolve-legends.ts가 함께 쓴다.
-// 한 번에 한 요청, 요청 사이 1초 간격. 응답은 cacheDir(기본 .cache/wikidata/)에 질의 문장의 SHA-1 이름으로 보관한다.
+// 한 번에 한 요청, 요청 사이 1초 간격. 응답은 캐시 폴더(기본 .cache/wikidata/)에 질의 문장의 SHA-1 이름으로 보관한다.
+// refresh(--no-cache)면 캐시를 읽지 않고 새로 받되, 받은 응답으로 캐시를 갱신한다(다음 실행이 옛 응답을 쓰지 않게).
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,9 +13,12 @@ export class QueryTimeout extends Error {}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export const log = (...m: unknown[]) => console.error(...m)
 
-export async function query(sparql: string, cacheDir: string | null): Promise<Row[]> {
-  const file = cacheDir && join(cacheDir, `${createHash('sha1').update(sparql).digest('hex')}.json`)
-  if (file && existsSync(file)) return (JSON.parse(readFileSync(file, 'utf8')) as Binding[]).map(flat)
+/** 캐시 폴더와, 읽지 않고 새로 받아 덮어쓸지(refresh). null이면 캐시를 쓰지 않는다 */
+export type Cache = { dir: string; refresh: boolean } | null
+
+export async function query(sparql: string, cache: Cache): Promise<Row[]> {
+  const file = cache && join(cache.dir, `${createHash('sha1').update(sparql).digest('hex')}.json`)
+  if (file && !cache.refresh && existsSync(file)) return (JSON.parse(readFileSync(file, 'utf8')) as Binding[]).map(flat)
   for (let attempt = 0; ; attempt++) {
     await sleep(1000)
     const res = await fetch(ENDPOINT, {
@@ -38,11 +42,11 @@ export async function query(sparql: string, cacheDir: string | null): Promise<Ro
 }
 
 /** 목록을 size개씩 나눠 질의한다. 시간 초과면 그 묶음을 반으로 나눠 다시 보낸다 */
-export async function batched(label: string, items: readonly string[], size: number, build: (chunk: string[]) => string, cacheDir: string | null): Promise<Row[]> {
+export async function batched(label: string, items: readonly string[], size: number, build: (chunk: string[]) => string, cache: Cache): Promise<Row[]> {
   const out: Row[] = []
   const run = async (chunk: string[]): Promise<void> => {
     try {
-      out.push(...await query(build(chunk), cacheDir))
+      out.push(...await query(build(chunk), cache))
     } catch (e) {
       if (!(e instanceof QueryTimeout)) throw e
       if (chunk.length === 1) { log(`  ${label}: ${chunk[0]} 시간 초과, 건너뜀`); return }

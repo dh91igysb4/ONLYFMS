@@ -16,18 +16,18 @@ import { parseCsv, toCsv } from './wikidata.ts'
 function args() {
   const a = process.argv.slice(2)
   const get = (k: string) => { const i = a.indexOf(`--${k}`); return i >= 0 ? a[i + 1] : undefined }
-  return { dir: get('dir') ?? 'data/football', cacheDir: a.includes('--no-cache') ? null : (get('cache') ?? '.cache/wikidata') }
+  return { dir: get('dir') ?? 'data/football', cache: { dir: get('cache') ?? '.cache/wikidata', refresh: a.includes('--no-cache') } }
 }
 
 async function main() {
   const o = args()
-  if (o.cacheDir) mkdirSync(o.cacheDir, { recursive: true })
+  mkdirSync(o.cache.dir, { recursive: true })
   const manual = join(o.dir, 'manual')
   const nominees = parseNominees(parseCsv(readFileSync(join(manual, 'ballon_dor_nominees.csv'), 'utf8')))
   log(`발롱도르 후보 ${nominees.length}명`)
 
   const toQuery = nominees.filter((n) => !n.player_id).map((n) => n.name)
-  const rows = await batched('이름 찾기', toQuery, 40, qResolveNames, o.cacheDir)
+  const rows = await batched('이름 찾기', toQuery, 40, qResolveNames, o.cache)
   const resolved = resolveNominees(nominees, rows)
 
   writeFileSync(join(manual, 'ballon_dor_resolved.csv'),

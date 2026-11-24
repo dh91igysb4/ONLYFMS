@@ -30,3 +30,9 @@ export const LEAGUES: League[] = [
   { id: 'Q485568', name_ko: '쉬페르리그', name_en: 'Süper Lig', nation_id: 'Q43', tier: 1, seasons: 10, teams: 18 },
   { id: 'Q2386334', name_ko: 'K리그1', name_en: 'K League 1', nation_id: 'Q884', tier: 1, seasons: 10, teams: 12 },
 ]
+
+/**
+ * 단일 연도(1~12월) 시즌으로 치르는 나라 QID. 이 나라 팀의 시즌 소속은 달력 연도로 판정한다(설계 §3.6).
+ * 한국·일본·미국·캐나다·중국·브라질·노르웨이·스웨덴·핀란드·아일랜드. 나머지는 가을–봄 시즌.
+ */
+export const CALENDAR_YEAR_NATIONS: readonly string[] = ['Q884', 'Q17', 'Q30', 'Q16', 'Q148', 'Q155', 'Q20', 'Q34', 'Q33', 'Q27']
