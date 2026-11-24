@@ -35,5 +35,5 @@ export const manifest: Manifest = {
       default: 'all',
     },
   ],
-  gold: { perPoint: 90, playCap: 2700, dailyCap: FREE_DAILY_CAP },
+  gold: { perPoint: 22.5, playCap: 680, dailyCap: FREE_DAILY_CAP },
 }

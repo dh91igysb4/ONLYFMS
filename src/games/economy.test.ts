@@ -11,6 +11,7 @@ import {
   FISHING_SINK_TARGET,
   FREE_DAILY_CAP,
   FREE_GAP_SEC,
+  FREE_REF,
   freeGold,
   hourlyGold,
   REF,
@@ -151,7 +152,8 @@ test('lastEconomy: 이름순 마지막 정의를 쓴다', () => {
 })
 
 test('자유 플레이 상수 (설계 §4, §7.3)', () => {
-  expect(FREE_DAILY_CAP).toBe(20500)
+  expect(FREE_REF).toBe(5125)
+  expect(FREE_DAILY_CAP).toBe(5125)
   expect(FREE_GAP_SEC).toBe(5)
   expect(FISHING_SINK_TARGET).toBe(820000)
   expect(FREE_DAILY_CAP).toBeLessThan(DAILY_SOFT_CAP)
