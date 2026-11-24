@@ -4,15 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
-import { AREAS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type TackleId } from './data.ts'
-import { price, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
+import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
-import { conditionsAt } from './clock.ts'
+import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase } from './scene.ts'
-import { castTarget, interactionAt, openExitAt, shopSpot, TILE, tileOf, type Interaction, type MapDef, type Opened, type TileFacing, type Vec } from './map.ts'
+import { spriteDataUrl } from './sprites.ts'
+import {
+  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, shopSpot, STATIC_DYNAMIC, TILE, tileOf,
+  type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
+} from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
-import { cameraFor, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
+import { cameraFor, feetBlocked, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
 import { loadPosition, savePosition, startPosition } from './position.ts'
 import { Controls, type ActionState } from './Controls.tsx'
 import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
@@ -26,6 +30,8 @@ import './fishing.css'
 const OUTCOME_MS = 1200
 /** 전설은 세이브당 한 번뿐이라 알림을 더 오래 보여 준다 */
 const LEGEND_OUTCOME_MS = 2500
+/** 신화는 새 힘 줄까지 있어 더 오래 */
+const MYTHIC_OUTCOME_MS = 3500
 const MAX_SCALE = 4
 /** 장면 논리 크기 상한. 그리는 양을 묶고, 큰 모니터에서 장면이 물바다가 되지 않게 한다. */
 const MAX_SCENE_W = 320
@@ -94,7 +100,7 @@ const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
 type Outcome =
-  | { kind: 'caught'; fish: Fish; isNew: boolean }
+  | { kind: 'caught'; fish: Fish; isNew: boolean; buff?: BuffId }
   | { kind: 'lost'; early: boolean }
 type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: 'info'; text: string }
 type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
@@ -137,10 +143,22 @@ type Runtime = {
   lastFrame: number
   /** 지금 걷는 지역의 맵 (출구를 지나면 바뀐다) */
   map: MapDef
-  /** 지역 전환 중(출구·배): 페이드 아웃 → 맵 교체 → 페이드 인. 끝나면 null */
-  trans: { target: AreaId; entry: TileFacing; ms: number; swapped: boolean } | null
+  /**
+   * 지역 전환 중(출구·배): 페이드 아웃 → 맵 교체 → 페이드 인. 끝나면 null.
+   * say: 도착 알림을 지역 이름 대신 이 문구로(밀물에 같은 맵 안에서 옮길 때)
+   */
+  trans: { target: AreaId; entry: TileFacing; ms: number; swapped: boolean; say?: string } | null
   /** 지역 전환 페이드 알파(0~1) */
   fade: number
+  /** 이 방문에 뚫은 얼음 구멍("tx,ty", 오래된 순). 맵을 떠나면 비운다 */
+  holes: string[]
+  holeSet: ReadonlySet<string>
+  /** 얼음 구멍을 뚫는 중(칸과 지난 시간) */
+  drill: { tx: number; ty: number; ms: number } | null
+  /** "곧 밀물이에요"를 이미 알린 썰물(게임 날짜-끝 분) */
+  tideWarnKey: string | null
+  /** 신화를 잡은 시각(performance.now). 장면이 캐릭터 둘레에 빛고리를 그린다 */
+  mythicAt: number | null
 }
 /** 지역 전환 페이드 한 방향의 길이 */
 const FADE_MS = 150
@@ -148,6 +166,14 @@ const FADE_MS = 150
 const TRANSITION_STEP_MAX_MS = 34
 /** 도착한 지역 이름을 보이는 시간 */
 const AREA_NOTICE_MS = 1500
+/** 얼음 구멍 하나를 뚫는 시간 */
+export const DRILL_MS = 1200
+/** 썰물이 끝나기 이만큼(게임 분) 전에 "곧 밀물이에요" */
+const TIDE_WARN_MIN = 30
+const TIDE_WARN_TEXT = '곧 밀물이에요'
+const TIDE_IN_TEXT = '밀물이 들어와 물가로 나왔어요'
+const REFROZE_TEXT = '구멍이 다시 얼었어요'
+const TIDE_NOTICE_MS = 3000
 
 /** 전체화면 요청·해제는 실패해도(거절·미지원) 조용히 넘긴다. */
 function ignoreRejection(fn: () => Promise<void> | void): void {
@@ -160,10 +186,11 @@ function ignoreRejection(fn: () => Promise<void> | void): void {
 
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
-/** 전설 어종인가. 모르는 어종(더 새 서버)은 아니다 */
+/** 전설·신화 어종인가(legend 필드). 모르는 어종(더 새 서버)은 아니다 */
 const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
-/** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
-const safePrice = (f: Fish): number | null => (SPECIES.some((s) => s.id === f.species) ? price(f.species, f.sizeCm, f.perfect) : null)
+const isMythic = (id: string) => SPECIES.find((s) => s.id === id)?.rarity === 'mythic'
+/** 화면용 가격(실제로 팔리는 값, 버프 포함): 모르는 어종이면 null(price는 모르는 id에 throw한다) */
+const safePrice = (f: Fish, buffs: readonly BuffId[] = []): number | null => (SPECIES.some((s) => s.id === f.species) ? sellPrice(f, buffs) : null)
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 // 결과를 모르는 실패: 오류 화면 없이 view를 다시 불러와 맞춘다.
 const SILENT_CODES = new Set(['network', 'no_pending'])
@@ -191,6 +218,8 @@ const FISHING_MESSAGES: Record<string, string> = {
   not_open: '아직 켜지지 않은 순간이동기예요',
   bad_wear: RETRY,
   not_for_sale: '업적으로만 얻을 수 있어요',
+  need_rod: '백골 낚싯대 이상이 있어야 해요',
+  spot_closed: '물이 들어와 갯골에 갈 수 없어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 /** 서버에 낚시(pending)가 남아 있어 지역을 못 열 때. 다시 던졌다 거두면 풀린다 */
@@ -205,6 +234,8 @@ const GATE_ACTION = '살펴보기'
 const DOCK_ACTION = '배 타기'
 /** 순간이동기 앞: 켜졌으면 순간이동, 꺼졌으면 살펴보기(켜는 과제를 보여 준다) */
 const TELEPORT_ACTION = '순간이동'
+/** 뚫을 수 있는 얼음 앞 */
+const DRILL_ACTION = '구멍 뚫기'
 /** 지역을 연 뒤 알림 */
 const UNLOCK_NOTICES: Partial<Record<AreaId, string>> = {
   lake: '산 호수 가는 다리를 고쳤어요',
@@ -236,8 +267,8 @@ const coarseQuery = (): MediaQueryList | null =>
  * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
  * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
  */
-function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened): Interaction {
-  const front = interactionAt(map, p.pos, p.facing, opened)
+function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
+  const front = interactionAt(map, p.pos, p.facing, opened, dyn)
   if (front) return front
   const t = tileOf(p.pos)
   const door = shopSpot(map)
@@ -249,6 +280,7 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'gate') return `gate-${i.area}`
   if (i.kind === 'dock') return `dock-${i.target}`
   if (i.kind === 'teleporter') return 'teleporter'
+  if (i.kind === 'drill') return 'drill'
   return 'shop'
 }
 /** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
@@ -303,6 +335,7 @@ export function Game({ gameId }: WorldGameProps) {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, openPress: null, chargeStart: 0, gauge: 0, castPower: 0,
       player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player, openedOf(null))), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0, map, trans: null, fade: 0,
+      holes: [], holeSet: new Set(), drill: null, tideWarnKey: null, mythicAt: null,
     }
   })
   const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
@@ -314,6 +347,18 @@ export function Game({ gameId }: WorldGameProps) {
   const setPhase = (p: Phase) => {
     rt.phase = p
     setPhaseState(p)
+  }
+  /** 지금 맵의 움직이는 상태: 서버 보정 시각의 물때와 이 방문의 얼음 구멍 */
+  const dynAt = (cond: Conditions): MapDynamic => ({ tide: tideAt(cond.gameMinute), holes: rt.holeSet })
+  const dynNow = (): MapDynamic => dynAt(conditionsAt(Date.now() + rt.offset))
+  const setHoles = (holes: string[]) => {
+    rt.holes = holes
+    rt.holeSet = new Set(holes)
+  }
+  /** 오류 알림을 덮지 않는 잠깐 안내 */
+  const flashInfo = (text: string, ms: number) => {
+    setNotice((n) => (n && n.kind !== 'info' ? n : { kind: 'info', text }))
+    later(() => setNotice((n) => (n?.kind === 'info' && n.text === text ? null : n)), ms)
   }
   /** 걷기 입력을 모두 놓는다. 키를 뗀 알림은 창이 초점을 잃으면 오지 않을 수 있다. */
   const clearMove = () => {
@@ -346,7 +391,7 @@ export function Game({ gameId }: WorldGameProps) {
     const start = startPosition(savedStart.current, areas)
     rt.map = mapFor(start.area) ?? VILLAGE
     rt.player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
-    const at = interactionFor(rt.map, rt.player, areas)
+    const at = interactionFor(rt.map, rt.player, areas, dynNow())
     rt.hereKey = interactionKey(at)
     setHere(at)
     placed.current = true
@@ -425,19 +470,21 @@ export function Game({ gameId }: WorldGameProps) {
   function showOutcome(o: Outcome) {
     resetFight()
     rt.caughtSpecies = o.kind === 'caught' ? o.fish.species : null
+    const mythic = o.kind === 'caught' && isMythic(o.fish.species)
+    if (mythic) rt.mythicAt = performance.now()
     setOutcome(o)
     setPhase(o.kind)
     later(() => {
       rt.caughtSpecies = null
       setOutcome(null)
       setPhase('idle')
-    }, o.kind === 'caught' && isLegend(o.fish.species) ? LEGEND_OUTCOME_MS : OUTCOME_MS)
+    }, mythic ? MYTHIC_OUTCOME_MS : o.kind === 'caught' && isLegend(o.fish.species) ? LEGEND_OUTCOME_MS : OUTCOME_MS)
   }
 
   // ------------------------------------------------------------ 단계
   async function cast(power: number) {
     rt.castPower = power
-    rt.bobber = castTarget(rt.map, rt.player.pos, rt.player.facing, power)
+    rt.bobber = castTarget(rt.map, rt.player.pos, rt.player.facing, power, dynNow())
     let res: WorldView<View, PendingView>
     try {
       res = await act<PendingView>({ type: 'cast', area: rt.map.id, power, spot: rt.castSpot })
@@ -493,7 +540,7 @@ export function Game({ gameId }: WorldGameProps) {
     }
     rt.hookServerNow = res.server_now
     rt.bar = initBar()
-    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [])
+    rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [], res.view.buffs ?? [])
     rt.settling = false
     setPhase('fighting')
   }
@@ -507,16 +554,17 @@ export function Game({ gameId }: WorldGameProps) {
 
   async function finishFight(success: boolean, perfect: boolean) {
     const before = viewRef.current
-    let res: WorldView<View, { caught: Fish | null; completed?: string[] }>
+    let res: WorldView<View, { caught: Fish | null; completed?: string[]; buff?: BuffId }>
     try {
-      res = await act<{ caught: Fish | null; completed?: string[] }>({ type: 'resolve', success, perfect })
+      res = await act<{ caught: Fish | null; completed?: string[]; buff?: BuffId }>({ type: 'resolve', success, perfect })
     } catch (e) {
       if (alive.current) await recover(codeOf(e))
       return
     }
     if (!alive.current) return
     const fish = res.result?.caught ?? null
-    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species] })
+    const buff = BUFFS.find((b) => b.id === res.result?.buff)?.id
+    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species], ...(buff ? { buff } : {}) })
     else showOutcome({ kind: 'lost', early: false })
     // 이번 잡이로 깬 과제(서버가 정한다): 첫 과제를 알린다. 나머지는 과제 목록에서 보인다
     const done = CHALLENGES.find((c) => res.result?.completed?.includes(c.id))
@@ -526,11 +574,11 @@ export function Game({ gameId }: WorldGameProps) {
   // ------------------------------------------------------------ 입력
   function press(source: Source, key: string) {
     rt.held.add(key)
-    if (rt.busy || rt.trans || menuRef.current || !viewRef.current) return
+    if (rt.busy || rt.trans || rt.drill || menuRef.current || !viewRef.current) return
     switch (rt.phase) {
       case 'idle': {
         if (source !== 'action') break
-        const at = interactionFor(rt.map, rt.player, opened)
+        const at = interactionFor(rt.map, rt.player, opened, dynNow())
         if (!at) break
         if (at.kind !== 'fish') {
           // 상점·해금 창과 배는 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 창의 버튼에 떨어진다
@@ -565,10 +613,12 @@ export function Game({ gameId }: WorldGameProps) {
       const pressedAt = rt.openPress.at
       rt.openPress = null
       // 아직 대기 중이고 누를 때와 같은 자리(상점 문·잠긴 문·선착장 앞)일 때만
-      if (rt.phase !== 'idle' || rt.busy || rt.trans || menuRef.current) return
-      const at = interactionFor(rt.map, rt.player, opened)
+      if (rt.phase !== 'idle' || rt.busy || rt.trans || rt.drill || menuRef.current) return
+      const at = interactionFor(rt.map, rt.player, opened, dynNow())
       if (!at || interactionKey(at) !== pressedAt) return
-      if (at.kind === 'shop') {
+      if (at.kind === 'drill') {
+        startDrill()
+      } else if (at.kind === 'shop') {
         setNotice(null)
         setMenu('shop')
       } else if (at.kind === 'gate') {
@@ -592,6 +642,59 @@ export function Game({ gameId }: WorldGameProps) {
     void cast(power)
   }
 
+  /** 보고 있는 얼음 칸에 구멍을 뚫기 시작한다(DRILL_MS 뒤 구멍. 그동안 걷지 않는다) */
+  function startDrill() {
+    const { tx, ty } = tileOf(rt.player.pos)
+    const step = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[rt.player.facing]
+    setNotice(null)
+    rt.drill = { tx: tx + step[0], ty: ty + step[1], ms: 0 }
+  }
+
+  /** 뚫기를 DRILL_MS만큼 진행했으면 구멍을 낸다. 넷째 구멍이면 가장 오래된 구멍이 다시 언다 */
+  function stepDrill(dt: number) {
+    const d = rt.drill
+    if (!d) return
+    d.ms += Math.min(Math.max(dt, 0), TRANSITION_STEP_MAX_MS)
+    if (d.ms < DRILL_MS) return
+    rt.drill = null
+    const before = rt.holes
+    const next = addHole(before, d.tx, d.ty)
+    setHoles(next)
+    if (before.length >= MAX_HOLES && !before.includes(`${d.tx},${d.ty}`)) flashInfo(REFROZE_TEXT, TIDE_NOTICE_MS)
+    // 발 사각형이 새 구멍에 걸쳐 있으면 서 있던 칸 가운데로 당긴다(그 칸은 늘 걸을 수 있다)
+    const { pos } = rt.player
+    if (feetBlocked(rt.map, pos.x, pos.y, opened, dynNow())) {
+      const t = tileOf(pos)
+      rt.player = { ...rt.player, pos: { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 } }
+    }
+  }
+
+  /**
+   * 물때 맵: 썰물이 끝나 진흙이 물이 되면, 낚시 중이 아닐 때 페이드와 함께 가장 가까운 늘 걷는 칸으로 옮긴다
+   * (낚시 중이면 끝난 뒤에). 썰물 끝 TIDE_WARN_MIN분 전에 한 번 "곧 밀물이에요".
+   */
+  function stepTide(cond: Conditions, dyn: MapDynamic) {
+    if (!rt.map.tidal || rt.trans) return
+    const gm = cond.gameMinute
+    if (dyn.tide === 'low') {
+      const end = nextTideChange(gm)
+      const left = (((end - gm) % 1440) + 1440) % 1440
+      const key = `${cond.gameDay}-${end}`
+      if (left <= TIDE_WARN_MIN && rt.tideWarnKey !== key) {
+        rt.tideWarnKey = key
+        flashInfo(TIDE_WARN_TEXT, TIDE_NOTICE_MS)
+      }
+      return
+    }
+    // 창이 열려 있으면 닫은 뒤에 옮긴다
+    if (rt.phase !== 'idle' || rt.busy || rt.drill || menuRef.current) return
+    const { pos } = rt.player
+    if (!feetBlocked(rt.map, pos.x, pos.y, opened, dyn)) return
+    // 진흙으로 이어진 땅이 없으면(맵 데이터 실수) 그 맵 시작 위치로: 물 위에 갇히지 않게
+    const dry = nearestDryTile(rt.map, tileOf(pos), opened) ?? tileOf(rt.map.spawn.pos)
+    startTransition(rt.map.id, { tx: dry.tx, ty: dry.ty, facing: rt.player.facing }, TIDE_IN_TEXT)
+  }
+
   /** 해금 창을 연다(잠긴 문 앞, 또는 안 연 지역으로 가는 선착장 앞) */
   function openUnlock(area: AreaId) {
     setNotice(null)
@@ -606,12 +709,12 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   /** 출구에 닿았거나 배를 탔다: 입력을 잠그고 페이드 아웃을 시작한다. entry는 도착 맵(target)에서 설 칸과 방향 */
-  function startTransition(target: AreaId, entry: TileFacing) {
+  function startTransition(target: AreaId, entry: TileFacing, say?: string) {
     // 조이스틱·방향키는 놓지 않는다: 누른 채 도착하면 페이드 뒤에 이어서 걷는다(걷기는 전환 중 막혀 있다)
     rt.held.clear()
     rt.openPress = null
     rt.player = { ...rt.player, moving: false, walkMs: 0 }
-    rt.trans = { target, entry, ms: 0, swapped: false }
+    rt.trans = { target, entry, ms: 0, swapped: false, ...(say ? { say } : {}) }
   }
 
   /** 페이드 아웃 → 맵·위치·방향 교체와 저장 → 페이드 인. 끝나는 프레임에는 출구를 다시 보지 않는다. */
@@ -621,7 +724,8 @@ export function Game({ gameId }: WorldGameProps) {
     // 맵을 바꾸는 프레임의 멈칫이 다음 dt에 실려 와도 페이드 인이 통째로 건너뛰어지지 않게 한 걸음을 줄인다
     tr.ms += Math.min(dt, TRANSITION_STEP_MAX_MS)
     if (!tr.swapped && tr.ms >= FADE_MS) {
-      const next = mapFor(tr.target)
+      // 같은 맵 안에서 옮기기(밀물)는 맵을 그대로 두고 얼음 구멍도 남긴다
+      const next = tr.target === rt.map.id && tr.say ? rt.map : mapFor(tr.target)
       if (!next) {
         // 맵이 없는 지역으로 가는 출구는 만들지 않지만, 있다면 전환을 접는다
         rt.trans = null
@@ -630,10 +734,14 @@ export function Game({ gameId }: WorldGameProps) {
       }
       tr.swapped = true
       const { tx, ty, facing } = tr.entry
+      if (next !== rt.map) {
+        setHoles([])
+        rt.drill = null
+      }
       rt.map = next
       rt.player = { pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing, moving: false, walkMs: 0 }
       savePlayer()
-      const name = AREAS.find((a) => a.id === next.id)?.name
+      const name = tr.say ?? AREAS.find((a) => a.id === next.id)?.name
       if (name) {
         // 오류 알림이 떠 있으면 덮지 않는다
         setNotice((n) => (n && n.kind !== 'info' ? n : { kind: 'info', text: name }))
@@ -649,8 +757,8 @@ export function Game({ gameId }: WorldGameProps) {
   }
 
   /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
-  function syncHere() {
-    const at = interactionFor(rt.map, rt.player, opened)
+  function syncHere(dyn: MapDynamic) {
+    const at = interactionFor(rt.map, rt.player, opened, dyn)
     const k = interactionKey(at)
     if (k === rt.hereKey) return
     rt.hereKey = k
@@ -663,11 +771,14 @@ export function Game({ gameId }: WorldGameProps) {
     // 걷기는 대기 중이고 메뉴가 닫혀 있을 때만. 충전부터 결과 표시까지는 자리·방향이 고정된다.
     const wasMoving = rt.player.moving
     let started = false
+    const cond = conditionsAt(Date.now() + rt.offset)
+    const dyn = dynAt(cond)
+    stepDrill(dt)
     if (rt.trans) {
       stepTransition(dt)
-    } else if (rt.phase === 'idle' && !menuRef.current) {
+    } else if (rt.phase === 'idle' && !menuRef.current && !rt.drill) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
-      rt.player = stepWalk(rt.map, rt.player, input, dt, opened)
+      rt.player = stepWalk(rt.map, rt.player, input, dt, opened, dyn)
       // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다). 안 연 지역·맵이 없는 지역으로 가는 출구는 무시한다
       const exit = openExitAt(rt.map, rt.player.pos, opened)
       if (exit && mapFor(exit.target)) {
@@ -679,7 +790,8 @@ export function Game({ gameId }: WorldGameProps) {
     }
     // 전환을 시작한 프레임의 출구 칸 위치는 저장하지 않는다(도착 위치만 저장)
     if (wasMoving && !rt.player.moving && !started) savePlayer()
-    syncHere()
+    if (!started) stepTide(cond, dynAt(cond))
+    syncHere(dynAt(cond))
 
     if (rt.phase === 'charging' && !rt.busy) rt.gauge = gaugeAt(now - rt.chargeStart)
     if (rt.phase === 'fighting' && rt.bar && rt.params && !rt.settling) {
@@ -702,12 +814,15 @@ export function Game({ gameId }: WorldGameProps) {
       bar: rt.bar,
       barParams: rt.params,
       caughtSpecies: rt.caughtSpecies,
-      cond: conditionsAt(Date.now() + rt.offset),
+      cond,
       hudTop: hudTopFor(touch, fit.scale),
       fade: rt.fade,
       opened,
       teleporterOn: tpOpen(viewRef.current, rt.map.id),
       outfit: outfitOf(viewRef.current),
+      dyn: dynAt(cond),
+      drill: rt.drill,
+      mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
     }, size)
   }
 
@@ -1141,7 +1256,8 @@ export function Game({ gameId }: WorldGameProps) {
   const placeAction = here?.kind === 'gate' ? GATE_ACTION
     : here?.kind === 'dock' ? DOCK_ACTION
       : here?.kind === 'teleporter' ? (tpOpen(view, rt.map.id) ? TELEPORT_ACTION : GATE_ACTION)
-        : null
+        : here?.kind === 'drill' ? DRILL_ACTION
+          : null
   const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
   const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
   const atShop = here?.kind === 'shop'
@@ -1207,7 +1323,12 @@ export function Game({ gameId }: WorldGameProps) {
             <div className={`fish-toast${outcome.kind === 'caught' && isLegend(outcome.fish.species) ? ' fish-toast-wrap' : ''}`} aria-live="polite">
               {outcome.kind === 'caught' ? (
                 <>
-                  {isLegend(outcome.fish.species) ? (
+                  {isMythic(outcome.fish.species) ? (
+                    <strong className="fish-new fish-toast-mythic">
+                      <img src={spriteDataUrl('mythic-badge', 2)} alt="" />
+                      신화의 물고기!
+                    </strong>
+                  ) : isLegend(outcome.fish.species) ? (
                     <strong className="fish-new fish-toast-legend">전설의 물고기!</strong>
                   ) : (
                     outcome.isNew && <strong className="fish-new">새로운 물고기!</strong>
@@ -1217,7 +1338,11 @@ export function Game({ gameId }: WorldGameProps) {
                     {outcome.fish.perfect ? ' · 완벽!' : ''}
                   </span>
                   {isLegend(outcome.fish.species) && <span className="muted">세이브당 한 마리 · 가방에 잠가 뒀어요</span>}
-                  {safePrice(outcome.fish) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish)!)}</span>}
+                  {outcome.buff && (() => {
+                    const b = BUFFS.find((x) => x.id === outcome.buff)!
+                    return <span className="fish-toast-buff">{`새 힘: ${b.name} — ${b.desc}`}</span>
+                  })()}
+                  {safePrice(outcome.fish, view.buffs ?? []) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish, view.buffs ?? [])!)}</span>}
                 </>
               ) : (
                 <span>{outcome.early ? '너무 일찍 챘어요' : '놓쳤어요'}</span>

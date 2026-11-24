@@ -1,6 +1,6 @@
 // 낚시 미니게임 물리. 순수 함수만: DOM·시계·Math.random 없이 난수는 rng 인자, 시간은 dtMs로만 받는다.
 // 위치는 모두 0~1(트랙 아래 = 0).
-import { RODS, SPECIES, TACKLE_FX, type Behavior, type RodTier, type TackleId } from './data.ts'
+import { BUFF_FX, RODS, SPECIES, TACKLE_FX, type Behavior, type BuffId, type RodTier, type TackleId } from './data.ts'
 
 export const MAX_DT_MS = 50
 
@@ -39,6 +39,21 @@ const DART_SPEED_SCALE = 1.5
 const DART_MIN_JUMP = 0.4 // dart: 새 목표는 현재 위치에서 이만큼 이상 떨어진 곳
 const FLOATER_MIN = 0.55 // floater: 새 목표 범위 0.55~1
 const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
+// surge(용솟음, 신화): bar.t로 정해지는 두 단계를 되풀이한다. 고요는 smooth처럼 가운데(0.3~0.7)에서 천천히,
+// 용솟음은 dart처럼 SURGE_MIN_JUMP 이상 떨어진 곳으로 SURGE_SPEED_SCALE배 빠르게. 같은 시드면 같은 결과다
+// (rng 호출 수는 고요가 시작될 때 가운데로 돌아오는 목표를 고르느라 하나 더할 수 있다).
+// 용솟음 동안 바는 SURGE_BAR_CAP까지 줄고 가시 바늘이 걸리지 않는다. 낚싯대·코르크·백룡의 숨결로 커진 바는 용솟음에서
+// 효과가 없다(큰 바로 용솟음을 공짜로 넘기지 않게 하는 것이 이 규칙의 목적). 숨결을 상한에도 곱해 봤더니(0.21 × 1.08)
+// 봇이 6단계+코르크·가시에서 53% → 83%로 범위(25~70%)를 넘어 넣지 않았다(리뷰 M6, 계획 리뷰 반영). 설계 초안(고요 2.4초·용솟음 1.2초)은 고요에서
+// 진행도가 거저 차 봇이 100% 잡아서, 봇 범위(6단계+코르크·가시 25~70%, 5단계 10% 이상)에 맞게 고쳤다(계획 리뷰 반영).
+export const SURGE_PERIOD_MS = 3400
+export const SURGE_CALM_MS = 1000
+const SURGE_CALM_MIN = 0.3
+const SURGE_CALM_SPAN = 0.4
+const SURGE_MIN_JUMP = 0.5
+const SURGE_SPEED_SCALE = 1.6
+const SURGE_RETARGET_SCALE = 2.5
+const SURGE_BAR_CAP = 0.21
 // 가시 바늘: 바 중심과 물고기 거리(가속 = 거리 × pull, 1/s²). 70이면 바 가장자리(거리 0.1)에서
 // 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
 // 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
@@ -53,12 +68,27 @@ const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 /** 더 새 서버가 준 모르는 어종이면 이 값으로 싸운다(화면이 죽지 않게) */
 const NEUTRAL_FISH = { difficulty: 0.5, behavior: 'mixed' as const }
 
-export function barParams(speciesId: string, rodTier: RodTier, equipped: readonly TackleId[] = []): BarParams {
+/** 용솟음 단계: 주기 SURGE_PERIOD_MS 중 앞 SURGE_CALM_MS는 고요 */
+export function surgePhase(tMs: number): 'calm' | 'surge' {
+  const m = ((tMs % SURGE_PERIOD_MS) + SURGE_PERIOD_MS) % SURGE_PERIOD_MS
+  return m < SURGE_CALM_MS ? 'calm' : 'surge'
+}
+
+/**
+ * 지금 바 크기. 용솟음 동안(surge 신화)은 물고기가 거세게 날뛰어 바가 SURGE_BAR_CAP까지 줄어든다
+ * (큰 바·가시 바늘로 용솟음을 공짜로 넘기지 않게. 장면도 이 값으로 그린다).
+ */
+export function effectiveBarSize(params: BarParams, tMs: number): number {
+  return params.behavior === 'surge' && surgePhase(tMs) === 'surge' ? Math.min(params.barSize, SURGE_BAR_CAP) : params.barSize
+}
+
+/** buffs: 신화 버프(view.buffs). 백룡의 숨결이면 바가 BUFF_FX.dragonBar배 */
+export function barParams(speciesId: string, rodTier: RodTier, equipped: readonly TackleId[] = [], buffs: readonly BuffId[] = []): BarParams {
   const fish = SPECIES.find((s) => s.id === speciesId) ?? NEUTRAL_FISH
   // 모르는 낚싯대 단계는 보너스 없는 기본 바
   const barBonus = RODS.find((r) => r.tier === rodTier)?.barBonus ?? 0
   return {
-    barSize: BASE_BAR_SIZE * (1 + barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
+    barSize: BASE_BAR_SIZE * (1 + barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1) * (buffs.includes('dragon-breath') ? BUFF_FX.dragonBar : 1),
     difficulty: fish.difficulty,
     behavior: fish.behavior,
     drain: equipped.includes('trap') ? TACKLE_FX.trapDrain : 1,
@@ -66,23 +96,38 @@ export function barParams(speciesId: string, rodTier: RodTier, equipped: readonl
   }
 }
 
+/** 현재 위치에서 minJump 이상 떨어진 아래·위 구간을 이어 붙여 r로 고른다 */
+function jumpTarget(fishPos: number, r: number, minJump: number): number {
+  const below = Math.max(0, fishPos - minJump)
+  const aboveLen = Math.max(0, 1 - (fishPos + minJump))
+  const total = below + aboveLen
+  if (total <= 0) return r
+  const x = r * total
+  return x < below ? x : fishPos + minJump + (x - below)
+}
+
+/** surge는 단계별로 고요·용솟음 중 하나처럼 움직인다 */
+type Motion = Exclude<Behavior, 'surge'> | 'surge-calm' | 'surge-burst'
+function motionOf(behavior: Behavior, tMs: number): Motion {
+  if (behavior !== 'surge') return behavior
+  return surgePhase(tMs) === 'calm' ? 'surge-calm' : 'surge-burst'
+}
+
 // 유형별 새 목표. rng는 한 번만 부른다(mixed는 예전과 같은 난수열).
-function pickTarget(behavior: Behavior, fishPos: number, rng: () => number): number {
+function pickTarget(behavior: Motion, fishPos: number, rng: () => number): number {
   const r = rng()
   switch (behavior) {
+    case 'surge-calm':
+      return SURGE_CALM_MIN + SURGE_CALM_SPAN * r
+    case 'surge-burst':
+      return jumpTarget(fishPos, r, SURGE_MIN_JUMP)
     case 'floater':
       return FLOATER_MIN + (1 - FLOATER_MIN) * r
     case 'sinker':
       return SINKER_MAX * r
-    case 'dart': {
+    case 'dart':
       // 현재 위치에서 DART_MIN_JUMP 이상 떨어진 아래·위 구간을 이어 붙여 고른다
-      const below = Math.max(0, fishPos - DART_MIN_JUMP)
-      const aboveLen = Math.max(0, 1 - (fishPos + DART_MIN_JUMP))
-      const total = below + aboveLen
-      if (total <= 0) return r
-      const x = r * total
-      return x < below ? x : fishPos + DART_MIN_JUMP + (x - below)
-    }
+      return jumpTarget(fishPos, r, DART_MIN_JUMP)
     default:
       return r
   }
@@ -97,11 +142,14 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   const dt = clampedMs / 1000
 
   // 바: 가속도 + 감쇠, 양 끝에서 속도 0
-  const lo = params.barSize / 2
-  const hi = 1 - params.barSize / 2
-  const wasInside = Math.abs(bar.fishPos - bar.barPos) <= params.barSize / 2
+  const barSize = effectiveBarSize(params, bar.t)
+  const lo = barSize / 2
+  const hi = 1 - barSize / 2
+  const wasInside = Math.abs(bar.fishPos - bar.barPos) <= barSize / 2
   // 가시 바늘은 누르고 있을 때만 끈다(놓은 바가 물고기에 매달려 저절로 잡히지 않게)
-  const pullAccel = params.pull > 0 && held && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
+  // 용솟음(surge 신화) 동안은 가시 바늘이 걸리지 않는다(물고기가 바늘을 털어 낸다)
+  const bursting = params.behavior === 'surge' && surgePhase(bar.t) === 'surge'
+  const pullAccel = params.pull > 0 && held && wasInside && !bursting ? (bar.fishPos - bar.barPos) * params.pull : 0
   let barVel = (bar.barVel + ((held ? BAR_ACCEL_UP : -BAR_ACCEL_DOWN) + pullAccel) * dt) * Math.exp(-BAR_DRAG * dt)
   let barPos = bar.barPos + barVel * dt
   if (barPos <= lo) {
@@ -114,20 +162,26 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
 
   // 물고기: 목표를 향해 이동, 가끔(어려울수록 자주) 새 목표
   const d = clamp01(params.difficulty)
-  const behavior = params.behavior
+  // surge는 고요면 smooth, 용솟음이면 dart처럼 움직인다(목표 범위·속도만 다르다)
+  const behavior = motionOf(params.behavior, bar.t)
+  const like = behavior === 'surge-calm' ? 'smooth' : behavior === 'surge-burst' ? 'dart' : behavior
   let fishTarget = bar.fishTarget
-  const retargetScale = behavior === 'smooth' ? SMOOTH_RETARGET_SCALE : behavior === 'dart' ? DART_RETARGET_SCALE : 1
+  const retargetScale = behavior === 'surge-burst' ? SURGE_RETARGET_SCALE : like === 'smooth' ? SMOOTH_RETARGET_SCALE : like === 'dart' ? DART_RETARGET_SCALE : 1
   const retargetRate = (RETARGET_RATE_MIN + (RETARGET_RATE_MAX - RETARGET_RATE_MIN) * d) * retargetScale
   if (rng() < 1 - Math.exp(-retargetRate * dt)) fishTarget = pickTarget(behavior, bar.fishPos, rng)
-  const speedScale = behavior === 'dart' ? DART_SPEED_SCALE : 1
+  // 고요가 시작되면 용솟음에서 고른 먼 목표를 버리고 가운데로 돌아온다
+  else if (behavior === 'surge-calm' && (fishTarget < SURGE_CALM_MIN || fishTarget > SURGE_CALM_MIN + SURGE_CALM_SPAN)) {
+    fishTarget = pickTarget(behavior, bar.fishPos, rng)
+  }
+  const speedScale = behavior === 'surge-burst' ? SURGE_SPEED_SCALE : like === 'dart' ? DART_SPEED_SCALE : 1
   const maxStep = (FISH_SPEED_MIN + (FISH_SPEED_MAX - FISH_SPEED_MIN) * d) * speedScale * dt
   const gap = fishTarget - bar.fishPos
   // smooth는 남은 거리에 비례해 감속하며 다가간다
-  const step = behavior === 'smooth' ? Math.min(maxStep, Math.abs(gap) * SMOOTH_GAIN * dt) : maxStep
-  const snap = behavior === 'smooth' ? SMOOTH_SNAP : 0
+  const step = like === 'smooth' ? Math.min(maxStep, Math.abs(gap) * SMOOTH_GAIN * dt) : maxStep
+  const snap = like === 'smooth' ? SMOOTH_SNAP : 0
   let fishPos = Math.abs(gap) <= Math.max(step, snap) ? fishTarget : bar.fishPos + Math.sign(gap) * step
   fishPos = clamp01(fishPos)
-  const arriveRetarget = behavior === 'smooth' ? SMOOTH_ARRIVE_RETARGET : 0.5
+  const arriveRetarget = like === 'smooth' ? SMOOTH_ARRIVE_RETARGET : 0.5
   if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, rng) // 도착하면 곧 다시 움직인다
 
   // 진행도
@@ -135,7 +189,7 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   // (안 눌러도 잡히는 일을 막는다. 바닥 근처에서 살살 누르는 동안 잠깐 닿는 것은 봐준다)
   const slackMs = barPos <= lo && !held ? (bar.slackMs ?? 0) + clampedMs : 0
   const slack = slackMs > SLACK_GRACE_MS
-  const inside = !slack && Math.abs(fishPos - barPos) <= params.barSize / 2
+  const inside = !slack && Math.abs(fishPos - barPos) <= barSize / 2
   const progress = clamp01(bar.progress + (inside ? PROGRESS_UP : -PROGRESS_DOWN * params.drain) * dt)
 
   return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs, slackMs }

@@ -3463,7 +3463,282 @@ const MAP_TELEPORTER = sprite({ k: MAP_INK, y: '#ffd23f', r: '#d9483b', w: '#fbf
   '.kkkkkkk.',
 ])
 
+// ── 낚시 5부 M1: 갯벌 진흙(썰물 땅 / 밀물 얕은 흙탕물 두 장), 얼음판, 얼음 구멍(두 장) ──
+const MUD: Record<string, string> = {
+  a: '#8a7356', // 진흙
+  b: '#76603f', // 젖은 결
+  c: '#a38c6a', // 마른 결
+  w: '#6f8f96', // 물웅덩이
+  W: '#a9c8cb', // 웅덩이 빛
+  h: '#4a3a29', // 게 구멍
+}
+const MUD_WET: Record<string, string> = {
+  a: '#5f8a86', // 얕은 흙탕물
+  d: '#557c78', // 깊은 결
+  b: '#79a39c', // 물결 몸
+  c: '#c2dcd2', // 물결 마루
+  m: '#7d6d55', // 비치는 진흙
+}
+const ICE: Record<string, string> = {
+  a: '#dcecf4', // 얼음
+  b: '#c4dcea', // 그늘
+  w: '#ffffff', // 빛
+  l: '#9fc3d6', // 금
+}
+const HOLE: Record<string, string> = {
+  ...ICE,
+  k: '#7fa6bd', // 구멍 테
+  d: '#1f4a66', // 깊은 물
+  D: '#2f6488', // 물
+  c: '#8fc8e4', // 물결 빛
+}
+const TILE_MUD = sprite(MUD, [
+  'aaaaaaaabaaaaaaa',
+  'aacaaaaaaaaaaaba',
+  'aaaaabbaaaaaaaaa',
+  'aaaaaaaaaaahaaaa',
+  'abaaaaaaaaaaaaaa',
+  'aaaawwwaaaaaacaa',
+  'aaawWwwwaaaaaaaa',
+  'aaaawwwaaabbaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaacaaaaaaaa',
+  'aahaaaaaaaaaaaaa',
+  'aaaaaaaaaawwwaaa',
+  'abbaaaaaawWwwaaa',
+  'aaaaacaaaawwaaaa',
+  'aaaaaaaaaaaaaaba',
+  'aaaaaaabaaaaaaaa',
+])
+const MUD_WET_0 = sprite(MUD_WET, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaadda',
+  'aaacccaaaaaaaaaa',
+  'aabaaabaaaamaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aamaaaaddaaaaaaa',
+  'aaaaaaaaaaaccaaa',
+  'aaaaaaaaaabaabaa',
+  'aaaaaaaaaaaaaaaa',
+  'adaaaaaaaaaaaama',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaccaaaaaaaaa',
+  'aaaabaabaaaaadaa',
+  'aaaaaaaaamaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+])
+const MUD_WET_1 = sprite(MUD_WET, [
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaada',
+  'aaaaaaaaaaaaaaaa',
+  'aaaacccaaaamaaaa',
+  'aaabaaabaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aamaaaaaddaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaacccaa',
+  'aaaaaaaaaabaaaba',
+  'aaaaaaaaaaaaaama',
+  'aadaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaacaaaaaaaaa',
+  'aaaaabaabmaaaaaa',
+  'aaaaaaaaaaaaadaa',
+])
+const TILE_ICE = sprite(ICE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'awaaaaaalaaaaaaa',
+  'aaaaaaaallaaaaaa',
+  'aaaaaaaaalaaaaaa',
+  'aaaaaaaaaallaaaa',
+  'aaabaaaaaaalaaaa',
+  'aaaaaaaaaaaaaaaa',
+  'aaaaaaaaaaaaawwa',
+  'aalaaaaaaaaaawaa',
+  'aaallaaaaabaaaaa',
+  'aaaaalaaaaaaaaaa',
+  'aaaaaalaaaaaaaaa',
+  'aaaaaaaaaaaaabaa',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+const HOLE_0 = sprite(HOLE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'aaaaakkkkkkaaaaa',
+  'aaaakddddddkaaaa',
+  'aaakdDDDDDDdkaaa',
+  'aakdDDcDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDDDDcDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDcDDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aaakdDDDDDDdkaaa',
+  'aaaakddddddkaaaa',
+  'aaaaakkkkkkaaaba',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+const HOLE_1 = sprite(HOLE, [
+  'aaaaaaaaaaaaaaab',
+  'awwaaaaaaaaaaaab',
+  'aaaaakkkkkkaaaaa',
+  'aaaakddddddkaaaa',
+  'aaakdDDDDDDdkaaa',
+  'aakdDDDDDcDDdkaa',
+  'aakdDcDDDDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDDcDDDdkaa',
+  'aakdDDDDDDDDdkaa',
+  'aakdDDDcDDDDdkaa',
+  'aaakdDDDDDDdkaaa',
+  'aaaakddddddkaaaa',
+  'aaaaakkkkkkaaaba',
+  'abaaaaaaaaaaaaaa',
+  'bbaaaaaaaaaaaaab',
+])
+
+// ── 낚시 5부 M1: 얼음 구멍 뚫는 금(세 단계, 투명 바탕), HUD 물때 아이콘(썰물·밀물 7×7) ──
+const DRILL: Record<string, string> = { l: '#6f97ae', w: '#ffffff', k: '#7fa6bd', d: '#24506c' }
+const DRILL_0 = sprite(DRILL, [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '.......l........',
+  '......lll.......',
+  '.......ll.......',
+  '........l.......',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+const DRILL_1 = sprite(DRILL, [
+  '................',
+  '................',
+  '........l.......',
+  '....l...l.......',
+  '.....l..l....w..',
+  '......l.l..ll...',
+  '.......lll.l....',
+  '...llllllll.....',
+  '......llll......',
+  '.....l.l.lll....',
+  '..w.l..l...l....',
+  '...l...l....l...',
+  '.......l........',
+  '................',
+  '................',
+  '................',
+])
+const DRILL_2 = sprite(DRILL, [
+  '................',
+  '..w.....l.....w.',
+  '........l.......',
+  '...l....l...l...',
+  '....l...l..l....',
+  '.....lkkkkl.....',
+  '.....kdddddk....',
+  '..llkdddddddkll.',
+  '....kddddddk....',
+  '.....kdddddk.l..',
+  '....l.kkkkk...l.',
+  '...l....l.....w.',
+  '..l.....l.......',
+  '.w......l.......',
+  '................',
+  '................',
+])
+const TIDE_ICON: Record<string, string> = { w: '#ffffff', b: '#4c9dd1', B: '#a6dcf2', m: '#8a7356' }
+const ICON_TIDE_LOW = sprite(TIDE_ICON, [
+  '...w...',
+  '...w...',
+  '.w.w.w.',
+  '..www..',
+  '...w...',
+  'bBbbBbb',
+  'mmmmmmm',
+])
+const ICON_TIDE_HIGH = sprite(TIDE_ICON, [
+  '...w...',
+  '..www..',
+  '.w.w.w.',
+  '...w...',
+  'bBbbBbb',
+  'bbbbbbb',
+  'bbbbbbb',
+])
+
+// ── 낚시 5부 M1: 신화의 힘(버프) 그림 9×9 — 비늘 방패, 숨결 소용돌이, 불꽃 이는 여의주 — 와 신화 표시(별 문장) ──
+const BUFF_IMUGI_SCALE = sprite({ k: '#1d3b36', g: '#3f9e86', G: '#8fe0c4', w: '#e8fff6' }, [
+  '...kkk...',
+  '..kgGgk..',
+  '.kgGwGgk.',
+  'kgGgkgGgk',
+  'kGgkgkgGk',
+  'kgkgGgkgk',
+  '.kgGwGgk.',
+  '..kgGgk..',
+  '...kkk...',
+])
+const BUFF_DRAGON_BREATH = sprite({ k: '#2a3b5c', b: '#7cc4ff', B: '#cfeeff', w: '#ffffff' }, [
+  '..kkk....',
+  '.kBBBk...',
+  'kBwwwBk..',
+  'kwBBBwBk.',
+  'kwBkBwbBk',
+  '.kwwBwbbk',
+  '..kBwbbk.',
+  '...kbbk..',
+  '....kk...',
+])
+const BUFF_DRAGON_PEARL = sprite({ k: '#5a3a10', y: '#ffd23f', Y: '#fff3b0', w: '#ffffff', o: '#ff9f43', r: '#e2483b' }, [
+  '...r.r...',
+  '..rorr...',
+  '...kkk...',
+  '..kyYYk..',
+  '.kyYwYyk.',
+  '.kyyYyyk.',
+  '.kyyyyyk.',
+  '..kyyyk..',
+  '...kkk...',
+])
+const MYTHIC_BADGE = sprite({ k: '#2a2135', y: '#ffc94a', Y: '#fff1a8', w: '#ffffff' }, [
+  '....k....',
+  '...kyk...',
+  'kkkyYykkk',
+  'kyyYwYyyk',
+  '.kyYYYyk.',
+  '.kyykyyk.',
+  'kyyk.kyyk',
+  'kyk...kyk',
+  'kk.....kk',
+])
+
 export const SPRITES: Record<string, Sprite> = {
+  'buff-imugi-scale': BUFF_IMUGI_SCALE,
+  'buff-dragon-breath': BUFF_DRAGON_BREATH,
+  'buff-dragon-pearl': BUFF_DRAGON_PEARL,
+  'mythic-badge': MYTHIC_BADGE,
+  'drill-0': DRILL_0,
+  'drill-1': DRILL_1,
+  'drill-2': DRILL_2,
+  'icon-tide-low': ICON_TIDE_LOW,
+  'icon-tide-high': ICON_TIDE_HIGH,
+  'tile-mud': TILE_MUD,
+  'tile-mud-wet-0': MUD_WET_0,
+  'tile-mud-wet-1': MUD_WET_1,
+  'tile-ice': TILE_ICE,
+  'tile-hole-0': HOLE_0,
+  'tile-hole-1': HOLE_1,
   'player-idle': PLAYER_IDLE,
   'player-cast': PLAYER_CAST,
   'player-reel': PLAYER_REEL,

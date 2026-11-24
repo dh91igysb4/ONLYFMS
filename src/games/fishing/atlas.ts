@@ -2,11 +2,11 @@
 // 맵 정의·어종·서버 view·조건에서 표시(마커) 자리, 낚시 자리 대표점, 물고기 목록·필터, 지역 경로를 만든다.
 // 좌표는 칸 단위. 표시 자리는 칸 가운데를 정수로 두고, 여러 칸에 걸친 것(가장자리 출구·문·순간이동기)은 .5가 될 수 있다.
 
-import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, type AreaId, type Rarity, type Species } from './data.ts'
+import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId, type Rarity, type Species } from './data.ts'
 import { inHours, type Conditions } from './clock.ts'
 import {
   ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, shopSpot, tileAt,
-  type Facing, type MapDef, type Opened, type Rect,
+  type Facing, type MapDef, type MapDynamic, type Opened, type Rect,
 } from './map.ts'
 import { MAPS, mapFor } from './maps/index.ts'
 import { teleporterOpen, type View } from './logic.ts'
@@ -77,7 +77,10 @@ export function fixedCells(map: MapDef): Cell[] {
   return out
 }
 
-/** 걸어서 닿는 칸(모두 열린 기준): 시작 위치·출구 칸·선착장·이동기 앞에서 */
+/** 지도가 설 자리를 셀 때의 맵 상태: 썰물(진흙으로 걸어 들어가는 갯골도 자리), 구멍 없음(얼음은 drill로 센다) */
+const ATLAS_DYN: MapDynamic = { tide: 'low', holes: new Set<string>() }
+
+/** 걸어서 닿는 칸(모두 열린 기준, 썰물): 시작 위치·출구 칸·선착장·이동기 앞에서 */
 function walkableReach(map: MapDef): ReadonlySet<string> {
   const starts: Cell[] = [{ tx: Math.floor(map.spawn.pos.x / TILE), ty: Math.floor(map.spawn.pos.y / TILE) }]
   for (const e of map.exits) {
@@ -86,13 +89,16 @@ function walkableReach(map: MapDef): ReadonlySet<string> {
   }
   for (const d of map.docks) starts.push(d.front)
   if (map.teleporter) starts.push(map.teleporter.front)
-  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN)
+  return reachableTiles(map, starts.map((c) => ({ tx: Math.floor(c.tx), ty: Math.floor(c.ty) })), ALL_AREAS_OPEN, ATLAS_DYN)
 }
 
 type StandInfo = { stands: Map<string, Cell[]>; waters: Map<string, Cell[]> }
 const standCache = new WeakMap<MapDef, StandInfo>()
 
-/** 자리별 설 자리(걸어서 닿고, 네 방향 중 하나에서 그 자리 낚시)와 그 칸에서 보는 물 칸 */
+/**
+ * 자리별 설 자리(걸어서 닿고, 네 방향 중 하나에서 그 자리 낚시)와 그 칸에서 보는 물 칸.
+ * 썰물 기준이고, 뚫을 수 있는 얼음을 보는 칸은 얼음 구멍 자리(map.spots.hole)의 설 자리로 친다.
+ */
 function standInfo(map: MapDef): StandInfo {
   const hit = standCache.get(map)
   if (hit) return hit
@@ -105,15 +111,16 @@ function standInfo(map: MapDef): StandInfo {
       if (!reach.has(`${tx},${ty}`)) continue
       const spots = new Set<string>()
       for (const f of FACINGS) {
-        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN)
-        if (it?.kind !== 'fish') continue
-        spots.add(it.spot)
+        const it = interactionAt(map, center(tx, ty), f, ALL_AREAS_OPEN, ATLAS_DYN)
+        const spot = it?.kind === 'fish' ? it.spot : it?.kind === 'drill' ? map.spots.hole : undefined
+        if (spot === undefined) continue
+        spots.add(spot)
         const w = { tx: tx + STEP[f].tx, ty: ty + STEP[f].ty }
-        const seen = seenWater.get(it.spot) ?? new Set<string>()
-        seenWater.set(it.spot, seen)
+        const seen = seenWater.get(spot) ?? new Set<string>()
+        seenWater.set(spot, seen)
         if (!seen.has(`${w.tx},${w.ty}`)) {
           seen.add(`${w.tx},${w.ty}`)
-          waters.set(it.spot, [...(waters.get(it.spot) ?? []), w])
+          waters.set(spot, [...(waters.get(spot) ?? []), w])
         }
       }
       for (const s of spots) stands.set(s, [...(stands.get(s) ?? []), { tx, ty }])
@@ -160,23 +167,33 @@ export function spotTiles(map: MapDef, spot: string): { stands: Cell[]; waters: 
   return { stands: info.stands.get(spot) ?? [], waters: info.waters.get(spot) ?? [] }
 }
 
-/** 물 칸이고 map.spots에 그 물의 자리가 있으면 그 자리(부두 옆 바다는 'shore' 같은 물 자리), 아니면 null */
+/**
+ * 물 칸이고 map.spots에 그 물의 자리가 있으면 그 자리(부두 옆 바다는 'shore' 같은 물 자리), 아니면 null.
+ * 진흙은 밀물 자리(spots.mud), 얼음은 구멍 자리(spots.hole)로 본다.
+ */
 export function spotAtTile(map: MapDef, tx: number, ty: number): string | null {
   const kind = tileAt(map, tx, ty)
+  if (kind === 'mud') return map.spots.mud ?? null
+  if (kind === 'ice') return map.spots.hole ?? null
   if (kind === null || !WATER_KINDS.has(kind)) return null
   return (map.spots as Record<string, string | undefined>)[kind] ?? null
 }
 
 // ---------------------------------------------------------------- 물고기 목록
-export type NotNow = 'legend-done' | 'rod' | 'season' | 'hours' | 'weather'
+/** needs: 신화인데 먼저 잡을 전설이 남았다 */
+export type NotNow = 'legend-done' | 'needs' | 'rod' | 'season' | 'hours' | 'weather'
 export type FishRow = { species: Species; found: boolean; now: boolean; legendDone: boolean; reason: NotNow | null }
 export type FishView = Pick<View, 'dex' | 'legends' | 'rodTier'>
 
-const RARITY_ORDER: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, legend: 3 }
+const RARITY_ORDER: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, legend: 3, mythic: 4 }
 
-/** 지금 안 나오는 첫 이유(자리는 보지 않는다): 이미 잡은 전설 → 낚싯대 → 계절 → 시간 → 날씨 */
-function notNow(s: Species, legendDone: boolean, cond: Conditions, rodTier: number): NotNow | null {
+/** 신화인데 먼저 잡을 전설(needs)이 남았는가 */
+const needsLeft = (s: Species, legends: readonly string[]) => s.rarity === 'mythic' && !(s.legend?.needs ?? []).every((id) => legends.includes(id))
+
+/** 지금 안 나오는 첫 이유(자리는 보지 않는다): 이미 잡은 전설·신화 → 먼저 잡을 전설 → 낚싯대 → 계절 → 시간 → 날씨 */
+function notNow(s: Species, legendDone: boolean, needs: boolean, cond: Conditions, rodTier: number): NotNow | null {
   if (legendDone) return 'legend-done'
+  if (needs) return 'needs'
   if (s.minRod > rodTier) return 'rod'
   if (s.seasons && !s.seasons.includes(cond.season)) return 'season'
   if (s.hours && !inHours(cond.gameMinute, s.hours)) return 'hours'
@@ -188,24 +205,28 @@ function rowsFor(list: readonly Species[], view: FishView, nowOf: (s: Species) =
   const legends = view.legends ?? []
   const rows = list.map((s) => {
     const legendDone = !!s.legend && legends.includes(s.id)
-    const now = !legendDone && nowOf(s)
-    return { species: s, found: !!view.dex[s.id], now, legendDone, reason: now ? null : notNow(s, legendDone, cond, view.rodTier) }
+    const needs = needsLeft(s, legends)
+    const now = !legendDone && !needs && nowOf(s)
+    return { species: s, found: !!view.dex[s.id], now, legendDone, reason: now ? null : notNow(s, legendDone, needs, cond, view.rodTier) }
   })
   const idx = (s: Species) => SPECIES.indexOf(s)
   return rows.sort((a, b) => Number(b.now) - Number(a.now) || RARITY_ORDER[a.species.rarity] - RARITY_ORDER[b.species.rarity] || idx(a.species) - idx(b.species))
 }
 
-/** 그 지역·자리 물고기. now = 서버와 같은 speciesAvailable이고 이미 잡은 전설이 아니다. 정렬: now 먼저 → 등급 → SPECIES 순 */
+/**
+ * 그 지역·자리 물고기. now = 서버와 같은 speciesAvailable이고, 그 자리가 지금 열려 있고(물때 spotOpen),
+ * 이미 잡은 전설·신화가 아니고, 신화면 먼저 잡을 전설을 다 잡았다. 정렬: now 먼저 → 등급 → SPECIES 순
+ */
 export function spotFish(area: AreaId, spot: string, view: FishView, cond: Conditions): FishRow[] {
   const list = SPECIES.filter((s) => s.area === area && (!s.spots || s.spots.includes(spot)))
-  return rowsFor(list, view, (s) => speciesAvailable(s, area, spot, cond, view.rodTier), cond)
+  return rowsFor(list, view, (s) => speciesAvailable(s, area, spot, cond, view.rodTier) && spotOpen(area, spot, cond.gameMinute), cond)
 }
 
 /** 지역 전체 물고기. now = 그 지역 자리 중 하나라도 now */
 export function areaFish(area: AreaId, view: FishView, cond: Conditions): FishRow[] {
   const spots = AREAS.find((a) => a.id === area)?.spots ?? []
   const list = SPECIES.filter((s) => s.area === area)
-  return rowsFor(list, view, (s) => spots.some((spot) => speciesAvailable(s, area, spot, cond, view.rodTier)), cond)
+  return rowsFor(list, view, (s) => spots.some((spot) => speciesAvailable(s, area, spot, cond, view.rodTier) && spotOpen(area, spot, cond.gameMinute)), cond)
 }
 
 export type FishFilter = { now: boolean; undiscovered: boolean }

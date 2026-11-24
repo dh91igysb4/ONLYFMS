@@ -446,3 +446,30 @@ describe('안 잡은 물고기 실루엣', () => {
     expect([...colors]).toEqual([SILHOUETTE])
   })
 })
+
+describe('낚시 5부 M1 타일: 진흙·얼음·구멍', () => {
+  const NEW = ['tile-mud', 'tile-mud-wet-0', 'tile-mud-wet-1', 'tile-ice', 'tile-hole-0', 'tile-hole-1']
+  it('16×16이고 서로 다르며, 기존 물·땅 타일과도 다르다', () => {
+    for (const n of NEW) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    const key = (n: string) => SPRITES[n].rows.join('|') + JSON.stringify(SPRITES[n].palette)
+    expect(new Set(NEW.map(key)).size).toBe(NEW.length)
+    for (const old of ['water-0', 'water-1', 'tile-sand', 'tile-path', 'lake-0', 'lake-1']) for (const n of NEW) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
+  })
+  it('땅 타일(진흙·얼음)은 칸을 꽉 채운다(투명 칸 없음)', () => {
+    for (const n of NEW) for (const r of SPRITES[n].rows) expect(r.includes('.'), n).toBe(false)
+  })
+})
+
+describe('낚시 5부 M1 그림: 신화의 힘·신화 표시', () => {
+  const NAMES = ['buff-imugi-scale', 'buff-dragon-breath', 'buff-dragon-pearl', 'mythic-badge']
+  it('9×9이고 서로 다르다', () => {
+    for (const n of NAMES) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([9, 9])
+    expect(new Set(NAMES.map((n) => SPRITES[n].rows.join('|'))).size).toBe(NAMES.length)
+  })
+  it('물때 아이콘은 7×7, 얼음 뚫는 금 세 단계는 16×16이고 갈수록 칠한 칸이 많다', () => {
+    for (const n of ['icon-tide-low', 'icon-tide-high']) expect([SPRITES[n].w, SPRITES[n].h]).toEqual([7, 7])
+    const filled = (n: string) => SPRITES[n].rows.join('').replace(/\./g, '').length
+    expect(filled('drill-0')).toBeLessThan(filled('drill-1'))
+    expect(filled('drill-1')).toBeLessThan(filled('drill-2'))
+  })
+})

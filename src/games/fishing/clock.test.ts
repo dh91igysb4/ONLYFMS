@@ -8,7 +8,9 @@ import {
   inHours,
   isNight,
   isSnow,
+  nextTideChange,
   nightLevel,
+  tideAt,
   weatherOf,
 } from './clock.ts'
 
@@ -101,5 +103,30 @@ describe('clock', () => {
     expect(formatClock(14 * 60 + 37)).toBe('14:30')
     expect(formatClock(1439)).toBe('23:50')
     expect(formatClock(9 * 60 + 5)).toBe('09:00')
+  })
+
+  it('tideAt: 썰물 2~6시·14~18시, 음수·1440 이상도 mod', () => {
+    expect(tideAt(1 * 60 + 59)).toBe('high')
+    expect(tideAt(2 * 60)).toBe('low')
+    expect(tideAt(5 * 60 + 59)).toBe('low')
+    expect(tideAt(6 * 60)).toBe('high')
+    expect(tideAt(14 * 60)).toBe('low')
+    expect(tideAt(17 * 60 + 59)).toBe('low')
+    expect(tideAt(18 * 60)).toBe('high')
+    expect(tideAt(-1)).toBe('high')
+    expect(tideAt(1440 + 120)).toBe('low')
+    expect(tideAt(-1440 + 15 * 60)).toBe('low')
+  })
+
+  it('nextTideChange: 다음 바뀌는 게임 분(0~1439)', () => {
+    expect(nextTideChange(0)).toBe(120)
+    expect(nextTideChange(120)).toBe(360)
+    expect(nextTideChange(130)).toBe(360)
+    expect(nextTideChange(359)).toBe(360)
+    expect(nextTideChange(360)).toBe(840)
+    expect(nextTideChange(1000)).toBe(1080)
+    expect(nextTideChange(1100)).toBe(120)
+    expect(nextTideChange(-1)).toBe(120)
+    expect(nextTideChange(1440 + 130)).toBe(360)
   })
 })

@@ -1005,3 +1005,181 @@ describe('옷 입은 캐릭터', () => {
     expect(colors(plain).has('#eaa53c')).toBe(true) // 원래 바람막이
   })
 })
+
+describe('신화 용솟음(surge) 트랙', () => {
+  const W = 195, H = 280
+  const p = player(tileCentre(10, 10))
+  const frameOf = (ctx: RecordingCtx, box: Box) => ctx.rects.filter((r) => r.x === box.x && r.y === box.y && r.w === 20 && r.h === box.h)
+  const draw = (tMs: number, barT: number, behavior: BarParams['behavior']) => {
+    const ctx = new RecordingCtx()
+    const s = scene('fighting', p, { w: W, h: H }, { tMs, bar: { ...bar, t: barT }, barParams: { ...barParams, behavior } })
+    drawWorld(asCtx(ctx), s, { w: W, h: H })
+    const box = hudLayout(Math.round(p.pos.x) - Math.round(s.camera.x), W, H, 0).track
+    return { ctx, box }
+  }
+  test('용솟음 단계 동안 트랙 테두리 색이 번갈아 바뀌고, 고요·다른 유형은 늘 외곽선 색', () => {
+    const colors = (barT: number, behavior: BarParams['behavior']) =>
+      new Set([0, 120, 240, 360].map((t) => { const { ctx, box } = draw(t, barT, behavior); return frameOf(ctx, box)[0]?.color }))
+    expect(colors(2000, 'surge').size).toBe(2)
+    expect(colors(100, 'surge').size).toBe(1)
+    expect(colors(2000, 'dart').size).toBe(1)
+  })
+  test('용솟음 동안 바는 줄어든 크기(effectiveBarSize)로 그린다', () => {
+    const barRects = (barT: number) => { const { ctx } = draw(0, barT, 'surge'); return ctx.rects.filter((r) => r.color === '#6fdc7e') }
+    const calm = barRects(100)[0].h
+    const surge = barRects(2000)[0].h
+    expect(surge).toBeLessThan(calm)
+    expect(surge / calm).toBeCloseTo(0.21 / 0.3, 1)
+  })
+})
+
+// ---------------------------------------------------------------- 낚시 5부 M1: 물때·구멍·안개·늘 눈·신화 빛고리
+describe('움직이는 맵 장면', () => {
+  const W = 195, H = 280
+  const FLAT = defineMap('village', ['..........', '.mmmmmmmm.', '.mmmrrmmm.', '.mmmmmmmm.', '~~~~~~~~~~', '~~~~~~~~~~'], {
+    tidal: true, spots: { water: 'shore', mud: 'shore', river: 'creek' },
+  })
+  const ICE = defineMap('village', [',,,,,,,,', ',iiiiii,', ',iiiiii,', ',,,,,,,,'], { snowy: true, spots: { hole: 'ice' } })
+  const SWAMP = defineMap('village', Array.from({ length: 30 }, () => ',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,'), { fog: true })
+  const dyn = (tide: 'low' | 'high', ...holes: string[]) => ({ tide, holes: new Set(holes) })
+  const at = (map: typeof FLAT, tx: number, ty: number, extra: Partial<WorldScene> = {}) => {
+    const p = player(tileCentre(tx, ty))
+    return { ...scene('idle', p, { w: W, h: H }), map, camera: cameraFor(map, p.pos, { w: W, h: H }), ...extra }
+  }
+
+  describe('with an offscreen canvas', () => {
+    let made: RecordingCtx[]
+    beforeEach(() => {
+      made = []
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+        const c = new RecordingCtx()
+        made.push(c)
+        return c as unknown as RenderingContext
+      })
+    })
+    test('물때 맵: 물때가 바뀌면 캐시를 다시 만들고, 같은 물때면 그대로; 물때 없는 맵은 물때와 무관', () => {
+      const main = new RecordingCtx()
+      const high = at(FLAT, 0, 0, { dyn: dyn('high') })
+      drawWorld(asCtx(main), high, { w: W, h: H })
+      drawWorld(asCtx(main), high, { w: W, h: H })
+      expect(made).toHaveLength(2)
+      drawWorld(asCtx(main), high, { w: W, h: H })
+      expect(made).toHaveLength(2)
+      const low = at(FLAT, 0, 0, { dyn: dyn('low') })
+      drawWorld(asCtx(main), low, { w: W, h: H })
+      expect(made).toHaveLength(3)
+      expect(made[2].sprites.some((s) => s.name === 'tile-mud')).toBe(true)
+      expect(made[0].sprites.some((s) => s.name.startsWith('tile-mud-wet-'))).toBe(true)
+      const village = scene('idle', player(SPAWN.pos), { w: W, h: H })
+      drawWorld(asCtx(main), { ...village, dyn: dyn('high') }, { w: W, h: H })
+      drawWorld(asCtx(main), { ...village, dyn: dyn('high') }, { w: W, h: H })
+      const n = made.length
+      drawWorld(asCtx(main), { ...village, dyn: dyn('low') }, { w: W, h: H })
+      expect(made).toHaveLength(n)
+    })
+    test('구멍은 화면(월드 레이어)에 그리고 캐시는 다시 만들지 않는다', () => {
+      const main = new RecordingCtx()
+      drawWorld(asCtx(main), at(ICE, 0, 1, { dyn: dyn('high') }), { w: W, h: H })
+      drawWorld(asCtx(main), at(ICE, 0, 1, { dyn: dyn('high') }), { w: W, h: H })
+      const n = made.length
+      const withHoles = new RecordingCtx()
+      drawWorld(asCtx(withHoles), at(ICE, 0, 1, { dyn: dyn('high', '2,1', '4,2') }), { w: W, h: H })
+      expect(made).toHaveLength(n)
+      const holes = withHoles.sprites.filter((s) => s.name.startsWith('tile-hole-'))
+      expect(holes.map((h) => [h.x, h.y]).sort()).toEqual([[2 * TILE - (at(ICE, 0, 1).camera.x), TILE - at(ICE, 0, 1).camera.y], [4 * TILE - at(ICE, 0, 1).camera.x, 2 * TILE - at(ICE, 0, 1).camera.y]].sort())
+      expect(made.at(-1)!.sprites.some((s) => s.name === 'tile-ice')).toBe(true)
+    })
+    test('안개 비네트는 화면 크기마다 한 번 만들고 drawImage 한 번으로 얹는다', () => {
+      const main = new RecordingCtx()
+      const s = at(SWAMP, 10, 10, { dyn: dyn('high') })
+      drawWorld(asCtx(main), s, { w: W, h: H })
+      drawWorld(asCtx(main), s, { w: W, h: H })
+      const n = made.length
+      drawWorld(asCtx(main), s, { w: W, h: H })
+      expect(made).toHaveLength(n)
+      const before = main.images.length
+      drawWorld(asCtx(main), s, { w: W, h: H })
+      expect(main.images.length - before).toBe(2) // 맵 한 번 + 안개 한 번
+      releaseSceneCache()
+    })
+  })
+
+  describe('direct drawing', () => {
+    beforeEach(() => {
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+    })
+    const fogRects = (c: RecordingCtx) => c.rects.filter((r) => r.color.startsWith('rgba(24, 32, 30,'))
+    const alphaOf = (r: Rect) => Number(r.color.split(',')[3].replace(')', ''))
+    const fogAt = (c: RecordingCtx, x: number, y: number) =>
+      fogRects(c).filter((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h).reduce((a, r) => Math.max(a, alphaOf(r)), 0)
+    test('진흙: 밀물이면 흙탕물 그림, 썰물이면 진흙 그림', () => {
+      const hi = new RecordingCtx()
+      drawWorld(asCtx(hi), at(FLAT, 0, 0, { dyn: dyn('high') }), { w: W, h: H })
+      expect(hi.sprites.some((s) => s.name.startsWith('tile-mud-wet-'))).toBe(true)
+      expect(hi.sprites.some((s) => s.name === 'tile-mud')).toBe(false)
+      const lo = new RecordingCtx()
+      drawWorld(asCtx(lo), at(FLAT, 0, 0, { dyn: dyn('low') }), { w: W, h: H })
+      expect(lo.sprites.some((s) => s.name === 'tile-mud')).toBe(true)
+      expect(lo.sprites.some((s) => s.name.startsWith('tile-mud-wet-'))).toBe(false)
+    })
+    test('물때 맵만 HUD에 물때 아이콘', () => {
+      const lo = new RecordingCtx()
+      drawWorld(asCtx(lo), at(FLAT, 0, 0, { dyn: dyn('low') }), { w: W, h: H })
+      expect(lo.sprites.some((s) => s.name === 'icon-tide-low')).toBe(true)
+      const hi = new RecordingCtx()
+      drawWorld(asCtx(hi), at(FLAT, 0, 0, { dyn: dyn('high') }), { w: W, h: H })
+      expect(hi.sprites.some((s) => s.name === 'icon-tide-high')).toBe(true)
+      const v = new RecordingCtx()
+      drawWorld(asCtx(v), scene('idle', player(SPAWN.pos), { w: W, h: H }), { w: W, h: H })
+      expect(v.sprites.some((s) => s.name.startsWith('icon-tide-'))).toBe(false)
+    })
+    test('안개: 캐릭터 둘레는 옅고 모서리는 짙다; 안개 없는 맵은 없다; 비 오는 밤이 맑은 낮보다 짙다', () => {
+      const s = at(SWAMP, 15, 15)
+      const px = Math.round(s.player.pos.x) - s.camera.x
+      const py = Math.round(s.player.pos.y) - s.camera.y
+      const day = new RecordingCtx()
+      drawWorld(asCtx(day), s, { w: W, h: H })
+      expect(fogAt(day, px, py - 8)).toBeLessThan(fogAt(day, 1, 1))
+      expect(fogAt(day, 1, 1)).toBeGreaterThan(0.3)
+      const night = new RecordingCtx()
+      drawWorld(asCtx(night), { ...s, cond: { ...NOON_SUN, gameMinute: 23 * 60, weather: 'rain' } }, { w: W, h: H })
+      expect(fogAt(night, 1, 1)).toBeGreaterThan(fogAt(day, 1, 1))
+      expect(fogAt(night, 1, 1)).toBeLessThanOrEqual(0.75)
+      const v = new RecordingCtx()
+      drawWorld(asCtx(v), scene('idle', player(SPAWN.pos), { w: W, h: H }), { w: W, h: H })
+      expect(fogRects(v)).toHaveLength(0)
+    })
+    test('늘 눈 맵: 여름 비도 눈(입자·HUD 아이콘)', () => {
+      const c = new RecordingCtx()
+      drawWorld(asCtx(c), at(ICE, 0, 1, { cond: { ...NOON_SUN, season: 'summer', weather: 'rain' } }), { w: W, h: H })
+      expect(c.sprites.some((s) => s.name === 'icon-snow')).toBe(true)
+      expect(c.rects.filter((r) => r.color === '#ffffff' && r.w === 2 && r.h === 2).length).toBeGreaterThan(10)
+      const v = new RecordingCtx()
+      drawWorld(asCtx(v), scene('idle', player(SPAWN.pos), { w: W, h: H }, { cond: { ...NOON_SUN, season: 'summer', weather: 'rain' } }), { w: W, h: H })
+      expect(v.sprites.some((s) => s.name === 'icon-rain')).toBe(true)
+    })
+    test('구멍 뚫기: 진행에 따라 금 그림 단계가 바뀐다', () => {
+      const stage = (ms: number) => {
+        const c = new RecordingCtx()
+        drawWorld(asCtx(c), at(ICE, 0, 1, { drill: { tx: 1, ty: 1, ms } }), { w: W, h: H })
+        return c.sprites.filter((s) => s.name.startsWith('drill-')).map((s) => s.name)
+      }
+      expect(stage(100)).toEqual(['drill-0'])
+      expect(stage(600)).toEqual(['drill-1'])
+      expect(stage(1100)).toEqual(['drill-2'])
+      const none = new RecordingCtx()
+      drawWorld(asCtx(none), at(ICE, 0, 1), { w: W, h: H })
+      expect(none.sprites.some((s) => s.name.startsWith('drill-'))).toBe(false)
+    })
+    test('신화 빛고리: 잡은 뒤 1.5초 동안 캐릭터 둘레에, 그 뒤·없으면 안 그린다', () => {
+      const ring = (ms: number | null) => {
+        const c = new RecordingCtx()
+        drawWorld(asCtx(c), scene('caught', player(SPAWN.pos), { w: W, h: H }, { mythicFlashMs: ms }), { w: W, h: H })
+        return c.rects.filter((r) => r.color === '#fff1a8' || r.color === '#ffc94a').length
+      }
+      expect(ring(300)).toBeGreaterThan(10)
+      expect(ring(null)).toBe(0)
+      expect(ring(1600)).toBe(0)
+    })
+  })
+})
