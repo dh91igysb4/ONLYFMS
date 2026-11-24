@@ -3,15 +3,16 @@ import {
   MARKER_GAP, areaFish, areaRoute, filterFish, firstHop, fishBadge, fixedCells, placeMarkers, spotAnchors, spotAtTile,
   spotFish, spotTiles, teleporterInfo, unlockPlace, type Cell, type FishRow,
 } from './atlas.ts'
-import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, type AreaId } from './data.ts'
+import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId } from './data.ts'
 import type { Conditions, Season, Weather } from './clock.ts'
-import { ALL_AREAS_OPEN, TILE, WATER_KINDS, defineMap, interactionAt, isWalkable, tileAt, type Facing, type Opened } from './map.ts'
+import { ALL_AREAS_OPEN, TILE, WATER_KINDS, defineMap, interactionAt, isWalkable, tileAt, type Facing, type MapDynamic, type Opened } from './map.ts'
 import { MAPS } from './maps/index.ts'
 import { teleportFee } from './teleport.ts'
 
 const FACINGS: Facing[] = ['up', 'down', 'left', 'right']
 const center = (tx: number, ty: number) => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
 const cheb = (a: Cell, b: Cell) => Math.max(Math.abs(a.tx - b.tx), Math.abs(a.ty - b.ty))
+const LOW: MapDynamic = { tide: 'low', holes: new Set<string>() }
 const opened = (...more: AreaId[]): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...more])
 const map = (id: AreaId) => MAPS[id]!
 const cond = (over: Partial<Conditions> = {}): Conditions => ({ gameMinute: 600, gameDay: 0, season: 'spring', weather: 'sun', ...over })
@@ -21,14 +22,15 @@ const ids = (rows: FishRow[]) => rows.map((r) => r.species.id)
 const row = (rows: FishRow[], id: string) => rows.find((r) => r.species.id === id)!
 
 describe('spotAnchors', () => {
-  it('6장 × 모든 자리에 대표점이 하나씩 있고, 걸을 수 있는 칸에서 네 방향 중 하나로 그 자리 낚시가 된다', () => {
+  it('모든 맵 × 모든 자리에 대표점이 하나씩 있고, 걸을 수 있는 칸에서 네 방향 중 하나로 그 자리 낚시가 된다(물때 자리는 썰물)', () => {
     for (const a of AREAS) {
       const anchors = spotAnchors(map(a.id))
       expect(anchors.map((x) => x.spot), a.id).toEqual([...a.spots])
       for (const an of anchors) {
-        expect(isWalkable(map(a.id), an.tx, an.ty, ALL_AREAS_OPEN), `${a.id} ${an.spot}`).toBe(true)
+        const dyn = a.tideSpots?.includes(an.spot) ? LOW : undefined
+        expect(isWalkable(map(a.id), an.tx, an.ty, ALL_AREAS_OPEN, dyn), `${a.id} ${an.spot}`).toBe(true)
         const fishes = FACINGS.some((f) => {
-          const it = interactionAt(map(a.id), center(an.tx, an.ty), f, ALL_AREAS_OPEN)
+          const it = interactionAt(map(a.id), center(an.tx, an.ty), f, ALL_AREAS_OPEN, dyn)
           return it?.kind === 'fish' && it.spot === an.spot
         })
         expect(fishes, `${a.id} ${an.spot}`).toBe(true)
@@ -92,11 +94,13 @@ describe('placeMarkers', () => {
     expect(placeMarkers(map('forest'), opened('cave')).find((m) => m.kind === 'exit' && m.target === 'cave')).toMatchObject({ dir: 'in' })
   })
 
-  it('마을: 북쪽 출구, 선착장(dock.front), 상점(shopSpot), 순간이동기(구조물 가운데); 섬: 선착장, 출구 없음', () => {
+  it('마을: 북쪽 출구, 갯벌 통나무 더미(잠김), 선착장(dock.front), 상점(shopSpot), 순간이동기(구조물 가운데); 섬: 선착장, 출구 없음', () => {
     const v = placeMarkers(map('village'), opened())
-    expect(v.map((m) => m.kind)).toEqual(['exit', 'dock', 'shop', 'teleporter'])
-    expect(v[1]).toMatchObject({ target: 'island', tx: 42, ty: 29 })
-    expect(v[3]).toMatchObject({ tx: 35.5, ty: 20.5 })
+    expect(v.map((m) => m.kind)).toEqual(['exit', 'gate', 'dock', 'shop', 'teleporter'])
+    expect(v[1]).toMatchObject({ area: 'tideflat', tx: 1, ty: 20 })
+    expect(v[2]).toMatchObject({ target: 'island', tx: 42, ty: 29 })
+    expect(v[4]).toMatchObject({ tx: 35.5, ty: 20.5 })
+    expect(placeMarkers(map('village'), opened('tideflat')).map((m) => m.kind)).toEqual(['exit', 'exit', 'dock', 'shop', 'teleporter'])
     const i = placeMarkers(map('island'), opened('island'))
     expect(i.some((m) => m.kind === 'exit')).toBe(false)
     expect(i.find((m) => m.kind === 'dock')).toMatchObject({ target: 'village' })
@@ -123,8 +127,10 @@ describe('spotAtTile / spotTiles', () => {
     for (const a of AREAS) for (const s of a.spots) {
       const t = spotTiles(map(a.id), s)
       expect(t.stands.length, `${a.id} ${s}`).toBeGreaterThan(0)
-      for (const c of t.stands) expect(isWalkable(map(a.id), c.tx, c.ty, ALL_AREAS_OPEN)).toBe(true)
-      for (const c of t.waters) expect(WATER_KINDS.has(tileAt(map(a.id), c.tx, c.ty)!)).toBe(true)
+      const dyn = a.tideSpots?.includes(s) ? LOW : undefined
+      for (const c of t.stands) expect(isWalkable(map(a.id), c.tx, c.ty, ALL_AREAS_OPEN, dyn)).toBe(true)
+      // 물 칸은 물 종류, 또는 밀물 진흙(하구)
+      for (const c of t.waters) expect(WATER_KINDS.has(tileAt(map(a.id), c.tx, c.ty)!) || tileAt(map(a.id), c.tx, c.ty) === 'mud').toBe(true)
     }
     for (const c of spotTiles(map('village'), 'pier').stands) expect(tileAt(map('village'), c.tx, c.ty)).toBe('pier')
     expect(spotTiles(map('village'), 'nope')).toEqual({ stands: [], waters: [] })
@@ -156,13 +162,13 @@ describe('spotFish / areaFish', () => {
     expect(row(spotFish('village', 'shore', view({ dex: { goby: { count: 1, maxCm: 10 } } }), cond()), 'goby').found).toBe(true)
   })
 
-  it('now ⇔ speciesAvailable (모든 지역·자리·계절·정각·날씨·낚싯대 1/4, 전설 안 잡음)', () => {
+  it('now ⇔ speciesAvailable && spotOpen, 먼저 잡을 전설이 남은 신화는 아님 (모든 지역·자리·계절·정각·날씨·낚싯대 1/4, 전설 안 잡음)', () => {
     const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter']
     const weathers: Weather[] = ['sun', 'rain']
     for (const a of AREAS) for (const spot of a.spots) for (const season of seasons) for (let h = 0; h < 24; h++) for (const weather of weathers) for (const rodTier of [1, 4] as const) {
       const c = cond({ season, weather, gameMinute: h * 60 })
       for (const r of spotFish(a.id, spot, view({ rodTier }), c)) {
-        expect(r.now).toBe(speciesAvailable(r.species, a.id, spot, c, rodTier))
+        expect(r.now).toBe(speciesAvailable(r.species, a.id, spot, c, rodTier) && spotOpen(a.id, spot, c.gameMinute) && r.species.rarity !== 'mythic')
       }
     }
   })
@@ -265,3 +271,13 @@ describe('spotAnchors: 움직이는 맵(낚시 5부 M1)', () => {
     expect(spotAtTile(ice, 0, 0)).toBeNull()
   })
 })
+
+describe('갯벌 갯골 "지금" (낚시 5부 M2)', () => {
+  it('짱뚱어는 썰물(3시)에 지금, 밀물(10시)에 아님; 하구 풀망둑은 늘 지금', () => {
+    expect(row(spotFish('tideflat', 'creek', view(), cond({ gameMinute: 180 })), 'mudskipper').now).toBe(true)
+    expect(row(spotFish('tideflat', 'creek', view(), cond({ gameMinute: 600 })), 'mudskipper').now).toBe(false)
+    expect(row(spotFish('tideflat', 'estuary', view(), cond({ gameMinute: 600 })), 'grass-goby').now).toBe(true)
+    expect(row(areaFish('tideflat', view(), cond({ gameMinute: 600 })), 'mudskipper').now).toBe(false)
+  })
+})
+

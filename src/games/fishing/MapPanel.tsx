@@ -3,7 +3,7 @@
 // 안 잡은 물고기는 실루엣·등급·"지금" 칩만(이름·그림·조건은 alt·aria-label 어디에도 없다).
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { AREAS, RODS, UNLOCKS, type AreaId, type Rarity } from './data.ts'
-import { SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
+import { LOW_TIDE_HOURS, SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
   areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, teleporterInfo, unlockPlace,
   type FishFilter, type FishRow, type NotNow, type PlaceMarker,
@@ -28,6 +28,13 @@ const CHECK_MS = 1000
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const areaName = (id: AreaId) => AREAS.find((a) => a.id === id)?.name ?? id
 const spotName = (s: string) => SPOT_NAMES[s] ?? s
+/** 썰물 구간 글("2~6시·14~18시") */
+const LOW_TIDE_TEXT = LOW_TIDE_HOURS.map(([a, b]) => `${a}~${b}시`).join('·')
+/** 자리 상세의 한 줄 안내: 물때 자리(갯골)는 썰물에만 들어간다 */
+function spotNote(area: AreaId, spot: string): string | null {
+  if (AREAS.find((a) => a.id === area)?.tideSpots?.includes(spot)) return `썰물(${LOW_TIDE_TEXT})에만 걸어 들어가요`
+  return null
+}
 
 /** 받침 있는 글자인가(ㄹ 받침은 따로) */
 function batchim(word: string): 'none' | 'rieul' | 'other' {
@@ -297,6 +304,7 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
       )}
       <div className="fish-map-detail">
         <h4 className="fish-map-detail-title" aria-live="polite">{detailTitle}</h4>
+        {pickedSpot && spotNote(area, pickedSpot) && <p className="muted">{spotNote(area, pickedSpot)}</p>}
         {pickedSpot && spotRows[pickedSpot] ? (
           <FishList rows={filterFish(spotRows[pickedSpot], filter)} view={view} />
         ) : pickedMark ? (

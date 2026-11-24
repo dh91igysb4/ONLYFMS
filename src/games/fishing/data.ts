@@ -4,7 +4,7 @@ import { inHours, tideAt, type Conditions, type Season, type Weather } from './c
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
-export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island'
+export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp'
 /** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
@@ -32,7 +32,7 @@ export type Species = {
    */
   legend?: { power: number; needs?: readonly string[]; buff?: BuffId }
 }
-/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(지금 어종 minRod는 1~4. 5부 난파선·신화가 5·6을 쓴다) */
+/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(일반·전설 어종 minRod는 1~4. 5부 신화(이무기 5)·난파선이 5·6을 쓴다) */
 export type RodTier = 1 | 2 | 3 | 4 | 5 | 6
 export type Rod = {
   tier: RodTier
@@ -52,6 +52,9 @@ export const AREAS: readonly AreaDef[] = [
   { id: 'lake', name: '산 호수', spots: ['lake'] },
   { id: 'cave', name: '동굴', spots: ['cave1', 'cave2', 'cave3'] },
   { id: 'island', name: '섬', spots: ['sea', 'lagoon'] },
+  // 낚시 5부 M2: 갯벌(갯골은 썰물에만), 늪지
+  { id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] },
+  { id: 'swamp', name: '늪지', spots: ['marsh', 'bog'] },
 ]
 export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest']
 // 돈으로 여는 지역. 기본 지역(DEFAULT_AREAS)은 여기 없다.
@@ -60,6 +63,8 @@ export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: str
   lake: { price: 5000, name: '무너진 다리 수리' },
   cave: { price: 15000, name: '동굴 장비' },
   island: { price: 50000, name: '배' },
+  tideflat: { price: 30000, name: '갯벌 장화' },
+  swamp: { price: 60000, name: '늪 나무 데크' },
 }
 export const LEGEND_CHANCE = 0.08
 
@@ -104,6 +109,9 @@ export const CHALLENGES: readonly Challenge[] = [
   { id: 'lake-night', area: 'lake', title: '호수의 밤', desc: '밤(20~5시)에 산 호수에서 5마리 낚기', count: 5, filter: { night: true } },
   { id: 'cave-deep', area: 'cave', title: '용암 낚시꾼', desc: '동굴 가장 깊은 용암에서 5마리 낚기', count: 5, filter: { spot: 'cave3' } },
   { id: 'island-big', area: 'island', title: '섬의 대물', desc: '섬에서 크기 상위 30% 물고기 3마리 낚기', count: 3, filter: { minSizePct: 0.7 } },
+  // 낚시 5부 M2: 갯골은 하루 두 번 열리고 짱뚱어·낙지가 사계절, 늪지는 동사리가 사계절·밤낮
+  { id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } },
+  { id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } },
 ]
 /** 순간이동 요금 = TP_BASE + ceil(두 이동기 세계 거리(칸) / 10) * TP_PER_10 */
 export const TP_BASE = 30
@@ -171,6 +179,27 @@ export const SPECIES: Species[] = [
   { id: 'stingray', name: '가오리', rarity: 'rare', basePrice: 650, minCm: 50, maxCm: 120, difficulty: 0.8, minRod: 2, behavior: 'sinker', area: 'island', spots: ['lagoon'] },
   { id: 'mahi', name: '만새기', rarity: 'rare', basePrice: 750, minCm: 60, maxCm: 140, difficulty: 0.82, minRod: 2, behavior: 'dart', area: 'island', spots: ['sea'], hours: [6, 19] },
   { id: 'rainbow-marlin', name: '무지개 청새치', rarity: 'legend', basePrice: 8000, minCm: 150, maxCm: 300, difficulty: 0.98, minRod: 4, behavior: 'dart', area: 'island', spots: ['sea'], hours: [11, 14], weather: 'sun', legend: { power: 0.95 } },
+  // 갯벌(낚시 5부 M2). 갯골(creek)은 썰물에만 열린다(spotOpen) — 왕민어의 시간(2~5시)도 썰물 안
+  { id: 'mudskipper', name: '짱뚱어', rarity: 'common', basePrice: 110, minCm: 10, maxCm: 20, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['creek'] },
+  { id: 'small-octopus', name: '낙지', rarity: 'common', basePrice: 140, minCm: 20, maxCm: 50, difficulty: 0.4, minRod: 1, behavior: 'sinker', area: 'tideflat', spots: ['creek'] },
+  { id: 'grass-goby', name: '풀망둑', rarity: 'common', basePrice: 90, minCm: 15, maxCm: 45, difficulty: 0.3, minRod: 1, behavior: 'mixed', area: 'tideflat', spots: ['estuary'] },
+  { id: 'blue-crab', name: '꽃게', rarity: 'uncommon', basePrice: 300, minCm: 15, maxCm: 25, difficulty: 0.5, minRod: 1, behavior: 'mixed', area: 'tideflat', spots: ['creek'], seasons: ['spring', 'autumn'] },
+  { id: 'spoon-worm', name: '개불', rarity: 'uncommon', basePrice: 240, minCm: 10, maxCm: 30, difficulty: 0.45, minRod: 1, behavior: 'smooth', area: 'tideflat', spots: ['creek'], weather: 'rain' },
+  { id: 'grenadier-anchovy', name: '웅어', rarity: 'uncommon', basePrice: 260, minCm: 20, maxCm: 30, difficulty: 0.5, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['estuary'], seasons: ['spring', 'summer'] },
+  { id: 'mitten-crab', name: '참게', rarity: 'uncommon', basePrice: 280, minCm: 5, maxCm: 10, difficulty: 0.55, minRod: 1, behavior: 'sinker', area: 'tideflat', spots: ['estuary'], seasons: ['autumn', 'winter'], hours: [20, 5] },
+  { id: 'river-puffer', name: '황복', rarity: 'rare', basePrice: 1000, minCm: 20, maxCm: 45, difficulty: 0.8, minRod: 2, behavior: 'floater', area: 'tideflat', seasons: ['spring', 'summer'] },
+  { id: 'king-croaker', name: '왕민어', rarity: 'legend', basePrice: 5000, minCm: 70, maxCm: 130, difficulty: 0.93, minRod: 4, behavior: 'sinker', area: 'tideflat', spots: ['creek'], seasons: ['summer'], hours: [2, 5], legend: { power: 0.95 } },
+  // 늪지(낚시 5부 M2). 비·밤 전용이 많다. 이무기는 신화(세이브당 한 마리, 백년 가물치·천년 자라를 먼저 잡아야 한다)
+  { id: 'bitterling', name: '납자루', rarity: 'common', basePrice: 120, minCm: 5, maxCm: 10, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'swamp', spots: ['marsh'] },
+  { id: 'dark-sleeper', name: '동사리', rarity: 'common', basePrice: 150, minCm: 10, maxCm: 25, difficulty: 0.4, minRod: 1, behavior: 'sinker', area: 'swamp' },
+  { id: 'paradise-fish', name: '버들붕어', rarity: 'common', basePrice: 130, minCm: 5, maxCm: 10, difficulty: 0.35, minRod: 1, behavior: 'floater', area: 'swamp', spots: ['marsh'], seasons: ['spring', 'summer', 'autumn'], hours: [6, 19] },
+  { id: 'bullfrog', name: '황소개구리', rarity: 'uncommon', basePrice: 300, minCm: 10, maxCm: 20, difficulty: 0.5, minRod: 1, behavior: 'floater', area: 'swamp', spots: ['marsh'], hours: [20, 5] },
+  { id: 'bullhead', name: '동자개', rarity: 'uncommon', basePrice: 340, minCm: 15, maxCm: 30, difficulty: 0.55, minRod: 1, behavior: 'mixed', area: 'swamp', hours: [20, 5] },
+  { id: 'swamp-eel', name: '드렁허리', rarity: 'uncommon', basePrice: 380, minCm: 30, maxCm: 60, difficulty: 0.6, minRod: 1, behavior: 'smooth', area: 'swamp', spots: ['bog'], weather: 'rain' },
+  { id: 'softshell-turtle', name: '자라', rarity: 'rare', basePrice: 1200, minCm: 15, maxCm: 35, difficulty: 0.78, minRod: 3, behavior: 'sinker', area: 'swamp', spots: ['bog'], weather: 'rain' },
+  { id: 'lamprey', name: '칠성장어', rarity: 'rare', basePrice: 1300, minCm: 30, maxCm: 60, difficulty: 0.82, minRod: 3, behavior: 'smooth', area: 'swamp', spots: ['bog'], hours: [20, 5] },
+  { id: 'thousand-turtle', name: '천년 자라', rarity: 'legend', basePrice: 5500, minCm: 60, maxCm: 100, difficulty: 0.94, minRod: 4, behavior: 'sinker', area: 'swamp', spots: ['bog'], hours: [4, 8], weather: 'rain', legend: { power: 0.95 } },
+  { id: 'imugi', name: '이무기', rarity: 'mythic', basePrice: 20000, minCm: 300, maxCm: 600, difficulty: 0.97, minRod: 5, behavior: 'surge', area: 'swamp', spots: ['bog'], hours: [20, 5], weather: 'rain', legend: { power: 0.95, needs: ['century-snakehead', 'thousand-turtle'], buff: 'imugi-scale' } },
 ]
 
 export const RODS: Rod[] = [

@@ -308,7 +308,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(11)
+    expect(logic.version).toBe(12)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -815,19 +815,19 @@ describe('fishing WorldLogic', () => {
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/56'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/75'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/56' },
-      { key: 'challenges', value: 0, detail: '0/6' },
+      { key: 'dex', value: 0, detail: '0/75' },
+      { key: 'challenges', value: 0, detail: '0/8' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/56' },
-      { key: 'challenges', value: 0, detail: '0/6' },
+      { key: 'dex', value: 2, detail: '2/75' },
+      { key: 'challenges', value: 0, detail: '0/8' },
     ])
   })
 
@@ -1198,9 +1198,9 @@ describe('도전과제', () => {
   })
 
   it('records: 도전과제 n/6', () => {
-    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/6' })
+    expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/8' })
     const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
-    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/6' })
+    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/8' })
   })
 })
 
@@ -1581,3 +1581,99 @@ describe('migrate 버프 (v11)', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------- 낚시 5부 M2: 갯벌·늪지 (logic.version 12)
+describe('갯벌·늪지 (logic.version 12)', () => {
+  const castAt = (s: State, area: string, spot: string, now: number, rng: () => number = () => 0.5) =>
+    logic.apply(s, { type: 'cast', area, power: 0.5, spot } as unknown as Action, { now, rng })
+  const flat = (over: Partial<State> = {}) => fresh({ areas: [...DEFAULT_AREAS, 'tideflat'], ...over })
+
+  it('갯골: 썰물(3시)이면 갯골 어종, 밀물(10시) → spot_closed, 하구는 밀물에도 정상', () => {
+    const creekIds = SPECIES.filter((x) => x.area === 'tideflat' && (!x.spots || x.spots.includes('creek'))).map((x) => x.id)
+    for (let seed = 0; seed < 20; seed++) {
+      const p = ok(castAt(flat(), 'tideflat', 'creek', nowAt(0, 3), rngFromSeed(seedBytes(seed)))).state.pending!
+      expect(creekIds).toContain(p.species)
+    }
+    expect(err(castAt(deepFreeze(flat()), 'tideflat', 'creek', nowAt(0, 10)))).toBe('spot_closed')
+    const e = ok(castAt(flat(), 'tideflat', 'estuary', nowAt(0, 10))).state.pending!
+    expect(SPECIES.find((x) => x.id === e.species)!.area).toBe('tideflat')
+  })
+  it('잠긴 갯벌·늪지에는 던질 수 없다', () => {
+    expect('error' in castAt(fresh(), 'tideflat', 'estuary', nowAt(0, 10))).toBe(true)
+    expect('error' in castAt(fresh(), 'swamp', 'marsh', nowAt(0, 10))).toBe(true)
+  })
+  it('unlockArea: 갯벌 30,000·늪지 60,000', () => {
+    const r = ok(logic.apply(fresh({ gold: 90000 }), { type: 'unlockArea', area: 'tideflat' }, ctx()))
+    expect(r.state.gold).toBe(60000)
+    const r2 = ok(logic.apply(r.state, { type: 'unlockArea', area: 'swamp' }, ctx()))
+    expect(r2.state.gold).toBe(0)
+    expect(r2.state.areas).toEqual([...DEFAULT_AREAS, 'tideflat', 'swamp'])
+    expect(err(logic.apply(fresh({ gold: 59999 }), { type: 'unlockArea', area: 'swamp' }, ctx()))).toBe('not_enough_gold')
+  })
+  it('이무기: 늪지 수렁 비 오는 밤, rod 5 + 백년 가물치·천년 자라 잡음 + 힘 0.95 + r0 0 → 이무기', () => {
+    const night = { area: 'swamp' as const, spot: 'bog', cond: cond('spring', 22, 'rain'), power: 0.95 }
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, rodTier: 5, legends: ['century-snakehead', 'thousand-turtle'] })).species).toBe('imugi')
+    // 전설 하나라도 남으면, 낚싯대 4면, 맑으면, 낮이면, 힘이 모자라면 안 나온다
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, rodTier: 5, legends: ['thousand-turtle'] })).species).not.toBe('imugi')
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, rodTier: 4, legends: ['century-snakehead', 'thousand-turtle'] })).species).not.toBe('imugi')
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, cond: cond('spring', 22), rodTier: 5, legends: ['century-snakehead', 'thousand-turtle'] })).species).not.toBe('imugi')
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, cond: cond('spring', 12, 'rain'), rodTier: 5, legends: ['century-snakehead', 'thousand-turtle'] })).species).not.toBe('imugi')
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, power: 0.9, rodTier: 5, legends: ['century-snakehead', 'thousand-turtle'] })).species).not.toBe('imugi')
+    // r0가 신화 확률 이상이면 일반 등급
+    expect(rollCatch(sequence(MYTHIC_CHANCE, 0.5, 0.5, 0.5, 0.5), ctxOf({ ...night, rodTier: 5, legends: ['century-snakehead', 'thousand-turtle'] })).species).not.toBe('imugi')
+  })
+  it('천년 자라가 남았으면 같은 판에서 천년 자라가 후보(이무기 아님): 비 오는 4시', () => {
+    const c = ctxOf({ area: 'swamp', spot: 'bog', cond: cond('spring', 4, 'rain'), power: 0.95, rodTier: 5, legends: ['century-snakehead'] })
+    expect(rollCatch(sequence(0, 0.5, 0.5, 0.5, 0.5), c).species).toBe('thousand-turtle')
+  })
+  it('이무기를 잡으면 legends·buffs(imugi-scale)', () => {
+    const pending = { species: 'imugi', sizeCm: 400, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'swamp' as const, spot: 'bog', cond: cond('spring', 22, 'rain'), power: 0.95 }
+    const r = ok(logic.apply(fresh({ areas: [...DEFAULT_AREAS, 'swamp'], legends: ['century-snakehead', 'thousand-turtle'], pending }), { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(r.state.legends).toEqual(['century-snakehead', 'thousand-turtle', 'imugi'])
+    expect(r.state.buffs).toEqual(['imugi-scale'])
+    expect(r.result).toMatchObject({ buff: 'imugi-scale' })
+  })
+  it('migrate v11 세이브(갯벌 해금은 아직 없음·버프) → 그대로; v12 세이브(갯벌·늪지·새 어종 도감·이무기) → 그대로', () => {
+    const v11 = { ...logic.init(), gold: 1234, areas: [...DEFAULT_AREAS, 'lake'], dex: { goby: { count: 2, maxCm: 15 } }, legends: [], buffs: [] }
+    expect(logic.migrate(JSON.parse(JSON.stringify(v11)), 11)).toEqual(v11)
+    const v12 = {
+      ...logic.init(), gold: 5, areas: [...DEFAULT_AREAS, 'tideflat', 'swamp'],
+      dex: { mudskipper: { count: 3, maxCm: 18 }, imugi: { count: 1, maxCm: 500 }, 'century-snakehead': { count: 1, maxCm: 120 }, 'thousand-turtle': { count: 1, maxCm: 80 } },
+      legends: ['century-snakehead', 'thousand-turtle', 'imugi'], buffs: ['imugi-scale'],
+      bag: [{ species: 'imugi', sizeCm: 500, perfect: false, locked: true }],
+    }
+    const m = logic.migrate(JSON.parse(JSON.stringify(v12)), 12)
+    expect(m.areas).toEqual(v12.areas)
+    expect(m.dex).toEqual(v12.dex)
+    expect(m.legends).toEqual(v12.legends)
+    expect(m.buffs).toEqual(['imugi-scale'])
+    expect(m.bag).toEqual(v12.bag)
+  })
+})
+
+describe('갯벌·늪지 도전과제·순간이동기 (낚시 5부 M2)', () => {
+  const castAt = (s: State, area: string, spot: string, now: number) =>
+    logic.apply(s, { type: 'cast', area, power: 0.5, spot } as unknown as Action, { now, rng: () => 0.5 })
+  it('갯골에서 잡으면 tideflat-creek 진행, 하구는 세지 않는다', () => {
+    const s = fresh({ areas: [...DEFAULT_AREAS, 'tideflat'] })
+    const catchAt = (st: State, spot: string, now: number) => {
+      const cast = ok(castAt(st, 'tideflat', spot, now)).state
+      const hooked = ok(logic.apply(cast, { type: 'hook' }, ctx(now + cast.pending!.biteDelayMs))).state
+      return ok(logic.apply(hooked, { type: 'resolve', success: true, perfect: false }, ctx(now + cast.pending!.biteDelayMs + MIN_FIGHT_MS))).state
+    }
+    const a = catchAt(s, 'creek', nowAt(0, 3))
+    expect(a.challenges['tideflat-creek']).toEqual({ progress: 1, done: false })
+    const b = catchAt(a, 'estuary', nowAt(0, 10))
+    expect(b.challenges['tideflat-creek']).toEqual({ progress: 1, done: false })
+  })
+  it('과제를 깨면 갯벌·늪지 이동기가 켜지고 요금은 거리대로', () => {
+    const done = { 'pier-perfect': { progress: 3, done: true }, 'tideflat-creek': { progress: 5, done: true } }
+    const s = fresh({ gold: 100, areas: [...DEFAULT_AREAS, 'tideflat'], challenges: done })
+    expect(teleporterOpen(s, 'tideflat')).toBe(true)
+    expect(teleporterOpen({ ...s, challenges: { 'pier-perfect': done['pier-perfect'] } }, 'tideflat')).toBe(false)
+    const r = ok(logic.apply(s, { type: 'teleport', from: 'village', to: 'tideflat' } as unknown as Action, ctx()))
+    expect(r.result).toEqual({ from: 'village', to: 'tideflat', fee: teleportFee('village', 'tideflat') })
+    expect(teleporterOpen(fresh({ areas: [...DEFAULT_AREAS, 'swamp'], challenges: { 'swamp-rain-night': { progress: 3, done: true } } }), 'swamp')).toBe(true)
+  })
+})
+

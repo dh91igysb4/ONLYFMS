@@ -241,6 +241,8 @@ const UNLOCK_NOTICES: Partial<Record<AreaId, string>> = {
   lake: '산 호수 가는 다리를 고쳤어요',
   cave: '동굴 입구를 치웠어요',
   island: '배를 샀어요 — 선착장에서 섬으로 갈 수 있어요',
+  tideflat: '통나무 더미를 치웠어요 — 서쪽 갯벌로 갈 수 있어요',
+  swamp: '덩굴을 걷어 냈어요 — 서쪽 늪지로 갈 수 있어요',
 }
 const HINTS: Partial<Record<Phase, string>> = {
   charging: '떼면 던져요',

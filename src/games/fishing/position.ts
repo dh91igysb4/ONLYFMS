@@ -3,7 +3,7 @@
 // 1단계 형식({pos, facing}, area 없음)은 마을로 읽는다.
 // 열린 지역으로 거르는 일은 첫 서버 상태를 받은 뒤 startPosition이 한다.
 import { AREAS, type AreaId } from './data.ts'
-import { ALL_AREAS_OPEN, reachableTiles, tileOf, type Facing, type MapDef, type Opened, type Vec } from './map.ts'
+import { ALL_AREAS_OPEN, nearestDryTile, reachableTiles, TILE, tileOf, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { feetBlocked } from './walk.ts'
@@ -13,6 +13,7 @@ export type SavedPosition = { area: AreaId; pos: Vec; facing: Facing }
 const FACINGS: readonly Facing[] = ['up', 'down', 'left', 'right']
 
 const keyFor = (userId: string) => `fishing-pos:${userId}`
+const LOW_TIDE: MapDynamic = { tide: 'low', holes: new Set<string>() }
 
 function parse(raw: string | null): SavedPosition | null {
   if (raw === null) return null
@@ -27,7 +28,13 @@ function parse(raw: string | null): SavedPosition | null {
   if (!FACINGS.includes(facing as Facing)) return null
   // 발이 걸을 수 없는 타일에 걸친 채로 시작하면 영영 움직일 수 없다.
   // 여기서는 맵만 본다(모든 지역이 열린 것으로). 아직 안 연 지역·문 칸인지는 화면이 열린 지역으로 다시 본다
-  return feetBlocked(map, x, y, ALL_AREAS_OPEN) ? null : { area: map.id, pos: { x, y }, facing: facing as Facing }
+  if (!feetBlocked(map, x, y, ALL_AREAS_OPEN)) return { area: map.id, pos: { x, y }, facing: facing as Facing }
+  // 물때 맵의 진흙 위(썰물에 저장): 지금 물때를 모르니 늘 가장 가까운 늘 걷는 칸에 세운다(썰물이면 다시 걸어 들어가면 된다)
+  if (map.tidal && !feetBlocked(map, x, y, ALL_AREAS_OPEN, LOW_TIDE)) {
+    const dry = nearestDryTile(map, tileOf({ x, y }), ALL_AREAS_OPEN)
+    if (dry) return { area: map.id, pos: { x: dry.tx * TILE + TILE / 2, y: dry.ty * TILE + TILE / 2 }, facing: facing as Facing }
+  }
+  return null
 }
 
 export function loadPosition(userId: string): SavedPosition | null {

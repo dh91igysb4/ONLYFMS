@@ -12,6 +12,8 @@ export type TileKind = 'water' | 'sand' | 'grass' | 'path' | 'pier' | 'tree' | '
   | 'lake' | 'cave-floor' | 'cave-wall' | 'cave-pool' | 'crystal' | 'lava' | 'cave-mouth' | 'palm' | 'lagoon' | 'dock'
   // 낚시 5부: 진흙(썰물이면 땅, 밀물이면 물), 얼음(걷는 칸, 구멍을 뚫으면 물). 구멍은 행 글자 없이 MapDynamic으로만
   | 'mud' | 'ice'
+  // 낚시 5부 M2: 갯골(늘 물)·갈대(키 큰 장애물)·늪·수렁(물)·나무 데크(걷는 칸)·고사목(키 큰 장애물)
+  | 'creek' | 'reed' | 'marsh' | 'bog' | 'boardwalk' | 'deadtree'
 export type Facing = 'up' | 'down' | 'left' | 'right'
 export type Vec = { x: number; y: number } // 월드 픽셀. 캐릭터 pos는 발 중앙
 
@@ -45,13 +47,19 @@ export const TILE_CHARS: Readonly<Record<string, TileKind>> = {
   K: 'dock', // 선착장
   m: 'mud', // 진흙(물때)
   i: 'ice', // 얼음
+  g: 'creek', // 갯골
+  R: 'reed', // 갈대
+  z: 'marsh', // 늪
+  Q: 'bog', // 수렁
+  d: 'boardwalk', // 나무 데크
+  X: 'deadtree', // 고사목
 }
 
-const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock'])
+const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock', 'boardwalk'])
 
 /** 낚시를 던질 수 있는 물 종류. 용암도 낚시하는 물로 친다(동굴 가장 깊은 곳). 폭포는 포함하지 않는다. */
-type WaterKind = 'water' | 'river' | 'pond' | 'basin' | 'lake' | 'cave-pool' | 'crystal' | 'lava' | 'lagoon'
-const WATER_LIST: readonly WaterKind[] = ['water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon']
+type WaterKind = 'water' | 'river' | 'pond' | 'basin' | 'lake' | 'cave-pool' | 'crystal' | 'lava' | 'lagoon' | 'creek' | 'marsh' | 'bog'
+const WATER_LIST: readonly WaterKind[] = ['water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'creek', 'marsh', 'bog']
 export const WATER_KINDS: ReadonlySet<TileKind> = new Set<TileKind>(WATER_LIST)
 /** 맵 spots의 열쇠: 늘 물인 종류 + 밀물 진흙(mud) + 얼음 구멍(hole) */
 export type SpotKey = WaterKind | 'mud' | 'hole'
@@ -98,7 +106,7 @@ export type Exit =
  * 돈으로 여는 지역의 문. 잠긴 동안 tiles는 못 걷고 look 그림이 덮인다.
  * 열리면 rows의 원래 칸 그대로(다리 H, 길 = 등). front에 서서 facing을 보면 { kind: 'gate', area } 상호작용.
  */
-export type Gate = { area: AreaId; tiles: Rect; look: 'broken-bridge' | 'rubble'; front: TileFacing }
+export type Gate = { area: AreaId; tiles: Rect; look: 'broken-bridge' | 'rubble' | 'driftwood' | 'vines'; front: TileFacing }
 
 /** 배 타는 곳. front에서 facing을 보면 { kind: 'dock', target }. boat는 배 그림 위치(물 위, 칸 좌표). */
 export type Dock = { front: TileFacing; target: AreaId; entry: TileFacing; boat: { tx: number; ty: number } }

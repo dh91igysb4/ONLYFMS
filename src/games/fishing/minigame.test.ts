@@ -369,7 +369,7 @@ describe('안 누르면 잡히지 않는다 (바닥에 내려앉은 바는 줄�
       }
     }
     expect(worst).toBe(0)
-    expect([...seen].sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth'])
+    expect([...seen].sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth', 'surge'])
   })
 
   it('바닥에 막 닿은 바(500ms 안)는 아직 센다: 바닥 근처에서 살살 누르는 것은 봐준다', () => {

@@ -7,8 +7,8 @@ import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
 const ICON_SCALE = 2
-/** 이 단계까지가 기본 낚싯대. 그 위(5·6단계)는 어떤 어종에도 필요 없는 고급 장비 */
-const PREMIUM_ROD = Math.max(...SPECIES.map((s) => s.minRod))
+/** 신화를 뺀 어종이 요구하는 가장 높은 낚싯대. 이보다 높은 단계는 "고급 장비"(신화만 그 단계를 요구할 수 있다) */
+const PREMIUM_ROD = Math.max(...SPECIES.filter((s) => s.rarity !== 'mythic').map((s) => s.minRod))
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
@@ -210,7 +210,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
               <div className="fish-rod-info">
                 <strong>{rod.name}</strong>
                 <span className="muted">{rod.price === 0 ? '기본' : gold(rod.price)}</span>
-                {rod.tier > PREMIUM_ROD && !owned && <span className="muted">고급 장비 · 없어도 모든 물고기를 낚아요</span>}
+                {rod.tier > PREMIUM_ROD && !owned && <span className="muted">고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
                 {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
@@ -428,7 +428,7 @@ export function TeleportPanel({ view, area, busy, onTeleport }: TeleportProps) {
 }
 
 /** 낚시 자리 이름. 모르는 자리는 id 그대로 보인다. */
-export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호' }
+export const SPOT_NAMES: Record<string, string> = { pier: '부두', shore: '해안', river: '강', pond: '연못', waterfall: '폭포', lake: '호수', cave1: '얕은 웅덩이', cave2: '수정 웅덩이', cave3: '용암', sea: '바다', lagoon: '석호', estuary: '하구', creek: '갯골', marsh: '늪', bog: '수렁' }
 
 /** 도감에 보일 출현 조건: 자리(spots가 있는 어종) · 계절 · 시간 · 날씨 */
 export function conditionLabel(s: Species): string {

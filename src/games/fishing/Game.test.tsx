@@ -425,8 +425,8 @@ describe('fishing Game', () => {
     expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
     expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
     expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
-    // 5·6단계는 고급 장비: 없어도 모든 물고기를 낚는다
-    expect(within(rods).getAllByText('고급 장비 · 없어도 모든 물고기를 낚아요')).toHaveLength(2)
+    // 5·6단계는 고급 장비: 신화 말고는 없어도 모든 물고기를 낚는다
+    expect(within(rods).getAllByText('고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요')).toHaveLength(2)
     unmount()
 
     const rich = makeView({ gold: 2000 })
@@ -474,7 +474,7 @@ describe('fishing Game', () => {
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
     const tabs = within(dex).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8', '산 호수 0/8', '동굴 0/7', '섬 0/8'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['바닷가 마을 0/16', '마을 강 0/9', '숲 0/8', '산 호수 0/8', '동굴 0/7', '섬 0/8', '갯벌 0/9', '늪지 0/10'])
     expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveAttribute('aria-selected', 'true')
     expect(within(dex).getAllByText('???')).toHaveLength(9)
     fireEvent.click(within(dex).getByRole('tab', { name: /숲/ }))
@@ -483,11 +483,11 @@ describe('fishing Game', () => {
     expect(within(dex).getAllByText('???')).toHaveLength(8)
   })
 
-  test('dex shows per-area counts and the overall n/56 on top; caught names only on their tab', async () => {
+  test('dex shows per-area counts and the overall n/75 on top; caught names only on their tab', async () => {
     await mount(makeView({ dex: { anchovy: { count: 1, maxCm: 10 }, 'pale-chub': { count: 2, maxCm: 12 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/56종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/75종')).toBeInTheDocument()
     expect(within(dex).getByRole('tab', { name: /바닷가 마을/ })).toHaveTextContent('1/16')
     expect(within(dex).getByRole('tab', { name: /마을 강/ })).toHaveTextContent('1/9')
     expect(within(dex).getByText('멸치')).toBeInTheDocument()
@@ -497,11 +497,11 @@ describe('fishing Game', () => {
     expect(within(dex).queryByText('멸치')).not.toBeInTheDocument()
   })
 
-  test('dex: 6 tabs in AREAS order, new spot names shown for caught species', async () => {
+  test('dex: 8 tabs in AREAS order, new spot names shown for caught species', async () => {
     await mount(makeView({ dex: { 'bat-catfish': { count: 1, maxCm: 50 }, lionfish: { count: 1, maxCm: 30 }, 'rainbow-trout': { count: 1, maxCm: 40 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getAllByRole('tab')).toHaveLength(6)
+    expect(within(dex).getAllByRole('tab')).toHaveLength(8)
     fireEvent.click(within(dex).getByRole('tab', { name: /동굴/ }))
     expect(within(dex).getByText('수정 웅덩이 · 사계절')).toBeInTheDocument()
     fireEvent.click(within(dex).getByRole('tab', { name: /섬/ }))
@@ -937,11 +937,11 @@ describe('fishing Game', () => {
     await flush()
     expect(calls('hook')).toHaveLength(1)
   })
-  test('dex shows spawn conditions only for caught species, legend mark, and n/56', async () => {
+  test('dex shows spawn conditions only for caught species, legend mark, and n/75', async () => {
     await mount(makeView({ dex: { pufferfish: { count: 1, maxCm: 20 }, grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
     const dex = screen.getByRole('region', { name: '도감' })
-    expect(within(dex).getByText('2/56종')).toBeInTheDocument()
+    expect(within(dex).getByText('2/75종')).toBeInTheDocument()
     expect(within(dex).getByText('여름 · 12~16시 · 맑음')).toBeInTheDocument()
     expect(within(dex).getByText('부두 · 겨울')).toBeInTheDocument()
     expect(within(dex).getByText('전설')).toBeInTheDocument()
@@ -2103,6 +2103,46 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(screen.getByText('동굴')).toBeInTheDocument()
   })
 
+  test('마을 서쪽 끝 통나무 더미 → 갯벌 장화 · 30,000 G; 열면 알림, 왼쪽으로 걸어 나가면 갯벌 맵', async () => {
+    const gate = VILLAGE.gates.find((g) => g.area === 'tideflat')!
+    const view = makeView({ gold: 35000, areas: BASE })
+    await mount(view, { area: 'village', pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing })
+    await advance(50)
+    expect(screen.getByText('방향키로 이동 · 스페이스로 살펴보기')).toBeInTheDocument()
+    await interact()
+    expect(screen.getByRole('heading', { name: '갯벌' })).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('갯벌 장화')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('30,000 G')).toBeInTheDocument()
+    route({ unlockArea: () => ok({ ...view, gold: 5000, areas: [...BASE, 'tideflat'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(calls('unlockArea')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'tideflat' } }])
+    expect(screen.getByText('통나무 더미를 치웠어요 — 서쪽 갯벌로 갈 수 있어요')).toBeInTheDocument()
+    key('ArrowLeft', true)
+    await advance(600)
+    key('ArrowLeft', false)
+    await advance(400)
+    expect(lastScene().map.id).toBe('tideflat')
+  })
+
+  test('숲 서쪽 엉킨 덩굴 → 늪 나무 데크 · 60,000 G; 골드가 모자라면 열기 비활성, 열면 알림', async () => {
+    const gate = FOREST.gates.find((g) => g.area === 'swamp')!
+    const at = { area: 'forest' as const, pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing }
+    const { unmount } = await mount(makeView({ gold: 59999, areas: BASE }), at)
+    await interact()
+    expect(within(unlockPanel()).getByText('늪 나무 데크')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('60,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeDisabled()
+    unmount()
+    const view = makeView({ gold: 60000, areas: BASE })
+    await mount(view, at)
+    await interact()
+    route({ unlockArea: () => ok({ ...view, gold: 0, areas: [...BASE, 'swamp'] }) })
+    fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
+    await flush()
+    expect(screen.getByText('덩굴을 걷어 냈어요 — 서쪽 늪지로 갈 수 있어요')).toBeInTheDocument()
+  })
+
   test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 G); 사면 알림, 다시 행동하면 배를 탄다', async () => {
     const view = makeView({ gold: 60000, areas: BASE })
     await mount(view, AT_VILLAGE_DOCK)
@@ -2360,18 +2400,20 @@ describe('도전과제·순간이동기', () => {
     await advance(300)
   }
 
-  test('과제 버튼 → 도전과제 6개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/6', async () => {
+  test('과제 버튼 → 도전과제 8개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/8', async () => {
     await mount(makeView({ challenges: { 'pier-perfect': { progress: 1, done: false }, 'river-rain': { progress: 5, done: true } } }), SAND)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
     const panel = screen.getByRole('region', { name: '도전과제' })
     const items = within(panel).getAllByRole('listitem')
-    expect(items).toHaveLength(6)
+    expect(items).toHaveLength(8)
+    expect(items[6]).toHaveTextContent('갯벌 · 물때를 아는 사람')
+    expect(items[7]).toHaveTextContent('늪지 · 안개 속의 밤낚시')
     expect(items[0]).toHaveTextContent('바닷가 마을 · 부두의 명수')
     expect(items[0]).toHaveTextContent('부두에서 완벽하게 3마리 낚기')
     expect(items[0]).toHaveTextContent('1/3')
     expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
     expect(items[2]).toHaveTextContent('0/3')
-    expect(within(panel).getByText('깬 과제 1/6')).toBeInTheDocument()
+    expect(within(panel).getByText('깬 과제 1/8')).toBeInTheDocument()
   })
 
   test('잡은 결과에 completed가 있으면 완료 알림', async () => {
@@ -2491,14 +2533,14 @@ describe('도전과제·순간이동기', () => {
     expect(actionButton()).toHaveTextContent('살펴보기')
   })
 
-  test('challenges가 없는 옛 서버 응답: 그려지고 이동기는 꺼짐, 과제 목록은 0/6', async () => {
+  test('challenges가 없는 옛 서버 응답: 그려지고 이동기는 꺼짐, 과제 목록은 0/8', async () => {
     const old = makeView() as Partial<View>
     delete old.challenges
     await mount(old as View, AT_VILLAGE_TP)
     await advance(50)
     expect(lastScene().teleporterOn).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
-    expect(screen.getByText('깬 과제 0/6')).toBeInTheDocument()
+    expect(screen.getByText('깬 과제 0/8')).toBeInTheDocument()
   })
 })
 

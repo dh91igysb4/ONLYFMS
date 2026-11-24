@@ -473,3 +473,61 @@ describe('낚시 5부 M1 그림: 신화의 힘·신화 표시', () => {
     expect(filled('drill-1')).toBeLessThan(filled('drill-2'))
   })
 })
+
+describe('낚시 5부 M2 타일: 갯벌·늪지', () => {
+  const WATERS = ['creek', 'marsh', 'bog']
+  const key = (n: string) => SPRITES[n].rows.join('|') + JSON.stringify(SPRITES[n].palette)
+  it('물 세 종은 0/1 두 장이 16×16, 칸을 꽉 채우고 두 장이 다르며 바탕색이 기존 물과 다르다', () => {
+    for (const k of WATERS) {
+      for (const f of [0, 1]) {
+        const sp = SPRITES[`${k}-${f}`]
+        expect([sp?.w, sp?.h], `${k}-${f}`).toEqual([16, 16])
+        expect(sp.rows.join('').includes('.'), `${k}-${f}`).toBe(false)
+      }
+      expect(SPRITES[`${k}-0`].rows.join('|'), k).not.toBe(SPRITES[`${k}-1`].rows.join('|'))
+    }
+    const bases = [...WATERS, 'water', 'river', 'pond', 'basin', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon'].map((k) => SPRITES[`${k}-0`].palette.a)
+    expect(new Set(bases).size).toBe(bases.length)
+  })
+  it('갈대·고사목은 나무처럼 16×32, 데크 판자 16×16, 문 그림 두 장 16×16, 모두 서로 다르다', () => {
+    for (const n of ['tile-reed', 'tile-deadtree']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 32])
+    for (const n of ['boardwalk-plank', 'gate-driftwood', 'gate-vines']) expect([SPRITES[n]?.w, SPRITES[n]?.h], n).toEqual([16, 16])
+    const all = [...WATERS.flatMap((k) => [`${k}-0`, `${k}-1`]), 'tile-reed', 'tile-deadtree', 'boardwalk-plank', 'gate-driftwood', 'gate-vines']
+    expect(new Set(all.map(key)).size).toBe(all.length)
+    for (const old of ['tile-tree', 'tile-palm', 'dock-plank', 'pier-plank', 'gate-rubble', 'gate-broken-bridge']) for (const n of all) expect(key(n), `${n} vs ${old}`).not.toBe(key(old))
+  })
+})
+
+describe('낚시 5부 M2 물고기 그림 19종', () => {
+  const IDS = [
+    'mudskipper', 'small-octopus', 'grass-goby', 'blue-crab', 'spoon-worm', 'grenadier-anchovy', 'mitten-crab', 'river-puffer', 'king-croaker',
+    'bitterling', 'dark-sleeper', 'paradise-fish', 'bullfrog', 'bullhead', 'swamp-eel', 'softshell-turtle', 'lamprey', 'thousand-turtle', 'imugi',
+  ]
+  const art = (n: string) => SPRITES[n].rows.join('|')
+  it('16×16, 쓰는 글자가 모두 팔레트에 있고, 서로·기존 물고기 그림과 다르다', () => {
+    for (const id of IDS) {
+      const sp = SPRITES[`fish-${id}`]
+      expect([sp?.w, sp?.h], id).toEqual([16, 16])
+      for (const ch of sp.rows.join('')) if (ch !== '.') expect(sp.palette[ch], `${id} ${ch}`).toBeDefined()
+    }
+    const all = Object.keys(SPRITES).filter((n) => n.startsWith('fish-') && n !== 'fish-shadow')
+    expect(new Set(all.map(art)).size).toBe(all.length)
+  })
+  it('전설·신화 그림은 빛 점이 있어 다른 칸보다 화려하다(색 6가지 이상)', () => {
+    for (const id of ['king-croaker', 'thousand-turtle', 'imugi']) expect(new Set(SPRITES[`fish-${id}`].rows.join('').replace(/\./g, '')).size, id).toBeGreaterThanOrEqual(6)
+  })
+})
+
+describe('늪지 그림 다듬기: 세로 데크·연잎 늪', () => {
+  it('세로 데크는 가로 데크를 돌린 그림(16×16), 연잎 늪 두 장은 칸을 꽉 채우고 서로·늪과 다르다', () => {
+    const h = SPRITES['boardwalk-plank'].rows
+    const v = SPRITES['boardwalk-plank-v'].rows
+    expect(v).toEqual(h.map((_, x) => h.map((row) => row[x]).join('')))
+    for (const n of ['marsh-lily-0', 'marsh-lily-1']) {
+      expect([SPRITES[n].w, SPRITES[n].h]).toEqual([16, 16])
+      expect(SPRITES[n].rows.join('').includes('.')).toBe(false)
+    }
+    const art = (n: string) => SPRITES[n].rows.join('|')
+    expect(new Set(['marsh-0', 'marsh-1', 'marsh-lily-0', 'marsh-lily-1'].map(art)).size).toBe(4)
+  })
+})
