@@ -7,7 +7,7 @@
 // manual/legends.csv의 선수(범위 밖 레전드)를 더한다. 설계 docs/superpowers/specs/2026-11-01-football-data-layer-design.md §3·§4.
 //
 // 위키데이터 공식 질의 서비스(query.wikidata.org)만 쓴다. 한 번에 한 요청, 요청 사이 1초 간격.
-// 응답은 .cache/wikidata/에 보관해 중간에 멈춰도 다시 돌리면 이어서 진행한다.
+// 응답은 .cache/wikidata/에 보관해 중간에 멈춰도 다시 돌리면 이어서 진행한다. --no-cache는 새로 받아 그 캐시를 갱신한다.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { LEAGUES, type League } from './leagues.ts'
@@ -35,11 +35,16 @@ function args() {
   const leagues = only ? LEAGUES.filter((l) => only.includes(l.id)) : LEAGUES
   if (only && leagues.length !== only.length) throw new Error(`모르는 리그: ${only.filter((q) => !LEAGUES.some((l) => l.id === q)).join(', ')} (scripts/football/leagues.ts)`)
   const limit = get('limit-teams')
+  // 일부만 받는 시험 실행(--leagues·--limit-teams·--seasons)은 본 데이터를 덮어쓰지 않게 따로 쓴다(--out으로 바꿀 수 있음)
+  const trial = only !== undefined || limit !== undefined || override !== undefined
   return {
     windows: seasonWindows(leagues, to, override), leagues,
     limitTeams: limit ? Number(limit) : Infinity,
-    out: get('out') ?? 'data/football',
-    cacheDir: a.includes('--no-cache') ? null : (get('cache') ?? '.cache/wikidata'),
+    out: get('out') ?? (trial ? '.cache/football-trial' : 'data/football'),
+    /** 직접 입력(manual/)·openfootball 결과를 읽는 곳. 출력 폴더와 달라도 본 데이터의 것을 쓴다 */
+    input: 'data/football', trial,
+    // --no-cache: 캐시를 읽지 않고 새로 받아 캐시를 갱신한다
+    cache: { dir: get('cache') ?? '.cache/wikidata', refresh: a.includes('--no-cache') },
   }
 }
 
@@ -60,26 +65,27 @@ function printCoverage(tc: ReturnType<typeof mergeTeamComps>, leagues: readonly 
 
 async function main() {
   const o = args()
-  if (o.cacheDir) mkdirSync(o.cacheDir, { recursive: true })
+  mkdirSync(o.cache.dir, { recursive: true })
   mkdirSync(o.out, { recursive: true })
+  if (o.trial && o.out !== 'data/football') log(`시험 실행: 결과를 ${o.out}/에 쓴다 (본 데이터 data/football/은 그대로)`)
   const to = Math.max(...[...o.windows.values()].map((w) => w.to))
   log(`리그 ${o.leagues.length}개, 시즌 ${o.leagues.map((l) => `${l.name_ko} ${o.windows.get(l.id)!.from}~`).join(', ')} ~${to}`)
 
   // 1. 시즌별 참가팀·우승 (리그마다 자기 창)
-  const seasons = buildSeasons(await query(qSeasons(o.windows), o.cacheDir))
+  const seasons = buildSeasons(await query(qSeasons(o.windows), o.cache))
   const leagueIds = new Set(o.leagues.map((l) => l.id))
   // 위키데이터 + openfootball 경기 일정(npm run football:openfootball, 설계 §3.5) + 직접 입력.
   // openfootball 명단이 다 이어진 시즌은 openfootball이 기준, 우승 기록의 옛 ID는 remap.csv로 옮긴다
-  const of = (name: string) => { const f = join(o.out, 'openfootball', name); return existsSync(f) ? parseCsv(readFileSync(f, 'utf8')) : [] }
+  const of = (name: string) => { const f = join(o.input, 'openfootball', name); return existsSync(f) ? parseCsv(readFileSync(f, 'utf8')) : [] }
   const combined = combineTeamComps(seasons.teamComps, of('team_competitions.csv') as unknown as TeamCompetition[], completeSeasons(of('seasons.csv') as unknown as SeasonInfo[]))
   const remap = new Map(of('remap.csv').map((r) => [r.from_id, r.to_id]))
   for (const h of seasons.honours) h.team_id = remap.get(h.team_id) ?? h.team_id
-  const teamComps = mergeTeamComps(combined.rows, readManual(o.out, 'team_competitions.csv')).filter((r) => leagueIds.has(r.competition_id))
+  const teamComps = mergeTeamComps(combined.rows, readManual(o.input, 'team_competitions.csv')).filter((r) => leagueIds.has(r.competition_id))
   if (combined.dropped.length) log(`openfootball 기준으로 뺀 위키데이터 참가팀 ${combined.dropped.length}개`)
   printCoverage(teamComps, o.leagues, o.windows)
 
   // 2. 선수를 찾을 팀과 팀별 시작 연도: 창 안 시즌 참가팀 + 지금 리그 소속 클럽
-  const clubs = await query(qLeagueClubs(o.leagues), o.cacheDir)
+  const clubs = await query(qLeagueClubs(o.leagues), o.cache)
   let starts = teamStarts(teamComps, clubs.map((r) => ({ league: r.league, team: r.team })), o.windows)
   if (starts.size > o.limitTeams) starts = new Map([...starts].slice(0, o.limitTeams))
   const seedTeams = [...starts.keys()]
@@ -90,58 +96,58 @@ async function main() {
   for (const [team, from] of starts) byStart.set(from, [...(byStart.get(from) ?? []), team])
   const found = new Set<string>()
   for (const [from, teams] of [...byStart].sort((a, b) => a[0] - b[0])) {
-    for (const r of await batched(`선수 찾기 (${from}~)`, teams, 20, (c) => qPlayersAtTeams(c, from, to), o.cacheDir)) found.add(r.p)
+    for (const r of await batched(`선수 찾기 (${from}~)`, teams, 20, (c) => qPlayersAtTeams(c, from, to), o.cache)) found.add(r.p)
   }
   log(`선수 ${found.size}명`)
 
   // 3-1. 레전드 수동 명단: 축구 선수인지 확인하고 더한다
-  const legends = mergeLegends([...found], readManual(o.out, 'legends.csv'))
+  const legends = mergeLegends([...found], readManual(o.input, 'legends.csv'))
   for (const id of legends.invalid) log(`  레전드 명단: QID가 아님, 건너뜀: ${id}`)
   let legendOk = new Set<string>()
   if (legends.added.length) {
-    legendOk = new Set((await batched('레전드 확인', legends.added, 200, qOccupation, o.cacheDir)).map((r) => r.p))
+    legendOk = new Set((await batched('레전드 확인', legends.added, 200, qOccupation, o.cache)).map((r) => r.p))
     for (const id of legends.added.filter((x) => !legendOk.has(x))) log(`  레전드 명단: 축구 선수가 아님, 뺌: ${id}`)
   }
   const playerIds = [...found, ...legends.added.filter((x) => legendOk.has(x))].sort()
   log(`레전드 ${legendOk.size}명 추가 (제외 ${legends.added.length - legendOk.size + legends.invalid.length}명), 합계 ${playerIds.length}명`)
 
   // 4. 선수의 전체 경력과 그 경력에 나오는 팀
-  const spellRows = await batched('경력', playerIds, 100, qSpells, o.cacheDir)
+  const spellRows = await batched('경력', playerIds, 100, qSpells, o.cache)
   const teamIds = [...new Set([...spellRows.map((r) => r.team), ...seedTeams, ...seasons.honours.map((h) => h.team_id)])]
-  const teams = buildTeams(await batched('팀', teamIds, 150, qTeams, o.cacheDir))
+  const teams = buildTeams(await batched('팀', teamIds, 150, qTeams, o.cache))
   applyLeagueNations(teams, teamComps, o.leagues)
   const teamMap = new Map<string, Team>(teams.map((t) => [t.id, t]))
   const { spells: wdSpells, national, dropped } = buildSpells(spellRows, teamMap)
   const caps = buildCaps(national)
   log(`경력 ${wdSpells.length}개, 국가대표 ${caps.length}개 (유스·2군·이름 없는 팀·날짜 없음·날짜 역전으로 뺀 구간 ${dropped}개)`)
   // 4-1. 직접 입력 경력(manual/spells.csv, 설계 §5.3). 선수·팀 존재는 9번 CSV 검사가 본다
-  const manualSpells = applyManualSpells(wdSpells, readManual(o.out, 'spells.csv'))
+  const manualSpells = applyManualSpells(wdSpells, readManual(o.input, 'spells.csv'))
   const spells = manualSpells.spells
   log(`직접 입력 경력: 추가 ${manualSpells.added}, 수정 ${manualSpells.fixed}, 삭제 ${manualSpells.deleted}`)
   for (const m of manualSpells.problems) log(`  ${m}`)
   if (manualSpells.problems.length) process.exitCode = 1
 
   // 5. 선수 정보·수상
-  const built = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cacheDir), caps, teamMap)
+  const built = buildPlayers(await batched('선수 정보', playerIds, 100, qPlayerDetails, o.cache), caps, teamMap)
   // 어느 언어로도 이름이 없는 선수는 화면에 보일 이름이 없어 뺀다(경력·국가대표·수상·별칭·외부 ID도 함께)
   const players = built.players.filter((p) => p.name_en)
   const nameless = built.players.filter((p) => !p.name_en).map((p) => p.id)
   const keptPlayers = new Set(players.map((p) => p.id))
   if (nameless.length) log(`이름 라벨이 없는 선수 ${nameless.length}명 뺌: ${nameless.slice(0, 10).join(' ')}${nameless.length > 10 ? ' …' : ''}`)
   const transfermarkt = [...built.transfermarkt].filter(([id]) => keptPlayers.has(id))
-  const awards = buildAwards(await batched('수상', playerIds, 200, qAwards, o.cacheDir)).filter((h) => keptPlayers.has(h.player_id))
+  const awards = buildAwards(await batched('수상', playerIds, 200, qAwards, o.cache)).filter((h) => keptPlayers.has(h.player_id))
 
   // 6. 국가
   const keptTeams = teams.filter((t) => t.kind !== 'other')
   const nationIds = [...new Set([...players.map((p) => p.nation_id), ...keptTeams.map((t) => t.nation_id), ...o.leagues.map((l) => l.nation_id)].filter(Boolean))]
-  const nations = buildNations(await batched('국가', nationIds, 200, qNations, o.cacheDir))
+  const nations = buildNations(await batched('국가', nationIds, 200, qNations, o.cache))
 
   // 7. 직접 입력한 한글 이름, 검색용 별칭
-  const namesKo = readManual(o.out, 'names_ko.csv')
+  const namesKo = readManual(o.input, 'names_ko.csv')
   const fixed = applyNamesKo(players, namesKo) + applyNamesKo(keptTeams, namesKo) + applyNamesKo(nations, namesKo)
   // 질의는 처음 목록 그대로(캐시 재사용), 뺀 선수의 별칭은 결과에서 거른다
   const keptIds0 = new Set(keptTeams.map((t) => t.id))
-  const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cacheDir)).filter((x) => keptPlayers.has(x.entity_id) || keptIds0.has(x.entity_id))
+  const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cache)).filter((x) => keptPlayers.has(x.entity_id) || keptIds0.has(x.entity_id))
 
   // 8. 쓰기 (팀은 유스·2군 제외, 경력·시즌 참가팀은 남은 팀만). 열과 행 순서는 schema.ts가 정한다
   const keptIds = new Set(keptTeams.map((t) => t.id))
@@ -167,7 +173,7 @@ async function main() {
     written[f] = parseCsv(text)
     headers[f] = text.split(/\r?\n/, 1)[0].split(',')
   }
-  const problems = checkDataset({ files: written, headers }, readManual(o.out, 'legends.csv'))
+  const problems = checkDataset({ files: written, headers }, readManual(o.input, 'legends.csv'))
 
   const noKo = players.filter((p) => !p.name_ko).length
   const noPos = players.filter((p) => !p.position).length

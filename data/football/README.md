@@ -29,14 +29,15 @@
 
 ```bash
 npm run football:fetch                                  # 대상 리그 전체 (40분~1시간)
-npm run football:fetch -- --leagues Q9448 --limit-teams 5   # 시험 실행 (1~2분)
-npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~2025로 (시즌 = 시작 연도)
+npm run football:fetch -- --leagues Q9448 --limit-teams 5   # 시험 실행 (1~2분, 결과는 .cache/football-trial/)
+npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~2025로 (시험, 결과는 .cache/football-trial/)
 ```
 
 - 리그와 리그별 수집 시즌 수는 `scripts/football/leagues.ts`에 있다(프리미어리그 최근 15시즌, 나머지 최근 10시즌, 현재 시즌 포함). 현재 시즌은 7월 이후면 올해, 아니면 작년이다. `--seasons N`은 모든 리그를 N시즌으로 바꾸는 시험용 옵션이다(옛 `--from`은 없어짐).
 - 팀마다 선수를 찾는 시작 연도는 그 팀이 창 안에서 속했던 리그(또는 지금 소속 리그)의 창 시작 중 가장 이른 해다.
+- `--leagues`·`--limit-teams`·`--seasons`를 쓰면 시험 실행이라 결과를 `.cache/football-trial/`에 쓴다(본 데이터 `data/football/`은 그대로). 직접 입력(`manual/`)·openfootball 결과는 `data/football/`에서 읽는다. 본 폴더에 쓰려면 `--out data/football`.
 - 위키데이터 공식 질의 서비스만 쓴다. 한 번에 한 요청, 요청 사이 1초.
-- 응답은 `.cache/wikidata/`에 보관된다(커밋 안 함). 중간에 멈추면 다시 돌려 이어 간다. 새로 받으려면 `--no-cache` 또는 그 폴더를 지운다.
+- 응답은 `.cache/wikidata/`에 보관된다(커밋 안 함). 중간에 멈추면 다시 돌려 이어 간다. 새로 받으려면 `--no-cache`(캐시를 읽지 않고 새로 받아 캐시도 갱신한다. 그 뒤 실행은 갱신된 캐시를 쓴다). 단 `--no-cache`로 돌리다 멈췄을 때 옵션 없이 이어 돌리면 아직 못 받은 부분은 옛 캐시를 쓴다. 중간에 멈출 수 있으면 `.cache/wikidata/` 폴더를 지우고 옵션 없이 돌리는 편이 안전하다.
 - `User-Agent`는 `WIKIDATA_UA` 환경 변수로 바꿀 수 있다(위키미디어 정책상 연락처 포함 권장).
 - 끝나면 리그·시즌별 참가팀 수 표가 나온다. `--`(없음)나 `!`(리그 정원 `teams` 미만) 칸은 `manual/team_competitions.csv`에 채운다.
 - ONLYFMS 클라우드 개발 환경은 네트워크 정책이 `query.wikidata.org`를 막고 있다. 로컬 PC에서 돌리거나 환경의 허용 도메인에 추가한 뒤 돌린다.

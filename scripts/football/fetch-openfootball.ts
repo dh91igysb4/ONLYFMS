@@ -34,7 +34,8 @@ function args() {
   return {
     leagues, windows: seasonWindows(leagues, to, override),
     dir: get('out') ?? 'data/football',
-    cacheDir: a.includes('--no-cache') ? null : (get('cache') ?? '.cache/openfootball'),
+    // --no-cache: 캐시를 읽지 않고 새로 받아 캐시를 갱신한다
+    cacheDir: get('cache') ?? '.cache/openfootball', refresh: a.includes('--no-cache'),
     merge: a.includes('--merge'),
   }
 }
@@ -42,15 +43,15 @@ function args() {
 const MISSING = '\u0000missing'
 
 /** 파일 하나를 받는다. 없으면(404) null. 없음도 캐시한다(--no-cache로 다시 확인) */
-async function download(url: string, path: string, cacheDir: string | null): Promise<string | null> {
-  const file = cacheDir && join(cacheDir, path)
-  if (file && existsSync(file)) { const t = readFileSync(file, 'utf8'); return t === MISSING ? null : t }
+async function download(url: string, path: string, cacheDir: string, refresh: boolean): Promise<string | null> {
+  const file = join(cacheDir, path)
+  if (!refresh && existsSync(file)) { const t = readFileSync(file, 'utf8'); return t === MISSING ? null : t }
   for (let attempt = 0; ; attempt++) {
     await sleep(200)
     const res = await fetch(url, { headers: { 'User-Agent': 'ONLYFMS-data/0.1 (https://github.com/dh91igysb4/ONLYFMS)' } })
     if (res.ok || res.status === 404) {
       const text = res.ok ? await res.text() : null
-      if (file) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, text ?? MISSING) }
+      mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, text ?? MISSING)
       return text
     }
     if (attempt >= 4) throw new Error(`openfootball ${res.status}: ${url}`)
@@ -87,7 +88,7 @@ async function main() {
     for (let season = w.from; season <= w.to; season++) {
       let names: string[] | null = null
       for (const src of sourceUrls(league.id, season)) {
-        const text = await download(src.url, src.path, o.cacheDir)
+        const text = await download(src.url, src.path, o.cacheDir, o.refresh)
         if (text === null) continue
         if (src.kind === 'json') names = parseJsonTeams(text)
         else {
