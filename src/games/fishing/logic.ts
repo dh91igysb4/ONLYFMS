@@ -197,8 +197,9 @@ export type PendingView = {
   species: string | null
   sizeCm: number | null
 }
+// 골드는 세이브에 없다(logic.version 14, 지갑 설계 §6): 플랫폼 지갑이 원본이고 ctx.gold로 읽고 apply의 gold로 증감한다.
 export type State = {
-  gold: number
+  /** 판매로 번 골드 누계(기록 total_earned). 사이트 하루 상한으로 줄기 전 금액이다 */
   totalEarned: number
   rodTier: RodTier
   bagTier: BagTier
@@ -237,9 +238,14 @@ export type Action =
   | { type: 'wear'; slot: string; id: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
-export type View = Omit<State, 'pending' | 'buffs'> & { pending: PendingView | null; buffs?: BuffId[] }
+// gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
+export type View = Omit<State, 'pending' | 'buffs'> & { pending: PendingView | null; buffs?: BuffId[]; gold: number }
 
-type Out = { state: State; result?: unknown } | { error: string }
+type Out = { state: State; result?: unknown; gold?: number } | { error: string }
+type Ctx = { now: number; rng: () => number; gold: number }
+
+/** 세이브에 gold를 두던 마지막 버전. 이 버전 이하 세이브의 gold는 world 핸들러가 legacyGold로 지갑에 한 번 옮긴다 */
+export const LAST_GOLD_IN_SAVE = 13
 
 function pendingView(p: Pending): PendingView {
   const hooked = p.hookedAt != null
@@ -253,7 +259,6 @@ function pendingView(p: Pending): PendingView {
 }
 
 const init = (): State => ({
-  gold: 0,
   totalEarned: 0,
   rodTier: 1,
   bagTier: 1,
@@ -275,7 +280,7 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 const knownTackle = (id: unknown): id is TackleId => typeof id === 'string' && TACKLES.some((t) => t.id === id)
 const knownSpecies = (id: unknown): id is string => typeof id === 'string' && SPECIES.some((s) => s.id === id)
 
-function cast(state: State, a: Record<string, unknown>, ctx: { now: number; rng: () => number }): Out {
+function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
   // 구버전 화면은 지역 'pier'를 보낸다
   const areaId = a.area === 'pier' ? 'village' : a.area
   const area = AREAS.find((x) => x.id === areaId)
@@ -374,8 +379,9 @@ function sell(state: State): Out {
   if (selling.length === 0) return { error: 'bag_empty' }
   const earned = selling.reduce((sum, f) => sum + sellPrice(f, state.buffs ?? []), 0)
   return {
-    state: { ...state, gold: state.gold + earned, totalEarned: state.totalEarned + earned, bag: state.bag.filter((f) => f.locked) },
+    state: { ...state, totalEarned: state.totalEarned + earned, bag: state.bag.filter((f) => f.locked) },
     result: { earned },
+    gold: earned,
   }
 }
 
@@ -388,31 +394,31 @@ function lock(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, bag: state.bag.map((f, j) => (j === i ? fish : f)) } }
 }
 
-function buyRod(state: State, a: Record<string, unknown>): Out {
+function buyRod(state: State, a: Record<string, unknown>, gold: number): Out {
   if (!Number.isInteger(a.tier) || a.tier !== state.rodTier + 1) return { error: 'bad_tier' }
   const rod = RODS.find((r) => r.tier === a.tier)
   if (!rod) return { error: 'bad_tier' }
-  if (state.gold < rod.price) return { error: 'not_enough_gold' }
-  return { state: { ...state, rodTier: rod.tier, gold: state.gold - rod.price } }
+  if (gold < rod.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, rodTier: rod.tier }, gold: -rod.price }
 }
 
-function buyBag(state: State, a: Record<string, unknown>): Out {
+function buyBag(state: State, a: Record<string, unknown>, gold: number): Out {
   if (!Number.isInteger(a.tier) || a.tier !== state.bagTier + 1) return { error: 'bad_tier' }
   const bag = BAGS.find((b) => b.tier === a.tier)
   if (!bag) return { error: 'bad_tier' }
-  if (state.gold < bag.price) return { error: 'not_enough_gold' }
-  return { state: { ...state, bagTier: bag.tier, gold: state.gold - bag.price } }
+  if (gold < bag.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, bagTier: bag.tier }, gold: -bag.price }
 }
 
-function buyTackle(state: State, a: Record<string, unknown>): Out {
+function buyTackle(state: State, a: Record<string, unknown>, gold: number): Out {
   const t = TACKLES.find((x) => x.id === a.id)
   if (!t) return { error: 'bad_tackle' }
   if (state.tackles.includes(t.id)) return { error: 'already_owned' }
-  if (state.gold < t.price) return { error: 'not_enough_gold' }
-  return { state: { ...state, gold: state.gold - t.price, tackles: [...state.tackles, t.id] } }
+  if (gold < t.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, tackles: [...state.tackles, t.id] }, gold: -t.price }
 }
 
-function unlockArea(state: State, a: Record<string, unknown>): Out {
+function unlockArea(state: State, a: Record<string, unknown>, gold: number): Out {
   const id = a.area
   // 프로토타입 키(__proto__ 등)가 걸리지 않게 자기 키만 본다
   if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(UNLOCKS, id)) return { error: 'bad_area' }
@@ -421,8 +427,8 @@ function unlockArea(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   if (state.areas.includes(area)) return { error: 'already_open' }
   if (u.minRod !== undefined && state.rodTier < u.minRod) return { error: 'need_rod' }
-  if (state.gold < u.price) return { error: 'not_enough_gold' }
-  return { state: { ...state, gold: state.gold - u.price, areas: [...state.areas, area] } }
+  if (gold < u.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, areas: [...state.areas, area] }, gold: -u.price }
 }
 
 /** 이동기가 있는 알려진 지역 id인가(자기 키만 본다: '__proto__' 같은 키가 걸리지 않게) */
@@ -431,15 +437,15 @@ function teleporterArea(id: unknown): id is AreaId {
 }
 
 // 화면이 알려 준 from을 믿는다(설계 §8.4). 둘 다 켜진 이동기이고 골드가 요금 이상이면 요금을 뺀다.
-function teleport(state: State, a: Record<string, unknown>): Out {
+function teleport(state: State, a: Record<string, unknown>, gold: number): Out {
   const { from, to } = a
   if (!teleporterArea(from) || !teleporterArea(to)) return { error: 'bad_teleporter' }
   if (from === to) return { error: 'same' }
   if (state.pending) return { error: 'busy' }
   if (!teleporterOpen(state, from) || !teleporterOpen(state, to)) return { error: 'not_open' }
   const fee = teleportFee(from, to)
-  if (state.gold < fee) return { error: 'not_enough_gold' }
-  return { state: { ...state, gold: state.gold - fee }, result: { from, to, fee } }
+  if (gold < fee) return { error: 'not_enough_gold' }
+  return { state, result: { from, to, fee }, gold: -fee }
 }
 
 function equip(state: State, a: Record<string, unknown>): Out {
@@ -451,18 +457,18 @@ function equip(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, equipped: [...ids] } }
 }
 
-// 옷 사기(설계 옷장 §5.2). 지갑이 들어오면 골드를 빼는 이 자리만 지갑으로 옮긴다(다른 낚시 구매와 같다).
-function buyWear(state: State, a: Record<string, unknown>): Out {
+// 옷 사기(설계 옷장 §5.2). 다른 낚시 구매처럼 지갑에서 뺀다(logic.version 14).
+function buyWear(state: State, a: Record<string, unknown>, gold: number): Out {
   if (!isWearSlot(a.slot)) return { error: 'bad_wear' }
   const w = wearItem(a.slot, a.id)
   if (!w) return { error: 'bad_wear' }
   if (w.unlock) return { error: 'not_for_sale' }
   if (!isShopItem(w) || ownsWear(state, w.slot, w.id)) return { error: 'already_owned' }
-  if (state.gold < w.price) return { error: 'not_enough_gold' }
+  if (gold < w.price) return { error: 'not_enough_gold' }
   return {
+    gold: -w.price,
     state: {
       ...state,
-      gold: state.gold - w.price,
       wardrobe: [...state.wardrobe, wearKey(w.slot, w.id)],
       outfit: { ...state.outfit, [w.slot]: w.id },
     },
@@ -484,6 +490,17 @@ function grantEarned(state: State): State {
   return earned.length === 0 ? state : { ...state, wardrobe: [...state.wardrobe, ...earned] }
 }
 
+/**
+ * v13 이하 세이브에 들어 있던 골드(0 이상 정수, 소수는 내림). world 핸들러가 migrate 직전에 한 번 지갑으로 옮긴다
+ * (장부 unique (user, 'migrate', 'fishing')가 두 번 들어가지 않게 지킨다). v14부터는 세이브에 골드가 없어 0.
+ */
+function legacyGold(raw: unknown, fromVersion: number): number {
+  if (fromVersion > LAST_GOLD_IN_SAVE || !isObj(raw)) return 0
+  const g = raw.gold
+  return isNum(g) && g >= 0 ? Math.floor(g) : 0
+}
+
+// 옛 세이브의 gold는 읽지 않는다(legacyGold가 지갑으로 옮긴다).
 function migrate(raw: unknown, fromVersion: number): State {
   const base = init()
   if (!isObj(raw)) return base
@@ -550,7 +567,6 @@ function migrate(raw: unknown, fromVersion: number): State {
   }
   const buffs = migrateBuffs(raw.buffs, legends)
   return {
-    gold: nonNeg(raw.gold, base.gold),
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
     rodTier,
     bagTier,
@@ -600,22 +616,26 @@ export const logic: WorldLogic<State, Action, View> = {
   // 11: 신화 등급·버프 상태(buffs), 물때 자리(spot_closed)·지역 최소 낚싯대(need_rod) 확인
   // 12: 갯벌·늪지 지역과 어종 19종(신화 이무기). 세이브 형식은 11과 같다(migrate가 새 지역·어종 id를 알게 됨)
   // 13: 산정 호수·난파선 앞바다 지역과 어종 19종(신화 천지 백룡·용왕). 세이브 형식은 12와 같다
-  version: 13,
+  // 14: 골드를 플랫폼 지갑으로(지갑 설계 §6). 세이브에서 gold를 빼고, 판매·구매는 apply의 gold 증감, view.gold는 지갑 잔액.
+  //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
+  version: 14,
+  wallet: true,
   init,
   migrate,
+  legacyGold,
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
   apply(state, action: unknown, ctx) {
     const r = applyAction(state, action, ctx)
     // 행동으로 업적 조건을 채웠으면(잡기·과제 깨기 등) 그 자리에서 옷을 저장한다
     return 'error' in r ? r : { ...r, state: grantEarned(r.state) }
   },
-  view: (state): View => ({ ...state, pending: state.pending && pendingView(state.pending) }),
+  view: (state, ctx): View => ({ ...state, gold: ctx.gold, pending: state.pending && pendingView(state.pending) }),
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),
 }
 
-function applyAction(state: State, action: unknown, ctx: { now: number; rng: () => number }): Out {
+function applyAction(state: State, action: unknown, ctx: Ctx): Out {
   if (!isObj(action)) return { error: 'bad_action' }
   switch (action.type) {
     case 'cast':
@@ -629,19 +649,19 @@ function applyAction(state: State, action: unknown, ctx: { now: number; rng: () 
     case 'lock':
       return lock(state, action)
     case 'buyRod':
-      return buyRod(state, action)
+      return buyRod(state, action, ctx.gold)
     case 'buyBag':
-      return buyBag(state, action)
+      return buyBag(state, action, ctx.gold)
     case 'buyTackle':
-      return buyTackle(state, action)
+      return buyTackle(state, action, ctx.gold)
     case 'equip':
       return equip(state, action)
     case 'unlockArea':
-      return unlockArea(state, action)
+      return unlockArea(state, action, ctx.gold)
     case 'teleport':
-      return teleport(state, action)
+      return teleport(state, action, ctx.gold)
     case 'buyWear':
-      return buyWear(state, action)
+      return buyWear(state, action, ctx.gold)
     case 'wear':
       return wear(state, action)
     default:

@@ -355,9 +355,16 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(sold.status, 200)
   const gold = (sold.body.view as { gold: number }).gold
   assert.ok(gold > 0)
-  // 낚시는 아직 지갑을 쓰지 않는다(계획 Task 4 전): 최상위 gold 없음, 지갑 행 없음
-  assert.equal('gold' in sold.body, false)
-  assert.equal((await sql`select 1 from public.wallets where user_id = ${admin}`).length, 0)
+  // 낚시는 지갑을 쓴다(logic.version 14): 최상위 gold = view.gold = 지갑 잔액, 장부에 world 줄, 세이브에 gold 없음
+  assert.equal(sold.body.gold, gold)
+  assert.equal(await balance(admin), gold)
+  const earned = (sold.body.result as { earned: number }).earned
+  assert.equal(earned, gold) // 첫 판매는 사이트 하루 상한 아래
+  const led = await ledger(admin)
+  assert.deepEqual(led.map((l) => [l.reason, Number(l.delta), l.game_id]), [['world', gold, 'fishing']])
+  const [sv] = await save(admin, game)
+  assert.equal(sv.logic_version, 14)
+  assert.equal('gold' in (sv.state as Record<string, unknown>), false)
   assert.ok(gold < 800)
   const bag = await real({ game, action: 'act', payload: { type: 'buyBag', tier: 2 } })
   assert.equal(bag.status, 400)
@@ -368,6 +375,103 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
   assert.deepEqual(rows.map((r) => r.key), ['avatar', 'biggest', 'challenges', 'dex', 'total_earned'])
+})
+
+// 실제 낚시 등록부로 v13 세이브의 골드 이전(지갑 계획 Task 4, Review Focus 1)
+async function fishingV13(uid: string, gold: number | string | null) {
+  const state = {
+    gold, totalEarned: 50_000, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'],
+    bag: [{ species: 'anchovy', sizeCm: 12, perfect: false, locked: true }], dex: { anchovy: { count: 4, maxCm: 14 } },
+    legends: [], tackles: ['cork'], equipped: ['cork'], challenges: {}, wardrobe: [], buffs: [], pending: null,
+    outfit: { hat: 'none', top: 'basic', bottom: 'basic', hairColor: 'black', rodSkin: 'basic' },
+  }
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${uid}, 'fishing', ${sql.json(state as never)}, 13)`
+}
+const realCall = async (uid: string, body: unknown): Promise<Res> => {
+  const req = new Request('http://localhost/functions/v1/world', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${uid}` },
+    body: JSON.stringify(body),
+  })
+  const res = await handle(req, { ...deps(), registry: undefined })
+  return { status: res.status, body: await res.json() }
+}
+
+t('real fishing: v13 save gold moves to the wallet once on first load (floor), save becomes v14 without gold', async () => {
+  const u = await user('approved', true)
+  await fishingV13(u, 12345.7)
+  const r = await realCall(u, { game: 'fishing', action: 'load' })
+  assert.equal(r.status, 200)
+  assert.equal(r.body.gold, 12345)
+  assert.equal((r.body.view as { gold: number }).gold, 12345)
+  assert.equal('gold_capped' in r.body, false)
+  const [sv] = await save(u, 'fishing')
+  assert.equal(sv.logic_version, 14)
+  const st = sv.state as Record<string, unknown>
+  assert.equal('gold' in st, false)
+  assert.equal(st.totalEarned, 50_000)
+  assert.equal(st.rodTier, 3)
+  assert.deepEqual(st.tackles, ['cork'])
+  // 다시 열어도 두 번 들어가지 않는다
+  const again = await realCall(u, { game: 'fishing', action: 'load' })
+  assert.equal(again.body.gold, 12345)
+  const led = await ledger(u)
+  assert.deepEqual(led.map((l) => [l.reason, Number(l.delta), l.ref, l.game_id]), [['migrate', 12345, 'fishing', 'fishing']])
+  assert.equal(await balance(u), 12345)
+  // 옮긴 골드로 바로 살 수 있다(카본 8,000 → 명장 40,000은 부족)
+  const rod = await realCall(u, { game: 'fishing', action: 'act', payload: { type: 'buyRod', tier: 4 } })
+  assert.equal(rod.status, 400)
+  assert.equal(rod.body.error, 'not_enough_gold')
+  const bag = await realCall(u, { game: 'fishing', action: 'act', payload: { type: 'buyBag', tier: 3 } })
+  assert.equal(bag.status, 200)
+  assert.equal(bag.body.gold, 12345 - 5000)
+  assert.equal(await balance(u), 7345)
+})
+
+t('real fishing: concurrent first loads/acts of a v13 save move the gold exactly once', async () => {
+  const u = await user('approved', true)
+  await fishingV13(u, 900)
+  const rs = await Promise.all([
+    realCall(u, { game: 'fishing', action: 'load' }),
+    realCall(u, { game: 'fishing', action: 'act', payload: { type: 'buyTackle', id: 'trap' } }),
+    realCall(u, { game: 'fishing', action: 'load' }),
+  ])
+  for (const r of [rs[0], rs[2]]) {
+    assert.equal(r.status, 200)
+    assert.equal(r.body.gold, 900)
+  }
+  // 함정 찌(1,500)는 900으로 못 산다
+  assert.equal(rs[1].status, 400)
+  assert.equal(rs[1].body.error, 'not_enough_gold')
+  assert.equal(await balance(u), 900)
+  assert.equal((await ledger(u)).filter((l) => l.reason === 'migrate').length, 1)
+})
+
+t('real fishing: first request is a failing act → migration (gold + v14 save) still committed', async () => {
+  const u = await user('approved', true)
+  await fishingV13(u, 300)
+  const r = await realCall(u, { game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'cave' } })
+  assert.equal(r.status, 400)
+  assert.equal(r.body.error, 'not_enough_gold')
+  assert.equal(await balance(u), 300)
+  const [sv] = await save(u, 'fishing')
+  assert.equal(sv.logic_version, 14)
+  assert.equal('gold' in (sv.state as Record<string, unknown>), false)
+  const again = await realCall(u, { game: 'fishing', action: 'load' })
+  assert.equal(again.body.gold, 300)
+  assert.equal((await ledger(u)).length, 1)
+})
+
+t('real fishing: v13 save with bad or zero gold moves nothing (no ledger row), still migrates', async () => {
+  for (const g of [0, -5, 'lots', null]) {
+    const u = await user('approved', true)
+    await fishingV13(u, g)
+    const r = await realCall(u, { game: 'fishing', action: 'load' })
+    assert.equal(r.status, 200)
+    assert.equal(r.body.gold, 0)
+    assert.equal((await ledger(u)).length, 0)
+    assert.equal((await save(u, 'fishing'))[0].logic_version, 14)
+  }
 })
 
 // ---------------------------------------------------------------- wallet (지갑 1단계 Task 3)

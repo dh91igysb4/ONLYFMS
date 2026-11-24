@@ -123,9 +123,7 @@ export type DuelModule = { manifest: Manifest; logic: DuelLogic<any, any, any> }
 // ctx.gold는 0, 응답에 최상위 gold가 없다(지갑 이전 전의 게임이 그대로 동작하게).
 
 /** 서버가 넘기는 시각(밀리초), 난수 함수, 지갑 잔액(잠근 뒤 읽은 값. `wallet`이 없는 게임은 0) */
-// gold는 지갑 1단계 동안 선택값이다(낚시가 지갑으로 옮기기 전 테스트·호출이 그대로 컴파일되게).
-// 핸들러는 언제나 채운다. 낚시 지갑 이전(계획 Task 4) 때 필수로 바꾼다.
-export type WorldCtx = { now: number; rng: () => number; gold?: number }
+export type WorldCtx = { now: number; rng: () => number; gold: number }
 
 /** 게임이 남기는 기록 하나. key는 manifest.records의 key와 맞는다 */
 export type WorldRecord = { key: string; value: number; detail?: string }
@@ -144,7 +142,7 @@ export interface WorldLogic<State, Action, View> {
    */
   apply(state: State, action: Action, ctx: WorldCtx): { state: State; result?: unknown; gold?: number } | { error: string }
   /** 브라우저에 보낼 상태. gold: 이 응답 시점의 지갑 잔액(`wallet`이 없는 게임은 0) */
-  view(state: State, ctx: { now: number; gold?: number }): View
+  view(state: State, ctx: { now: number; gold: number }): View
   records(state: State): WorldRecord[]
   /**
    * 프로필에 그릴 캐릭터 문자열(manifest `avatar`가 있는 게임만). world 함수가 행동 뒤
