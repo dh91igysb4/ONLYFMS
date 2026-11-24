@@ -1,6 +1,6 @@
 // 낚시 미니게임 물리. 순수 함수만: DOM·시계·Math.random 없이 난수는 rng 인자, 시간은 dtMs로만 받는다.
 // 위치는 모두 0~1(트랙 아래 = 0).
-import { RODS, SPECIES, TACKLE_FX, type Behavior, type TackleId } from './data.ts'
+import { RODS, SPECIES, TACKLE_FX, type Behavior, type RodTier, type TackleId } from './data.ts'
 
 export const MAX_DT_MS = 50
 
@@ -12,6 +12,7 @@ export type Bar = {
   progress: number
   perfect: boolean
   t: number // 누적 경과 ms(MAX_DT_MS로 자른 값)
+  slackMs?: number // 손을 놓은 채 바가 바닥에 내려앉아 있던 시간(ms). 없으면 0
 }
 export type BarParams = {
   barSize: number
@@ -42,21 +43,24 @@ const SINKER_MAX = 0.45 // sinker: 새 목표 범위 0~0.45
 // 가속 약 7로 중력(6.5)·누르기(8)와 맞먹는다. 안에 든 물고기에 바가 눈에 띄게 달라붙지만,
 // 손을 떼면 바는 여전히 천천히 가라앉고, 빠른 dart 물고기는 안 눌러도 빠져나간다.
 export const BARBED_PULL = 70
+const SLACK_GRACE_MS = 500
 const PROGRESS_UP = 0.35 // 초당 진행 증가
 const PROGRESS_DOWN = 0.3 // 초당 진행 감소
 const GAUGE_PERIOD_MS = 1600
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v))
 
-export function barParams(speciesId: string, rodTier: 1 | 2 | 3 | 4, equipped: readonly TackleId[] = []): BarParams {
-  const species = SPECIES.find((s) => s.id === speciesId)
-  const rod = RODS.find((r) => r.tier === rodTier)
-  if (!species) throw new Error(`unknown species: ${speciesId}`)
-  if (!rod) throw new Error(`unknown rod tier: ${rodTier}`)
+/** 더 새 서버가 준 모르는 어종이면 이 값으로 싸운다(화면이 죽지 않게) */
+const NEUTRAL_FISH = { difficulty: 0.5, behavior: 'mixed' as const }
+
+export function barParams(speciesId: string, rodTier: RodTier, equipped: readonly TackleId[] = []): BarParams {
+  const fish = SPECIES.find((s) => s.id === speciesId) ?? NEUTRAL_FISH
+  // 모르는 낚싯대 단계는 보너스 없는 기본 바
+  const barBonus = RODS.find((r) => r.tier === rodTier)?.barBonus ?? 0
   return {
-    barSize: BASE_BAR_SIZE * (1 + rod.barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
-    difficulty: species.difficulty,
-    behavior: species.behavior,
+    barSize: BASE_BAR_SIZE * (1 + barBonus) * (equipped.includes('cork') ? TACKLE_FX.corkBar : 1),
+    difficulty: fish.difficulty,
+    behavior: fish.behavior,
     drain: equipped.includes('trap') ? TACKLE_FX.trapDrain : 1,
     pull: equipped.includes('barbed') ? BARBED_PULL : 0,
   }
@@ -96,7 +100,8 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   const lo = params.barSize / 2
   const hi = 1 - params.barSize / 2
   const wasInside = Math.abs(bar.fishPos - bar.barPos) <= params.barSize / 2
-  const pullAccel = params.pull > 0 && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
+  // 가시 바늘은 누르고 있을 때만 끈다(놓은 바가 물고기에 매달려 저절로 잡히지 않게)
+  const pullAccel = params.pull > 0 && held && wasInside ? (bar.fishPos - bar.barPos) * params.pull : 0
   let barVel = (bar.barVel + ((held ? BAR_ACCEL_UP : -BAR_ACCEL_DOWN) + pullAccel) * dt) * Math.exp(-BAR_DRAG * dt)
   let barPos = bar.barPos + barVel * dt
   if (barPos <= lo) {
@@ -126,10 +131,14 @@ export function stepBar(bar: Bar, held: boolean, dtMs: number, params: BarParams
   if (fishPos === fishTarget && clampedMs > 0 && rng() < arriveRetarget) fishTarget = pickTarget(behavior, fishPos, rng) // 도착하면 곧 다시 움직인다
 
   // 진행도
-  const inside = Math.abs(fishPos - barPos) <= params.barSize / 2
+  // 손을 놓아 바닥에 내려앉은 지 SLACK_GRACE_MS가 지난 바는 줄이 느슨해 물고기가 겹쳐도 세지 않는다
+  // (안 눌러도 잡히는 일을 막는다. 바닥 근처에서 살살 누르는 동안 잠깐 닿는 것은 봐준다)
+  const slackMs = barPos <= lo && !held ? (bar.slackMs ?? 0) + clampedMs : 0
+  const slack = slackMs > SLACK_GRACE_MS
+  const inside = !slack && Math.abs(fishPos - barPos) <= params.barSize / 2
   const progress = clamp01(bar.progress + (inside ? PROGRESS_UP : -PROGRESS_DOWN * params.drain) * dt)
 
-  return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs }
+  return { barPos, barVel, fishPos, fishTarget, progress, perfect: bar.perfect && inside, t: bar.t + clampedMs, slackMs }
 }
 
 export function barResult(bar: Bar): 'playing' | 'caught' | 'lost' {

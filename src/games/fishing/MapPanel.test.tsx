@@ -114,6 +114,20 @@ describe('MapPanel', () => {
     }
   })
 
+  it('전설 칸 테두리는 잡은 뒤에도 남는다(안 잡았을 때도 테두리)', () => {
+    const legendItem = () => [...panel().querySelectorAll('li.fish-dex-item')].filter((li) => li.classList.contains('fish-dex-item-legend'))
+    const { unmount } = mount()
+    fireEvent.click(spotMarker('부두'))
+    expect(legendItem()).toHaveLength(1)
+    expect(legendItem()[0]).toHaveTextContent('???')
+    unmount()
+    mount(makeView({ dex: dexOf('grouper'), legends: ['grouper'] }))
+    fireEvent.click(spotMarker('부두'))
+    expect(legendItem()).toHaveLength(1)
+    expect(legendItem()[0]).toHaveTextContent('다금바리')
+    expect(legendItem()[0]).toHaveTextContent('전설')
+  })
+
   it('지금 잡히는: 봄 5:50에 숭어(6~19시)는 없고, 게임 시각이 6시를 넘으면 목록·머리줄이 바뀐다', async () => {
     vi.setSystemTime(timeAt('spring', 350))
     mount(makeView({ dex: dexOf('goby', 'mullet', 'mackerel') }))

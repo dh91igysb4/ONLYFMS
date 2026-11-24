@@ -367,6 +367,28 @@ const WATER_SPRITE: Readonly<Partial<Record<TileKind, string>>> = {
   lake: 'lake', 'cave-pool': 'cave-pool', crystal: 'crystal', lava: 'lava', lagoon: 'lagoon',
 }
 
+/** 물 칸 그림 이름 앞부분. 바위는 이웃(상하좌우) 물 칸 그림 중 가장 많은 것(같으면 위·아래·왼쪽·오른쪽 순서로 먼저 센 것) */
+function waterSpriteAt(map: MapDef, tx: number, ty: number): string {
+  const kind = tileAt(map, tx, ty)
+  if (kind !== 'rock') return (kind && WATER_SPRITE[kind]) ?? 'water'
+  const count = new Map<string, number>()
+  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    const k = tileAt(map, tx + dx, ty + dy)
+    if (k === null || !WATER_GROUND.has(k) || k === 'falls') continue
+    const name = WATER_SPRITE[k] ?? 'water'
+    count.set(name, (count.get(name) ?? 0) + 1)
+  }
+  let best = 'water'
+  let most = 0
+  for (const [name, n] of count) {
+    if (n > most) {
+      best = name
+      most = n
+    }
+  }
+  return best
+}
+
 /** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무·야자수 밑동·바위·울타리·부두·선착장 판자). 모두 자기 칸 안에 그린다. */
 function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
   const kind = tileAt(g.map, tx, ty)
@@ -382,8 +404,8 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'cave-mouth') drawSprite(ctx, 'tile-cave-mouth', x, y, 1)
   else if (kind === 'falls') drawSprite(ctx, `falls-${(k + tx) % 2}`, x, y, 1)
   else if (ground === 'water') {
-    // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게. 다리 밑은 강물
-    drawSprite(ctx, `${WATER_SPRITE[kind] ?? 'water'}-${(k + tx + ty * 3) % 2}`, x, y, 1)
+    // 칸마다 위상을 어긋나게 해서 물결이 한꺼번에 깜빡이지 않게. 다리 밑은 강물, 바위 밑은 둘레의 물
+    drawSprite(ctx, `${waterSpriteAt(g.map, tx, ty)}-${(k + tx + ty * 3) % 2}`, x, y, 1)
     drawShoreEdges(ctx, g, tx, ty, k)
   } else if (ground === 'cave') {
     drawSprite(ctx, 'tile-cave-floor', x, y, 1)

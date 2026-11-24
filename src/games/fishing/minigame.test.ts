@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
-import { RODS, SPECIES, TACKLE_FX, type Behavior } from './data.ts'
-import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar } from './minigame.ts'
+import { RODS, SPECIES, TACKLE_FX, tackleSlots, type Behavior, type RodTier, type TackleId } from './data.ts'
+import { MAX_DT_MS, barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 
 function seeded(n: number): () => number {
   const seed = new Uint8Array(16)
@@ -76,17 +76,17 @@ describe('찌 효과 stepBar', () => {
     expect(run(trap)).toBeCloseTo(run(base) * TACKLE_FX.trapDrain, 9)
     expect(run(base)).toBeGreaterThan(0)
   })
-  it('barbed: 바 안 위쪽 끝 근처 물고기가 있으면 안 눌러도 바가 그쪽으로 끌린다, 바 밖이면 효과 없음', () => {
+  it('barbed: 누르는 동안 바 안 위쪽 끝 근처 물고기가 있으면 바가 그쪽으로 더 끌린다, 바 밖이면 효과 없음', () => {
     const base = { ...barParams('anchovy', 1), behavior: 'mixed' as const }
     const barbed = barParams('anchovy', 1, ['barbed'])
     const top = base.barSize / 2 - 0.01
     const inside = { ...initBar(), barPos: 0.5, fishPos: 0.5 + top, fishTarget: 0.5 + top }
-    const a = stepBar(inside, false, 20, base, calm)
-    const b = stepBar(inside, false, 20, { ...base, pull: barbed.pull }, calm)
+    const a = stepBar(inside, true, 20, base, calm)
+    const b = stepBar(inside, true, 20, { ...base, pull: barbed.pull }, calm)
     expect(b.barPos).toBeGreaterThan(a.barPos)
     const outside = { ...inside, fishPos: 0.5 + base.barSize, fishTarget: 0.5 + base.barSize }
-    const c = stepBar(outside, false, 20, base, calm)
-    const d = stepBar(outside, false, 20, { ...base, pull: barbed.pull }, calm)
+    const c = stepBar(outside, true, 20, base, calm)
+    const d = stepBar(outside, true, 20, { ...base, pull: barbed.pull }, calm)
     expect(d.barPos).toBe(c.barPos)
   })
   it('barbed만으로는 혼자 다 잡지 못한다: 안 눌러도 빠른 dart 물고기(난이도 .7)는 빠져나간다', () => {
@@ -302,5 +302,113 @@ describe('behavior 시뮬레이션 (난이도 0.5, 60초, 바는 안 누름)', (
         }
       }
     }
+  })
+})
+
+describe('barParams: 더 새 서버가 준 모르는 값', () => {
+  it('모르는 어종이면 throw하지 않고 중립값(난이도 0.5, mixed)', () => {
+    const p = barParams('fish-from-the-future', 2)
+    expect(p.difficulty).toBe(0.5)
+    expect(p.behavior).toBe('mixed')
+    expect(p.barSize).toBeCloseTo(barParams('goby', 2).barSize)
+  })
+  it('모르는 낚싯대 단계면 기본 바(보너스 없음)', () => {
+    const p = barParams('goby', 9 as never)
+    expect(p.barSize).toBeCloseTo(0.22)
+    expect(p.difficulty).toBe(SPECIES.find((s) => s.id === 'goby')!.difficulty)
+  })
+})
+
+/** 60초 동안 strategy로 누른다. 결과와 끝난 시각 */
+function fight(params: BarParams, seedN: number, strategy: (b: Bar, hist: Bar[]) => boolean) {
+  const rng = seeded(seedN)
+  let bar = initBar()
+  const hist: Bar[] = []
+  let t = 0
+  for (; t < 60000 && barResult(bar) === 'playing'; t += 16) {
+    hist.push(bar)
+    bar = stepBar(bar, strategy(bar, hist), 16, params, rng)
+  }
+  return { result: barResult(bar), t, perfect: bar.perfect }
+}
+/** 사람 비슷한 봇: 200ms 늦게 본 물고기·바 위치로 누른다(속도 보정 0.12) */
+const human200 = (_b: Bar, hist: Bar[]) => {
+  const s = hist[Math.max(0, hist.length - 1 - Math.round(200 / 16))]
+  return s.fishPos - s.barPos - 0.12 * s.barVel > 0
+}
+const rate = (params: BarParams, strategy: (b: Bar, hist: Bar[]) => boolean, n: number, seed0: number) => {
+  let caught = 0
+  for (let i = 0; i < n; i++) if (fight(params, seed0 + i, strategy).result === 'caught') caught++
+  return caught / n
+}
+
+describe('안 누르면 잡히지 않는다 (바닥에 내려앉은 바는 줄이 느슨하다)', () => {
+  // 낚싯대 칸 수 안의 찌 조합: 칸 0 → 없음, 1 → 하나씩, 2·3 → 코르크+가시(+함정)까지
+  const combos = (tier: number): TackleId[][] => {
+    const slots = tackleSlots(tier)
+    const out: TackleId[][] = [[]]
+    if (slots >= 1) out.push(['cork'], ['barbed'], ['trap'])
+    if (slots >= 2) out.push(['cork', 'barbed'], ['barbed', 'trap'])
+    if (slots >= 3) out.push(['cork', 'barbed', 'trap'])
+    return out
+  }
+
+  it('모든 어종 × 낚을 수 있는 모든 낚싯대(1~6) × 칸 안의 모든 찌 조합(코르크·가시·함정), 60초 안 누르면 잡히는 비율 ≤ 5% (실제 0)', () => {
+    let worst = 0
+    const seen = new Set<string>()
+    for (const s of SPECIES) {
+      for (const r of RODS) {
+        if (r.tier < s.minRod) continue
+        for (const eq of combos(r.tier)) {
+          const v = rate(barParams(s.id, r.tier, eq), () => false, 20, 500)
+          seen.add(s.behavior)
+          worst = Math.max(worst, v)
+          expect(v, `${s.id} rod ${r.tier} ${eq.join('+')}`).toBeLessThanOrEqual(0.05)
+        }
+      }
+    }
+    expect(worst).toBe(0)
+    expect([...seen].sort()).toEqual(['dart', 'floater', 'mixed', 'sinker', 'smooth'])
+  })
+
+  it('바닥에 막 닿은 바(500ms 안)는 아직 센다: 바닥 근처에서 살살 누르는 것은 봐준다', () => {
+    const params = { barSize: 0.22, difficulty: 0, behavior: 'sinker' as const, drain: 1, pull: 0 }
+    const calm = () => 0.99
+    let bar: Bar = { ...initBar(), barPos: 0.11, fishPos: 0.05, fishTarget: 0.05, progress: 0.5 }
+    bar = stepBar(bar, false, 16, params, calm)
+    expect(bar.progress).toBeGreaterThan(0.5)
+    for (let i = 0; i < 40; i++) bar = stepBar(bar, false, 16, params, calm)
+    const p = bar.progress
+    bar = stepBar(bar, false, 16, params, calm)
+    expect(bar.progress).toBeLessThan(p) // 640ms 뒤에는 느슨해져 줄어든다
+    bar = stepBar(bar, true, 16, params, calm)
+    expect(bar.slackMs).toBe(0)
+  })
+
+  it('가시 바늘은 누를 때만 바를 끈다', () => {
+    const base = { ...barParams('anchovy', 3, ['barbed']), behavior: 'mixed' as const }
+    const calm = () => 0.99
+    const inside = { ...initBar(), barPos: 0.5, fishPos: 0.6, fishTarget: 0.6 }
+    expect(stepBar(inside, false, 20, base, calm).barPos).toBe(stepBar(inside, false, 20, { ...base, pull: 0 }, calm).barPos)
+    expect(stepBar(inside, true, 20, base, calm).barPos).toBeGreaterThan(stepBar(inside, true, 20, { ...base, pull: 0 }, calm).barPos)
+  })
+})
+
+describe('난이도는 그대로 (사람 비슷한 봇의 잡는 비율, 바꾸기 전 구현 3097fc9로 잰 값 ±15%p)', () => {
+  // [어종, 낚싯대, 찌, 옛 구현 잡는 비율(시드 900~939)]
+  const cases: [string, RodTier, TackleId[], number][] = [
+    ['grouper', 3, [], 0], // 전설 다금바리, 가장 낮은 낚싯대
+    ['grouper', 4, ['cork'], 0.6],
+    ['golden-mandarin', 3, ['cork'], 0.275], // 전설 황금 쏘가리
+    ['silver-king-trout', 4, [], 0.15], // 전설 은빛 대왕송어(dart)
+    ['fire-dragonfish', 4, ['cork'], 0.95], // 전설 화룡어(dart)
+    ['lava-eel', 3, [], 0], // 동굴 수입의 대부분
+    ['lava-eel', 6, ['cork'], 0.75],
+    ['rockfish', 1, [], 0.275], // sinker, 바닥 근처에서 살살 눌러야 한다
+    ['yellowtail', 2, [], 0.95], // smooth
+  ]
+  it.each(cases)('%s 낚싯대 %i %j: 옛 값 %f', (id, tier, eq, old) => {
+    const v = rate(barParams(id, tier, eq), human200, 40, 900)
+    expect(Math.abs(v - old)).toBeLessThanOrEqual(0.15)
   })
 })

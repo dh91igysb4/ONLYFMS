@@ -369,7 +369,7 @@ function FishList({ rows, view }: { rows: FishRow[]; view: View }) {
         const s = r.species
         const entry = r.found ? view.dex[s.id] : undefined
         return (
-          <li key={s.id} className={`fish-dex-item${s.legend && !r.found ? ' fish-dex-item-legend' : ''}`}>
+          <li key={s.id} className={`fish-dex-item${s.legend ? ' fish-dex-item-legend' : ''}`}>
             <img src={spriteDataUrl(`fish-${s.id}`, ICON_SCALE, { silhouette: !r.found })} alt={r.found ? s.name : '미발견 물고기'} />
             <span className="fish-dex-info">
               {r.found ? (

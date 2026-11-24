@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { RODS, SPECIES } from './data.ts'
 import { TILE } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
-import { SPRITES, drawSprite } from './sprites.ts'
+import { SILHOUETTE, SPRITES, drawSprite } from './sprites.ts'
+import { PALETTES, PALETTE_IDS } from '../../app/palettes.ts'
 
 const PLAYER_POSES = [
   'player-idle-down',
@@ -410,5 +411,38 @@ describe('큰 지도 표시 스프라이트', () => {
       }
       expect(inked / edge, n).toBeGreaterThanOrEqual(0.5)
     }
+  })
+})
+
+describe('안 잡은 물고기 실루엣', () => {
+  const lum = (hex: string) => {
+    const ch = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+  }
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+
+  it('모든 팔레트(다크·라이트)의 bg·panel 위에서 대비 3:1 이상(그래픽 대비)', () => {
+    for (const id of PALETTE_IDS) {
+      for (const mode of ['dark', 'light'] as const) {
+        for (const bg of ['bg', 'panel'] as const) {
+          const c = PALETTES[id][mode][bg]
+          expect(contrast(SILHOUETTE, c), `${id}/${mode}/${bg}`).toBeGreaterThanOrEqual(3)
+        }
+      }
+    }
+  })
+
+  it('모양만: 실루엣은 색 하나로만 칠한다', () => {
+    const colors = new Set<string>()
+    const fake = { fillStyle: '', fillRect: () => colors.add(fake.fillStyle) }
+    const ctx = fake as unknown as CanvasRenderingContext2D
+    for (const s of SPECIES) drawSprite(ctx, `fish-${s.id}`, 0, 0, 1, { silhouette: true })
+    expect([...colors]).toEqual([SILHOUETTE])
   })
 })

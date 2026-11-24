@@ -304,7 +304,7 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(8)
+    expect(logic.version).toBe(9)
     expect(logic.init()).toEqual({
       gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null,
     })
@@ -427,8 +427,18 @@ describe('fishing WorldLogic', () => {
     for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 4]) {
       expect(err(logic.apply(rich, { type: 'buyBag', tier } as unknown as Action, ctx()))).toBe('bad_tier')
     }
-    const max = deepFreeze(fresh({ gold: 1e6, bagTier: 3 }))
-    expect(err(logic.apply(max, { type: 'buyBag', tier: 4 }, ctx()))).toBe('bad_tier')
+    const max = deepFreeze(fresh({ gold: 1e6, bagTier: 5 }))
+    expect(err(logic.apply(max, { type: 'buyBag', tier: 6 }, ctx()))).toBe('bad_tier')
+  })
+
+  it('고급 가방: 3 → 4(50칸, 50,000), 4 → 5(60칸, 100,000)', () => {
+    expect(err(logic.apply(fresh({ gold: 49_999, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(logic.apply(fresh({ gold: 50_000, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
+    expect(ok(logic.apply(fresh({ gold: 100_000, bagTier: 4 }), { type: 'buyBag', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
+    // 60칸이면 60마리째까지 던지고 61번째는 bag_full
+    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    expect('state' in logic.apply(fresh({ bagTier: 5, bag: fish(59) }), { type: 'cast', area: 'village', power: 0.5 }, ctx())).toBe(true)
+    expect(err(logic.apply(fresh({ bagTier: 5, bag: fish(60) }), { type: 'cast', area: 'village', power: 0.5 }, ctx()))).toBe('bag_full')
   })
 
   it('bagTier 2 allows the 21st..30th fish and rejects the 31st cast with bag_full', () => {
@@ -437,7 +447,7 @@ describe('fishing WorldLogic', () => {
       expect(ok(logic.apply(fresh({ bagTier: 2, bag: fish(n) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBeTruthy()
     }
     expect(err(logic.apply(fresh({ bagTier: 2, bag: fish(30) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
-    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000]])
+    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000], [50, 50_000], [60, 100_000]])
     expect(bagSize(99)).toBe(20)
   })
 
@@ -680,6 +690,26 @@ describe('fishing WorldLogic', () => {
     const rich = deepFreeze(fresh({ gold: 1e6 }))
     for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 5]) {
       expect(err(logic.apply(rich, { type: 'buyRod', tier } as unknown as Action, ctx()))).toBe('bad_tier')
+    }
+  })
+
+  it('고급 낚싯대: 4 → 5(280,000), 5 → 6(620,000), 6에서 더 없음', () => {
+    expect(err(logic.apply(fresh({ gold: 279_999, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(logic.apply(fresh({ gold: 280_000, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 5 })
+    expect(ok(logic.apply(fresh({ gold: 620_000, rodTier: 5 }), { type: 'buyRod', tier: 6 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 6 })
+    expect(err(logic.apply(fresh({ gold: 1e9, rodTier: 6 }), { type: 'buyRod', tier: 7 }, ctx()))).toBe('bad_tier')
+  })
+
+  it('6단계 낚싯대는 찌 3칸, 5단계는 2칸', () => {
+    const all = ['cork', 'spinner', 'curious']
+    expect(ok(logic.apply(fresh({ rodTier: 6, tackles: ['cork', 'spinner', 'curious'] }), { type: 'equip', ids: all }, ctx())).state.equipped).toEqual(all)
+    expect(err(logic.apply(fresh({ rodTier: 5, tackles: ['cork', 'spinner', 'curious'] }), { type: 'equip', ids: all }, ctx()))).toBe('too_many')
+  })
+
+  it('5·6단계 낚싯대로도 4단계와 같은 규칙으로 던진다(전설 포함)', () => {
+    for (const rodTier of [5, 6] as const) {
+      const c = rollCatch(() => 0.01, { rodTier, power: 0.95, sizeBonus: 0, area: 'island', spot: 'sea', cond: cond('summer', 12), legends: [], equipped: [] })
+      expect(c.species).toBe('rainbow-marlin')
     }
   })
 
@@ -1145,6 +1175,21 @@ describe('도전과제', () => {
       'river-rain': { progress: 0, done: false },
       'lake-night': { progress: 2, done: false },
     })
+  })
+
+  it('migrate v8 → v9: 세이브 그대로(고급 장비만 더해졌다)', () => {
+    const v8 = {
+      gold: 123_456, totalEarned: 999_999, rodTier: 4, bagTier: 3, areas: ALL_OPEN,
+      bag: [{ species: 'grouper', sizeCm: 100, perfect: true, locked: true }, { species: 'anchovy', sizeCm: 10, perfect: false }],
+      dex: { grouper: { count: 1, maxCm: 100 }, anchovy: { count: 3, maxCm: 12 } },
+      legends: ['grouper'], tackles: ['cork', 'spinner', 'curious'], equipped: ['spinner', 'curious'],
+      challenges: { 'pier-perfect': { progress: 3, done: true }, 'forest-variety': { progress: 1, seen: ['carp'], done: false } },
+      pending: null,
+    }
+    expect(logic.migrate(v8, 8)).toEqual(v8)
+    // v9 세이브(고급 장비)도 그대로 읽는다
+    const v9 = { ...v8, rodTier: 6, bagTier: 5, equipped: ['cork', 'spinner', 'curious'] }
+    expect(logic.migrate(v9, 9)).toEqual(v9)
   })
 
   it('records: 도전과제 n/6', () => {

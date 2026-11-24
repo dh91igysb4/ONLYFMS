@@ -327,6 +327,49 @@ describe('fishing Game', () => {
     expect(screen.queryByText('새로운 물고기!')).not.toBeInTheDocument()
   })
 
+  test('전설을 잡으면 알림에 "전설의 물고기!"와 "세이브당 한 마리 · 가방에 잠가 뒀어요"', async () => {
+    const view = makeView({ rodTier: 3 })
+    await castAndWait(view, 3000)
+    const fish = { species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
+    route({
+      hook: () => ok(view, { species: 'grouper', sizeCm: 100 }),
+      resolve: () => ok({ ...view, bag: [fish], dex: { grouper: { count: 1, maxCm: 100 } }, legends: ['grouper'] }, { caught: fish }),
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(200 + MIN_FIGHT_MS)
+    expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
+    expect(screen.queryByText('새로운 물고기!')).not.toBeInTheDocument()
+    expect(screen.getByText('세이브당 한 마리 · 가방에 잠가 뒀어요')).toBeInTheDocument()
+    // 보통 물고기(1.2초)보다 오래, 2.5초 보이고 좁은 화면에서 줄을 바꾼다
+    expect(document.querySelector('.fish-toast')).toHaveClass('fish-toast-wrap')
+    await advance(2000)
+    expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
+    await advance(600)
+    expect(screen.queryByText('전설의 물고기!')).not.toBeInTheDocument()
+  })
+
+  test('모르는 어종(더 새 서버)을 잡아도 알림이 죽지 않고 가격 줄만 빠진다', async () => {
+    const view = makeView()
+    await castAndWait(view, 3000)
+    const fish = { species: 'fish-from-the-future', sizeCm: 33, perfect: false }
+    route({
+      hook: () => ok(view, { species: fish.species, sizeCm: 33 }),
+      resolve: () => ok({ ...view, bag: [fish], dex: { [fish.species]: { count: 1, maxCm: 33 } } }, { caught: fish }),
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(200 + MIN_FIGHT_MS)
+    expect(screen.getByText(/fish-from-the-future 33cm/)).toBeInTheDocument()
+    expect(document.querySelector('.fish-toast-price')).toBeNull()
+  })
+
   test('shop: sell calls act sell and updates gold from the response', async () => {
     const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
     await mountAtShop(view)
@@ -377,7 +420,9 @@ describe('fishing Game', () => {
     const rods = screen.getByRole('list', { name: '낚싯대 목록' })
     expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
     expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
-    expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(2)
+    expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
+    // 5·6단계는 고급 장비: 없어도 모든 물고기를 낚는다
+    expect(within(rods).getAllByText('고급 장비 · 없어도 모든 물고기를 낚아요')).toHaveLength(2)
     unmount()
 
     const rich = makeView({ gold: 2000 })
@@ -401,7 +446,7 @@ describe('fishing Game', () => {
   })
 
   test('shop shows the top-tier message when the best rod is owned', async () => {
-    await mountAtShop(makeView({ rodTier: 4 }))
+    await mountAtShop(makeView({ rodTier: 6 }))
     expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '구매' })).not.toBeInTheDocument()
   })
@@ -469,6 +514,32 @@ describe('fishing Game', () => {
     expect(within(dex).queryByText('전설')).not.toBeInTheDocument()
     expect(dex.querySelectorAll('.fish-dex-item-legend')).toHaveLength(1)
     expect(dex.querySelectorAll('.fish-dex-item-legend')[0]).toHaveTextContent('???')
+  })
+
+  test('도감 전설: 잡았든 아니든 테두리, 안 잡으면 "세이브당 한 마리", 잡으면 "세이브당 한 마리 · 잡았어요"', async () => {
+    const { unmount } = await mount(makeView())
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    let dex = screen.getByRole('region', { name: '도감' })
+    expect(dex.querySelectorAll('.fish-dex-item-legend')[0]).toHaveTextContent('세이브당 한 마리')
+    unmount()
+
+    await mount(makeView({ dex: { grouper: { count: 1, maxCm: 90 } }, legends: ['grouper'] }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    dex = screen.getByRole('region', { name: '도감' })
+    const items = dex.querySelectorAll('.fish-dex-item-legend')
+    expect(items).toHaveLength(1)
+    expect(items[0]).toHaveTextContent('다금바리')
+    expect(items[0]).toHaveTextContent('세이브당 한 마리 · 잡았어요')
+  })
+
+  test('가방 전설 칸은 테두리 표시와 이름에 "전설"', async () => {
+    const view = makeView({ bag: [{ species: 'grouper', sizeCm: 100, perfect: false, locked: true }, { species: 'anchovy', sizeCm: 10, perfect: false }] })
+    await mount(view)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    const bag = screen.getByRole('region', { name: '가방' })
+    const legend = within(bag).getByRole('button', { name: /^전설 다금바리 100cm/ })
+    expect(legend).toHaveClass('fish-cell-legend')
+    expect(within(bag).getByRole('button', { name: /^멸치 10cm/ })).not.toHaveClass('fish-cell-legend')
   })
 
   test('bag_full on cast tells the player to go and sell at the shop, with no open-shop button', async () => {
@@ -1539,11 +1610,11 @@ describe('fishing Game: walking and interaction', () => {
     expect(within(bags).getByText('골드가 부족해요')).toBeInTheDocument()
     unmount()
 
-    await mountAtShop(makeView({ gold: 99999, bagTier: 3, rodTier: 1 }))
+    await mountAtShop(makeView({ gold: 99999, bagTier: 5, rodTier: 1 }))
     const top = screen.getByRole('list', { name: '가방 목록' })
     expect(within(top).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getByText('최고 단계예요')).toBeInTheDocument()
-    expect(screen.getByText('0/40')).toBeInTheDocument()
+    expect(screen.getByText('0/60')).toBeInTheDocument()
   })
 
   test('unmount releases the scene background cache', async () => {

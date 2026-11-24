@@ -140,6 +140,46 @@ describe('new tile kinds', () => {
   })
 })
 
+describe('물 속 바위', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+  // 가운데(2,2) 바위를 그 물로 둘러싼다. 아래 두 줄은 걸을 땅
+  const pool = (ch: string) => [',,,,,', `,${ch}${ch}${ch},`, `,${ch}o${ch},`, `,${ch}${ch}${ch},`, ',,,,,']
+  const cases: [string, string, string][] = [
+    ['r', 'river', 'river'],
+    ['p', 'pond', 'pond'],
+    ['k', 'lake', 'lake'],
+    ['l', 'lagoon', 'lagoon'],
+    ['L', 'lava', 'lava'],
+    ['u', 'cave-pool', 'cave-pool'],
+    ['~', 'water', 'water'],
+  ]
+  test.each(cases)('%s 물 속 바위는 그 물(%s) 위에 그린다', (ch, sprite) => {
+    const m = defineMap('river', pool(ch))
+    const size = { w: 195, h: 280 }
+    const p = player(tileCentre(0, 0))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    const at = ctx.sprites.filter((c) => c.x === 2 * 16 - cam.x && c.y === 2 * 16 - cam.y).map((c) => c.name)
+    expect(at).toContainEqual(expect.stringMatching(new RegExp(`^${sprite}-[01]$`)))
+    if (sprite !== 'water') expect(at.some((n) => /^water-[01]$/.test(n))).toBe(false)
+    // 바위는 물 위 작은 바위 그림
+    expect(ctx.sprites.some((c) => c.name === 'rock')).toBe(true)
+  })
+  test('물 종류가 섞이면 이웃(상하좌우)에 가장 많은 물', () => {
+    const m = defineMap('river', [',,,,,', ',rrr,', ',~or,', ',rrr,', ',,,,,'])
+    const size = { w: 195, h: 280 }
+    const p = player(tileCentre(0, 0))
+    const cam = cameraFor(m, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: m, camera: cam }, size)
+    const at = ctx.sprites.filter((c) => c.x === 2 * 16 - cam.x && c.y === 2 * 16 - cam.y).map((c) => c.name)
+    expect(at).toContainEqual(expect.stringMatching(/^river-[01]$/))
+  })
+})
+
 describe('drawWorld without an offscreen canvas (direct drawing)', () => {
   beforeEach(() => {
     // jsdom처럼 오프스크린 캔버스 컨텍스트가 없으면 보이는 타일만 직접 그린다

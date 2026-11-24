@@ -1944,7 +1944,7 @@ const SEASON_WINTER = sprite({ w: '#cfeeff', W: '#ffffff' }, [
   '...w...',
 ])
 
-// ── 낚싯대 4종: 왼쪽 아래 손잡이 → 오른쪽 위 끝 ──
+// ── 낚싯대 6종: 왼쪽 아래 손잡이 → 오른쪽 위 끝 ──
 const ROD_1 = sprite({ k: '#2b2118', a: '#e2c27a', b: '#8f7438', h: '#7a5a3a', H: '#a07a4e', l: '#f4f4f4' }, [
   '..............k.',
   '.............kak',
@@ -2026,6 +2026,52 @@ const ROD_4 = sprite(
     '.kYykHk.........',
     '..kkhHk.........',
     '.kyhk...........',
+    'kkk.............',
+  ],
+)
+
+// 5단계 백골 낚싯대: 상아색 뼈 마디 대, 끝에 작은 해골 장식, 가죽 감은 손잡이
+const ROD_5 = sprite(
+  { k: '#2a2420', a: '#ece4cc', A: '#c9bd98', j: '#fffaf0', w: '#f4eedc', h: '#4a3a2e', H: '#6e5644' },
+  [
+    '..........kkkkk.',
+    '.........kwwwwwk',
+    '.........kwkwkwk',
+    '.........kwwwwwk',
+    '..........kwkwk.',
+    '..........kak...',
+    '.........kjk....',
+    '........kak.....',
+    '.......kAk......',
+    '......kjk.......',
+    '..kkkkak........',
+    '.khHkkk.........',
+    '.kHhkjk.........',
+    '..kkhHk.........',
+    '.khHk...........',
+    'kkk.............',
+  ],
+)
+
+// 6단계 용왕의 낚싯대: 비취색 대에 금 비늘 마디, 붉은 옻칠 손잡이, 끝에 진주
+const ROD_6 = sprite(
+  { k: '#0c1f18', a: '#1f8a6a', A: '#49c49a', y: '#e8c050', p: '#f4f0ff', P: '#b8b0d8', r: '#7a1e2a', R: '#b83a48' },
+  [
+    '.............pp.',
+    '.............pP.',
+    '............kAk.',
+    '...........kyk..',
+    '..........kak...',
+    '.........kAk....',
+    '........kyk.....',
+    '.......kak......',
+    '......kAk.......',
+    '.....kyk........',
+    '..kkkak.........',
+    '.kyykkk.........',
+    '.kRrkyk.........',
+    '..krRk..........',
+    '.kRrk...........',
     'kkk.............',
   ],
 )
@@ -3546,6 +3592,8 @@ export const SPRITES: Record<string, Sprite> = {
   'rod-2': ROD_2,
   'rod-3': ROD_3,
   'rod-4': ROD_4,
+  'rod-5': ROD_5,
+  'rod-6': ROD_6,
   'tackle-cork': TACKLE_CORK,
   'tackle-trap': TACKLE_TRAP,
   'tackle-barbed': TACKLE_BARBED,
@@ -3570,7 +3618,8 @@ export const SPRITES: Record<string, Sprite> = {
   'map-teleporter': MAP_TELEPORTER,
 }
 
-const SILHOUETTE = '#1b1f2a'
+/** 안 잡은 물고기 실루엣 색(모양만). 중간 밝기라 모든 팔레트의 어두운·밝은 패널에서 대비 3:1 이상(sprites.test) */
+export const SILHOUETTE = '#767e90'
 
 export function drawSprite(
   ctx: CanvasRenderingContext2D,

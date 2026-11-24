@@ -7,10 +7,13 @@ import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
 const ICON_SCALE = 2
+/** 이 단계까지가 기본 낚싯대. 그 위(5·6단계)는 어떤 어종에도 필요 없는 고급 장비 */
+const PREMIUM_ROD = Math.max(...SPECIES.map((s) => s.minRod))
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
 const knownSpecies = (id: string) => SPECIES.some((s) => s.id === id)
+const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
 /** 화면용 가격: 모르는 어종이면 null(price는 모르는 id에 throw한다) */
 const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }): number | null =>
   knownSpecies(f.species) ? price(f.species, f.sizeCm, f.perfect) : null
@@ -92,9 +95,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
             <li key={i} className="fish-cell-slot">
               <button
                 type="button"
-                className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}`}
+                className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}${isLegend(f.species) ? ' fish-cell-legend' : ''}`}
                 aria-pressed={!!f.locked}
-                aria-label={`${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
+                aria-label={`${isLegend(f.species) ? '전설 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
                 disabled={busy}
                 onClick={() => onLock(i, !f.locked)}
               >
@@ -149,6 +152,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
               <div className="fish-rod-info">
                 <strong>{rod.name}</strong>
                 <span className="muted">{rod.price === 0 ? '기본' : gold(rod.price)}</span>
+                {rod.tier > PREMIUM_ROD && !owned && <span className="muted">고급 장비 · 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
                 {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
@@ -403,7 +407,7 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
         {inArea(active.id).map((s) => {
           const entry = view.dex[s.id]
           return (
-            <li key={s.id} className={`fish-dex-item${s.legend && !entry ? ' fish-dex-item-legend' : ''}`}>
+            <li key={s.id} className={`fish-dex-item${s.legend ? ' fish-dex-item-legend' : ''}`}>
               <img
                 src={spriteDataUrl(`fish-${s.id}`, ICON_SCALE, { silhouette: !entry })}
                 alt={entry ? s.name : '미발견 물고기'}
@@ -419,8 +423,14 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
                       {entry.count}마리 · 최대 {entry.maxCm}cm
                     </span>
                     <span className="muted">{conditionLabel(s)}</span>
+                    {s.legend && <span className="muted">세이브당 한 마리 · 잡았어요</span>}
                   </span>
                 </>
+              ) : s.legend ? (
+                <span className="fish-dex-info">
+                  <strong className="muted">???</strong>
+                  <span className="muted">세이브당 한 마리</span>
+                </span>
               ) : (
                 <strong className="muted">???</strong>
               )}

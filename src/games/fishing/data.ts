@@ -26,8 +26,10 @@ export type Species = {
   /** 전설 어종. power는 이 어종이 나오는 데 필요한 최소 던지기 힘 (rollCatch가 확인한다) */
   legend?: { power: number }
 }
+/** 낚싯대 단계. 5·6단계는 6단계 마무리에서 더한 고급 장비(어종 minRod는 1~4라 4단계로 모든 어종을 낚는다) */
+export type RodTier = 1 | 2 | 3 | 4 | 5 | 6
 export type Rod = {
-  tier: 1 | 2 | 3 | 4
+  tier: RodTier
   name: string
   price: number
   barBonus: number
@@ -143,6 +145,9 @@ export const RODS: Rod[] = [
   { tier: 2, name: '유리섬유 낚싯대', price: 1500, barBonus: 0.15, biteScale: 1, weights: { common: 55, uncommon: 33, rare: 12 } },
   { tier: 3, name: '카본 낚싯대', price: 8000, barBonus: 0.3, biteScale: 1, weights: { common: 50, uncommon: 34, rare: 16 } },
   { tier: 4, name: '명장의 낚싯대', price: 40000, barBonus: 0.45, biteScale: 0.8, weights: { common: 46, uncommon: 34, rare: 20 } },
+  // 고급 장비(6단계 마무리): 어떤 어종에도 필요 없고, 버는 속도만 조금씩 올린다(효과는 갈수록 작게)
+  { tier: 5, name: '백골 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
+  { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]
 
 /** 지역·자리·계절·시간·날씨·낚싯대 조건을 모두 만족하는가. legend.power는 보지 않는다. */
@@ -159,10 +164,14 @@ export function areaHasSpecies(area: AreaId): boolean {
   return SPECIES.some((s) => s.area === area)
 }
 
-export const BAGS: readonly { tier: 1 | 2 | 3; size: number; price: number }[] = [
+export type BagTier = 1 | 2 | 3 | 4 | 5
+export const BAGS: readonly { tier: BagTier; size: number; price: number }[] = [
   { tier: 1, size: 20, price: 0 },
   { tier: 2, size: 30, price: 800 },
   { tier: 3, size: 40, price: 5000 },
+  // 고급 가방(6단계 마무리)
+  { tier: 4, size: 50, price: 50000 },
+  { tier: 5, size: 60, price: 100000 },
 ]
 /** 모르는 tier는 기본 가방(20칸) */
 export function bagSize(tier: number): number {
@@ -185,8 +194,8 @@ export const TACKLES: readonly Tackle[] = [
   { id: 'spinner', name: '회전 찌', price: 1500, desc: '입질이 30% 빨리 와요' },
   { id: 'curious', name: '호기심 찌', price: 5000, desc: '희귀·전설 물고기가 더 잘 나와요' },
 ]
-/** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장 2칸 */
+/** 낚싯대 단계별 찌 칸 수. 1·2단계 0칸, 카본 1칸, 명장·백골 2칸, 용왕 3칸 */
 export function tackleSlots(rodTier: number): number {
-  return rodTier === 3 ? 1 : rodTier === 4 ? 2 : 0
+  return rodTier === 3 ? 1 : rodTier === 4 || rodTier === 5 ? 2 : rodTier === 6 ? 3 : 0
 }
 export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5 } as const
