@@ -71,11 +71,36 @@ describe('joinWorldRoom', () => {
   test('둘이면 tick이 위치를 보낸다', () => {
     const r = joinWorldRoom('fishing', 'village', 'me')
     expect(r.count()).toBe(1)
+    fake.status?.('SUBSCRIBED')
     sync('me', 'u2')
     expect(r.count()).toBe(2)
     r.tick(5000, me)
     expect(fake.send).toHaveBeenCalledTimes(1)
     expect(fake.send).toHaveBeenCalledWith({ type: 'broadcast', event: 'pos', payload: { ...me, t: 5000 } })
+  })
+
+  test('구독 뒤 연결이 끊기면(CHANNEL_ERROR·CLOSED) 보내지 않고 인원을 1로 되돌린다', () => {
+    for (const status of ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']) {
+      fake.send.mockReset()
+      const r = joinWorldRoom('fishing', 'village', 'me')
+      fake.status?.('SUBSCRIBED')
+      sync('me', 'u2')
+      fake.status?.(status)
+      expect(r.count(), status).toBe(1)
+      r.tick(9000, me)
+      expect(fake.send, status).not.toHaveBeenCalled()
+      fake.status?.('SUBSCRIBED')
+      sync('me', 'u2')
+      r.tick(20000, me)
+      expect(fake.send, status).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  test('구독 전에는 프레즌스가 있어도 보내지 않는다', () => {
+    const r = joinWorldRoom('fishing', 'village', 'me')
+    sync('me', 'u2')
+    r.tick(5000, me)
+    expect(fake.send).not.toHaveBeenCalled()
   })
 
   test('혼자면 보내지 않는다', () => {

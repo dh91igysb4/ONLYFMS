@@ -2850,6 +2850,18 @@ describe('fishing Game: 온라인(같은 지역 친구)', () => {
     expect(roomGate.joins).toHaveLength(1)
   })
 
+  test('탭이 숨으면 방을 나가고, 돌아오면 다시 들어간다', async () => {
+    await mount(makeView(), SAND)
+    await advance(50)
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(roomGate.joins[0].room.leave).toHaveBeenCalledTimes(1)
+    vis.mockReturnValue('visible')
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await advance(50)
+    expect(roomGate.joins.map((j) => j.area)).toEqual(['village', 'village'])
+  })
+
   test('화면을 떠나면 방을 나간다', async () => {
     const { unmount } = await mount(makeView(), SAND)
     await advance(50)

@@ -972,7 +972,18 @@ export function Game({ gameId }: WorldGameProps) {
       running = false
       cancelAnimationFrame(raf)
     }
-    const onVisibility = () => (document.visibilityState === 'hidden' ? stop() : start())
+    // 숨은 탭은 프레임이 멈춰 위치를 못 보내므로 실시간 방에서도 나간다(남아 있으면 친구가 혼자인데도 보내게 된다).
+    // 돌아오면 다음 프레임이 다시 들어간다
+    const leaveRoom = () => {
+      roomRef.current?.room.leave()
+      roomRef.current = null
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        stop()
+        leaveRoom()
+      } else start()
+    }
     document.addEventListener('visibilitychange', onVisibility)
     start()
     return () => {

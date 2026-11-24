@@ -25,6 +25,8 @@ export function joinWorldRoom(gameId: string, areaId: string, selfId: string): W
   let present = new Set<string>([selfId])
   let clock = newSendClock()
   let left = false
+  // 소켓이 붙어 있을 때만 보낸다. 끊긴 채 send하면 realtime-js가 매번 REST로 보내 사용량·지연이 생긴다
+  let subscribed = false
   let channel: ReturnType<typeof supabase.channel> | null = null
 
   try {
@@ -40,8 +42,14 @@ export function joinWorldRoom(gameId: string, areaId: string, selfId: string): W
       prunePeers(book, Date.now(), present)
     })
     ch.subscribe((status: string) => {
-      if (status === 'SUBSCRIBED') void Promise.resolve(ch.track({ id: selfId })).catch(() => {})
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('world room: realtime', status)
+      if (status === 'SUBSCRIBED') {
+        subscribed = true
+        void Promise.resolve(ch.track({ id: selfId })).catch(() => {})
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        subscribed = false
+        present = new Set([selfId])
+        if (status !== 'CLOSED') console.warn('world room: realtime', status)
+      }
     })
     channel = ch
   } catch (e) {
@@ -51,7 +59,7 @@ export function joinWorldRoom(gameId: string, areaId: string, selfId: string): W
 
   return {
     tick(now, me) {
-      if (!channel || left) return
+      if (!channel || left || !subscribed) return
       // 시간 초과만 여기서 정리한다(프레즌스 반영이 위치 메시지보다 늦게 와도 새 친구가 깜빡이지 않게)
       prunePeers(book, Date.now(), new Set(book.keys()))
       const sig = sigOf(me)
