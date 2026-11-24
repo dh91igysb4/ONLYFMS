@@ -610,6 +610,9 @@ function records(state: State): WorldRecord[] {
   ]
 }
 
+/** 메인 미리보기용 열린 지역 기록의 키(game_records, detail = 쉼표로 이은 지역 id). 메인 미리보기 설계 §6 */
+export const PREVIEW_AREAS_KEY = 'areas'
+
 export const logic: WorldLogic<State, Action, View> = {
   // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
   // 10: 옷장(wardrobe·outfit, buyWear·wear). v9 세이브는 빈 옷장·기본 옷차림
@@ -633,6 +636,7 @@ export const logic: WorldLogic<State, Action, View> = {
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),
+  previewData: (state) => ({ [PREVIEW_AREAS_KEY]: state.areas.join(',') }),
   freeBonus,
 }
 

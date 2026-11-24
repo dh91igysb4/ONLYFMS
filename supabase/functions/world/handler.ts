@@ -218,6 +218,8 @@ async function run(
         do update set value = excluded.value, updated_at = now()`
     }
   }
+  // 메인 미리보기 값(메인 미리보기 설계 §6): 요청마다 계산해 저장된 detail과 다른 키만 쓴다(배포 뒤 첫 load에서도 채워진다)
+  if (logic.previewData) await syncPreviewData(tx, uid, gameId, logic.previewData(state))
   if (!wallet) return out(200, { view: logic.view(state, { now, gold: 0 }), result, server_now: now })
   const body: Record<string, unknown> = { view: logic.view(state, { now, gold }), result, server_now: now, gold }
   if (capped) body.gold_capped = capped
@@ -229,6 +231,23 @@ async function writeSave(tx: Tx, uid: string, gameId: string, state: unknown, ve
     update public.world_saves
        set state = ${tx.json(state as never)}, logic_version = ${version}, updated_at = now()
      where user_id = ${uid} and game_id = ${gameId}`
+}
+
+async function syncPreviewData(tx: Tx, uid: string, gameId: string, data: Record<string, string>) {
+  const keys = Object.keys(data)
+  if (keys.length === 0) return
+  const cur = await tx<{ key: string; detail: string | null }[]>`
+    select key, detail from public.game_records
+     where user_id = ${uid} and game_id = ${gameId} and key = any(${keys})`
+  const have = new Map(cur.map((r) => [r.key, r.detail]))
+  for (const key of keys) {
+    if (have.get(key) === data[key]) continue
+    await tx`
+      insert into public.game_records (user_id, game_id, key, value, detail)
+      values (${uid}, ${gameId}, ${key}, 0, ${data[key]})
+      on conflict (user_id, game_id, key)
+      do update set value = excluded.value, detail = excluded.detail, updated_at = now()`
+  }
 }
 
 async function writeAvatar(tx: Tx, uid: string, gameId: string, avatar: string) {

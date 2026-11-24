@@ -59,6 +59,8 @@ export type Manifest = {
   records?: { key: string; label: string; unit?: string }[]
   /** 지속형 게임이 프로필 요약 탭에 캐릭터를 보여 준다(`WorldLogic.avatar`·`getAvatarComponent`와 함께). label은 제목 */
   avatar?: { label: string }
+  /** 지속형 게임이 메인 화면 미리보기를 그린다(`getWorldPreview`와 함께). 메인 미리보기 설계 §5.1 */
+  preview?: true
   /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
   duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
   /**
@@ -149,6 +151,11 @@ export interface WorldLogic<State, Action, View> {
    * `game_records`의 키 `AVATAR_RECORD_KEY`(값 0, detail = 이 문자열)에 쓰고, 화면 `getAvatarComponent`가 읽는다.
    */
   avatar?(state: State): string
+  /**
+   * 메인 미리보기에 쓸 짧은 값들(메인 미리보기 설계 §6). world 함수가 요청마다 계산해 키마다 `game_records` 한 행
+   * (값 0, detail = 문자열)으로, 저장된 값과 다를 때만 쓴다. 키는 manifest records·`AVATAR_RECORD_KEY`·`FREE_BONUS_RECORD_KEY`와 겹치면 안 된다.
+   */
+  previewData?(state: State): Record<string, string>
   /** 옛 세이브 안에 들어 있던 골드(0 이상 정수). 세이브 버전이 바뀔 때 핸들러가 한 번 지갑으로 옮긴다 */
   legacyGold?(raw: unknown, fromVersion: number): number
   /**

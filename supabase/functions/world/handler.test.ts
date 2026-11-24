@@ -96,6 +96,7 @@ const worlds = new Map<string, WorldModule>([
   ['test-world-avatar', { manifest: { ...manifest('test-world-avatar', false), avatar: { label: '캐릭터' } }, logic: { ...base, avatar: (state: S) => `look-${state.n}` } }],
   ['test-world-bonus', { manifest: manifest('test-world-bonus', false), logic: { ...base, freeBonus: (state: S) => state.n * 10 } }],
   ['test-world-badbonus', { manifest: manifest('test-world-badbonus', false), logic: { ...base, freeBonus: () => -1 } }],
+  ['test-world-preview', { manifest: manifest('test-world-preview', false), logic: { ...base, previewData: (state: S) => ({ p1: `t-${state.n}`, p2: 'fixed' }) } }],
   ['test-world-avatar-fixed', { manifest: { ...manifest('test-world-avatar-fixed', false), avatar: { label: '캐릭터' } }, logic: { ...base, version: 2, avatar: () => 'same' } }],
 ])
 const registry = { getWorld: (id: string) => worlds.get(id) }
@@ -404,7 +405,7 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   assert.equal(tp.status, 400)
   assert.equal(tp.body.error, 'not_open')
   const rows = await sql`select key from public.game_records where user_id = ${admin} and game_id = ${game} order by key`
-  assert.deepEqual(rows.map((r) => r.key), ['avatar', 'biggest', 'challenges', 'dex', 'free_bonus', 'total_earned'])
+  assert.deepEqual(rows.map((r) => r.key), ['areas', 'avatar', 'biggest', 'challenges', 'dex', 'free_bonus', 'total_earned'])
 })
 
 // ---------------------------------------------------------------- 자유 플레이 골드 보너스 (지갑 설계 §7.5)
@@ -752,6 +753,58 @@ t('wallet concurrent force-spend across two wallet games: one 400, balance 20', 
   const rs = await Promise.all([act(v, { type: 'force', n: -80 }, W), act(v, { type: 'force', n: -80 }, W2)])
   assert.deepEqual(rs.map((r) => r.status).sort(), [200, 400])
   assert.equal(await balance(v), 20)
+})
+
+
+
+// ---------------------------------------------------------------- previewData (메인 미리보기 설계 §6)
+async function previewRows(uid: string, game: string) {
+  return await sql<{ key: string; detail: string | null; at: Date }[]>`
+    select key, detail, updated_at as at from public.game_records
+     where user_id = ${uid} and game_id = ${game} and key in ('p1', 'p2') order by key`
+}
+
+t('previewData: rows written on the first load (new save)', async () => {
+  const u = await user()
+  await load(u, 'test-world-preview')
+  const rows = await previewRows(u, 'test-world-preview')
+  assert.deepEqual(rows.map((r) => [r.key, r.detail]), [['p1', 't-0'], ['p2', 'fixed']])
+})
+
+t('previewData: an act that changes a value updates only that row', async () => {
+  const u = await user()
+  await load(u, 'test-world-preview')
+  await sql`update public.game_records set updated_at = '2000-01-01T00:00:00Z' where user_id = ${u} and game_id = 'test-world-preview'`
+  await act(u, { type: 'inc' }, 'test-world-preview')
+  const rows = await previewRows(u, 'test-world-preview')
+  assert.deepEqual(rows.map((r) => r.detail), ['t-1', 'fixed'])
+  assert.ok(rows[0].at.getTime() > Date.parse('2001-01-01'), 'p1 rewritten')
+  assert.equal(rows[1].at.getTime(), Date.parse('2000-01-01T00:00:00Z'), 'p2 untouched')
+})
+
+t('previewData: a load fills rows for an existing save that has none (after deploy, no migrate)', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${u}, 'test-world-preview', ${sql.json({ n: 4 })}, 1)`
+  await load(u, 'test-world-preview')
+  const rows = await previewRows(u, 'test-world-preview')
+  assert.deepEqual(rows.map((r) => r.detail), ['t-4', 'fixed'])
+})
+
+t('previewData: a failed act leaves rows unchanged', async () => {
+  const u = await user()
+  await load(u, 'test-world-preview')
+  await sql`update public.game_records set detail = 'kept' where user_id = ${u} and game_id = 'test-world-preview' and key = 'p1'`
+  const r = await act(u, { type: 'bad' }, 'test-world-preview')
+  assert.equal(r.status, 400)
+  const rows = await previewRows(u, 'test-world-preview')
+  assert.equal(rows[0].detail, 'kept')
+})
+
+t('previewData: no rows for a world without previewData()', async () => {
+  const u = await user()
+  await act(u, { type: 'inc' })
+  const rows = await previewRows(u, 'test-world')
+  assert.equal(rows.length, 0)
 })
 
 t('teardown', async () => {

@@ -4,7 +4,7 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, freeBonus, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { challengeMatches, freeBonus, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -2014,5 +2014,16 @@ describe('freeBonus: 깬 도전과제의 미니게임 골드 보너스', () => {
     const s = fresh({ challenges: { 'pier-perfect': { progress: 2, done: false } } })
     expect(logic.freeBonus!(s)).toBe(0)
     expect(logic.freeBonus!(fresh({ challenges: done(['pier-perfect']) }))).toBe(20)
+  })
+})
+
+describe('previewData (메인 미리보기 설계 §6)', () => {
+  it('처음 세이브 → { areas: 기본 지역 쉼표 목록 }, 키는 PREVIEW_AREAS_KEY', () => {
+    expect(PREVIEW_AREAS_KEY).toBe('areas')
+    expect(logic.previewData?.(logic.init())).toEqual({ areas: DEFAULT_AREAS.join(',') })
+  })
+  it('지역을 연 상태 → 그 id가 목록에 들어간다', () => {
+    const s = { ...logic.init(), areas: [...DEFAULT_AREAS, 'lake' as AreaId] }
+    expect(logic.previewData?.(s)?.areas.split(',')).toContain('lake')
   })
 })
