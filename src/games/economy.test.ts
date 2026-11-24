@@ -27,10 +27,10 @@ import { games } from './index.ts'
 test('경제 상수 (설계 §4)', () => {
   expect(REF).toBe(20500)
   expect(DAILY_SOFT_CAP).toBe(30750)
-  expect(SOFT_CAP_RATE).toBe(0.2)
+  expect(SOFT_CAP_RATE).toBe(0.75)
   expect(DAILY_SOFT_CAP_2).toBe(41000)
-  expect(SOFT_CAP_RATE_2).toBe(0.04)
-  expect(SOFT_CAP_TIERS).toEqual([[30750, 1], [41000, 0.2], [Infinity, 0.04]])
+  expect(SOFT_CAP_RATE_2).toBe(0.5)
+  expect(SOFT_CAP_TIERS).toEqual([[30750, 1], [41000, 0.75], [Infinity, 0.5]])
 })
 
 test('softCap: _gold_move와 같은 식 (설계 §5.6)', () => {
