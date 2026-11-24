@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { FREE_DAILY_CAP } from './economy.ts'
 import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
 import { AVATAR_RECORD_KEY, FREE_BONUS_RECORD_KEY } from './types.ts'
+import { getWorldPreview } from './ui.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -234,4 +235,21 @@ test('manifest gold는 자유 플레이 게임에만, dailyCap = FREE_DAILY_CAP 
     // numeric(10,4)에 그대로 들어가는 값
     expect(Math.round(m.gold.perPoint * 10000) / 10000, m.id).toBe(m.gold.perPoint)
   }
+})
+
+test('world previewData keys are not record, avatar or free_bonus keys', () => {
+  for (const w of worlds) {
+    const keys = Object.keys(w.logic.previewData?.(w.logic.init()) ?? {})
+    const taken = [...(w.manifest.records ?? []).map((r) => r.key), AVATAR_RECORD_KEY, FREE_BONUS_RECORD_KEY]
+    for (const k of keys) expect(taken, `${w.manifest.id}:${k}`).not.toContain(k)
+  }
+})
+
+test('solo and duel modules have no preview', () => {
+  for (const g of [...games, ...duels]) expect(g.manifest.preview).toBeUndefined()
+})
+
+test('world preview: manifest preview ⇔ getWorldPreview', () => {
+  for (const w of worlds) expect(!!w.manifest.preview, w.manifest.id).toBe(!!getWorldPreview(w.manifest.id))
+  expect(worlds.some((w) => w.manifest.preview)).toBe(true)
 })

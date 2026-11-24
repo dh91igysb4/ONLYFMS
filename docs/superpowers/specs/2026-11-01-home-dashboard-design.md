@@ -1,7 +1,7 @@
 # 홈 대시보드 설계
 
 - 날짜: 2026-11-01
-- 상태: 초안 (사용자 검토 전)
+- 상태: **대체됨** (2026-11-24) — 메인은 `2026-11-24-home-valley-design.md`(밸리 미리보기 + 바로가기 버튼)로 바뀌었다. 블록 코드는 지웠고 `profiles.home_layout`·`set_home_layout`은 DB에만 남아 있다.
 - 관련: 플랫폼 설계 `2026-10-31-onlyfms-platform-design.md`, 대전 설계 `2026-11-01-duel-platform-design.md`, 팔레트 설계 `2026-11-01-appearance-palettes-design.md`
 
 ## 1. 목표

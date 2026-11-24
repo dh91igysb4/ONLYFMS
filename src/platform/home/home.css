@@ -1,13 +1,19 @@
-/* 홈 대시보드 배치. 폰은 한 열, 900px 이상은 두 열. 색은 theme 토큰만. */
-.home-grid { display: flex; flex-direction: column; gap: 10px; }
-@media (min-width: 900px) {
-  .home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+/* 메인 화면(메인 미리보기 설계 §4). 폰·넓은 화면 모두 세로 한 열, 최대 480px 가운데. 색은 theme 토큰만. */
+.home { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 480px; margin: 0 auto; }
+.home-valley-box { width: 100%; display: flex; justify-content: center; }
+.home-valley { position: relative; display: block; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--edge); background: var(--panel); }
+.home-valley:focus-visible { outline: 2px solid var(--accent-edge); outline-offset: 2px; }
+.home-valley-enter { position: absolute; right: 8px; bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--panel); color: var(--ink); font-size: 13px; box-shadow: inset 0 0 0 1px var(--edge); }
+.home-valley-fallback { width: 100%; }
+
+/* 메인 바로가기 버튼(메인 미리보기 설계 §4.2). 이름만, 오른쪽 끝에 할 일 표시. 폰 2열, 900px 이상 3열 */
+.home-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 900px) { .home-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.home-shortcut {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 48px; padding: 10px 14px;
+  border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--ink);
+  text-decoration: none; font-weight: 600;
 }
-
-/* 편집 모드 한 줄. 꺼진 블록은 흐리게 */
-.home-edit-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); }
-.home-edit-row[data-off="true"] { opacity: 0.5; }
-
-/* 블록 안 목록 */
-.home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.home-list .me { color: var(--accent-strong); font-weight: 700; }
+.home-shortcut:hover, .home-shortcut:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-edge); }
+.home-shortcut-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-shortcut-mark { flex: none; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--lime); color: var(--on-accent); font-size: 13px; text-align: center; }
