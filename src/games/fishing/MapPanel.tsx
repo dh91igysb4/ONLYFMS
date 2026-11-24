@@ -2,6 +2,7 @@
 // 축소 그림(<img>, 지역별 캐시) 위에 표시 버튼을 퍼센트 좌표로 띄우고, 아래 상세 칸에 고른 것의 정보를 보인다.
 // 안 잡은 물고기는 실루엣·등급·"지금" 칩만(이름·그림·조건은 alt·aria-label 어디에도 없다).
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import type { OnlinePeer } from '../../platform/world/presence.ts'
 import { AREAS, RODS, rodAtLeast, UNLOCKS, type AreaId, type Rarity } from './data.ts'
 import { LOW_TIDE_HOURS, SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
@@ -71,12 +72,14 @@ type MapPanelProps = {
   innerWidth: number
   layers: MapLayers
   onLayers(next: MapLayers): void
+  /** 다른 지역까지 포함한 접속 중 친구(나 제외, 온라인 2단계-1). 탭 인원 수와 지도 위 점 */
+  online?: OnlinePeer[]
 }
 
 /** 머리줄·목록 갱신 단위: 시계 표시(10분) 또는 날짜·계절·날씨가 바뀔 때만 새 값 */
 const condKey = (c: Conditions) => `${c.gameDay}|${formatClock(c.gameMinute)}|${c.season}|${c.weather}`
 
-export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapPanelProps) {
+export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online = [] }: MapPanelProps) {
   const [tab, setTab] = useState<AreaId>(here.area)
   const [pick, setPick] = useState<Pick | null>(null)
   /** 지금 지역 탭에서 가는 길을 강조할 마지막으로 본 다른 지역 */
@@ -140,6 +143,7 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapP
               onClick={() => goTab(a.id)}
             >
               {open ? `${a.name} ${fishBadge(areaRows[a.id], filter)}` : `${a.name} · 잠김`}
+              {friendBadge(online, a.id)}
             </button>
           )
         })}
@@ -173,6 +177,7 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapP
           onPick={setPick}
           onTab={goTab}
           lastOther={lastOther}
+          friends={online.filter((p) => p.area === tab)}
         />
       ) : (
         <LockedArea area={tab} rows={filterFish(lockedRows(areaRows[tab]), filter)} view={view} onTab={goTab} />
@@ -182,6 +187,12 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers }: MapP
 }
 
 /** 잠긴 지역 목록은 등급만: 거기서는 던질 수 없으므로 "지금"도, 안 나오는 이유도 없다 */
+/** 탭 이름 뒤 그 지역 친구 수(0이면 없음) */
+function friendBadge(online: readonly OnlinePeer[], area: AreaId): string {
+  const n = online.filter((p) => p.area === area).length
+  return n > 0 ? ` · 친구 ${n}` : ''
+}
+
 const lockedRows = (rows: readonly FishRow[]): FishRow[] => rows.map((r) => ({ ...r, now: false, reason: null }))
 
 function Chip({ on, onClick, children }: { on: boolean; onClick(): void; children: string }) {
@@ -209,9 +220,10 @@ type OpenProps = {
   onPick(p: Pick | null): void
   onTab(a: AreaId, p?: Pick | null): void
   lastOther: AreaId | null
+  friends: OnlinePeer[]
 }
 
-function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows, filter, filtering, layers, innerWidth, pick, onPick, onTab, lastOther }: OpenProps) {
+function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows, filter, filtering, layers, innerWidth, pick, onPick, onTab, lastOther, friends }: OpenProps) {
   const map = mapFor(area)!
   const k = minimapScale(innerWidth, map)
   const P = MINIMAP_PX * k
@@ -292,6 +304,11 @@ function OpenArea({ area, view, here, opened, cond, hourKey, fishView, areaRows,
             </button>
           )
         })}
+        {friends.map((f) => (
+          <div key={f.id} className="fish-map-friend" style={pos(f.tx, f.ty, YOU_HALF)} role="img" aria-label={`${f.handle} 위치`}>
+            <span className="fish-map-friend-name">{f.handle}</span>
+          </div>
+        ))}
         {atHere && (
           <div className={`fish-map-you fish-map-you-${here.facing}`} style={pos(here.tx, here.ty, YOU_HALF)} role="img" aria-label="현재 위치">
             <img src={spriteDataUrl('map-you', MARK_SCALE)} alt="" />

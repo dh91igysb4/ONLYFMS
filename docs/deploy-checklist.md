@@ -560,6 +560,17 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 펨타듀 밸리 온라인 2단계-1: 다른 지역 친구 위치 (`feat/fishing-online-2`)
+
+설계 `docs/superpowers/specs/2026-11-24-fishing-online-2a-design.md`. DB·Edge Function 없음, Vercel만.
+
+수동 확인 (두 계정, 서로 다른 지역):
+- [ ] 지도 창(`M` 또는 지도 버튼) 지역 탭에 상대가 있는 지역의 `친구 1`, 그 지역 탭을 열면 아이디가 달린 점.
+- [ ] 상대가 지역을 옮기면 몇 초 안에 탭 숫자가 바뀌고, 걷는 동안 점이 10초 단위로 따라온다.
+- [ ] 메인(`/`) 미리보기 왼쪽 위에 `접속 중 1명 · <아이디> <지역>(에서 낚시 중)`.
+- [ ] 메인만 열어 둔 계정은 상대 쪽에서 접속 중으로 잡히지 않는다.
+- [ ] 상대가 탭을 닫거나 숨기면 목록에서 빠진다.
+
 ## 펨타듀 밸리 온라인 1단계 (`feat/fishing-online`)
 
 설계 `docs/superpowers/specs/2026-11-24-fishing-online-design.md`. DB 마이그레이션·Edge Function 배포 없음, Vercel만. `feat/home-valley` 위의 브랜치라 그 PR이 먼저 머지돼야 한다.

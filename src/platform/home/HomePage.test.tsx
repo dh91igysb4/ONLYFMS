@@ -17,6 +17,19 @@ vi.mock('../../lib/api.ts', async (orig) => ({
   world: (...a: unknown[]) => worldMock(...a),
 }))
 vi.mock('../auth/AuthProvider.tsx', () => ({ useAuth: () => ({ profile, refresh: vi.fn() }) }))
+const pres = vi.hoisted(() => ({ joins: [] as unknown[][], peers: [] as unknown[], subs: [] as (() => void)[], leave: [] as number[] }))
+vi.mock('../world/presence.ts', () => ({
+  joinWorldPresence: (...a: unknown[]) => {
+    pres.joins.push(a)
+    const idx = pres.joins.length - 1
+    pres.leave[idx] = 0
+    return {
+      update: () => {}, peers: () => pres.peers,
+      onChange: (cb: () => void) => { pres.subs.push(cb); return () => {} },
+      leave: () => { pres.leave[idx]++ },
+    }
+  },
+}))
 vi.mock('./Shortcuts.tsx', () => ({ Shortcuts: () => <nav aria-label="바로가기">버튼들</nav> }))
 vi.mock('../../games/index.ts', () => {
   const manifest = (id: string, extra: Partial<Manifest>) => ({
@@ -71,6 +84,10 @@ beforeEach(() => {
   previewProps.mockReset()
   previewMode = 'ok'
   fishingHidden = false
+  pres.joins = []
+  pres.peers = []
+  pres.subs = []
+  pres.leave = []
   profile = { id: 'u1', handle: 'kane', is_admin: false, status: 'approved' }
   vi.stubGlobal('ResizeObserver', FakeRO)
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -164,5 +181,29 @@ describe('HomePage', () => {
     view()
     expect(screen.getByRole('heading', { name: '홈' }).className).toContain('sr-only')
     expect(screen.queryByRole('button', { name: '편집' })).toBeNull()
+  })
+})
+
+describe('HomePage: 접속 중 친구', () => {
+  test('미리보기 게임의 전체 방을 듣기만 하고, 바뀐 목록을 미리보기에 넘긴다', async () => {
+    view()
+    await screen.findByTestId('preview')
+    expect(pres.joins).toEqual([['fishing', 'u1', true]])
+    pres.peers = [{ id: 'u2', handle: 'son', area: 'forest', act: 'fish', tx: 1, ty: 1 }]
+    act(() => { for (const cb of pres.subs) cb() })
+    expect((lastProps() as { online: unknown[] }).online).toHaveLength(1)
+  })
+
+  test('떠나면 방을 나간다', async () => {
+    const { unmount } = view()
+    await screen.findByTestId('preview')
+    unmount()
+    expect(pres.leave[0]).toBe(1)
+  })
+
+  test('미리보기 게임이 숨김이고 관리자가 아니면 들어가지 않는다', () => {
+    fishingHidden = true
+    view()
+    expect(pres.joins).toHaveLength(0)
   })
 })

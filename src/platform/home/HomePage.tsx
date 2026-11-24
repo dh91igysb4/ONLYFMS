@@ -8,6 +8,7 @@ import { getWorldPreview } from '../../games/ui.ts'
 import { rpc } from '../../lib/api.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { Shortcuts } from './Shortcuts.tsx'
+import { joinWorldPresence, type OnlinePeer } from '../world/presence.ts'
 import './home.css'
 
 /** 미리보기 정사각형 한 변의 최대(px) */
@@ -60,6 +61,19 @@ export function HomePage() {
     return () => { alive = false }
   }, [gameId, handle])
 
+  // 접속 중 친구(온라인 2단계-1): 듣기만 한다(메인만 연 사람은 접속 중으로 세지 않는다)
+  const [online, setOnline] = useState<OnlinePeer[]>([])
+  const selfId = profile?.id
+  useEffect(() => {
+    if (!gameId || !selfId) return
+    const pres = joinWorldPresence(gameId, selfId, true)
+    pres.onChange(() => setOnline(pres.peers()))
+    return () => {
+      pres.leave()
+      setOnline([])
+    }
+  }, [gameId, selfId])
+
   useLayoutEffect(() => {
     const el = boxRef.current
     if (!el) return
@@ -85,7 +99,7 @@ export function HomePage() {
         {target && Preview && (failed ? fallback : (
           <PreviewBoundary fallback={fallback}>
             <Link className="home-valley" to={`/world/${target.manifest.id}`} aria-label={name} style={{ width: size, height: size }}>
-              {records && <Preview userId={profile?.id ?? ''} records={records} size={size} onFail={() => setFailed(true)} />}
+              {records && <Preview userId={profile?.id ?? ''} records={records} size={size} onFail={() => setFailed(true)} online={online} />}
               <span className="home-valley-enter" aria-hidden="true">들어가기</span>
             </Link>
           </PreviewBoundary>

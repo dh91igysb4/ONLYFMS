@@ -10,6 +10,7 @@ import type { View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { teleportFee } from './teleport.ts'
 import type { Facing } from './map.ts'
+import type { OnlinePeer } from '../../platform/world/presence.ts'
 
 vi.mock('./minimap.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./minimap.ts')>()
@@ -39,11 +40,12 @@ function timeAt(season: Season, gameMinute: number): number {
 type Here = { area: AreaId; tx: number; ty: number; facing: Facing }
 const VILLAGE_HERE: Here = { area: 'village', tx: 5, ty: 20, facing: 'down' }
 
-function Harness({ view, here, layers0 }: { view: View; here: Here; layers0?: MapLayers }) {
+function Harness({ view, here, layers0, online }: { view: View; here: Here; layers0?: MapLayers; online?: OnlinePeer[] }) {
   const [layers, setLayers] = useState<MapLayers>(layers0 ?? DEFAULT_LAYERS)
-  return <MapPanel view={view} here={here} now={Date.now} innerWidth={300} layers={layers} onLayers={setLayers} />
+  return <MapPanel view={view} here={here} now={Date.now} innerWidth={300} layers={layers} onLayers={setLayers} online={online} />
 }
-const mount = (view = makeView(), here = VILLAGE_HERE, layers0?: MapLayers) => render(<Harness view={view} here={here} layers0={layers0} />)
+const mount = (view = makeView(), here = VILLAGE_HERE, layers0?: MapLayers, online?: OnlinePeer[]) =>
+  render(<Harness view={view} here={here} layers0={layers0} online={online} />)
 const panel = () => screen.getByRole('region', { name: '지도' })
 const tab = (name: RegExp) => within(panel()).getByRole('tab', { name })
 const spotMarker = (name: string) => within(screen.getByTestId('fish-map')).getByRole('button', { name: new RegExp(`^${name} 낚시 자리`) })
@@ -353,3 +355,35 @@ describe('MapPanel', () => {
   })
 })
 
+
+describe('MapPanel: 다른 지역 친구', () => {
+  const f = (id: string, handle: string, area: string, tx = 10, ty = 10): OnlinePeer => ({ id, handle, area, act: 'walk', tx, ty })
+  const ONLINE = [f('a', 'kim', 'river'), f('b', 'son', 'river', 12, 12), f('c', 'zed', 'cave')]
+
+  it('지역 탭에 그 지역 친구 수', () => {
+    mount(makeView(), VILLAGE_HERE, undefined, ONLINE)
+    expect(tab(/^마을 강/).textContent).toContain('친구 2')
+    expect(tab(/^동굴/).textContent).toContain('친구 1')
+    expect(tab(/^바닷가 마을/).textContent).not.toContain('친구')
+  })
+
+  it('열린 지역 지도에 아이디가 달린 점', () => {
+    mount(makeView(), VILLAGE_HERE, undefined, ONLINE)
+    fireEvent.click(tab(/^마을 강/))
+    const map = screen.getByTestId('fish-map')
+    expect(within(map).getByRole('img', { name: 'kim 위치' }).textContent).toBe('kim')
+    expect(within(map).getByRole('img', { name: 'son 위치' })).toBeTruthy()
+    expect(within(map).queryByRole('img', { name: 'zed 위치' })).toBeNull()
+  })
+
+  it('잠긴 지역에는 점이 없다', () => {
+    mount(makeView(), VILLAGE_HERE, undefined, ONLINE)
+    fireEvent.click(tab(/^동굴/))
+    expect(screen.queryByRole('img', { name: 'zed 위치' })).toBeNull()
+  })
+
+  it('online이 없으면 친구 글자가 없다', () => {
+    mount()
+    expect(panel().textContent).not.toContain('친구')
+  })
+})

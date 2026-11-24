@@ -10,6 +10,7 @@ import { startPosition, type SavedPosition } from './position.ts'
 import { SCENE_W } from './scene.ts'
 import type { Player } from './walk.ts'
 import type { Outfit } from './wardrobe.ts'
+import type { OnlinePeer } from '../../platform/world/presence.ts'
 
 export type PreviewRecord = { key: string; detail: string | null }
 export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit }
@@ -45,4 +46,17 @@ export function previewScale(size: number): number {
 export function redrawDelayMs(cond: Conditions, nowMs: number): number {
   if (cond.weather === 'rain') return PREVIEW_RAIN_FRAME_MS
   return CLOCK_STEP_MS - (((nowMs % CLOCK_STEP_MS) + CLOCK_STEP_MS) % CLOCK_STEP_MS)
+}
+
+/** 메인 미리보기 모서리 요약(온라인 2단계-1). 최대 2명, 넘으면 '외 n명'. 0명이면 null */
+export function onlineSummary(peers: readonly OnlinePeer[]): string | null {
+  if (peers.length === 0) return null
+  const one = (p: OnlinePeer) => {
+    const area = AREAS.find((a) => a.id === p.area)?.name
+    if (!area) return p.handle
+    return p.act === 'fish' ? `${p.handle} ${area}에서 낚시 중` : `${p.handle} ${area}`
+  }
+  const shown = peers.slice(0, 2).map(one).join(', ')
+  const more = peers.length > 2 ? ` 외 ${peers.length - 2}명` : ''
+  return `접속 중 ${peers.length}명 · ${shown}${more}`
 }
