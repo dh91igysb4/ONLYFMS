@@ -126,6 +126,40 @@ describe('joinWorldPresence', () => {
     expect(fake.track).not.toHaveBeenCalled()
   })
 
+  test('재연결: 끊긴 동안 온 상태는 다시 SUBSCRIBED 때 보낸다', () => {
+    const p = joinWorldPresence('fishing', 'me', false)
+    fake.status?.('SUBSCRIBED')
+    p.update(me, 0)
+    fake.status?.('CHANNEL_ERROR')
+    p.update(me, 1)
+    fake.status?.('SUBSCRIBED')
+    expect(fake.track).toHaveBeenCalledTimes(2)
+    expect(fake.track).toHaveBeenLastCalledWith(me)
+  })
+
+  test('재연결: 끊긴 동안 update가 없었어도 다음 update에서 같은 상태를 다시 보낸다', () => {
+    const p = joinWorldPresence('fishing', 'me', false)
+    fake.status?.('SUBSCRIBED')
+    p.update(me, 0)
+    fake.status?.('CHANNEL_ERROR')
+    fake.status?.('SUBSCRIBED')
+    p.update(me, 1)
+    expect(fake.track).toHaveBeenCalledTimes(2)
+  })
+
+  test('track이 ok가 아니면 다음 update에서 다시 보낸다', async () => {
+    fake.track.mockResolvedValueOnce('timed out').mockResolvedValue('ok')
+    const p = joinWorldPresence('fishing', 'me', false)
+    fake.status?.('SUBSCRIBED')
+    p.update(me, 0)
+    await Promise.resolve(); await Promise.resolve()
+    p.update(me, 1)
+    expect(fake.track).toHaveBeenCalledTimes(2)
+    await Promise.resolve(); await Promise.resolve()
+    p.update(me, 2)
+    expect(fake.track).toHaveBeenCalledTimes(2)
+  })
+
   test('channel()이 던져도 안전, leave 두 번이면 removeChannel 한 번', () => {
     fake.throwOnChannel = true
     const a = joinWorldPresence('fishing', 'me', false)

@@ -52,9 +52,12 @@ export function joinWorldPresence(gameId: string, selfId: string, listenOnly: bo
 
   const send = (s: OnlinePeer, now: number) => {
     if (!channel) return
-    last = { s, at: now }
+    const mine = { s, at: now }
+    last = mine
+    // realtime-js는 실패를 reject 대신 'timed out'·'error'로 돌려준다. 그대로 두면 멈춘 사람은 안 보인 채 남는다.
+    const retry = () => { if (last === mine) last = null }
     try {
-      void Promise.resolve(channel.track(s)).catch(() => {})
+      void Promise.resolve(channel.track(s)).then((r) => { if (r !== 'ok') retry() }, retry)
     } catch (e) {
       console.warn('world presence: track failed', e)
     }
