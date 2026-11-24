@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { FREE_DAILY_CAP } from './economy.ts'
 import { duels, games, getDuel, getGame, getWorld, worlds } from './index.ts'
-import { AVATAR_RECORD_KEY } from './types.ts'
+import { AVATAR_RECORD_KEY, FREE_BONUS_RECORD_KEY } from './types.ts'
 
 test('every game has unique id, valid id format, and options defaults in choices', () => {
   expect(games.length).toBeGreaterThan(0)
@@ -111,6 +111,10 @@ test('world avatar: manifest avatar ⇔ logic.avatar, avatar key is not a record
     expect((w.manifest.records ?? []).map((r) => r.key)).not.toContain(AVATAR_RECORD_KEY)
   }
   for (const g of [...games, ...duels]) expect(g.manifest.avatar).toBeUndefined()
+})
+
+test('free_bonus key (도전과제 보너스 원천) is not a record key', () => {
+  for (const w of worlds) expect((w.manifest.records ?? []).map((r) => r.key)).not.toContain(FREE_BONUS_RECORD_KEY)
 })
 
 test('solo modules have no duel category', () => {

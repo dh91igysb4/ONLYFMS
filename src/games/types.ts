@@ -151,7 +151,16 @@ export interface WorldLogic<State, Action, View> {
   avatar?(state: State): string
   /** 옛 세이브 안에 들어 있던 골드(0 이상 정수). 세이브 버전이 바뀔 때 핸들러가 한 번 지갑으로 옮긴다 */
   legacyGold?(raw: unknown, fromVersion: number): number
+  /**
+   * 이 세이브가 사이트 자유 플레이 골드에 주는 영구 보너스(%, 0 이상 정수. 지갑 설계 §7.5).
+   * world 함수가 요청마다 계산해 바뀌었으면 `game_records`의 키 `FREE_BONUS_RECORD_KEY`(값 = %)에 쓰고,
+   * DB `_free_bonus_pct`가 그 행들을 합쳐(상한 `FREE_BONUS_MAX_PCT`) 자유 플레이 지급 트리거가 판당 골드와 게임별 하루 상한에 곱한다.
+   */
+  freeBonus?(state: State): number
 }
+
+/** 자유 플레이 골드 보너스가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */
+export const FREE_BONUS_RECORD_KEY = 'free_bonus'
 
 /** 프로필 캐릭터가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */
 export const AVATAR_RECORD_KEY = 'avatar'

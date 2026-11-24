@@ -80,20 +80,39 @@ function scoreGold(score: number, perPoint: number): number {
 }
 
 /**
- * 서버와 같은 순서로 이번 판 골드를 미리 계산한다: 트리거(least(floor(score × perPoint), playCap) → 게임별 남은 몫)
- * → _gold_move(softCap). gameAskedToday = 오늘 이 게임 줄기 전 합계(my_wallet today[game]),
- * siteEarnedToday = my_wallet earned_today. asked = 사이트 상한 전 금액, got = 실제 들어갈 금액. 모두 0 이상 정수.
+ * 도전과제 보너스 상한(%, 지갑 설계 §7.5). 지속형 게임이 game_records `free_bonus`에 쓴 값의 합을 이만큼에서 자른다.
+ * 400 = ×5(낚시 도전과제 열 개). SQL 사본 _economy()->'free_bonus_max_pct'
+ */
+export const FREE_BONUS_MAX_PCT = 400
+
+/** 보너스 %를 상한 안의 0 이상 정수로 (_free_bonus_pct와 같다) */
+export function clampBonusPct(pct: number): number {
+  if (!Number.isFinite(pct) || pct <= 0) return 0
+  return Math.min(Math.floor(pct), FREE_BONUS_MAX_PCT)
+}
+
+/** floor(n × (100 + pct) / 100) — 트리거 _free_plays_gold와 같은 정수 연산 */
+export function withBonus(n: number, pct: number): number {
+  return Math.floor((Math.floor(n) * (100 + clampBonusPct(pct))) / 100)
+}
+
+/**
+ * 서버와 같은 순서로 이번 판 골드를 미리 계산한다: 트리거(least(floor(score × perPoint), playCap) × 보너스 → 게임별 남은 몫,
+ * 하루 상한도 × 보너스) → _gold_move(softCap). gameAskedToday = 오늘 이 게임 줄기 전 합계(my_wallet today[game]),
+ * siteEarnedToday = my_wallet earned_today, bonusPct = my_wallet free_bonus_pct(도전과제 보너스, 0이면 없음).
+ * asked = 사이트 상한 전 금액, got = 실제 들어갈 금액. 모두 0 이상 정수. 사이트 하루 상한은 보너스와 무관하게 그대로다.
  */
 export function freeGold(
   score: number,
   g: FreeGold | undefined,
   gameAskedToday: number,
   siteEarnedToday: number,
+  bonusPct = 0,
 ): { asked: number; got: number } {
   if (!g || !Number.isFinite(score) || score <= 0) return { asked: 0, got: 0 }
-  const perPlay = Math.min(scoreGold(score, g.perPoint), g.playCap)
+  const perPlay = withBonus(Math.min(scoreGold(score, g.perPoint), g.playCap), bonusPct)
   const used = Number.isFinite(gameAskedToday) ? Math.max(0, gameAskedToday) : 0
-  const asked = Math.max(0, Math.min(perPlay, g.dailyCap - used))
+  const asked = Math.max(0, Math.min(perPlay, withBonus(g.dailyCap, bonusPct) - used))
   return { asked, got: softCap(asked, siteEarnedToday) }
 }
 

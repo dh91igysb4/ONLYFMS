@@ -104,22 +104,27 @@ export const isBuffId = (v: unknown): v is BuffId => typeof v === 'string' && BU
  * distinct: 서로 다른 어종 수를 센다. 조건은 모두 던질 때(pending) 기준이다.
  */
 export type ChallengeFilter = { spot?: string; perfect?: true; weather?: 'rain'; night?: true; minSizePct?: number; distinct?: true }
-export type Challenge = { id: string; area: AreaId; title: string; desc: string; count: number; filter: ChallengeFilter }
+/**
+ * freeBonusPct: 깨면 사이트 자유 플레이(미니게임) 골드가 영구히 이만큼(%) 는다(지갑 설계 §7.5 도전과제 보너스).
+ * 열 개를 다 깨면 +400% = ×5. 지역 가중(마을·강·숲 작게, 동굴·산정·난파선 크게)은 낚시 시간당 수입 곡선을 따라가게
+ * 정했다(gold.test.ts "도전과제 보너스가 낚시 수입 곡선을 따른다"가 고정). world 함수가 game_records `free_bonus`에 쓴다.
+ */
+export type Challenge = { id: string; area: AreaId; title: string; desc: string; count: number; filter: ChallengeFilter; freeBonusPct: number }
 // 지역마다 하나(AREAS 순서). 어떤 계절에도 깰 수 있어야 한다(계절 한정 어종을 요구하지 않는다, data.test가 확인).
 // 숲은 설계 초안 "폭포에서 3종"이 폭포 어종 2종뿐이라 깰 수 없어 "숲에서 3종"으로 바꿨다.
 export const CHALLENGES: readonly Challenge[] = [
-  { id: 'pier-perfect', area: 'village', title: '부두의 명수', desc: '부두에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'pier', perfect: true } },
-  { id: 'river-rain', area: 'river', title: '빗속의 강태공', desc: '비 오는 날 강에서 5마리 낚기', count: 5, filter: { weather: 'rain' } },
-  { id: 'forest-variety', area: 'forest', title: '숲의 탐험가', desc: '숲에서 서로 다른 물고기 3종 낚기', count: 3, filter: { distinct: true } },
-  { id: 'lake-night', area: 'lake', title: '호수의 밤', desc: '밤(20~5시)에 산 호수에서 5마리 낚기', count: 5, filter: { night: true } },
-  { id: 'cave-deep', area: 'cave', title: '용암 낚시꾼', desc: '동굴 가장 깊은 용암에서 5마리 낚기', count: 5, filter: { spot: 'cave3' } },
-  { id: 'island-big', area: 'island', title: '섬의 대물', desc: '섬에서 크기 상위 30% 물고기 3마리 낚기', count: 3, filter: { minSizePct: 0.7 } },
+  { id: 'pier-perfect', area: 'village', title: '부두의 명수', desc: '부두에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'pier', perfect: true }, freeBonusPct: 20 },
+  { id: 'river-rain', area: 'river', title: '빗속의 강태공', desc: '비 오는 날 강에서 5마리 낚기', count: 5, filter: { weather: 'rain' }, freeBonusPct: 20 },
+  { id: 'forest-variety', area: 'forest', title: '숲의 탐험가', desc: '숲에서 서로 다른 물고기 3종 낚기', count: 3, filter: { distinct: true }, freeBonusPct: 20 },
+  { id: 'lake-night', area: 'lake', title: '호수의 밤', desc: '밤(20~5시)에 산 호수에서 5마리 낚기', count: 5, filter: { night: true }, freeBonusPct: 20 },
+  { id: 'cave-deep', area: 'cave', title: '용암 낚시꾼', desc: '동굴 가장 깊은 용암에서 5마리 낚기', count: 5, filter: { spot: 'cave3' }, freeBonusPct: 60 },
+  { id: 'island-big', area: 'island', title: '섬의 대물', desc: '섬에서 크기 상위 30% 물고기 3마리 낚기', count: 3, filter: { minSizePct: 0.7 }, freeBonusPct: 40 },
   // 낚시 5부 M2: 갯골은 하루 두 번 열리고 짱뚱어·낙지가 사계절, 늪지는 동사리가 사계절·밤낮
-  { id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' } },
-  { id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true } },
+  { id: 'tideflat-creek', area: 'tideflat', title: '물때를 아는 사람', desc: '갯골에서 5마리 낚기', count: 5, filter: { spot: 'creek' }, freeBonusPct: 40 },
+  { id: 'swamp-rain-night', area: 'swamp', title: '안개 속의 밤낚시', desc: '비 오는 밤 늪지에서 3마리 낚기', count: 3, filter: { weather: 'rain', night: true }, freeBonusPct: 40 },
   // 낚시 5부 M3: 산정 호수·난파선은 계절 조건이 없는 지역. 얼음 구멍은 곤들매기·금강모치가, 밤 심해는 가다랑어가 늘 나온다
-  { id: 'summit-perfect', area: 'summit', title: '얼음 위의 인내', desc: '얼음 구멍에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'ice', perfect: true } },
-  { id: 'wreck-abyss-night', area: 'wreck', title: '심해의 밤', desc: '밤(20~5시) 심해에서 5마리 낚기', count: 5, filter: { spot: 'abyss', night: true } },
+  { id: 'summit-perfect', area: 'summit', title: '얼음 위의 인내', desc: '얼음 구멍에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'ice', perfect: true }, freeBonusPct: 60 },
+  { id: 'wreck-abyss-night', area: 'wreck', title: '심해의 밤', desc: '밤(20~5시) 심해에서 5마리 낚기', count: 5, filter: { spot: 'abyss', night: true }, freeBonusPct: 80 },
 ]
 /** 순간이동 요금 = TP_BASE + ceil(두 이동기 세계 거리(칸) / 10) * TP_PER_10 */
 export const TP_BASE = 30

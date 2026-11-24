@@ -633,6 +633,12 @@ export const logic: WorldLogic<State, Action, View> = {
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),
+  freeBonus,
+}
+
+/** 깬 도전과제의 미니게임 골드 보너스 합(%, 지갑 설계 §7.5). 열 개 다 깨면 400 */
+export function freeBonus(state: Pick<State, 'challenges'>): number {
+  return CHALLENGES.reduce((sum, c) => sum + (state.challenges[c.id]?.done === true ? c.freeBonusPct : 0), 0)
 }
 
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {

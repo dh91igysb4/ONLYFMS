@@ -18,6 +18,9 @@ import {
   SOFT_CAP_RATE_2,
   SOFT_CAP_TIERS,
   softCap,
+  FREE_BONUS_MAX_PCT,
+  clampBonusPct,
+  withBonus,
 } from './economy.ts'
 import { games } from './index.ts'
 
@@ -110,7 +113,31 @@ test('SQL 사본 _economy()가 economy.ts와 같다 (설계 §12)', () => {
     daily_prizes: DAILY_PRIZES,
     stake_max: STAKE_MAX,
     fee_max: FEE_MAX,
+    free_bonus_max_pct: FREE_BONUS_MAX_PCT,
   })
+})
+
+test('도전과제 보너스: 판당·게임별 하루 상한에 곱하고 사이트 상한은 그대로 (설계 §7.5)', () => {
+  expect(FREE_BONUS_MAX_PCT).toBe(400)
+  expect(clampBonusPct(-5)).toBe(0)
+  expect(clampBonusPct(NaN)).toBe(0)
+  expect(clampBonusPct(140.9)).toBe(140)
+  expect(clampBonusPct(900)).toBe(400)
+  expect(withBonus(1000, 140)).toBe(2400)
+  expect(withBonus(999, 15)).toBe(1148) // floor(999 × 1.15) = 1148.85 → 1148
+  expect(withBonus(1000, 900)).toBe(5000)
+  const g = { perPoint: 10, playCap: 1000, dailyCap: 20500 }
+  // 판당: least(floor(80 × 10), 1000) = 800 → × 2.4 = 1920
+  expect(freeGold(80, g, 0, 0, 140)).toEqual({ asked: 1920, got: 1920 })
+  // 판당 상한도 보너스 뒤: 1000 × 5 = 5000
+  expect(freeGold(500, g, 0, 0, 400).asked).toBe(5000)
+  // 게임별 하루 상한 20,500 × 2.4 = 49,200. 오늘 48,000을 받았으면 남은 1,200만
+  expect(freeGold(80, g, 48_000, 0, 140).asked).toBe(1200)
+  expect(freeGold(80, g, 49_200, 0, 140).asked).toBe(0)
+  // 보너스 없음은 지금과 같다
+  expect(freeGold(80, g, 0, 0)).toEqual(freeGold(80, g, 0, 0, 0))
+  // 사이트 하루 상한(softCap)은 보너스 뒤 금액에 그대로
+  expect(freeGold(80, g, 0, 30_000, 140)).toEqual({ asked: 1920, got: softCap(1920, 30_000) })
 })
 
 test('lastEconomy: 이름순 마지막 정의를 쓴다', () => {

@@ -4,7 +4,7 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { challengeMatches, freeBonus, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -1989,5 +1989,30 @@ describe('v14 지갑 계약', () => {
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
     expect(logic.legacyGold!(m, 14)).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------- 도전과제 보너스 (지갑 설계 §7.5)
+describe('freeBonus: 깬 도전과제의 미니게임 골드 보너스', () => {
+  const done = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, { progress: 9, done: true }]))
+  it('지역마다 하나, 10 단위, 합 400(×5)', () => {
+    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    for (const c of CHALLENGES) {
+      expect(c.freeBonusPct % 10, c.id).toBe(0)
+      expect(c.freeBonusPct, c.id).toBeGreaterThan(0)
+    }
+    expect(CHALLENGES.reduce((a, c) => a + c.freeBonusPct, 0)).toBe(400)
+  })
+  it('깬 것(done: true)만 더한다; 진행 중·모르는 id는 0', () => {
+    expect(freeBonus({ challenges: {} })).toBe(0)
+    expect(freeBonus({ challenges: { 'pier-perfect': { progress: 2, done: false }, zzz: { progress: 9, done: true } } })).toBe(0)
+    expect(freeBonus({ challenges: done(['pier-perfect', 'cave-deep']) })).toBe(80)
+    expect(freeBonus({ challenges: done(CHALLENGES.map((c) => c.id)) })).toBe(400)
+  })
+  it('logic.freeBonus가 world 함수에 연결돼 있고, 과제를 깨는 resolve 뒤 값이 오른다', () => {
+    expect(logic.freeBonus).toBe(freeBonus)
+    const s = fresh({ challenges: { 'pier-perfect': { progress: 2, done: false } } })
+    expect(logic.freeBonus!(s)).toBe(0)
+    expect(logic.freeBonus!(fresh({ challenges: done(['pier-perfect']) }))).toBe(20)
   })
 })
