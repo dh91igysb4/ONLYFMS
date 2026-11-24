@@ -256,6 +256,34 @@ t('throwing logic on first request leaves no save', async () => {
   assert.equal((await save(u)).length, 0)
 })
 
+t('save newer than the code → 409 version_newer, nothing is migrated down or written', async () => {
+  const u = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, 'test-world', ${sql.json({ n: 7, future: true })}, 2)`
+  const l = await load(u)
+  assert.equal(l.status, 409)
+  assert.equal(l.body.error, 'version_newer')
+  const a = await act(u, { type: 'inc' })
+  assert.equal(a.status, 409)
+  assert.equal(a.body.error, 'version_newer')
+  const [row] = await save(u)
+  assert.equal(row.logic_version, 2)
+  assert.deepEqual(row.state, { n: 7, future: true })
+  assert.equal((await sql`select 1 from public.game_records where user_id = ${u}`).length, 0)
+})
+
+t('real fishing: a v15 save (newer than this code) is refused, gold and save untouched', async () => {
+  const u = await user('approved', true)
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
+            values (${u}, 'fishing', ${sql.json({ totalEarned: 5, gold: 999 })}, 15)`
+  const r = await realCall(u, { game: 'fishing', action: 'load' })
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, 'version_newer')
+  assert.equal((await save(u, 'fishing'))[0].logic_version, 15)
+  assert.equal(await balance(u), 0)
+  assert.equal((await ledger(u)).length, 0)
+})
+
 t('version bump migrates on load', async () => {
   const u = await user()
   await sql`insert into public.world_saves (user_id, game_id, state, logic_version)

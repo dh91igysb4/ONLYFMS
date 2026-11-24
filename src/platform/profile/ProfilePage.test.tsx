@@ -391,6 +391,8 @@ test('profile_free_bonus: 미니게임 골드 배율(도전과제 보너스), 0�
   setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 140 })
   const v = renderAt('messi')
   expect(await screen.findByLabelText('미니게임 골드 ×2.4')).toBeTruthy()
+  // 플랫폼은 게임 이름을 적지 않는다: 보너스를 주는 게임(freeBonus 선언)이 없는 등록부에서는 꼬리말 없음
+  expect(screen.getByLabelText('미니게임 골드 ×2.4').textContent).toBe('미니게임 골드 ×2.4')
   expect(rpcMock).toHaveBeenCalledWith('user_free_bonus', { p_handle: 'messi' })
   v.unmount()
   setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 0 })

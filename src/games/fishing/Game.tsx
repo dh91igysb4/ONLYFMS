@@ -1057,7 +1057,13 @@ export function Game({ gameId }: WorldGameProps) {
     setNotice(null)
     try {
       const res = await act<{ earned: number }>({ type: 'sell' })
-      if (alive.current && res.result) setNotice({ kind: 'info', text: `${gold(res.result.earned)}를 벌었어요` })
+      // 판 금액은 사이트 하루 상한으로 줄기 전 값이다. 실제로 지갑에 들어온 양은 플랫폼 필드 gold_capped가 있을 때만 다르다
+      // (HUD·헤더는 응답의 지갑 잔액을 쓴다). 그래서 "벌었어요" 대신 판 사실과, 줄었으면 들어온 양을 함께 적는다
+      if (alive.current && res.result) {
+        const c = res.gold_capped
+        const got = c ? ` · 오늘 상한으로 ${gold(c.got)}만 들어왔어요` : ''
+        setNotice({ kind: 'info', text: `${gold(res.result.earned)}어치를 팔았어요${got}` })
+      }
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }

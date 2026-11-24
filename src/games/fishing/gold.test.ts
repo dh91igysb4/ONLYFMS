@@ -241,7 +241,7 @@ describe('산정 호수·난파선 수입과 최종 진행 (40칸, 회전+호기
 // 사용자 요구(2026-11-24): 미니게임 골드도 낚시처럼 자란다 — 도전과제 열 개를 다 깨면 ×5, 지역 가중.
 // 비교: 지역 해금 시점마다 (1) 낚시 시간당 수입 / 처음 수입, (2) 그때까지 열린 지역의 과제를 다 깼다고 본 배율.
 // 낚시는 끝에 약 ×13.7까지 자라고 보너스는 ×5에서 멈추므로 곱셈 성장을 로그로 정규화해 비교한다:
-//   f = ln(낚시 비율) / ln(낚시 최종 비율), m = ln(배율) / ln(5). 해금 시점마다 |m − f| ≤ 0.13.
+//   f = ln(낚시 비율) / ln(낚시 최종 비율), m = ln(배율) / ln(5). 해금 시점마다 |m − f| ≤ 0.15 (지금 최대 0.12, 낚시 데이터가 조금 바뀌어도 깨지지 않게 여유).
 // 사용자 초안(마을·강·숲 20, 호수·동굴 40, 섬·갯벌·늪지 40, 산정·난파선 70)은 최대 차이 0.18(산 호수에서 앞섬)이라
 // 호수 20 / 동굴 60, 산정 60 / 난파선 80으로 옮겨 0.12로 맞췄다(합 400 그대로).
 describe('도전과제 보너스 = 낚시 수입 곡선 (로그 정규화)', () => {
@@ -256,7 +256,7 @@ describe('도전과제 보너스 = 낚시 수입 곡선 (로그 정규화)', () 
     expect(Math.abs(start - 11_499) / 11_499).toBeLessThan(0.01)
     expect(unlocks.map((m) => areaOfLabel(m.label))).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
   })
-  it('해금 지점마다 |ln(배율)/ln 5 − ln(낚시 비율)/ln(최종 비율)| ≤ 0.13, 다 깨면 ×5', () => {
+  it('해금 지점마다 |ln(배율)/ln 5 − ln(낚시 비율)/ln(최종 비율)| ≤ 0.15, 다 깨면 ×5', () => {
     let pct = DEFAULT_AREAS.reduce((a, id) => a + pctOf(id), 0)
     expect(pct).toBe(60)
     const rows: [string, number, number][] = []
@@ -267,7 +267,7 @@ describe('도전과제 보너스 = 낚시 수입 곡선 (로그 정규화)', () 
       rows.push([m.label, +f.toFixed(3), +g.toFixed(3)])
     }
     expect(pct).toBe(400)
-    for (const [label, f, g] of rows) expect(Math.abs(g - f), `${label}: 배율 ${g} vs 낚시 ${f}`).toBeLessThanOrEqual(0.13)
+    for (const [label, f, g] of rows) expect(Math.abs(g - f), `${label}: 배율 ${g} vs 낚시 ${f}`).toBeLessThanOrEqual(0.15)
   })
   it('낚시 성장과 같은 방향: 동굴(낚시가 가장 크게 뛰는 곳)이 산 호수보다, 난파선이 산정보다 크다', () => {
     expect(pctOf('cave')).toBeGreaterThan(pctOf('lake'))

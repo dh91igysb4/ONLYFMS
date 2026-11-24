@@ -353,7 +353,7 @@ export function ChallengePanel({ view }: { view: View }) {
     <section className="fish-panel-body" aria-label="도전과제">
       <p className="muted">{`깬 과제 ${done}/${CHALLENGES.length}`}</p>
       <p className="muted">과제를 깨면 그 지역 순간이동기가 켜지고, 미니게임(자유 플레이) 골드가 영구히 늘어요</p>
-      <p className="fish-shop-note">{`지금 미니게임 골드 ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>
+      <p className="fish-bonus-now">{`지금 미니게임 골드 ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>
       <ul className="fish-rods" aria-label="도전과제 목록">
         {CHALLENGES.map((c) => {
           const finished = progress[c.id]?.done === true

@@ -120,6 +120,8 @@
 
 .fish-shop-sell { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .fish-shop-note { margin: 0; color: var(--warn-text); }
+/* 도전과제 보너스 배율(좋은 소식이라 경고색이 아닌 강조 토큰) */
+.fish-bonus-now { margin: 0; color: var(--accent-strong); font-weight: 700; }
 .fish-rods, .fish-dex { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .fish-rod, .fish-dex-item {
   display: flex;

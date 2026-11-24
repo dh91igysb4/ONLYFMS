@@ -140,6 +140,9 @@ async function run(
     }
   }
 
+  // 저장이 이 코드보다 새 버전이면(배포 중 옛 인스턴스, 옛 코드로 되돌림, 옛 브랜치에서 배포) 절대 낮춰 migrate하지 않는다.
+  // 낮추면 새 필드를 지우고, 지갑 게임은 이전된 골드 뒤의 수입을 잃는다. 아무것도 쓰지 않고 거절한다
+  if (row.logic_version > logic.version) return err(409, 'version_newer')
   let state: unknown = row.state
   let dirty = false
   if (row.logic_version !== logic.version) {

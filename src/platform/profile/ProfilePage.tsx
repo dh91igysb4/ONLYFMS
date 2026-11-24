@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
-import { duels, games } from '../../games/index.ts'
+import { duels, games, worlds } from '../../games/index.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { normalizeHandle } from '../../shared/handle.ts'
 import { DuelSection } from './DuelSection.tsx'
@@ -14,6 +14,9 @@ import { pct } from '../leaderboard/LeaderboardPage.tsx'
 import { fetchUserFreeBonus, fetchUserPrizeTotal, fetchUserWallet } from '../wallet/api.ts'
 import { formatGold, formatMultiplier } from '../wallet/format.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
+
+/** 미니게임 골드 보너스를 주는 지속형 게임 이름(등록부의 freeBonus 선언 기준, 게임 id를 모른다) */
+const BONUS_SOURCES = worlds.filter((w) => typeof w.logic.freeBonus === 'function').map((w) => w.manifest.name).join('·')
 import '../leaderboard/leaderboard.css'
 import './profile.css'
 
@@ -205,7 +208,7 @@ export function ProfilePage() {
         {freeBonus !== null && (
           <p className="pf-gold" aria-label={`미니게임 골드 ${formatMultiplier(freeBonus)}`}>
             미니게임 골드 <strong>{formatMultiplier(freeBonus)}</strong>
-            <span className="muted"> · 낚시 도전과제 보너스</span>
+            {BONUS_SOURCES && <span className="muted">{` · ${BONUS_SOURCES} 보너스`}</span>}
           </p>
         )}
         {prizeTotal !== null && prizeTotal > 0 && (

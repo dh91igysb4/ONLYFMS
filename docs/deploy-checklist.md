@@ -525,9 +525,14 @@ npx supabase@2 functions deploy world --no-verify-jwt
 순서: **DB push → `world` → `duel` → Vercel**. 진행 중 데일리가 적은 새벽(KST)에 한 번에 이어서 한다.
 
 - [ ] `npx supabase@2 db push` → 지갑 마이그레이션(`20261123181545_wallet` ~ `20261124020000_contest_fee`, 아직이면) + **`20261124030000_wallet_on.sql`**(`_wallet_enabled()` → `true`: `create_contest`가 참가비 > 0 대회를 받는다). 이 사이(새 DB·옛 함수·옛 화면)에는 옛 화면에 참가비 입력이 없을 뿐 깨지는 것은 없다
+- [ ] **`functions deploy world` 바로 전(db push 뒤)** 낚시 세이브 골드 합계를 적어 둔다(db push와 world 배포 사이에도 v13 판매·구매가 세이브 골드를 바꾸므로 그보다 먼저 적으면 안 맞는다). 시각도 함께 적는다(아래 겹침 확인용):
+  `select now() as at, count(*), sum(floor((state->>'gold')::numeric)) as total, max((state->>'gold')::numeric) as max from world_saves where game_id = 'fishing' and logic_version <= 13 and jsonb_typeof(state->'gold') = 'number' and (state->>'gold')::numeric > 0;`
+  `max`가 2^53(9,007,199,254,740,992) 이상이면 배포하지 말고 알린다(그 사람은 이전 때 500이 난다. 운영 값으로는 나올 수 없다)
 - [ ] `npx supabase@2 functions deploy world --no-verify-jwt` — **이 브랜치(PR 미리보기 확인용) 또는 머지 뒤 main에서만** 배포한다. 옛 지갑 브랜치(`feat/wallet-core` ~ `feat/wallet-contest`)에서 배포하지 않는다: 그 브랜치들의 낚시는 v13보다 옛 버전이라 옛 migrate가 산정·난파선·옷장·버프 등을 지우고, 지갑도 쓰지 않는다
   - 배포 직후 각 사람의 **첫 낚시 요청(load든 act든)**에서 v13 세이브의 `gold`가 소수 내림으로 지갑에 한 번 들어가고(장부 `migrate`, ref `fishing`, 사이트 하루 상한과 무관), 세이브는 v14(gold 없음)로 저장된다. 그 요청이 실패한 행동이어도 이전은 커밋된다. 두 탭에서 동시에 열어도 세이브 행 잠금 + 장부 unique로 한 번뿐이다
   - 진행 중이던 캐스트는 사라진다(v13 → v14, 설계상 허용)
+  - 새 `world`는 저장이 자기보다 새 버전이면 409 `version_newer`("새 버전이 나왔어요. 새로고침해 주세요")로 거절하고 아무것도 쓰지 않는다. 그래서 v14 이후에는 옛 코드로 되돌리거나 옛 브랜치에서 배포해도 저장을 낮추지 않는다(v13 이하 운영 코드는 이 검사가 없어 아래 겹침 확인이 필요하다)
+  - 배포 몇 분 뒤 겹침 확인: 배포하는 몇 초 동안 옛(v13) 인스턴스가 v14 세이브를 받으면 버전을 13으로 되돌릴 수 있다. `select user_id, updated_at, state->>'gold' as gold from world_saves where game_id = 'fishing' and logic_version <= 13 and updated_at > '<world 배포 시각>';` → **0행**이어야 한다. 행이 있으면 그 사람의 `gold`를 `/admin` 골드 조정으로 넣는다(migrate 장부가 이미 있어 다음 이전은 무시되므로 두 번 들어가지 않는다)
 - [ ] 같은 `db push`에 **`20261124040000_free_bonus.sql`**(도전과제 보너스, 설계 §7.5)도 들어간다: `_free_bonus_pct`, 자유 플레이 트리거가 판당·게임별 하루 상한에 × (100 + 보너스)/100, `my_wallet().free_bonus_pct`, `user_free_bonus`. 새 `world`가 배포되기 전에는 `free_bonus` 행이 없어 보너스 0(지금과 같음)이고, `world` 배포 뒤 각 사람이 낚시를 한 번 열면 깬 과제만큼 채워진다
 - [ ] `npx supabase@2 functions deploy duel --no-verify-jwt` — `duel` 함수가 등록부의 `walletEnabled()`를 번들하므로 다시 배포해야 판돈 > 0을 받는다(안 하면 `invalid_stake`로 판돈 0만)
 - [ ] PR 머지 → Vercel 배포. 머지 뒤 main 기준으로 `world`·`duel`을 한 번 더 배포한다(M1~M3과 같은 관례)
@@ -542,7 +547,8 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - [ ] 사이트 하루 상한: 관리자 계정으로 낚시를 해 들어간 합계 30,750을 넘긴 뒤 판매 → "오늘 골드 상한을 넘어 일부만 들어왔어요 (+… G / +… G)" 알림 3초, 넘은 몫은 41,000까지 20%, 그 위 4%. 관리자 장부에 "(상한, 원래 …)"
 - 확인 쿼리(SQL 편집기):
   - 아직 이전되지 않은 세이브(낚시를 아직 안 연 사람): `select count(*) from world_saves where game_id = 'fishing' and logic_version <= 13;`
-  - 이전 합계: `select count(*), sum(delta) from gold_ledger where reason = 'migrate';` — 배포 직전 `select count(*), sum(floor((state->>'gold')::numeric)) from world_saves where game_id = 'fishing' and jsonb_typeof(state->'gold') = 'number' and (state->>'gold')::numeric > 0;`를 적어 두고, 모두 연 뒤 같아야 한다
+  - 이전 합계 확인(언제든): **migrate 장부 합 + 아직 v13인 세이브의 골드 합 = world 배포 직전에 적은 total**
+    `select (select coalesce(sum(delta), 0) from gold_ledger where reason = 'migrate' and game_id = 'fishing') + (select coalesce(sum(floor((state->>'gold')::numeric)), 0) from world_saves where game_id = 'fishing' and logic_version <= 13 and jsonb_typeof(state->'gold') = 'number' and (state->>'gold')::numeric > 0) as now_total;`
   - 이중 이전 없음: `select user_id, count(*) from gold_ledger where reason = 'migrate' group by 1 having count(*) > 1;`(0행)
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
