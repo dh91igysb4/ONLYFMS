@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rngFromSeed } from '../../shared/rng.ts'
 import { teleportFee } from './teleport.ts'
+import { DEFAULT_OUTFIT, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { BAGS, bagSize, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, type Species, type TackleId } from './data.ts'
 import { challengeMatches, logic, pickPool, price, progressChallenges, rollCatch, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State } from './logic.ts'
@@ -288,6 +289,8 @@ const T0 = 1_000_000
 const fixedRng = () => 0.5
 const ctx = (now = T0) => ({ now, rng: fixedRng })
 const fresh = (over: Partial<State> = {}): State => ({ ...logic.init(), ...over })
+/** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
+const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT } }
 const ok = (r: ReturnType<typeof logic.apply>) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
   return r
@@ -304,9 +307,9 @@ const withHooked = (over: Partial<State> = {}): State =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(9)
+    expect(logic.version).toBe(10)
     expect(logic.init()).toEqual({
-      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null,
+      gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null, ...W0,
     })
   })
 
@@ -772,7 +775,7 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
     const dex = { grouper: { count: 1, maxCm: 100 }, goby: { count: 2, maxCm: 12 } }
     const m = logic.migrate({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }, 2)
-    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], challenges: {}, pending: null })
+    expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], challenges: {}, pending: null, ...W0, wardrobe: ['hat:crown'] })
     expect(logic.migrate({ dex: { goby: { count: 1, maxCm: 10 } }, areas: ['pier'] }, 2).legends).toEqual([])
   })
 
@@ -780,9 +783,9 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
     const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
     const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
-    expect(logic.migrate(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {} })
+    expect(logic.migrate(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, ...W0, wardrobe: ['hat:crown'] })
     const v2 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }
-    expect(logic.migrate(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, areas: [...DEFAULT_AREAS] })
+    expect(logic.migrate(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, areas: [...DEFAULT_AREAS], ...W0, wardrobe: ['hat:crown'] })
   })
 
   it('migrate legends: 모르는 id·비전설 id는 버리고, 기본 지역은 항상 포함, 알려진 추가 지역은 유지', () => {
@@ -908,7 +911,7 @@ describe('fishing WorldLogic', () => {
       const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
       const dex = { grouper: { count: 1, maxCm: 100 } }
       const v4 = { gold: 300, totalEarned: 900, rodTier: 4, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper'], pending: null }
-      expect(logic.migrate(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [], challenges: {} })
+      expect(logic.migrate(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [], challenges: {}, ...W0, wardrobe: ['hat:crown'] })
     })
     it('migrate v5: 모르는 id·중복 제거, 미보유 장착 제거, 칸 초과분은 뒤에서 자른다', () => {
       const m = (raw: Record<string, unknown>) => logic.migrate(raw, 5)
@@ -960,7 +963,7 @@ describe('지역 해금', () => {
       bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
       legends: [], tackles: ['cork'], equipped: ['cork'], pending: null,
     }
-    expect(logic.migrate(v6, 6)).toEqual({ ...v6, challenges: {} })
+    expect(logic.migrate(v6, 6)).toEqual({ ...v6, challenges: {}, ...W0 })
   })
 })
 
@@ -1153,7 +1156,7 @@ describe('도전과제', () => {
       legends: [], tackles: ['cork'], equipped: ['cork'],
       pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'pier', cond: cond('spring', 12), power: 0.5 },
     }
-    expect(logic.migrate(v7, 7)).toEqual({ ...v7, pending: null, challenges: {} })
+    expect(logic.migrate(v7, 7)).toEqual({ ...v7, pending: null, challenges: {}, ...W0 })
     expect(logic.migrate({ ...v7, pending: { species: 'anchovy' } }, 2).challenges).toEqual({})
   })
 
@@ -1186,10 +1189,11 @@ describe('도전과제', () => {
       challenges: { 'pier-perfect': { progress: 3, done: true }, 'forest-variety': { progress: 1, seen: ['carp'], done: false } },
       pending: null,
     }
-    expect(logic.migrate(v8, 8)).toEqual(v8)
+    // 전설 1마리·부두 과제를 이미 이룬 세이브는 migrate에서 업적 옷(왕관·산호 낚싯대)을 받는다
+    expect(logic.migrate(v8, 8)).toEqual({ ...v8, ...W0, wardrobe: ['hat:crown', 'rodSkin:coral'] })
     // v9 세이브(고급 장비)도 그대로 읽는다
     const v9 = { ...v8, rodTier: 6, bagTier: 5, equipped: ['cork', 'spinner', 'curious'] }
-    expect(logic.migrate(v9, 9)).toEqual(v9)
+    expect(logic.migrate(v9, 9)).toEqual({ ...v9, ...W0, wardrobe: ['hat:crown', 'rodSkin:coral'] })
   })
 
   it('records: 도전과제 n/6', () => {
@@ -1248,5 +1252,130 @@ describe('순간이동', () => {
     const toIsland = ok(logic.apply(rich(), tp('village', 'island'), ctx())).result as { fee: number }
     const toRiver = ok(logic.apply(rich(), tp('village', 'river'), ctx())).result as { fee: number }
     expect(toIsland.fee).toBeGreaterThan(3 * toRiver.fee)
+  })
+})
+
+describe('옷장 (logic.version 10)', () => {
+  it('buyWear: 골드를 빼고 옷장에 넣고 바로 입는다', () => {
+    const s = deepFreeze(fresh({ gold: 25_000 }))
+    const r = ok(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 'straw' }, ctx()))
+    expect(r.state.gold).toBe(5_000)
+    expect(r.state.wardrobe).toEqual(['hat:straw'])
+    expect(r.state.outfit).toEqual({ ...DEFAULT_OUTFIT, hat: 'straw' })
+    // 다른 부위의 같은 id(검정)는 따로 산다
+    const r2 = ok(logic.apply(r.state, { type: 'buyWear', slot: 'bottom', id: 'black' }, ctx()))
+    expect(r2.state.wardrobe).toEqual(['hat:straw', 'bottom:black'])
+    expect(r2.state.outfit.bottom).toBe('black')
+    expect(r2.state.outfit.hairColor).toBe('brown')
+  })
+
+  it('buyWear 오류: 이미 가짐·무료·업적·모르는 것·골드 부족', () => {
+    const s = deepFreeze(fresh({ gold: 1_000_000, wardrobe: ['hat:straw'] }))
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 'straw' }, ctx()))).toBe('already_owned')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 'none' }, ctx()))).toBe('already_owned')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 'crown' }, ctx()))).toBe('not_for_sale')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 'zzz' }, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'shoes', id: 'straw' }, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'top', id: 'straw' }, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(s, { type: 'buyWear', slot: 'hat', id: 7 } as unknown as Action, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(fresh({ gold: 19_999 }), { type: 'buyWear', slot: 'hat', id: 'straw' }, ctx()))).toBe('not_enough_gold')
+  })
+
+  it('모든 상점 품목을 살 수 있고, 업적 품목은 하나도 못 산다', () => {
+    let s = fresh({ gold: 10_000_000 })
+    for (const w of WEAR) {
+      const r = logic.apply(s, { type: 'buyWear', slot: w.slot, id: w.id }, ctx())
+      if (w.unlock) expect(err(r)).toBe('not_for_sale')
+      else if (w.price === 0) expect(err(r)).toBe('already_owned')
+      else s = ok(r).state
+    }
+    expect(s.gold).toBe(10_000_000 - 1_340_000)
+  })
+
+  it('wear: 가진 것만, 부위가 맞아야 한다', () => {
+    const s = deepFreeze(fresh({ wardrobe: [wearKey('top', 'kit-stripes')] }))
+    expect(ok(logic.apply(s, { type: 'wear', slot: 'top', id: 'kit-stripes' }, ctx())).state.outfit.top).toBe('kit-stripes')
+    expect(ok(logic.apply(s, { type: 'wear', slot: 'hat', id: 'none' }, ctx())).state.outfit.hat).toBe('none')
+    expect(err(logic.apply(s, { type: 'wear', slot: 'top', id: 'kit-red' }, ctx()))).toBe('not_owned')
+    expect(err(logic.apply(s, { type: 'wear', slot: 'hat', id: 'kit-stripes' }, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(s, { type: 'wear', slot: 'zzz', id: 'none' }, ctx()))).toBe('bad_wear')
+    expect(err(logic.apply(s, { type: 'wear', slot: 'hat', id: 'crown' }, ctx()))).toBe('not_owned')
+  })
+
+  it('업적 옷은 조건을 채운 행동에서 바로 저장되고, 그다음 입는다', () => {
+    // 전설을 잡는 resolve에서 왕관을 얻는다
+    const hooked = withHooked()
+    const legendHooked = { ...hooked, pending: { ...hooked.pending!, species: 'grouper', sizeCm: 100, spot: 'pier', cond: cond('winter', 12) } }
+    const caught = ok(logic.apply(legendHooked, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(caught.state.wardrobe).toEqual(['hat:crown'])
+    expect(ok(logic.apply(caught.state, { type: 'wear', slot: 'hat', id: 'crown' }, ctx())).state.outfit.hat).toBe('crown')
+    // 과제 6개를 다 깬 세이브: 아무 행동 하나로 저장된다(무지개 + 과제별 업적 옷)
+    const all = Object.fromEntries(CHALLENGES.map((c) => [c.id, { progress: c.count, done: true }]))
+    const s1 = ok(logic.apply(fresh({ challenges: all }), { type: 'wear', slot: 'hat', id: 'none' }, ctx())).state
+    expect(s1.wardrobe).toEqual(expect.arrayContaining(['rodSkin:rainbow', 'rodSkin:coral', 'rodSkin:ice', 'top:lava-suit', 'top:moss-vest', 'bottom:wave', 'hairColor:rain']))
+    expect(ok(logic.apply(s1, { type: 'wear', slot: 'rodSkin', id: 'rainbow' }, ctx())).state.outfit.rodSkin).toBe('rainbow')
+    // 한 지역 도감
+    const dex = Object.fromEntries(SPECIES.filter((s) => s.area === 'river').map((s) => [s.id, { count: 1, maxCm: s.minCm }]))
+    expect(ok(logic.apply(fresh({ dex }), { type: 'wear', slot: 'hat', id: 'none' }, ctx())).state.wardrobe).toContain('hat:fish-hat')
+    // 저장 안 된(조건만 채운) 상태에서 곧장 입기는 거부된다 — 실제 세이브는 행동·migrate에서 이미 저장돼 있다
+    expect(err(logic.apply(fresh({ legends: ['grouper'] }), { type: 'wear', slot: 'hat', id: 'crown' }, ctx()))).toBe('not_owned')
+  })
+
+  it('얻은 업적 옷은 과제·어종이 늘어도(다음 확장) 잃지 않는다', () => {
+    const all = Object.fromEntries(CHALLENGES.map((c) => [c.id, { progress: c.count, done: true }]))
+    const s = ok(logic.apply(fresh({ challenges: all }), { type: 'wear', slot: 'hat', id: 'none' }, ctx())).state
+    const worn = ok(logic.apply(s, { type: 'wear', slot: 'rodSkin', id: 'rainbow' }, ctx())).state
+    // 7번째 과제가 생긴 데이터에서는 조건이 거짓이 된다
+    const grown = { challenges: [...CHALLENGES, { id: 'new-7' }], species: SPECIES }
+    expect(unlockMet(worn, { kind: 'allChallenges' }, grown)).toBe(false)
+    expect(newlyEarned({ ...worn, wardrobe: [] }, grown)).not.toContain('rodSkin:rainbow')
+    // 그래도 저장된 옷은 가진 것이고, migrate(v10 → v10, 다음 버전도 같은 길)가 입은 채로 둔다
+    expect(ownsWear(worn, 'rodSkin', 'rainbow')).toBe(true)
+    const again = logic.migrate(JSON.parse(JSON.stringify(worn)), 10)
+    expect(again.wardrobe).toContain('rodSkin:rainbow')
+    expect(again.outfit.rodSkin).toBe('rainbow')
+    // 어종이 늘어 지역 도감이 다시 미완성이 돼도 물고기 모자는 남는다
+    const dex = Object.fromEntries(SPECIES.filter((x) => x.area === 'river').map((x) => [x.id, { count: 1, maxCm: x.minCm }]))
+    const withHat = ok(logic.apply(fresh({ dex }), { type: 'wear', slot: 'hat', id: 'none' }, ctx())).state
+    const moreFish = { challenges: CHALLENGES, species: [...SPECIES, { id: 'new-river-fish', area: 'river' }] }
+    expect(unlockMet(withHat, { kind: 'areaDex' }, { ...moreFish, species: moreFish.species.filter((x) => x.area === 'river') })).toBe(false)
+    expect(ownsWear(withHat, 'hat', 'fish-hat')).toBe(true)
+    expect(logic.migrate(withHat, 10).wardrobe).toContain('hat:fish-hat')
+  })
+
+  it('옷은 낚시 중에도 바꿀 수 있고 pending을 건드리지 않는다', () => {
+    const s = withPending()
+    const r = ok(logic.apply(s, { type: 'wear', slot: 'hat', id: 'none' }, ctx()))
+    expect(r.state.pending).toBe(s.pending)
+  })
+
+  it('migrate v9 → v10: 빈 옷장, 기본 옷차림', () => {
+    const m = logic.migrate({ gold: 5, rodTier: 6 }, 9)
+    expect(m.wardrobe).toEqual([])
+    expect(m.outfit).toEqual(DEFAULT_OUTFIT)
+  })
+
+  it('migrate v10: 모르는 키·중복·안 가진 옷·다른 부위 id는 정리한다', () => {
+    const m = logic.migrate({
+      wardrobe: ['hat:straw', 'hat:straw', 'hat:zzz', 'hat:none', 'hat:crown', 'top:kit-red', 3, 'straw'],
+      outfit: { hat: 'straw', top: 'kit-stripes', bottom: 'zzz', hair: 'afro', hairColor: 'gold', rodSkin: 'bamboo', extra: 'x' },
+    }, 10)
+    // 저장된 업적 옷 키(hat:crown)는 조건과 상관없이 남는다(저장된 것이 곧 소유)
+    expect(m.wardrobe).toEqual(['hat:straw', 'hat:crown', 'top:kit-red'])
+    expect(m.outfit).toEqual({ ...DEFAULT_OUTFIT, hat: 'straw' })
+    expect(logic.migrate({ outfit: 'x' }, 10).outfit).toEqual(DEFAULT_OUTFIT)
+    // 업적 옷은 조건을 채웠으면 그대로 남는다
+    expect(logic.migrate({ legends: ['grouper'], outfit: { hat: 'crown' } }, 10).outfit.hat).toBe('crown')
+  })
+
+  it('avatar: 옷차림 JSON', () => {
+    const s = fresh({ outfit: { ...DEFAULT_OUTFIT, hat: 'straw' } })
+    expect(JSON.parse(logic.avatar!(s))).toEqual({ ...DEFAULT_OUTFIT, hat: 'straw' })
+  })
+
+  it('view에 wardrobe·outfit이 나간다', () => {
+    const v = logic.view(fresh({ wardrobe: ['hat:cap'], outfit: { ...DEFAULT_OUTFIT, hat: 'cap' } }), { now: T0 })
+    expect(v.wardrobe).toEqual(['hat:cap'])
+    expect(v.outfit.hat).toBe('cap')
   })
 })

@@ -7,6 +7,7 @@ import { SPECIES, type AreaId } from './data.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Season } from './clock.ts'
 import { minimapUrl } from './minimap.ts'
 import type { View } from './logic.ts'
+import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { teleportFee } from './teleport.ts'
 import type { Facing } from './map.ts'
 
@@ -20,7 +21,7 @@ vi.mock('./sprites.ts', () => ({
 }))
 
 function makeView(over: Partial<View> = {}): View {
-  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village', 'river', 'forest'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, pending: null, ...over }
+  return { gold: 1234, totalEarned: 0, rodTier: 1, bagTier: 1, areas: ['village', 'river', 'forest'], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, wardrobe: [], outfit: { ...DEFAULT_OUTFIT }, pending: null, ...over }
 }
 const dexOf = (...ids: string[]) => Object.fromEntries(ids.map((id) => [id, { count: 1, maxCm: 30 }]))
 

@@ -355,3 +355,34 @@
 .fish-notices .fish-info { padding: 6px 10px; border-radius: 8px; background: var(--panel); text-align: center; }
 /* 토글 뒤 초점을 받는 게임 뿌리(tabIndex -1)는 테두리를 그리지 않는다 */
 .fish:focus { outline: none; }
+
+/* 옷장 */
+.fish-wear-top { display: flex; gap: 12px; align-items: center; }
+.fish-wear-preview {
+  width: 100px;
+  height: 130px;
+  image-rendering: pixelated;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--edge);
+  flex-shrink: 0;
+}
+.fish-wear-side { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; font-size: 14px; }
+.fish-wear-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fish-wear-pick img { width: 32px; height: 48px; image-rendering: pixelated; flex-shrink: 0; }
+.fish-wear-picked { box-shadow: inset 0 0 0 2px var(--accent-strong); }
+.fish-wear-lock { white-space: nowrap; }
+.fish-wear-open { align-self: flex-start; }
+.fish-wear-confirm { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }

@@ -28,10 +28,12 @@ type BagProps = {
   busy: boolean
   onEquip(ids: TackleId[]): void
   onLock(index: number, locked: boolean): void
+  /** 옷장 창 열기 */
+  onWardrobe?(): void
 }
 
 /** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 잠금을 뒤집는다. */
-export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
+export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: BagProps) {
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
   const slots = tackleSlots(view.rodTier)
   const fishing = view.pending !== null
@@ -43,6 +45,11 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
   const toggle = (id: TackleId) => onEquip(equipped.includes(id) ? equipped.filter((x) => x !== id) : [...equipped, id])
   return (
     <section className="fish-panel-body" aria-label="가방">
+      {onWardrobe && (
+        <button type="button" className="btn btn-ghost btn-sm fish-wear-open" disabled={busy} onClick={onWardrobe}>
+          옷장
+        </button>
+      )}
       {(owned.length > 0 || slots > 0) && (
         <div className="fish-gear" role="group" aria-label="장비">
           <h3 className="fish-panel-sub">장비</h3>
@@ -116,9 +123,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock }: BagProps) {
   )
 }
 
-type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
+type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void; onWardrobe?(): void }
 
-export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
+export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, onWardrobe }: ShopProps) {
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
@@ -234,6 +241,15 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
           )
         })}
       </ul>
+      {onWardrobe && (
+        <>
+          <h3 className="fish-panel-sub">옷 가게</h3>
+          <p className="muted">모자·옷·머리·낚싯대 겉모습을 사고 입어 봐요. 성능은 그대로예요</p>
+          <button type="button" className="btn btn-primary btn-sm fish-wear-open" disabled={busy} onClick={onWardrobe}>
+            옷 가게 열기
+          </button>
+        </>
+      )}
     </section>
   )
 }

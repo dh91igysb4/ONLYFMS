@@ -989,3 +989,19 @@ describe('순간이동기', () => {
     expect(leavesAfter.length).toBeGreaterThan(0)
   })
 })
+
+describe('옷 입은 캐릭터', () => {
+  test('outfit이 있으면 옷 색으로 그리고, 없으면 원래 그림', () => {
+    const size = { w: 160, h: 240 }
+    const p = player(SPAWN.pos)
+    const plain = new RecordingCtx()
+    drawWorld(asCtx(plain), scene('idle', p, size), size)
+    const straw = new RecordingCtx()
+    drawWorld(asCtx(straw), scene('idle', p, size, { outfit: { hat: 'straw', top: 'kit-red', bottom: 'jeans', hair: 'short', hairColor: 'brown', rodSkin: 'gold' } }), size)
+    const colors = (c: RecordingCtx) => new Set(c.rects.map((r) => r.color.toLowerCase()))
+    expect(colors(straw).has('#e8c36a')).toBe(true) // 밀짚
+    expect(colors(straw).has('#d3262c')).toBe(true) // 빨간 유니폼
+    expect(colors(plain).has('#e8c36a')).toBe(false)
+    expect(colors(plain).has('#eaa53c')).toBe(true) // 원래 바람막이
+  })
+})

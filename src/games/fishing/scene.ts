@@ -6,7 +6,9 @@
 import type { Bar, BarParams } from './minigame.ts'
 import { TILE, tileAt, type MapDef, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
-import { SPRITES, drawSprite } from './sprites.ts'
+import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
+import { playerSprites } from './outfit.ts'
+import type { Outfit } from './wardrobe.ts'
 import { formatClock, isSnow, nightLevel, type Conditions } from './clock.ts'
 
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
@@ -33,6 +35,8 @@ export type WorldScene = {
   opened: Opened
   /** 이 맵의 순간이동기가 켜져 있는가(등롱 불빛) */
   teleporterOn: boolean
+  /** 입은 옷. 없으면 원래 그림. 옷차림마다 15장을 한 번만 합성해 캐시한다(outfit.ts) */
+  outfit?: Outfit
 }
 
 /** 화면 좌표 사각형 */
@@ -55,7 +59,7 @@ const PLAYER_W = 16
 const PLAYER_H = 24
 
 // 자세별 낚싯대 끝(스프라이트 안 좌표, 오른쪽을 볼 때). 왼쪽은 x를 거울로 뒤집는다.
-const ROD_TIP: Record<string, [number, number]> = {
+export const ROD_TIP: Readonly<Record<string, [number, number]>> = {
   'player-idle-down': [14, 2],
   'player-cast': [5, 0],
   'player-reel': [15, 23],
@@ -870,7 +874,10 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
 function drawPlayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, tip: [number, number] | null): void {
   // 발밑 그림자
   rect(ctx, px + 3, py + PLAYER_H - 2, 10, 3, C.groundShadow)
-  drawSprite(ctx, pose.name, px, py, 1, pose.flipX ? { flipX: true } : undefined)
+  const flip = pose.flipX ? { flipX: true } : undefined
+  const dressed = s.outfit ? playerSprites(s.outfit)[pose.name] : undefined
+  if (dressed) drawSpriteData(ctx, dressed, px, py, 1, flip)
+  else drawSprite(ctx, pose.name, px, py, 1, flip)
   if (s.phase === 'lost') {
     // 끊어진 줄이 낚싯대 끝에서 늘어지고, 진땀 한 방울
     if (tip) {
