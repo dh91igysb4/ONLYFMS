@@ -150,13 +150,13 @@ describe('sneak-exam Game', () => {
     const calls = onAction.mock.calls.length
     expect(btn(GLASSES)).toBeDisabled()
     fireEvent.click(btn(GLASSES))
-    fireEvent.keyDown(window, { key: '1', code: 'Digit1' }) // 키는 disabled를 거치지 않는다
+    fireEvent.keyDown(window, { key: 'u', code: 'KeyU' }) // 키는 disabled를 거치지 않는다
     expect(onAction).toHaveBeenCalledTimes(calls)
     // 숨기는 중에도 다른 도구는 켤 수 없다
     fireEvent.click(btn(PHONE))
     expect(btn(GLASSES)).toBeDisabled()
     fireEvent.click(btn(GLASSES))
-    fireEvent.keyDown(window, { key: '1', code: 'Digit1' })
+    fireEvent.keyDown(window, { key: 'u', code: 'KeyU' })
     expect(onAction).toHaveBeenCalledTimes(calls + 1)
     expect(lastSent(onAction).c).toEqual(['t', 0])
   })
@@ -221,7 +221,7 @@ describe('sneak-exam Game', () => {
     const calls = onAction.mock.calls.length
     fireEvent.click(btn(PHONE))
     fireEvent.click(btn('1번 마킹'))
-    fireEvent.keyDown(window, { key: '1', code: 'Digit1' })
+    fireEvent.keyDown(window, { key: 'u', code: 'KeyU' })
     advance(2000)
     expect(onAction).toHaveBeenCalledTimes(calls)
     expect(screen.getByText('제출했어요')).toBeInTheDocument()
@@ -371,13 +371,23 @@ describe('sneak-exam Game', () => {
     const onAction = vi.fn()
     await mount(props({ onAction }))
     start()
-    fireEvent.keyDown(window, { key: '3', code: 'Digit3' })
+    fireEvent.keyDown(window, { key: 'ㅐ', code: 'KeyO' }) // 한글 자판에서도
     expect(lastSent(onAction).c).toEqual(['t', 3])
     fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight' })
     expect(lastSent(onAction).c).toEqual(['q', 1])
-    fireEvent.keyDown(window, { key: 'ㄷ', code: 'KeyE' }) // 한글 자판에서도
+    fireEvent.keyDown(window, { key: '3', code: 'Digit3' })
     expect(lastSent(onAction).c).toEqual(['m', 1, 2])
+    fireEvent.keyDown(window, { key: '5', code: 'Numpad5' })
+    expect(lastSent(onAction).c).toEqual(['m', 1, 4])
     fireEvent.keyDown(window, { key: 'ArrowLeft', code: 'ArrowLeft' })
+    expect(lastSent(onAction).c).toEqual(['q', 0])
+    fireEvent.keyDown(window, { key: 'ㅇ', code: 'KeyD' })
+    expect(lastSent(onAction).c).toEqual(['q', 1])
+    fireEvent.keyDown(window, { key: 'ㅁ', code: 'KeyA' })
+    expect(lastSent(onAction).c).toEqual(['q', 0])
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL' })
+    expect(lastSent(onAction).c).toEqual(['q', 1])
+    fireEvent.keyDown(window, { key: 'j', code: 'KeyJ' })
     expect(lastSent(onAction).c).toEqual(['q', 0])
     fireEvent.keyDown(window, { key: ' ', code: 'Space' })
     expect(screen.getByText('계속하려면 누르기')).toBeInTheDocument()
