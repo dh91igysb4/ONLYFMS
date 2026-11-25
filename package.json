@@ -18,7 +18,8 @@
     "football:seasons": "node scripts/football/derive-seasons.ts",
     "football:eras": "node scripts/football/find-eras.ts",
     "football:honours": "node scripts/football/fetch-honours.ts",
-    "ttt:generate": "node scripts/tiki-taka-toe/generate.ts"
+    "ttt:generate": "node scripts/tiki-taka-toe/generate.ts",
+    "ttt:load": "bash scripts/tiki-taka-toe/load.sh"
   },
   "dependencies": {
     "@fontsource/exo-2": "^5.3.0",

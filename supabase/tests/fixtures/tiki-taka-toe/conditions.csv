@@ -1,0 +1,7 @@
+id,kind,label_ko,label_en,ref
+award:x-a,award,테스트 상,Test Award,x-a
+club:x-r,club,행 클럽,Row Club,x-r
+club:x-c,club,열 클럽,Col Club,x-c
+continent:asia,continent,아시아,Asia,asia
+nation:x-n,nation,테스트 나라,Test Nation,x-n
+teammate:Q21621995,teammate,음바페와 뛴 선수,Played with Mbappé,Q21621995
