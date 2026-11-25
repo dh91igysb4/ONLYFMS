@@ -386,4 +386,11 @@ describe('MapPanel: 다른 지역 친구', () => {
     mount()
     expect(panel().textContent).not.toContain('친구')
   })
+
+  it('섬에 있는 친구는 탭 대신 "다른 곳" 줄에 섬 이름으로(내 섬 설계 §5.6)', () => {
+    const away: OnlinePeer[] = [{ id: 'u9', handle: 'kim', area: 'isle-000000000000000000000000000000bb', act: 'walk', tx: 1, ty: 1 }]
+    render(<MapPanel view={makeView()} here={VILLAGE_HERE} now={Date.now} innerWidth={300} layers={DEFAULT_LAYERS} onLayers={() => {}} online={away}
+      names={{ selfId: null, players: [{ id: '00000000-0000-0000-0000-0000000000bb', handle: 'mj' }] }} />)
+    expect(screen.getByTestId('fish-map-away').textContent).toBe('다른 곳: kim mj의 섬')
+  })
 })
