@@ -354,6 +354,11 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       () => setHofError(true),
     )
   }
+  const hofRef = useRef<HallOfFame | null>(null)
+  hofRef.current = hof
+  /** 불러온 게시판에 없는 액자 칸(빈 벽): 행동 없음 */
+  const deadFame = (i: Interaction): boolean =>
+    i?.kind === 'fame' && hofRef.current !== null && boardIndexFor(hofRef.current, gameId, i.slot) === null
   /** 명예의 전당 액자가 있는 맵에 들어왔으면 새로 불러온다 */
   const enteredMap = (m: MapDef) => {
     if (m.fixtures.some((f) => f.act.kind === 'fame')) refreshFame()
@@ -702,6 +707,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         setNotice(null)
         setMenu('elevator')
       } else if (at.kind === 'fame') {
+        if (deadFame(at)) return
         setNotice(null)
         setFameSlot(at.slot)
         refreshFame()
@@ -1484,7 +1490,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     : here?.kind === 'dock' ? DOCK_ACTION
       : here?.kind === 'teleporter' ? (tpOpen(view, rt.map.id) ? TELEPORT_ACTION : GATE_ACTION)
         : here?.kind === 'drill' ? DRILL_ACTION
-          : here ? FIXTURE_ACTION[here.kind] ?? null
+          : here && !deadFame(here) ? FIXTURE_ACTION[here.kind] ?? null
             : null
   const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
   const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]

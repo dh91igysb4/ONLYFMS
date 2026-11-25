@@ -3192,7 +3192,7 @@ describe('마을회관', () => {
 
   test('잠긴 6번 문 앞: 행동 살펴보기 → 안내', async () => {
     stubTouch()
-    await mount(makeView(), at(11, 10, 'up'))
+    await mount(makeView(), at(11, 10, 'down'))
     expect(actionButton()).toHaveTextContent('살펴보기')
     await act1()
     expect(screen.getByText('곤의 라면가게 · 준비 중이에요')).toBeInTheDocument()
@@ -3225,6 +3225,15 @@ describe('마을회관', () => {
     expect(within(panel).getByText('요트 다이스 · 레이팅')).toBeInTheDocument()
     expect(within(panel).getByText('아직 기록이 없어요')).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '다음' })).toBeDisabled()
+  })
+
+  test('게시판이 없는 빈 벽 액자 칸(사이트 게시판 수 이상)에서는 보기가 없다', async () => {
+    stubTouch()
+    fameGate.load = () => Promise.resolve({ records: [], site: [board('ball-run', '볼 런', '최고 점수')] })
+    await mount(makeView(), at(30, 2, 'up'))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('낚시')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
   })
 
   test('명예의 전당 불러오기 실패: 안내, 회관은 그대로', async () => {

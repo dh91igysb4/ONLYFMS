@@ -5,3 +5,6 @@
 dist/
 node_modules/
 .cache/
+
+# Python 캐시(scripts/build-hall-art.py 등)
+__pycache__/

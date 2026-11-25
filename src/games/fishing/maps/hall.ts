@@ -22,9 +22,9 @@ const FIXTURES: Fixture[] = [
   at(18, 14, 'down', { kind: 'laptop' }),
   // 9번 방 옷 가게 행거
   ...many([[29, 12], [29, 13], [29, 14]], 'left', { kind: 'wardrobe' }),
-  // 잠긴 6·8번 문
-  ...many([[11, 10], [12, 10]], 'up', { kind: 'notice', text: '곤의 라면가게 · 준비 중이에요' }),
-  ...many([[21, 10], [22, 10]], 'up', { kind: 'notice', text: '들어갈 수 없어요' }),
+  // 잠긴 6·8번 문(방은 복도 아래쪽이라 문을 아래로 본다)
+  ...many([[11, 10], [12, 10]], 'down', { kind: 'notice', text: '곤의 라면가게 · 준비 중이에요' }),
+  ...many([[21, 10], [22, 10]], 'down', { kind: 'notice', text: '들어갈 수 없어요' }),
   // 엘리베이터(문은 왼쪽 벽) · 계단(왼쪽 위가 열림)
   ...many([[37, 3], [37, 4], [37, 5]], 'right', { kind: 'elevator' }),
   ...many([[37, 11], [37, 12]], 'right', { kind: 'notice', text: '2층은 공사 중이에요' }),
