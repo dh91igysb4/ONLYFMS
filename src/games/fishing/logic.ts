@@ -242,6 +242,8 @@ export type Action =
   | { type: 'lock'; index: number; locked: boolean }
   // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed. species·sizeCm이 그 칸과 다르면 bag_changed
   | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number; at?: DiscardAt }
+  // 여러 마리 한 번에(v21): fee는 합계. 하나라도 틀리면 아무것도 버리지 않는다
+  | { type: 'discardMany'; items: { index: number; species: string; sizeCm: number }[]; fee: number; at?: DiscardAt }
   // 마을회관 냉장고(v18): species·sizeCm이 그 칸과 다르면 bag_changed / fridge_changed
   | { type: 'store'; index: number; species: string; sizeCm: number }
   | { type: 'takeOut'; index: number; species: string; sizeCm: number }
@@ -473,6 +475,29 @@ function discard(state: State, a: Record<string, unknown>, gold: number): Out {
 }
 
 const validIndex = (i: unknown, len: number): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < len
+
+/**
+ * 여러 마리 한 번에 버리기(v21). 요청 한 번(마리마다 보내면 요청이 많아진다). 모두 검사하고 하나라도 틀리면 아무것도 버리지 않는다.
+ * fee는 화면이 본 합계(마리마다 discardFee를 더한 값)
+ */
+function discardMany(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!Array.isArray(a.items) || a.items.length === 0) return { error: 'bad_action' }
+  if (a.at !== undefined && a.at !== 'bag' && a.at !== 'trash') return { error: 'bad_action' }
+  const at: DiscardAt = a.at === 'trash' ? 'trash' : 'bag'
+  const picked = new Set<number>()
+  let fee = 0
+  for (const it of a.items as unknown[]) {
+    if (!isObj(it) || !validIndex(it.index, state.bag.length) || picked.has(it.index)) return { error: 'bad_action' }
+    const f = state.bag[it.index]
+    if (it.species !== f.species || it.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+    if (f.locked) return { error: 'locked' }
+    picked.add(it.index)
+    fee += discardFee(f, state.buffs ?? [], at)
+  }
+  if (a.fee !== fee) return { error: 'price_changed' }
+  if (gold < fee) return { error: 'not_enough_gold' }
+  return { state: { ...state, bag: state.bag.filter((_, j) => !picked.has(j)) }, result: { fee, n: picked.size }, gold: -fee }
+}
 
 /** 가방 칸 → 냉장고 끝(잠금 유지) */
 function store(state: State, a: Record<string, unknown>): Out {
@@ -784,7 +809,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
   // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
-  version: 20,
+  // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
+  version: 21,
   wallet: true,
   init,
   migrate,
@@ -827,6 +853,8 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return takeOut(state, action)
     case 'discard':
       return discard(state, action, ctx.gold)
+    case 'discardMany':
+      return discardMany(state, action, ctx.gold)
     case 'buyRod':
       return buyRod(state, action, ctx.gold)
     case 'buyBag':

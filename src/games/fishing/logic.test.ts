@@ -361,7 +361,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(20)
+    expect(logic.version).toBe(21)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -2143,6 +2143,43 @@ describe('구매 가격 확인 (v15)', () => {
 })
 
 // ---------------------------------------------------------------- 버리기·환경부담금 (설계 2026-11-25-fishing-brag-discard, v16)
+describe('여러 마리 버리기 discardMany (logic.version 21)', () => {
+  const f = (species: string, sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ species, sizeCm, perfect: false, ...extra })
+  const bag = [f('mackerel', 40), f('anchovy', 12), f('mackerel', 30, { locked: true }), f('goby', 15)]
+  const item = (i: number) => ({ index: i, species: bag[i].species, sizeCm: bag[i].sizeCm })
+  const feeOf = (idx: number[], at: 'bag' | 'trash' = 'bag') => idx.reduce((a, i) => a + discardFee(bag[i], [], at), 0)
+  const many = (idx: number[], over: Record<string, unknown> = {}) => ({ type: 'discardMany', items: idx.map(item), fee: feeOf(idx), at: 'bag', ...over }) as unknown as Action
+  it('두 마리를 한 번에: 남은 물고기 순서 그대로, 골드 −합계, result {fee, n}', () => {
+    const fee = feeOf([0, 3])
+    const r = ok(play(deepFreeze(fresh({ gold: fee, bag })), many([0, 3]), ctx()))
+    expect(r.state.bag).toEqual([bag[1], bag[2]])
+    expect(r.state.gold).toBe(0)
+    expect(r.result).toEqual({ fee, n: 2 })
+  })
+  it('쓰레기통(at trash)은 마리마다 5% 요금의 합', () => {
+    const fee = feeOf([0, 1, 3], 'trash')
+    const r = ok(play(fresh({ gold: 1e6, bag }), many([3, 0, 1], { fee, at: 'trash' }), ctx()))
+    expect(r.state.bag).toEqual([bag[2]])
+    expect(r.result).toEqual({ fee, n: 3 })
+  })
+  it('중복 칸·빈 목록·형식 오류·범위 밖·잘못된 at은 bad_action', () => {
+    const s = deepFreeze(fresh({ gold: 1e6, bag }))
+    expect(err(play(s, many([0, 0]), ctx()))).toBe('bad_action')
+    expect(err(play(s, many([]), ctx()))).toBe('bad_action')
+    expect(err(play(s, { type: 'discardMany', items: 'x', fee: 1, at: 'bag' } as unknown as Action, ctx()))).toBe('bad_action')
+    expect(err(play(s, { type: 'discardMany', items: [{ index: 9, species: 'goby', sizeCm: 15 }], fee: 1, at: 'bag' } as unknown as Action, ctx()))).toBe('bad_action')
+    expect(err(play(s, { type: 'discardMany', items: [null], fee: 1, at: 'bag' } as unknown as Action, ctx()))).toBe('bad_action')
+    expect(err(play(s, many([0], { at: 'sea' }), ctx()))).toBe('bad_action')
+  })
+  it('하나라도 틀리면 아무것도 버리지 않는다: 칸 다름 bag_changed, 잠김 locked, 합계 다름 price_changed, 골드 모자람 not_enough_gold', () => {
+    const s = deepFreeze(fresh({ gold: 1e6, bag }))
+    expect(err(play(s, { type: 'discardMany', items: [item(0), { index: 1, species: 'goby', sizeCm: 12 }], fee: feeOf([0, 1]), at: 'bag' } as unknown as Action, ctx()))).toBe('bag_changed')
+    expect(err(play(s, many([0, 2]), ctx()))).toBe('locked')
+    expect(err(play(s, many([0, 1], { fee: feeOf([0, 1]) - 1 }), ctx()))).toBe('price_changed')
+    expect(err(play(deepFreeze(fresh({ gold: feeOf([0, 1]) - 1, bag })), many([0, 1]), ctx()))).toBe('not_enough_gold')
+  })
+})
+
 describe('버리기', () => {
   const mack = (sizeCm = 40): Fish => ({ species: 'mackerel', sizeCm, perfect: false })
   it('discardFee(v18): 가방은 판매가(감쇠 전, 버프 포함)의 50% 올림, 쓰레기통은 5% 올림, 최소 1', () => {
@@ -2189,8 +2226,8 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 20', () => {
-    expect(logic.version).toBe(20)
+  it('version 21', () => {
+    expect(logic.version).toBe(21)
   })
 })
 
