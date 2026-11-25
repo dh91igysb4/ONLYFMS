@@ -3593,6 +3593,36 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     expect(lastScene().map.id).toBe('village')
   })
 
+  test('응답을 기다리는 동안 창을 닫으면 응답이 와도 출발하지 않는다(구경·고르기)', async () => {
+    playersMock.mockResolvedValue([{ id: FRIEND, handle: 'mj', avatar: null }])
+    let resolveVisit: (v: unknown) => void = () => {}
+    visitMock.mockImplementation(() => new Promise((r) => { resolveVisit = r as (v: unknown) => void }) as ReturnType<typeof worldVisit>)
+    const view = makeView()
+    await openBoat(view)
+    fireEvent.click(within(boatPanel()).getByRole('button', { name: '친구 섬' }))
+    await flush()
+    fireEvent.click(within(boatPanel()).getByRole('button', { name: 'mj의 섬' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    resolveVisit({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: { layout: 'twin' }, outfit: DEFAULT_OUTFIT } })
+    await flush()
+    await advance(400)
+    expect(lastScene().map.id).toBe('village')
+
+    await interact()
+    fireEvent.click(within(boatPanel()).getByRole('button', { name: '내 섬' }))
+    await advance(300)
+    let resolveChoose: (v: unknown) => void = () => {}
+    route({ isleChoose: () => new Promise((r) => { resolveChoose = r as (v: unknown) => void }) as ReturnType<Handler> })
+    fireEvent.click(within(isleChoosePanel()).getByRole('button', { name: '초승달 섬' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    resolveChoose({ view: { ...view, isle: { layout: 'crescent' } }, result: null, server_now: Date.now() })
+    await flush()
+    await advance(400)
+    expect(lastScene().map.id).toBe('village')
+  })
+
   test('이미 고른 내 섬: 배 창의 내 섬은 바로 출발, 섬 선착장 → 마을 (42,28)', async () => {
     await openBoat(makeView({ isle: { layout: 'twin' } }))
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '내 섬' }))

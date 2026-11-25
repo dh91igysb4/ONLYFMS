@@ -886,6 +886,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         setBoatNote('섬에 갈 수 없어요')
         return
       }
+      // 기다리는 동안 창을 닫았거나 다른 곳으로 가는 중이면 출발하지 않는다
+      if (menuRef.current !== 'boat' || rt.trans) return
       rt.isleView = res.view
       goIsle(layout, p.id, res.owner?.handle || p.handle)
     } catch {
@@ -901,7 +903,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const res = await act({ type: 'isleChoose', layout })
       if (!alive.current) return
       const got = res.view.isle?.layout
-      if (got) goIsle(got, null)
+      // 고른 섬은 저장됐다. 기다리는 동안 창을 닫았거나 다른 곳으로 가는 중이면 출발만 하지 않는다(다음 "내 섬"에서 출발)
+      if (got && menuRef.current === 'isle' && !rt.trans) goIsle(got, null)
     } catch (e) {
       if (!alive.current) return
       const code = codeOf(e)
