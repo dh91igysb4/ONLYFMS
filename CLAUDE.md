@@ -57,7 +57,7 @@
 1. `logic.ts`의 `logic.version`을 올린다.
 2. `migrate`가 옛 버전 세이브를 읽는지 `logic.test.ts`에 테스트를 추가한다 (세이브는 서버에 계속 남아 있다).
 3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
-4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 + 사이트 상한으로 목표 약 34일 ±20%, 지갑 설계 §4.1·낚시 5부 §8)를 다시 잰다: `src/games/fishing/econSim.ts`가 실제 사이트 상한(`economy.ts` `SOFT_CAP_TIERS`)으로 재고, `fishing/gold.test.ts`와 `src/games/economyPace.test.ts`의 기록 값·날짜 검사가 통과해야 한다.
+4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 약 30일, 27~41일, 설계 `2026-11-25-fishing-sell-decay-design.md`)를 다시 잰다: `src/games/fishing/econSim.ts`가 판매 마릿수 감쇠(`data.ts` `SELL_DECAY`)로 재고, `fishing/gold.test.ts`의 기록 값·날짜 검사가 통과해야 한다. 낚시 수입(`world`)은 사이트 하루 상한을 받지 않는다(상한은 미니게임 `free`만).
 5. 골드는 지갑에 있다(logic.version 14부터, `wallet: true`). 새 골드 행동은 `ctx.gold`로 검사하고 `apply`의 `gold`로 증감을 돌려준다. 세이브(`State`)에 골드를 두지 않는다. `world`를 v14 아래로 되돌리지 않는다(`docs/deploy-checklist.md` "지갑 켜기").
 
 ## 로직 버전 규칙

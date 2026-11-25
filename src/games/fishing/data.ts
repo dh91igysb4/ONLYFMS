@@ -67,9 +67,9 @@ export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: str
   cave: { price: 15000, name: '동굴 장비' },
   island: { price: 50000, name: '배' },
   tideflat: { price: 30000, name: '갯벌 장화' },
-  swamp: { price: 60000, name: '늪 나무 데크' },
-  summit: { price: 120000, name: '등산 장비' },
-  wreck: { price: 150000, name: '원양 어선', minRod: 5 },
+  swamp: { price: 132000, name: '늪 나무 데크' },
+  summit: { price: 264000, name: '등산 장비' },
+  wreck: { price: 330000, name: '원양 어선', minRod: 5 },
 }
 export const LEGEND_CHANCE = 0.08
 
@@ -244,8 +244,8 @@ export const RODS: Rod[] = [
   { tier: 3, name: '카본 낚싯대', price: 8000, barBonus: 0.3, biteScale: 1, weights: { common: 50, uncommon: 34, rare: 16 } },
   { tier: 4, name: '명장의 낚싯대', price: 40000, barBonus: 0.45, biteScale: 0.8, weights: { common: 46, uncommon: 34, rare: 20 } },
   // 고급 장비(6단계 마무리): 버는 속도를 조금씩 올린다(효과는 갈수록 작게). 낚시 5부: 백골은 난파선 앞바다(어종 모두 5)를 열고, 용왕의 낚싯대는 신화 용왕을 낚는다
-  { tier: 5, name: '백골 낚싯대', price: 280000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
-  { tier: 6, name: '용왕의 낚싯대', price: 620000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
+  { tier: 5, name: '백골 낚싯대', price: 448000, barBonus: 0.48, biteScale: 0.72, weights: { common: 44, uncommon: 34, rare: 22 } },
+  { tier: 6, name: '용왕의 낚싯대', price: 992000, barBonus: 0.5, biteScale: 0.66, weights: { common: 42, uncommon: 34, rare: 24 } },
 ]
 
 /** 낚싯대 요구 문구 머리("백골 낚싯대 이상"). 해금 창·지도·오류 문구가 함께 쓴다. 모르는 단계는 "n단계 낚싯대 이상" */
@@ -273,8 +273,8 @@ export const BAGS: readonly { tier: BagTier; size: number; price: number }[] = [
   { tier: 2, size: 30, price: 800 },
   { tier: 3, size: 40, price: 5000 },
   // 고급 가방(6단계 마무리)
-  { tier: 4, size: 50, price: 50000 },
-  { tier: 5, size: 60, price: 100000 },
+  { tier: 4, size: 50, price: 80000 },
+  { tier: 5, size: 60, price: 160000 },
 ]
 /** 모르는 tier는 기본 가방(20칸) */
 export function bagSize(tier: number): number {
@@ -302,3 +302,14 @@ export function tackleSlots(rodTier: number): number {
   return rodTier === 3 ? 1 : rodTier === 4 || rodTier === 5 ? 2 : rodTier === 6 ? 3 : 0
 }
 export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curiousRare: 1.5, curiousLegend: 1.5, curiousMythic: 1.5 } as const
+
+/**
+ * 판매 마릿수 감쇠(설계 2026-11-25-fishing-sell-decay-design.md): KST 하루에 판 n번째 물고기의 판매가 배율(%).
+ * [이 마릿수까지, 배율] 차례. 후반 가격(장비 ×1.6, 지역 ×2.2, 갯벌 제외)과 함께 하루 1시간 약 30일에 맞췄다(econSim)
+ */
+export const SELL_DECAY: readonly (readonly [upTo: number, pct: number])[] = [
+  [150, 100],
+  [300, 50],
+  [450, 20],
+  [Infinity, 5],
+]

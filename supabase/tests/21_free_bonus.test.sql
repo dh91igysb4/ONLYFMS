@@ -91,7 +91,7 @@ insert into public.free_plays (client_id, user_id, game_id, logic_version, solve
 values ('22222222-0000-0000-0000-000000000041', :'u4', 'g-fbbig', 1, false, 10, 3);   -- 10,000 × 5 = 50,000
 reset role;
 select is((select row(delta, raw_delta)::text from public.gold_ledger where ref = '22222222-0000-0000-0000-000000000041'),
-  row(34600::bigint, 50000::bigint)::text, 'u4: 보너스 뒤 50,000 → 사이트 2단 상한으로 34,600 (raw_delta 50,000)');
+  row(43791::bigint, 50000::bigint)::text, 'u4: 보너스 뒤 50,000 → 사이트 2단 상한으로 43,791 (75%·50%, raw_delta 50,000)');
 
 -- ---------------------------------------------------------------- 다른 골드에는 곱하지 않는다
 select is(public._gold_move(:'u1', 100, 'world', 'fb-w1', 'w-a'), 388::bigint,

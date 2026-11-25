@@ -88,14 +88,14 @@ describe('fishing data', () => {
     expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
     expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
   })
-  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/60000, 산정·난파선 120000/150000(난파선은 백골 이상)', () => {
+  it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/132000, 산정·난파선 264000/330000(v15)(난파선은 백골 이상)', () => {
     expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
-    expect(UNLOCKS.summit).toEqual({ price: 120000, name: '등산 장비' })
-    expect(UNLOCKS.wreck).toEqual({ price: 150000, name: '원양 어선', minRod: 5 })
+    expect(UNLOCKS.summit).toEqual({ price: 264000, name: '등산 장비' })
+    expect(UNLOCKS.wreck).toEqual({ price: 330000, name: '원양 어선', minRod: 5 })
     expect(AREAS.find((a) => a.id === 'summit')).toEqual({ id: 'summit', name: '산정 호수', spots: ['ice', 'hotspring'] })
     expect(AREAS.find((a) => a.id === 'wreck')).toEqual({ id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 })
     expect(UNLOCKS.tideflat).toEqual({ price: 30000, name: '갯벌 장화' })
-    expect(UNLOCKS.swamp).toEqual({ price: 60000, name: '늪 나무 데크' })
+    expect(UNLOCKS.swamp).toEqual({ price: 132000, name: '늪 나무 데크' })
     expect(AREAS.find((a) => a.id === 'tideflat')).toEqual({ id: 'tideflat', name: '갯벌', spots: ['estuary', 'creek'], tideSpots: ['creek'] })
     expect(AREAS.find((a) => a.id === 'swamp')).toEqual({ id: 'swamp', name: '늪지', spots: ['marsh', 'bog'] })
     expect(UNLOCKS.lake).toEqual({ price: 5000, name: '무너진 다리 수리' })
@@ -121,7 +121,7 @@ describe('fishing data', () => {
       expect(Object.keys(r.weights).sort()).toEqual(['common', 'rare', 'uncommon'])
       expect(Object.values(r.weights).reduce((a, b) => a + b)).toBe(100)
     }
-    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000, 280_000, 620_000])
+    expect(RODS.map((r) => r.price)).toEqual([0, 1500, 8000, 40000, 448_000, 992_000])
   })
 })
 

@@ -9,7 +9,8 @@
 export const REF = 20500
 
 /**
- * 사이트 하루 상한(설계 §5.6, 2026-11-24 2단 상한 개정). world(+)·free·daily_prize의 오늘(KST) 실제 수입 합계 기준.
+ * 사이트 하루 상한(설계 §5.6, 2026-11-24 2단 상한 개정). free·daily_prize의 오늘(KST) 실제 수입 합계 기준.
+ * 2026-11-25부터 낚시(world)는 상한을 받지 않고 합계에도 들지 않는다(판매 마릿수 감쇠, 설계 2026-11-25-fishing-sell-decay-design.md).
  * 들어간 합계가 DAILY_SOFT_CAP까지는 다, DAILY_SOFT_CAP_2까지는 SOFT_CAP_RATE, 그 위는 SOFT_CAP_RATE_2만 들어간다.
  * 2026-11-24 사용자 결정: 지급률 20%·4% → 75%·50%.
  */
@@ -36,7 +37,7 @@ const R1 = Math.round(SOFT_CAP_RATE * PER_MILLE) // 750
 const R2 = Math.round(SOFT_CAP_RATE_2 * PER_MILLE) // 500
 
 /**
- * _gold_move와 같은 식. 줄이는 reason(world·free)의 수입 `amount`가 실제로 들어갈 양.
+ * _gold_move와 같은 식. 줄이는 reason(free)의 수입 `amount`가 실제로 들어갈 양.
  * earnedToday = 오늘(KST) 이미 들어간 수입 합계(my_wallet earned_today).
  * 정수 연산(지급률은 천분율)으로 부동소수 오차 없이 마지막에 한 번 내림한다.
  */

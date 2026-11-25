@@ -1,6 +1,7 @@
 -- 지갑·골드 장부·사이트 하루 상한 (지갑 1단계 Task 1, 설계 §5)
 -- 장부·지갑 변경은 슈퍼유저(= Edge Function의 소유자 연결)로 _gold_move를 부른다.
--- 사이트 상한 경우마다 새 사용자(c1~c9)로 시작한다. cap 30,750 · rate 0.2 기준.
+-- 사이트 상한 경우마다 새 사용자(c1~c9)로 시작한다. cap 30,750 · rate 0.75 기준(2026-11-24 개정).
+-- 2026-11-25부터 상한은 free에만 걸리고 world는 줄지 않으며 합계에도 들지 않는다(설계 2026-11-25-fishing-sell-decay).
 begin;
 select plan(104);
 
@@ -46,7 +47,7 @@ select has_function('public', 'my_wallet', 'has my_wallet');
 select has_function('public', 'user_wallet', array['text'], 'has user_wallet');
 select has_function('public', 'admin_gold_adjust', array['text', 'bigint', 'text'], 'has admin_gold_adjust');
 select has_function('public', 'admin_gold_ledger', array['integer'], 'has admin_gold_ledger');
-select ok(public._economy() @> '{"daily_soft_cap":30750,"soft_cap_rate":0.2,"daily_soft_cap_2":41000,"soft_cap_rate_2":0.04}'::jsonb,
+select ok(public._economy() @> '{"daily_soft_cap":30750,"soft_cap_rate":0.75,"daily_soft_cap_2":41000,"soft_cap_rate_2":0.5}'::jsonb,
   '_economy: economy.ts 사본 상한 키 (2단 상한은 16_soft_cap_tier2, 상금·판돈·참가비는 18_settle_daily)');
 
 -- ---------------------------------------------------------------- _gold_move 기본 (Review Focus 2)
@@ -90,26 +91,26 @@ select throws_ok($$insert into public.gold_ledger (user_id, delta, balance_after
 rollback to savepoint s_c4;
 
 -- ---------------------------------------------------------------- 사이트 하루 상한 (Review Focus 6)
--- c1: free 20,000 → 20,000; free 20,000 → 12,600; world 100 → 20; free 4 → 0
+-- c1: free 20,000 → 20,000; free 20,000 → 17,687; world 100 → 100(줄지 않음); free 1 → 0
 select is(public._gold_move(:'c1', 20000, 'free', 'a', 'g1'), 20000::bigint, 'cap: free +20,000 다 들어감');
 select is((select raw_delta from public.gold_ledger where user_id = :'c1' and ref = 'a'), null::bigint, 'cap: 안 줄면 raw_delta null');
-select is(public._gold_move(:'c1', 20000, 'free', 'b', 'g1'), 32600::bigint, 'cap: free +20,000 → 12,600 (10,750 + 1,850)');
+select is(public._gold_move(:'c1', 20000, 'free', 'b', 'g1'), 37687::bigint, 'cap: free +20,000 → 17,687 (10,750 + 6,937)');
 select is((select row(delta, raw_delta)::text from public.gold_ledger where user_id = :'c1' and ref = 'b'),
-  row(12600::bigint, 20000::bigint)::text, 'cap: 장부 delta 12,600 · raw_delta 20,000');
-select is(public._gold_move(:'c1', 100, 'world', 'c', 'g2'), 32620::bigint, 'cap: world +100 → 20 (world·free 합계 공유)');
-select is(public._gold_move(:'c1', 4, 'free', 'd', 'g1'), 32620::bigint, 'cap: free +4 → 0, 잔액 그대로');
+  row(17687::bigint, 20000::bigint)::text, 'cap: 장부 delta 17,687 · raw_delta 20,000');
+select is(public._gold_move(:'c1', 100, 'world', 'c', 'g2'), 37787::bigint, 'cap: world +100 → 100 (낚시는 상한 밖)');
+select is(public._gold_move(:'c1', 1, 'free', 'd', 'g1'), 37787::bigint, 'cap: free +1 → floor(0.75) = 0, 잔액 그대로');
 select is((select count(*)::int from public.gold_ledger where user_id = :'c1' and ref = 'd'), 0, 'cap: got 0 → 장부 줄 없음');
 
 -- c2: 지출은 합계를 줄이지 않는다
-select is(public._gold_move(:'c2', 30000, 'world', 'a'), 30000::bigint, 'cap: world +30,000');
+select is(public._gold_move(:'c2', 30000, 'free', 'a', 'g1'), 30000::bigint, 'cap: free +30,000');
 select is(public._gold_move(:'c2', -10000, 'world', 'b'), 20000::bigint, 'cap: world −10,000');
-select is(public._gold_move(:'c2', 1000, 'free', 'c', 'g1'), 20800::bigint, 'cap: free +1,000 → 800 (지출은 합계를 줄이지 않음)');
+select is(public._gold_move(:'c2', 1000, 'free', 'c', 'g1'), 20937::bigint, 'cap: free +1,000 → 937 (지출은 합계를 줄이지 않음)');
 
 -- c3: daily_prize는 세되 줄이지 않는다
-select is(public._gold_move(:'c3', 30000, 'world', 'a'), 30000::bigint, 'cap: world +30,000');
+select is(public._gold_move(:'c3', 30000, 'free', 'a', 'g1'), 30000::bigint, 'cap: free +30,000');
 select is(public._gold_move(:'c3', 6150, 'daily_prize', 'k1', 'g1'), 36150::bigint, 'cap: daily_prize +6,150 그대로');
 select is((select raw_delta from public.gold_ledger where user_id = :'c3' and ref = 'k1'), null::bigint, 'cap: daily_prize raw_delta null');
-select is(public._gold_move(:'c3', 100, 'free', 'b', 'g1'), 36170::bigint, 'cap: 상금 뒤 free +100 → 20 (상금도 합계에 듦)');
+select is(public._gold_move(:'c3', 100, 'free', 'b', 'g1'), 36225::bigint, 'cap: 상금 뒤 free +100 → 75 (상금도 합계에 듦)');
 
 -- c4: migrate·admin·duel_payout·contest_prize는 세지 않는다
 select is(public._gold_move(:'c4', 100000, 'migrate', 'fishing', 'fishing'), 100000::bigint, 'cap: migrate 그대로');
@@ -119,10 +120,10 @@ select is(public._gold_move(:'c4', 50000, 'contest_prize', 'k1'), 300000::bigint
 select is(public._gold_move(:'c4', 100, 'free', 'a', 'g1'), 300100::bigint, 'cap: 옮기는 돈 뒤 free +100 → 100');
 
 -- c5: 합계가 넘은 상태에서도 옮기는 돈은 줄이지 않는다
-select is(public._gold_move(:'c5', 40000, 'world', 'a'), 32600::bigint, 'cap: world +40,000 → 32,600');
-select is(public._gold_move(:'c5', 500, 'duel_refund', 'm1'), 33100::bigint, 'cap: duel_refund 그대로');
-select is(public._gold_move(:'c5', 500, 'contest_refund', 'k1'), 33600::bigint, 'cap: contest_refund 그대로');
-select is(public._gold_move(:'c5', 500, 'duel_payout', 'm2'), 34100::bigint, 'cap: duel_payout 그대로');
+select is(public._gold_move(:'c5', 40000, 'free', 'a', 'g1'), 37687::bigint, 'cap: free +40,000 → 37,687');
+select is(public._gold_move(:'c5', 500, 'duel_refund', 'm1'), 38187::bigint, 'cap: duel_refund 그대로');
+select is(public._gold_move(:'c5', 500, 'contest_refund', 'k1'), 38687::bigint, 'cap: contest_refund 그대로');
+select is(public._gold_move(:'c5', 500, 'duel_payout', 'm2'), 39187::bigint, 'cap: duel_payout 그대로');
 
 -- c6·c7: KST 자정 경계
 insert into public.gold_ledger (user_id, delta, balance_after, reason, ref, game_id, created_at) values
@@ -131,7 +132,7 @@ insert into public.gold_ledger (user_id, delta, balance_after, reason, ref, game
   (:'c7', 30750, 30750, 'free', 'old', 'g1',
    ((date_trunc('day', now() at time zone 'Asia/Seoul')) at time zone 'Asia/Seoul'));
 select is(public._gold_move(:'c6', 100, 'free', 'a', 'g1'), 100::bigint, 'cap: 어제(KST 0시 − 1초) 줄은 세지 않음');
-select is(public._gold_move(:'c7', 100, 'free', 'a', 'g1'), 20::bigint, 'cap: 오늘 KST 0시 정각 줄은 셈');
+select is(public._gold_move(:'c7', 100, 'free', 'a', 'g1'), 75::bigint, 'cap: 오늘 KST 0시 정각 줄은 셈');
 
 -- c8: 중복은 상한 계산보다 먼저
 select is(public._gold_move(:'c8', 1000, 'free', 'a', 'g1'), 1000::bigint, 'dup: free +1,000');
@@ -172,7 +173,7 @@ select throws_ok($$select public._economy()$$, '42501', null, '_economy: authent
 select throws_ok($$select public._kst_today_start()$$, '42501', null, '_kst_today_start: authenticated 실행 불가');
 select throws_ok($$select public._earned_today(auth.uid())$$, '42501', null, '_earned_today: authenticated 실행 불가');
 
-select is(public.my_wallet() - 'prizes' - 'free_bonus_pct', '{"balance":0,"today":{},"earned_today":100}'::jsonb, 'my_wallet: free 없음, earned_today는 world +100만 (admin 제외)');
+select is(public.my_wallet() - 'prizes' - 'free_bonus_pct', '{"balance":0,"today":{},"earned_today":0}'::jsonb, 'my_wallet: free 없음, earned_today 0 (world·admin 제외)');
 select is(public.user_wallet('goldb'), 0::bigint, 'user_wallet: 지갑 0');
 select is(public.user_wallet(' GoldB '), 0::bigint, 'user_wallet: handle 정규화');
 select is(public.user_wallet('goldp'), null::bigint, 'user_wallet: 대기 사용자 → null');
@@ -183,14 +184,14 @@ select throws_ok($$select * from public.admin_gold_ledger(5)$$, 'P0001', 'forbid
 -- c9 본인
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000c9","role":"authenticated"}';
 select is(public.my_wallet()->'today', '{"g1":40000,"g2":300}'::jsonb, 'my_wallet.today: 오늘 free 게임별 줄기 전 합계 (어제·world 제외)');
-select is((public.my_wallet()->>'earned_today')::bigint, 32760::bigint,
-  'my_wallet.earned_today: 실제 들어간 수입 합계');
+select is((public.my_wallet()->>'earned_today')::bigint, 37912::bigint,
+  'my_wallet.earned_today: 실제 들어간 free 수입 합계 (world 제외)');
 select is((public.my_wallet()->>'balance')::bigint, (select balance from public.wallets where user_id = auth.uid()), 'my_wallet.balance');
 
--- c1 본인: today는 raw 기준 40,004가 아니라 장부에 남은 줄 기준 40,000
+-- c1 본인: today는 raw 기준 40,001이 아니라 장부에 남은 줄 기준 40,000
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}';
 select is(public.my_wallet()->'today', '{"g1":40000}'::jsonb, 'my_wallet.today: c1 free 40,000');
-select is((public.my_wallet()->>'earned_today')::bigint, 32620::bigint, 'my_wallet.earned_today: c1 32,620');
+select is((public.my_wallet()->>'earned_today')::bigint, 37687::bigint, 'my_wallet.earned_today: c1 37,687 (world 제외)');
 
 -- ---------------------------------------------------------------- 대기 사용자
 set local request.jwt.claims = :'PU';

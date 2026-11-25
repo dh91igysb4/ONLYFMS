@@ -77,8 +77,8 @@ insert into public.attempts (item_id, user_id, state, logic_version, finished, s
   ('00000000-0000-0000-0000-00000000e006', :'d2', '{}', 1, true, 9, 1),
   ('00000000-0000-0000-0000-00000000e007', :'d2', '{}', 1, true, 9, 1);
 
--- d1은 오늘 이미 사이트 상한을 넘었다: world +100,000 → 41,720 들어감
-select public._gold_move(:'d1', 100000, 'world', 'sd-world', 'fishing');
+-- d1은 오늘 이미 사이트 상한을 넘었다: free +100,000 → 68,791 들어감(75%·50%, 2026-11-25부터 world는 상한 밖이라 free로)
+select public._gold_move(:'d1', 100000, 'free', 'sd-world', 'g-other');
 -- d2의 4일 전 상금 줄(prizes에서 빠져야 한다)
 insert into public.gold_ledger (user_id, delta, balance_after, reason, ref, game_id, note, created_at)
 values (:'d2', 100, 100, 'daily_prize', 'old-contest', 'g-daily', '1등', now() - interval '4 days');
@@ -149,9 +149,9 @@ select is((select balance from public.wallets where user_id = :'dp'), null::bigi
 -- 상한과의 관계: 이미 상한을 넘은 d1도 상금 전액, raw_delta null
 select is((select row(delta, raw_delta)::text from public.gold_ledger where user_id = :'d1' and reason = 'daily_prize' and ref = :'k1'),
   row(6150::bigint, null::bigint)::text, 'd1: 상한을 넘은 날에도 상금 전액(raw_delta null)');
-select is((select balance from public.wallets where user_id = :'d1'), (41720 + 6150 * 2)::bigint, 'd1: 41,720 + 6,150 × 2');
-select is(public._gold_move(:'d1', 100, 'free', 'sd-free', 'g-daily'), (41720 + 12300 + 4)::bigint,
-  'd1: 상금 뒤 free 100 → 4 (상금이 합계에 들어감, 4% 구간)');
+select is((select balance from public.wallets where user_id = :'d1'), (68791 + 6150 * 2)::bigint, 'd1: 68,791 + 6,150 × 2');
+select is(public._gold_move(:'d1', 100, 'free', 'sd-free', 'g-daily'), (68791 + 12300 + 50)::bigint,
+  'd1: 상금 뒤 free 100 → 50 (상금이 합계에 들어감, 50% 구간)');
 
 -- ---------------------------------------------------------------- 두 번째 정산·되돌린 뒤 다시
 set local role authenticated;

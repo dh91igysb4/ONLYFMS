@@ -134,7 +134,8 @@ select is((select count(*)::int from public.gold_ledger where user_id = :'f6'), 
 select is((select count(*)::int from public.wallets where user_id = :'f6' and balance <> 0), 0, 'f6: 잔액 없음');
 
 -- ---------------------------------------------------------------- f4: 사이트 하루 상한과 함께 (Review Focus 6)
-select public._gold_move(:'f4', 30750, 'world', 'w1', 'fishing');
+-- 사이트 합계는 free·daily_prize만 센다(2026-11-25부터 낚시 world 제외): 상금으로 채운다(today에는 안 듦)
+select public._gold_move(:'f4', 30750, 'daily_prize', 'w1', 'g-other');
 set local role authenticated;
 set local request.jwt.claims = :'F4';
 insert into public.free_plays (client_id, user_id, game_id, logic_version, solved, score, action_count) values
@@ -149,14 +150,14 @@ insert into public.free_plays (client_id, user_id, game_id, logic_version, solve
 select is(public.my_wallet()->'today', '{"g-free":120}'::jsonb, 'f4 my_wallet.today: 37 + 50 + 33 = 120 (줄기 전)');
 reset role;
 select is((select row(delta, raw_delta)::text from public.gold_ledger where user_id = :'f4' and ref = '44444444-0000-0000-0000-000000000001'),
-  row(7::bigint, 37::bigint)::text, 'f4: 상한 뒤 37 → floor(7.4) = 7, raw_delta 37');
+  row(27::bigint, 37::bigint)::text, 'f4: 상한 뒤 37 → floor(27.75) = 27, raw_delta 37');
 select is((select row(delta, raw_delta)::text from public.gold_ledger where user_id = :'f4' and ref = '44444444-0000-0000-0000-000000000002'),
-  row(10::bigint, 50::bigint)::text, 'f4: 판당 50 → 10');
+  row(37::bigint, 50::bigint)::text, 'f4: 판당 50 → 37');
 select is((select row(delta, raw_delta)::text from public.gold_ledger where user_id = :'f4' and ref = '44444444-0000-0000-0000-000000000003'),
-  row(6::bigint, 33::bigint)::text, 'f4: 게임별 남은 몫 120 − 87 = 33(줄기 전으로 셈) → 6');
+  row(24::bigint, 33::bigint)::text, 'f4: 게임별 남은 몫 120 − 87 = 33(줄기 전으로 셈) → 24');
 select is((select count(*)::int from public.gold_ledger where user_id = :'f4' and ref = '44444444-0000-0000-0000-000000000004'), 0,
   'f4: 그다음 판은 장부 줄 없음');
-select is((select balance from public.wallets where user_id = :'f4'), (30750 + 7 + 10 + 6)::bigint, 'f4: 잔액');
+select is((select balance from public.wallets where user_id = :'f4'), (30750 + 27 + 37 + 24)::bigint, 'f4: 잔액');
 
 -- ---------------------------------------------------------------- f6: 한 문장 여러 행 (행마다 트리거가 앞 행의 장부를 본다)
 set local role authenticated;

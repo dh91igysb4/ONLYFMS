@@ -4,7 +4,7 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, freeBonus, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { challengeMatches, decayedSale, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -323,7 +323,8 @@ function migrateW(raw: unknown, from: number): WS {
   return { ...m, gold: logic.legacyGold!(raw, from) }
 }
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
-const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT } }
+// v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
+const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 } }
 const ok = (r: Played) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
   return r
@@ -340,7 +341,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(14)
+    expect(logic.version).toBe(15)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -449,13 +450,13 @@ describe('fishing WorldLogic', () => {
   })
 
   it('buyBag 1->2 at 800 gold leaves 0 gold, bagTier 2, totalEarned unchanged', () => {
-    const r = ok(play(fresh({ gold: 800, totalEarned: 900 }), { type: 'buyBag', tier: 2 }, ctx()))
+    const r = ok(play(fresh({ gold: 800, totalEarned: 900 }), { type: 'buyBag', tier: 2, price: 800 }, ctx()))
     expect(r.state).toMatchObject({ gold: 0, bagTier: 2, totalEarned: 900 })
   })
 
   it('buyBag 2->3 costs 5000; 799 gold -> not_enough_gold', () => {
-    expect(err(play(fresh({ gold: 799 }), { type: 'buyBag', tier: 2 }, ctx()))).toBe('not_enough_gold')
-    expect(ok(play(fresh({ gold: 5000, bagTier: 2 }), { type: 'buyBag', tier: 3 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 3 })
+    expect(err(play(fresh({ gold: 799 }), { type: 'buyBag', tier: 2, price: 800 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(play(fresh({ gold: 5000, bagTier: 2 }), { type: 'buyBag', tier: 3, price: 5000 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 3 })
   })
 
   it('buyBag rejects skipped, malformed, current and beyond-max tiers', () => {
@@ -467,10 +468,10 @@ describe('fishing WorldLogic', () => {
     expect(err(play(max, { type: 'buyBag', tier: 6 }, ctx()))).toBe('bad_tier')
   })
 
-  it('고급 가방: 3 → 4(50칸, 50,000), 4 → 5(60칸, 100,000)', () => {
-    expect(err(play(fresh({ gold: 49_999, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx()))).toBe('not_enough_gold')
-    expect(ok(play(fresh({ gold: 50_000, bagTier: 3 }), { type: 'buyBag', tier: 4 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
-    expect(ok(play(fresh({ gold: 100_000, bagTier: 4 }), { type: 'buyBag', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
+  it('고급 가방: 3 → 4(50칸, 80,000), 4 → 5(60칸, 160,000) (v15 가격)', () => {
+    expect(err(play(fresh({ gold: 49_999, bagTier: 3 }), { type: 'buyBag', tier: 4, price: 80000 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(play(fresh({ gold: 80_000, bagTier: 3 }), { type: 'buyBag', tier: 4, price: 80000 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
+    expect(ok(play(fresh({ gold: 160_000, bagTier: 4 }), { type: 'buyBag', tier: 5, price: 160000 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
     // 60칸이면 60마리째까지 던지고 61번째는 bag_full
     const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
     expect('state' in play(fresh({ bagTier: 5, bag: fish(59) }), { type: 'cast', area: 'village', power: 0.5 }, ctx())).toBe(true)
@@ -483,7 +484,7 @@ describe('fishing WorldLogic', () => {
       expect(ok(play(fresh({ bagTier: 2, bag: fish(n) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBeTruthy()
     }
     expect(err(play(fresh({ bagTier: 2, bag: fish(30) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
-    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000], [50, 50_000], [60, 100_000]])
+    expect(BAGS.map((b) => [b.size, b.price])).toEqual([[20, 0], [30, 800], [40, 5000], [50, 80_000], [60, 160_000]])
     expect(bagSize(99)).toBe(20)
   })
 
@@ -718,21 +719,21 @@ describe('fishing WorldLogic', () => {
   })
 
   it('buyRod: 1->2 at 1500 gold leaves 0 and keeps totalEarned; 1499 -> not_enough_gold; bad tiers', () => {
-    const r = ok(play(fresh({ gold: 1500, totalEarned: 2000 }), { type: 'buyRod', tier: 2 }, ctx()))
+    const r = ok(play(fresh({ gold: 1500, totalEarned: 2000 }), { type: 'buyRod', tier: 2, price: 1500 }, ctx()))
     expect(r.state.rodTier).toBe(2)
     expect(r.state.gold).toBe(0)
     expect(r.state.totalEarned).toBe(2000)
-    expect(err(play(fresh({ gold: 1499 }), { type: 'buyRod', tier: 2 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 1499 }), { type: 'buyRod', tier: 2, price: 1500 }, ctx()))).toBe('not_enough_gold')
     const rich = deepFreeze(fresh({ gold: 1e6 }))
     for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 5]) {
       expect(err(play(rich, { type: 'buyRod', tier } as unknown as Action, ctx()))).toBe('bad_tier')
     }
   })
 
-  it('고급 낚싯대: 4 → 5(280,000), 5 → 6(620,000), 6에서 더 없음', () => {
-    expect(err(play(fresh({ gold: 279_999, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx()))).toBe('not_enough_gold')
-    expect(ok(play(fresh({ gold: 280_000, rodTier: 4 }), { type: 'buyRod', tier: 5 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 5 })
-    expect(ok(play(fresh({ gold: 620_000, rodTier: 5 }), { type: 'buyRod', tier: 6 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 6 })
+  it('고급 낚싯대: 4 → 5(448,000), 5 → 6(992,000), 6에서 더 없음 (v15 가격)', () => {
+    expect(err(play(fresh({ gold: 279_999, rodTier: 4 }), { type: 'buyRod', tier: 5, price: 448000 }, ctx()))).toBe('not_enough_gold')
+    expect(ok(play(fresh({ gold: 448_000, rodTier: 4 }), { type: 'buyRod', tier: 5, price: 448000 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 5 })
+    expect(ok(play(fresh({ gold: 992_000, rodTier: 5 }), { type: 'buyRod', tier: 6, price: 992000 }, ctx())).state).toMatchObject({ gold: 0, rodTier: 6 })
     expect(err(play(fresh({ gold: 1e9, rodTier: 6 }), { type: 'buyRod', tier: 7 }, ctx()))).toBe('bad_tier')
   })
 
@@ -774,10 +775,10 @@ describe('fishing WorldLogic', () => {
       [withPending(), { type: 'hook' }, BITE + HOOK_WINDOW_MS + HOOK_GRACE_MS + 1],
       [withHooked(), { type: 'hook' }, BITE + 1],
       [fresh(), { type: 'sell' }],
-      [fresh(), { type: 'buyRod', tier: 3 }],
-      [fresh({ gold: 5 }), { type: 'buyRod', tier: 2 }],
-      [fresh(), { type: 'buyBag', tier: 3 }],
-      [fresh({ gold: 799 }), { type: 'buyBag', tier: 2 }],
+      [fresh(), { type: 'buyRod', tier: 3, price: 8000 }],
+      [fresh({ gold: 5 }), { type: 'buyRod', tier: 2, price: 1500 }],
+      [fresh(), { type: 'buyBag', tier: 3, price: 5000 }],
+      [fresh({ gold: 799 }), { type: 'buyBag', tier: 2, price: 800 }],
       [fresh({ gold: 1e6 }), { type: 'buyBag', tier: '2' }],
       [fresh(), { type: 'dance' }],
       [fresh(), null],
@@ -959,7 +960,7 @@ describe('fishing WorldLogic', () => {
 })
 
 describe('지역 해금', () => {
-  const unlock = (area: string) => ({ type: 'unlockArea', area }) as unknown as Action
+  const unlock = (area: string) => ({ type: 'unlockArea', area, price: UNLOCKS[area as AreaId]?.price }) as unknown as Action
   it('unlockArea lake: 골드 6000 → 1000, areas에 lake, totalEarned 그대로; 다시 → already_open', () => {
     const r = ok(play(deepFreeze(fresh({ gold: 6000, totalEarned: 9000 })), unlock('lake'), ctx()))
     expect(r.state.gold).toBe(1000)
@@ -1575,10 +1576,10 @@ describe('지역 최소 낚싯대·물때 자리 (합성 지역)', () => {
     const s4 = deepFreeze(fresh({ rodTier: 4, gold: 5000 }))
     expect(err(play(s4, { type: 'unlockArea', area: TMP_DEEP }, ctx()))).toBe('need_rod')
     expect(err(play(fresh({ rodTier: 4, gold: 0 }), { type: 'unlockArea', area: TMP_DEEP }, ctx()))).toBe('need_rod')
-    const r = ok(play(fresh({ rodTier: 5, gold: 5000 }), { type: 'unlockArea', area: TMP_DEEP }, ctx()))
+    const r = ok(play(fresh({ rodTier: 5, gold: 5000 }), { type: 'unlockArea', area: TMP_DEEP, price: UNLOCKS[TMP_DEEP as AreaId]!.price }, ctx()))
     expect(r.state.areas).toContain(TMP_DEEP)
     expect(r.state.gold).toBe(4000)
-    expect(err(play(fresh({ rodTier: 5, gold: 999 }), { type: 'unlockArea', area: TMP_DEEP }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ rodTier: 5, gold: 999 }), { type: 'unlockArea', area: TMP_DEEP, price: UNLOCKS[TMP_DEEP as AreaId]!.price }, ctx()))).toBe('not_enough_gold')
   })
 })
 
@@ -1592,7 +1593,7 @@ describe('migrate 버프 (v11)', () => {
   })
   it('v10(옷장) 세이브: 산 옷·업적 옷·입은 옷이 그대로 남고 buffs []', () => {
     const v10 = { ...v9, wardrobe: ['hat:straw', 'top:marine', 'hat:crown'], outfit: { ...DEFAULT_OUTFIT, hat: 'straw', top: 'marine' } }
-    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [] })
+    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 } })
     // 옷장 행동은 v11에서도 그대로
     const s = migrateW(v10, 10)
     const r = play(s, { type: 'wear', slot: 'hat', id: 'crown' }, { now: T0, rng: fixedRng })
@@ -1634,13 +1635,13 @@ describe('갯벌·늪지 (logic.version 12)', () => {
     expect('error' in castAt(fresh(), 'tideflat', 'estuary', nowAt(0, 10))).toBe(true)
     expect('error' in castAt(fresh(), 'swamp', 'marsh', nowAt(0, 10))).toBe(true)
   })
-  it('unlockArea: 갯벌 30,000·늪지 60,000', () => {
-    const r = ok(play(fresh({ gold: 90000 }), { type: 'unlockArea', area: 'tideflat' }, ctx()))
-    expect(r.state.gold).toBe(60000)
-    const r2 = ok(play(r.state, { type: 'unlockArea', area: 'swamp' }, ctx()))
+  it('unlockArea: 갯벌 30,000·늪지 132,000(v15 가격)', () => {
+    const r = ok(play(fresh({ gold: 162000 }), { type: 'unlockArea', area: 'tideflat', price: 30000 }, ctx()))
+    expect(r.state.gold).toBe(132000)
+    const r2 = ok(play(r.state, { type: 'unlockArea', area: 'swamp', price: 132000 }, ctx()))
     expect(r2.state.gold).toBe(0)
     expect(r2.state.areas).toEqual([...DEFAULT_AREAS, 'tideflat', 'swamp'])
-    expect(err(play(fresh({ gold: 59999 }), { type: 'unlockArea', area: 'swamp' }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 131999 }), { type: 'unlockArea', area: 'swamp', price: 132000 }, ctx()))).toBe('not_enough_gold')
   })
   it('이무기: 늪지 수렁 비 오는 밤, rod 5 + 백년 가물치·천년 자라 잡음 + 힘 0.95 + r0 0 → 이무기', () => {
     const night = { area: 'swamp' as const, spot: 'bog', cond: cond('spring', 22, 'rain'), power: 0.95 }
@@ -1725,13 +1726,13 @@ describe('산정 호수·난파선 (logic.version 13)', () => {
     }
     expect(err(castAt(deepFreeze(fresh({ rodTier: 4, areas: [...DEFAULT_AREAS, 'island', 'wreck'] })), 'wreck', 'abyss', nowAt(0, 10)))).toBe('need_rod')
   })
-  it('unlockArea: 산정 120,000; 난파선 150,000은 백골 이상(명장 + 골드 충분 → need_rod, 상태 그대로)', () => {
-    const r = ok(play(fresh({ gold: 120000, areas: [...DEFAULT_AREAS, 'lake'] }), { type: 'unlockArea', area: 'summit' }, ctx()))
+  it('unlockArea: 산정 264,000; 난파선 330,000은 (v15 가격) 백골 이상(명장 + 골드 충분 → need_rod, 상태 그대로)', () => {
+    const r = ok(play(fresh({ gold: 264000, areas: [...DEFAULT_AREAS, 'lake'] }), { type: 'unlockArea', area: 'summit', price: 264000 }, ctx()))
     expect(r.state.gold).toBe(0)
     expect(r.state.areas).toEqual([...DEFAULT_AREAS, 'lake', 'summit'])
     const poor = deepFreeze(fresh({ gold: 999999, rodTier: 4, areas: [...DEFAULT_AREAS, 'island'] }))
-    expect(err(play(poor, { type: 'unlockArea', area: 'wreck' }, ctx()))).toBe('need_rod')
-    const r2 = ok(play(fresh({ gold: 150000, rodTier: 5, areas: [...DEFAULT_AREAS, 'island'] }), { type: 'unlockArea', area: 'wreck' }, ctx()))
+    expect(err(play(poor, { type: 'unlockArea', area: 'wreck', price: 330000 }, ctx()))).toBe('need_rod')
+    const r2 = ok(play(fresh({ gold: 330000, rodTier: 5, areas: [...DEFAULT_AREAS, 'island'] }), { type: 'unlockArea', area: 'wreck', price: 330000 }, ctx()))
     expect(r2.state.gold).toBe(0)
     expect(r2.state.areas).toEqual([...DEFAULT_AREAS, 'island', 'wreck'])
   })
@@ -1853,18 +1854,18 @@ describe('v14 지갑 계약', () => {
   const allDone = Object.fromEntries(CHALLENGES.map((c) => [c.id, DONE]))
   const tpAreas = AREAS.map((a) => a.id).filter((id) => teleporterWorld(id) !== null)
   const spends: [string, State, unknown, number][] = [
-    ...RODS.filter((r) => r.tier > 1).map((r): [string, State, unknown, number] => [`buyRod ${r.tier}`, base({ rodTier: (r.tier - 1) as State['rodTier'] }), { type: 'buyRod', tier: r.tier }, r.price]),
-    ...BAGS.filter((b) => b.tier > 1).map((b): [string, State, unknown, number] => [`buyBag ${b.tier}`, base({ bagTier: (b.tier - 1) as State['bagTier'] }), { type: 'buyBag', tier: b.tier }, b.price]),
+    ...RODS.filter((r) => r.tier > 1).map((r): [string, State, unknown, number] => [`buyRod ${r.tier}`, base({ rodTier: (r.tier - 1) as State['rodTier'] }), { type: 'buyRod', tier: r.tier, price: r.price }, r.price]),
+    ...BAGS.filter((b) => b.tier > 1).map((b): [string, State, unknown, number] => [`buyBag ${b.tier}`, base({ bagTier: (b.tier - 1) as State['bagTier'] }), { type: 'buyBag', tier: b.tier, price: b.price }, b.price]),
     ...TACKLES.map((t): [string, State, unknown, number] => [`buyTackle ${t.id}`, base(), { type: 'buyTackle', id: t.id }, t.price]),
     ...(Object.entries(UNLOCKS) as [AreaId, { price: number; minRod?: number }][]).map(([area, u]): [string, State, unknown, number] => [
-      `unlockArea ${area}`, base({ rodTier: (u.minRod ?? 1) as State['rodTier'] }), { type: 'unlockArea', area }, u.price,
+      `unlockArea ${area}`, base({ rodTier: (u.minRod ?? 1) as State['rodTier'] }), { type: 'unlockArea', area, price: u.price }, u.price,
     ]),
     ['teleport village→river', base({ areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island'], challenges: allDone }), { type: 'teleport', from: 'village', to: 'river' }, teleportFee('village', 'river')],
     ...WEAR.filter(isShopItem).map((w): [string, State, unknown, number] => [`buyWear ${w.slot}:${w.id}`, base(), { type: 'buyWear', slot: w.slot, id: w.id }, w.price]),
   ]
 
-  it('version 14, wallet: true, LAST_GOLD_IN_SAVE 13, init·view 세이브에 gold 없음, view.gold = ctx.gold', () => {
-    expect(logic.version).toBe(14)
+  it('version 15(v14 지갑 계약 유지), wallet: true, LAST_GOLD_IN_SAVE 13, init·view 세이브에 gold 없음, view.gold = ctx.gold', () => {
+    expect(logic.version).toBe(15)
     expect(logic.wallet).toBe(true)
     expect(LAST_GOLD_IN_SAVE).toBe(13)
     expect(logic.init()).not.toHaveProperty('gold')
@@ -1896,13 +1897,13 @@ describe('v14 지갑 계약', () => {
   })
 
   it('다른 오류는 잔액 검사보다 먼저다(잔액 0이어도 그 오류)', () => {
-    expect(apply(base(), { type: 'buyRod', tier: 3 }, 0)).toEqual({ error: 'bad_tier' })
+    expect(apply(base(), { type: 'buyRod', tier: 3, price: 8000 }, 0)).toEqual({ error: 'bad_tier' })
     expect(apply(base(), { type: 'buyBag', tier: 9 }, 0)).toEqual({ error: 'bad_tier' })
     expect(apply(base({ tackles: ['cork'] }), { type: 'buyTackle', id: 'cork' }, 0)).toEqual({ error: 'already_owned' })
     expect(apply(base(), { type: 'buyTackle', id: 'zzz' }, 0)).toEqual({ error: 'bad_tackle' })
-    expect(apply(base({ rodTier: 4 }), { type: 'unlockArea', area: 'wreck' }, 0)).toEqual({ error: 'need_rod' })
-    expect(apply(base({ areas: [...DEFAULT_AREAS, 'lake'] }), { type: 'unlockArea', area: 'lake' }, 0)).toEqual({ error: 'already_open' })
-    expect(apply(withPending() as State, { type: 'unlockArea', area: 'lake' }, 0)).toEqual({ error: 'busy' })
+    expect(apply(base({ rodTier: 4 }), { type: 'unlockArea', area: 'wreck', price: 330000 }, 0)).toEqual({ error: 'need_rod' })
+    expect(apply(base({ areas: [...DEFAULT_AREAS, 'lake'] }), { type: 'unlockArea', area: 'lake', price: 5000 }, 0)).toEqual({ error: 'already_open' })
+    expect(apply(withPending() as State, { type: 'unlockArea', area: 'lake', price: 5000 }, 0)).toEqual({ error: 'busy' })
     expect(apply(base(), { type: 'teleport', from: 'village', to: 'village' }, 0)).toEqual({ error: 'same' })
     expect(apply(base(), { type: 'teleport', from: 'village', to: 'river' }, 0)).toEqual({ error: 'not_open' })
     expect(apply(base(), { type: 'buyWear', slot: 'hat', id: 'zzz' }, 0)).toEqual({ error: 'bad_wear' })
@@ -1984,7 +1985,7 @@ describe('v14 지갑 계약', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
-    expect(m).toEqual(rest)
+    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 } })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2025,5 +2026,85 @@ describe('previewData (메인 미리보기 설계 §6)', () => {
   it('지역을 연 상태 → 그 id가 목록에 들어간다', () => {
     const s = { ...logic.init(), areas: [...DEFAULT_AREAS, 'lake' as AreaId] }
     expect(logic.previewData?.(s)?.areas.split(',')).toContain('lake')
+  })
+})
+
+// ---------------------------------------------------------------- 판매 마릿수 감쇠 (설계 2026-11-25-fishing-sell-decay-design.md, v15)
+describe('판매 마릿수 감쇠', () => {
+  // 2026-11-25 12:00 KST = 03:00 UTC
+  const NOON = Date.UTC(2026, 10, 25, 3, 0, 0)
+  const anchovy = (sizeCm = 15): Fish => ({ species: 'anchovy', sizeCm, perfect: false })
+  const nOf = (n: number) => Array.from({ length: n }, () => anchovy())
+
+  it('kstDay: KST 자정 기준 날짜', () => {
+    expect(kstDay(Date.UTC(2026, 10, 24, 14, 59, 59))).toBe('2026-11-24')
+    expect(kstDay(Date.UTC(2026, 10, 24, 15, 0, 0))).toBe('2026-11-25')
+  })
+
+  it('sellRatePct: 1~150 100, 151~300 50, 301~450 20, 그 뒤 5', () => {
+    expect([1, 150, 151, 300, 301, 450, 451, 9999].map(sellRatePct)).toEqual([100, 100, 50, 50, 20, 20, 5, 5])
+  })
+
+  it('soldToday: 날짜가 오늘이 아니면 0', () => {
+    expect(soldToday({ day: '2026-11-25', n: 7 }, NOON)).toBe(7)
+    expect(soldToday({ day: '2026-11-24', n: 7 }, NOON)).toBe(0)
+    expect(soldToday({ day: '', n: 0 }, NOON)).toBe(0)
+  })
+
+  it('decayedSale: 경계를 넘는 판매는 한 마리씩 배율, 물고기마다 반올림', () => {
+    const p = sellPrice(anchovy())
+    const r = decayedSale(nOf(3), [], 149)
+    expect(r.earned).toBe(p + 2 * Math.round((p * 50) / 100))
+    expect(r.count).toBe(3)
+    expect(decayedSale(nOf(2), [], 450).earned).toBe(2 * Math.round((p * 5) / 100))
+  })
+
+  it('sell: 오늘 판 수를 세고 감쇠를 적용, totalEarned에는 감쇠 뒤 금액', () => {
+    const p = sellPrice(anchovy())
+    const s = fresh({ bag: nOf(2), sold: { day: '2026-11-25', n: 150 }, totalEarned: 10 })
+    const r = ok(play(s, { type: 'sell' }, ctx(NOON)))
+    const want = 2 * Math.round((p * 50) / 100)
+    expect(r.result).toEqual({ earned: want })
+    expect(r.state.sold).toEqual({ day: '2026-11-25', n: 152 })
+    expect(r.state.totalEarned).toBe(10 + want)
+  })
+
+  it('sell: 날짜가 바뀌면 0부터 다시 센다', () => {
+    const p = sellPrice(anchovy())
+    const s = fresh({ bag: nOf(1), sold: { day: '2026-11-24', n: 999 } })
+    const r = ok(play(s, { type: 'sell' }, ctx(NOON)))
+    expect(r.result).toEqual({ earned: p })
+    expect(r.state.sold).toEqual({ day: '2026-11-25', n: 1 })
+  })
+
+  it('init·migrate: 옛 세이브는 { day: "", n: 0 }, 저장된 값은 검증해 유지', () => {
+    expect(logic.init().sold).toEqual({ day: '', n: 0 })
+    expect(logic.migrate({ rodTier: 2 }, 14).sold).toEqual({ day: '', n: 0 })
+    expect(logic.migrate({ ...logic.init(), sold: { day: '2026-11-25', n: 12 } }, 15).sold).toEqual({ day: '2026-11-25', n: 12 })
+    for (const bad of [{ day: 5, n: 1 }, { day: '2026-11-25', n: -1 }, { day: '2026-11-25', n: 1.5 }, { day: 'x', n: 1 }, null]) {
+      expect(logic.migrate({ ...logic.init(), sold: bad }, 15).sold).toEqual({ day: '', n: 0 })
+    }
+  })
+
+  it('version 15', () => {
+    expect(logic.version).toBe(15)
+  })
+})
+
+// 배포 사이 옛 화면이 옛 가격을 보고 사지 않게(v15 리뷰): 낚싯대·가방·지역 해금은 화면이 본 가격을 함께 보내고 다르면 거절
+describe('구매 가격 확인 (v15)', () => {
+  it('price가 없거나 서버 가격과 다르면 price_changed, 상태·골드 그대로', () => {
+    const s = fresh({ gold: 1_000_000, rodTier: 4, bagTier: 3, areas: [...DEFAULT_AREAS, 'lake'] })
+    for (const a of [
+      { type: 'buyRod', tier: 5 }, { type: 'buyRod', tier: 5, price: 280_000 }, { type: 'buyRod', tier: 5, price: '448000' },
+      { type: 'buyBag', tier: 4 }, { type: 'buyBag', tier: 4, price: 50_000 },
+      { type: 'unlockArea', area: 'summit' }, { type: 'unlockArea', area: 'summit', price: 120_000 },
+    ]) expect(err(play(s, a, ctx())), JSON.stringify(a)).toBe('price_changed')
+  })
+  it('맞는 가격이면 산다', () => {
+    const s = fresh({ gold: 1_000_000, rodTier: 4, bagTier: 3, areas: [...DEFAULT_AREAS, 'lake'] })
+    expect(ok(play(s, { type: 'buyRod', tier: 5, price: 448_000 }, ctx())).state).toMatchObject({ rodTier: 5, gold: 552_000 })
+    expect(ok(play(s, { type: 'buyBag', tier: 4, price: 80_000 }, ctx())).state).toMatchObject({ bagTier: 4, gold: 920_000 })
+    expect(ok(play(s, { type: 'unlockArea', area: 'summit', price: 264_000 }, ctx())).state.gold).toBe(736_000)
   })
 })

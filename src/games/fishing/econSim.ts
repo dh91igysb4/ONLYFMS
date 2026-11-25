@@ -1,7 +1,7 @@
 // 낚시 경제 시뮬레이션(결정적). 실제 어종·낚싯대·찌 데이터와 price()로 시간당 수입과
 // "장비·해금을 다 사기까지 걸리는 플레이 시간"을 계산한다. 테스트(gold.test.ts)가 이 값을 고정해
-// 데이터·가격이 바뀌어 진행 속도가 목표(지갑 설계 §4.1·낚시 5부 §8: 하루 1시간 + 사이트 하루 상한으로 약 34일)에서 벗어나면 실패한다.
-// 사이트 하루 상한은 economy.ts의 SOFT_CAP_TIERS(실제 _gold_move와 같은 2단 상한)를 그대로 쓴다.
+// 데이터·가격이 바뀌어 진행 속도가 목표(하루 1시간 약 30일, 설계 2026-11-25-fishing-sell-decay-design.md)에서 벗어나면 실패한다.
+// 하루의 수입은 판매 마릿수 감쇠(data.ts SELL_DECAY, logic.sellRatePct와 같은 구간)로 줄인다. 낚시 수입은 사이트 하루 상한을 받지 않는다(2026-11-25).
 // 서버·화면 어디서도 import하지 않는다(world 번들에 들어가지 않는다). 순수 함수만.
 //
 // 가정은 지갑 설계 §4의 REF 계산과 같다.
@@ -18,11 +18,10 @@
 //   이무기의 비늘은 입질, 용왕의 여의주는 판매가에 넣고, 백룡의 숨결(바)은 성공률 고정 가정이라 넣지 않는다.
 import { RAIN_CHANCE, type Conditions, type Season } from './clock.ts'
 import {
-  AREAS, areaMinRod, BAGS, BUFF_FX, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
+  AREAS, areaMinRod, BAGS, BUFF_FX, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES, UNLOCKS,
   type AreaId, type BagTier, type BuffId, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
 import { pickPool, price } from './logic.ts'
-import { SOFT_CAP_TIERS } from '../economy.ts'
 
 export const SIM = {
   power: 0.8,
@@ -112,7 +111,12 @@ function valueAt(area: AreaId, spot: string, gear: Gear, minutes?: (gameMinute: 
 
 /** 한 자리의 기대 시간당 판매 수입(G/h). 물때 자리는 닫힌 시각에 같은 지역 첫 늘 열린 자리로 옮겨 낚는다 */
 export function hourlyIncome(area: AreaId, spot: string, gear: Gear): number {
-  if (gear.rodTier < areaMinRod(area)) return 0
+  return spotRates(area, spot, gear).income
+}
+
+/** 한 자리의 시간당 판매 수입(감쇠 전)과 시간당 잡아 파는 마릿수 */
+export function spotRates(area: AreaId, spot: string, gear: Gear): { income: number; fishPerHour: number } {
+  if (gear.rodTier < areaMinRod(area)) return { income: 0, fishPerHour: 0 }
   const rod = RODS.find((r) => r.tier === gear.rodTier)!
   const spinner = gear.equipped.includes('spinner')
   const imugi = gear.buffs?.includes('imugi-scale') ? BUFF_FX.imugiBite : 1
@@ -130,7 +134,7 @@ export function hourlyIncome(area: AreaId, spot: string, gear: Gear): number {
     const isOpen = (m: number) => spotOpen(area, spot, m)
     value = open * valueAt(area, spot, gear, isOpen) + (1 - open) * (alt ? valueAt(area, alt, gear, (m) => !isOpen(m)) : 0)
   }
-  return (3600 / secPerFish) * value
+  return { income: (3600 / secPerFish) * value, fishPerHour: 3600 / secPerFish }
 }
 
 /**
@@ -157,15 +161,15 @@ export function bestSpot(areas: readonly AreaId[], rodTier: RodTier, bagTier: Ba
     combos.push([a])
     for (const b of owned) if (a < b) combos.push([a, b])
   }
-  let best = { area: 'village' as AreaId, spot: 'shore', equipped: [] as TackleId[], income: 0 }
+  let best = { area: 'village' as AreaId, spot: 'shore', equipped: [] as TackleId[], income: 0, fishPerHour: 0 }
   const buffs = buffsAt(areas, rodTier)
   for (const area of AREAS) {
     if (!areas.includes(area.id)) continue
     for (const spot of area.spots) {
       for (const equipped of combos) {
         if (equipped.length > slots) continue
-        const income = hourlyIncome(area.id, spot, { rodTier, bagTier, equipped, buffs })
-        if (income > best.income) best = { area: area.id, spot, equipped, income }
+        const r = spotRates(area.id, spot, { rodTier, bagTier, equipped, buffs })
+        if (r.income > best.income) best = { area: area.id, spot, equipped, income: r.income, fishPerHour: r.fishPerHour }
       }
     }
   }
@@ -245,25 +249,27 @@ export function totalSinks(): number {
 }
 
 export type Milestone = { label: string; price: number; atHours: number; atDay: number; incomeAfter: number; where: string }
-/** 사이트 하루 상한 구간: [들어간 합계 상한, 그 구간의 지급률] (economy.ts SOFT_CAP_TIERS 모양) */
-export type CapTiers = readonly (readonly [upTo: number, rate: number])[]
+/** 판매 마릿수 감쇠 구간: [오늘 판 마릿수 상한, 배율 %] (data.ts SELL_DECAY 모양) */
+export type DecayTiers = readonly (readonly [upTo: number, pct: number])[]
 /**
- * 하루 플레이 시간과 사이트 하루 상한(지갑 설계 §5.6). tiers를 생략하면 실제 사이트 상한(economy.ts SOFT_CAP_TIERS, 2단).
- * day를 아예 넘기지 않으면 상한 없이 이어서 플레이
+ * 하루 플레이 시간과 판매 마릿수 감쇠. decay를 생략하면 실제 감쇠(SELL_DECAY).
+ * day를 아예 넘기지 않으면 감쇠 없이 이어서 플레이
  */
-export type DayPlan = { hoursPerDay: number; tiers?: CapTiers }
+export type DayPlan = { hoursPerDay: number; decay?: DecayTiers }
 
 /**
- * 오늘 이미 들어간 합계 earnedToday에서 원래 금액 raw가 실제로 들어갈 양. 구간마다 남은 칸을 지급률로 채우는 적분이다
- * (_gold_move·economy.softCap과 같은 식이되 시뮬레이션이라 내림하지 않는다).
+ * 오늘 이미 soldToday마리 판 뒤 fish마리(소수 가능)를 마리당 per G에 팔 때 들어오는 양.
+ * logic.decayedSale과 같은 구간이되 시뮬레이션이라 반올림하지 않는다.
  */
-export function cappedIncome(raw: number, earnedToday: number, tiers: CapTiers = SOFT_CAP_TIERS): number {
+export function decayedIncome(fish: number, per: number, soldToday: number, decay: DecayTiers = SELL_DECAY): number {
   let got = 0
-  let left = raw
-  for (const [upTo, rate] of tiers) {
+  let left = fish
+  let n = soldToday
+  for (const [upTo, pct] of decay) {
     if (left <= 0) break
-    const use = Math.min(left, Math.max(upTo - earnedToday - got, 0) / rate)
-    got += use * rate
+    const use = Math.min(left, Math.max(upTo - n, 0))
+    got += (use * per * pct) / 100
+    n += use
     left -= use
   }
   return got
@@ -272,7 +278,7 @@ export function cappedIncome(raw: number, earnedToday: number, tiers: CapTiers =
 /**
  * 처음(대나무·20칸·기본 지역·0 G)부터 order대로 산다. 살 수 있게 되는 순간 바로 산다.
  * 그 사이에는 그때 가진 것으로 가장 많이 버는 자리에서 낚시한다. 각 구매 시각(플레이 시간, day가 있으면 날짜)을 돌려준다.
- * 시간은 STEP_H(0.01시간) 단위로 나아간다.
+ * 시간은 STEP_H(0.01시간) 단위로 나아간다. 판 마릿수는 잡는 대로 판다고 본다(가방이 차면 파는 왕복은 수입 속도에 들어 있다).
  */
 export function simulate(order: readonly Purchase[] = BUY_ORDER, day?: DayPlan): Milestone[] {
   const STEP_H = 0.01
@@ -282,20 +288,20 @@ export function simulate(order: readonly Purchase[] = BUY_ORDER, day?: DayPlan):
   const owned: TackleId[] = []
   let gold = 0
   let steps = 0
-  let earnedToday = 0
+  let soldToday = 0
   const out: Milestone[] = []
   let now = bestSpot(areas, rodTier, bagTier, owned)
   for (const p of order) {
     const cost = purchasePrice(p)
     while (gold < cost) {
       const raw = now.income * STEP_H
-      if (day) {
-        const got = cappedIncome(raw, earnedToday, day.tiers)
-        earnedToday += got
-        gold += got
+      if (day && now.fishPerHour > 0) {
+        const fish = now.fishPerHour * STEP_H
+        gold += decayedIncome(fish, raw / fish, soldToday, day.decay)
+        soldToday += fish
       } else gold += raw
       steps++
-      if (day && Math.round(steps * STEP_H * 1e6) % Math.round(day.hoursPerDay * 1e6) === 0) earnedToday = 0
+      if (day && Math.round(steps * STEP_H * 1e6) % Math.round(day.hoursPerDay * 1e6) === 0) soldToday = 0
     }
     gold -= cost
     if (p.kind === 'rod') rodTier = p.tier

@@ -8,7 +8,7 @@ import { getWorld } from '../index.ts'
 import { joinWorldRoom, type WorldRoom } from '../../platform/world/room.ts'
 import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../platform/world/presence.ts'
 import { syncTags, type Tag } from './peerTags.ts'
-import { AREAS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -209,6 +209,7 @@ const NEED_ROD = `${rodAtLeast(NEED_ROD_TIER)}이 있어야 해요`
 const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
   not_enough_gold: '골드가 부족해요',
+  price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 사 주세요',
   bad_tier: '이전 단계를 먼저 사야 해요',
   too_early: RETRY,
   too_late: RETRY,
@@ -1142,8 +1143,8 @@ export function Game({ gameId }: WorldGameProps) {
     setNotice(null)
     try {
       const res = await act<{ earned: number }>({ type: 'sell' })
-      // 판 금액은 사이트 하루 상한으로 줄기 전 값이다. 실제로 지갑에 들어온 양은 플랫폼 필드 gold_capped가 있을 때만 다르다
-      // (HUD·헤더는 응답의 지갑 잔액을 쓴다). 그래서 "벌었어요" 대신 판 사실과, 줄었으면 들어온 양을 함께 적는다
+      // 판 금액은 판매 마릿수 감쇠(v15)를 넣은 값이다. 2026-11-25부터 낚시는 사이트 하루 상한을 받지 않아 gold_capped는
+      // 보통 오지 않지만, 플랫폼 필드라 오면 들어온 양을 함께 적는다(HUD·헤더는 응답의 지갑 잔액을 쓴다)
       if (alive.current && res.result) {
         const c = res.gold_capped
         const got = c ? ` · 오늘 상한으로 ${gold(c.got)}만 들어왔어요` : ''
@@ -1166,7 +1167,7 @@ export function Game({ gameId }: WorldGameProps) {
   async function buyRod(tier: number) {
     setNotice(null)
     try {
-      await act({ type: 'buyRod', tier })
+      await act({ type: 'buyRod', tier, price: RODS.find((r) => r.tier === tier)?.price ?? -1 })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
@@ -1175,7 +1176,7 @@ export function Game({ gameId }: WorldGameProps) {
   async function buyBag(tier: number) {
     setNotice(null)
     try {
-      await act({ type: 'buyBag', tier })
+      await act({ type: 'buyBag', tier, price: BAGS.find((b) => b.tier === tier)?.price ?? -1 })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
@@ -1211,7 +1212,7 @@ export function Game({ gameId }: WorldGameProps) {
   async function unlock(area: AreaId) {
     setNotice(null)
     try {
-      const res = await act({ type: 'unlockArea', area })
+      const res = await act({ type: 'unlockArea', area, price: UNLOCKS[area]?.price ?? -1 })
       if (!alive.current) return
       if (!res.view.areas.includes(area)) {
         // 성공 응답인데 지역이 없다: 창을 열어 둔 채 다시 시도하라고 알린다
