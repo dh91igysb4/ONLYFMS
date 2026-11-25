@@ -1,0 +1,5 @@
+id,kind,name_en,name_ko,nation_id,source,page,from
+x-pl-golden-boot,award,Premier League Golden Boot,PL 득점왕,Q21,wikipedia,Premier League Golden Boot,1992
+x-wc,international,FIFA World Cup,FIFA 월드컵,,wikipedia,{year} FIFA World Cup squads,1990
+Q324867,league,LaLiga,라리가,Q29,existing,,1987
+x-wenger,manager,Arsène Wenger,아르센 벵거,,wikipedia,Arsène Wenger,1987

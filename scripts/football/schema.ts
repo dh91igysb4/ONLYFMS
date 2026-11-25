@@ -4,6 +4,7 @@ import { cmp, type Row } from './wikidata.ts'
 
 export const FILE_NAMES = [
   'nations', 'competitions', 'competition_eras', 'teams', 'team_competitions', 'players', 'aliases', 'external_ids', 'spells', 'caps', 'honours',
+  'honour_catalog', 'honours_extra', 'managers', 'manager_spells',
 ] as const
 export type FileName = typeof FILE_NAMES[number]
 
@@ -29,6 +30,11 @@ export const FILES: Record<FileName, { columns: string[]; key: string[]; order: 
   },
   caps: { columns: ['player_id', 'team_id', 'caps', 'goals', 'first_year', 'last_year'], key: ['player_id', 'team_id'], order: ['player_id', 'team_id'] },
   honours: { columns: ['honour', 'season', 'team_id', 'player_id'], key: ['honour', 'season', 'team_id', 'player_id'], order: ['honour', 'season', 'team_id', 'player_id'] },
+  // 우승·수상·감독 수집기(fetch-honours.ts)의 설정과 출력 (설계 2026-11-25-football-honours-design.md §3.2·§3.4)
+  honour_catalog: { columns: ['id', 'kind', 'name_en', 'name_ko', 'nation_id', 'source', 'page', 'from'], key: ['id'], order: ['kind', 'id'] },
+  honours_extra: { columns: ['honour', 'season', 'team_id', 'player_id'], key: ['honour', 'season', 'team_id', 'player_id'], order: ['honour', 'season', 'team_id', 'player_id'] },
+  managers: { columns: ['id', 'name_en'], key: ['id'], order: ['id'] },
+  manager_spells: { columns: ['manager_id', 'team_id', 'from_season', 'to_season', 'source_url'], key: ['manager_id', 'team_id', 'from_season'], order: ['manager_id', 'from_season', 'team_id'] },
 }
 
 const get = (r: object, c: string) => String((r as Record<string, unknown>)[c] ?? '')
@@ -54,6 +60,8 @@ const INT = /^\d+$/
 const YEAR = /^\d{4}$/
 const ENUMS = {
   competitionKind: ['league', 'cup', 'continental', 'international'],
+  honourKind: ['league', 'cup', 'continental', 'international', 'award', 'manager'],
+  honourSource: ['existing', 'wikidata', 'wikipedia', 'manual'],
   teamKind: ['club', 'national'],
   position: ['GK', 'DF', 'MF', 'FW'],
   foot: ['left', 'right', 'both'],
@@ -110,6 +118,7 @@ export function checkDataset({ files, headers }: Dataset, legends: readonly Row[
   const ids = (f: FileName) => new Set(files[f].map((r) => r.id))
   const nations = ids('nations'), competitions = ids('competitions'), players = ids('players')
   const teamKind = new Map(files.teams.map((t) => [t.id, t.kind]))
+  const catalogKind = new Map((files.honour_catalog ?? []).map((c) => [c.id, c.kind]))
 
   for (const f of FILE_NAMES) {
     files[f].forEach((r, i) => {
@@ -199,6 +208,30 @@ export function checkDataset({ files, headers }: Dataset, legends: readonly Row[
           }
           break
         }
+        case 'honour_catalog':
+          entityId('id'); oneOf('kind', ENUMS.honourKind); required('name_en'); required('name_ko'); ref('nation_id', nations)
+          oneOf('source', ENUMS.honourSource); year('from', false)
+          break
+        case 'honours_extra': {
+          year('season', false); ref('team_id', new Set(teamKind.keys())); ref('player_id', players)
+          const m = /^(award|squad|final_goal):(.+)$/.exec(r.honour)
+          const id = m ? m[2] : r.honour, kind = catalogKind.get(id)
+          if (kind === undefined || kind === 'manager') { err(`honour ${r.honour || '(빈 값)'} 카탈로그에 없음`); break }
+          const want = m?.[1] === 'award' ? ['award'] : m ? ['international'] : ['league', 'cup', 'continental', 'international']
+          if (!want.includes(kind)) err(`honour ${r.honour}의 카탈로그 종류 ${kind}가 맞지 않음 (${want.join('|')})`)
+          if (m?.[1] !== 'award' && r.team_id === '') err(`${r.honour}에 team_id 없음`)
+          if (m && r.player_id === '') err(`${r.honour}에 player_id 없음`)
+          break
+        }
+        case 'managers':
+          if (catalogKind.get(r.id) !== 'manager') err(`id ${r.id || '(빈 값)'} 카탈로그 감독이 아님`)
+          required('name_en')
+          break
+        case 'manager_spells':
+          if (catalogKind.get(r.manager_id) !== 'manager') err(`manager_id ${r.manager_id || '(빈 값)'} 카탈로그 감독이 아님`)
+          ref('team_id', new Set(teamKind.keys()), false); year('from_season', false); year('to_season', false)
+          if (Number(r.to_season) < Number(r.from_season)) err(`to_season ${r.to_season}가 from_season ${r.from_season}보다 앞`)
+          break
       }
     })
   }

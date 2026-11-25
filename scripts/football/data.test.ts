@@ -205,3 +205,21 @@ describe('real data', () => {
     if (existsSync(hcFile)) expect(checkHistoryClubs(parseCsv(readFileSync(hcFile, 'utf8')), new Date().getFullYear())).toEqual([])
   })
 })
+
+describe('honours_extra (설계 2026-11-25-football-honours-design.md §3.4)', () => {
+  test('extra_honour_unknown_catalog', () => {
+    expect(check((d) => { d.files.honours_extra[0].honour = 'award:Q999999' })).toContainEqual(expect.stringMatching(/^honours_extra:2: honour award:Q999999 카탈로그에 없음/))
+  })
+  test('extra_award_needs_player', () => {
+    expect(check((d) => { const r = d.files.honours_extra.find((x) => x.honour.startsWith('award:'))!; r.player_id = '' })).toContainEqual(expect.stringMatching(/^honours_extra:\d+: .*player_id 없음/))
+  })
+  test('manager_spell_order', () => {
+    expect(check((d) => { const r = d.files.manager_spells[0]; r.from_season = '2010'; r.to_season = '2009' })).toContainEqual(expect.stringMatching(/^manager_spells:2: /))
+  })
+  test('manager_must_be_in_catalog', () => {
+    expect(check((d) => { d.files.managers[0].id = 'x-nobody' })).toContainEqual(expect.stringMatching(/^managers:2: id x-nobody 카탈로그 감독이 아님/))
+  })
+  test('catalog_kind', () => {
+    expect(check((d) => { d.files.honour_catalog[0].kind = 'trophy' })).toContainEqual(expect.stringMatching(/^honour_catalog:2: kind trophy 허용 안 됨/))
+  })
+})
