@@ -167,6 +167,16 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
+## 마을회관 1차 배포 (`feat/village-hall`, 낚시 `logic.version` 17)
+상점 건물이 마을회관이 되고(상점 = 회관 1층 자판기), 지역 `hall`이 기본 지역에 들어간다. 명예의 전당 RPC가 새로 생긴다.
+
+순서: DB push → `world` 함수 배포 → Vercel.
+
+- [ ] `npx supabase@2 db push --dry-run`으로 `20261125111129_hall_of_fame.sql`만 올라가는지 확인한 뒤 `npx supabase@2 db push`
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (`data.ts`·`logic.ts`·`maps/**`가 바뀌었다. v17을 배포한 뒤에는 v16으로 되돌리지 않는다)
+- [ ] 머지·Vercel 배포까지 이어서 한다. 열어 둔 낚시 탭은 새로고침
+- [ ] 확인: 마을 회관 문으로 들어가 자판기에서 팔기, 9번 방 행거에서 옷 사기, 7번 방 노트북 → 게임 목록, 명예의 전당 액자 창, 엘리베이터 창
+
 ## 낚시(지속형 world 게임) 배포
 낚시 마을 변경(`feat/fishing-walk`, `logic.version` 2) 머지 전에, 미리보기에서 관리자 계정으로 확인한다. 낚시는 `20261123065500_fishing_public.sql`부터 공개다 (`hidden: false`, `npx supabase@2 db push` 필요).
 
