@@ -916,9 +916,19 @@ describe('마을회관', () => {
     expect(interactionAt(HALL, center(22, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '들어갈 수 없어요' })
     expect(interactionAt(HALL, center(39, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '2층은 공사 중이에요' })
   })
-  it('회관에는 낚시 자리·순간이동기가 없다', () => {
+  it('회관에는 낚시 자리가 없고, 이동기는 왼쪽 벽 로비(1~2, 8~9), 앞 (3,8) 오른쪽', () => {
     expect(HALL.spots).toEqual({})
-    expect(HALL.teleporter).toBeNull()
+    expect(HALL.teleporter).toEqual({ tiles: { tx: 1, ty: 8, w: 2, h: 2 }, front: { tx: 3, ty: 8, facing: 'right' } })
+    expect(isWalkable(HALL, 1, 8, ALL_AREAS_OPEN)).toBe(false)
+    expect(interactionAt(HALL, center(3, 8), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'teleporter' })
+    expect(interactionAt(HALL, center(3, 8), 'right', ALL_AREAS_OPEN)).toBeNull()
+    expect(fromEntry.has('3,8')).toBe(true)
+  })
+  it('1번 방: 냉장고 앞(13,1~3) 오른쪽 fridge, 쓰레기통 앞(11,1~3) 왼쪽 trash', () => {
+    for (const ty of [1, 2, 3]) {
+      expect(interactionAt(HALL, center(13, ty), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'fridge' })
+      expect(interactionAt(HALL, center(11, ty), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'trash' })
+    }
   })
   it('회관 안 어떤 칸에서도 낚시 상호작용이 없다', () => {
     for (const k of fromEntry) {

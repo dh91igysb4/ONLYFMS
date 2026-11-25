@@ -256,7 +256,8 @@ describe('teleporterInfo', () => {
   it('이동기 없는 맵이면 null', () => {
     // 합성 맵을 실제 등록부에 넣지 않으므로, 이동기 없는 지역이 생기면 이 분기를 탄다: 모든 실제 지역은 이동기가 있다
     for (const a of FISHING_AREAS) expect(teleporterInfo(a.id, { areas: [...DEFAULT_AREAS] }, 'village')).not.toBeNull()
-    expect(teleporterInfo('hall', { areas: [...DEFAULT_AREAS] }, 'village')).toBeNull()
+    // 마을회관 이동기는 과제가 없고 열려 있으면 켜져 있다(v18)
+    expect(teleporterInfo('hall', { areas: [...DEFAULT_AREAS] }, 'village')).toMatchObject({ open: true, challenge: null })
   })
 })
 

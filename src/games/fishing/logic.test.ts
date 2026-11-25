@@ -3,7 +3,7 @@ import { rngFromSeed } from '../../shared/rng.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { AREAS, FISHING_AREAS, FRIDGE_SIZE, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
@@ -2218,6 +2218,16 @@ describe('마을회관 지역 (logic.version 17)', () => {
   it('hall에서 cast는 거절', () => {
     expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5, spot: 'x' } as unknown as Action, ctx()))).toBeTruthy()
     expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5 } as unknown as Action, ctx()))).toBeTruthy()
+  })
+  it('회관 이동기는 과제 없이 켜지고(v18), 마을과 오가는 요금은 TP 공식', () => {
+    expect(teleporterOpen(fresh(), 'hall')).toBe(true)
+    expect(teleporterOpen({ areas: ['village'], challenges: {} }, 'hall')).toBe(false)
+    const p = teleporterWorld('village')!
+    const q = teleporterWorld('hall')!
+    expect(teleportFee('village', 'hall')).toBe(TP_BASE + Math.ceil(Math.hypot(p.x - q.x, p.y - q.y) / 10) * TP_PER_10)
+    const done = { 'pier-perfect': { progress: 5, done: true } }
+    const r = ok(play(fresh({ gold: 10_000, challenges: done }), { type: 'teleport', from: 'village', to: 'hall' }, ctx()))
+    expect(r.result).toEqual({ from: 'village', to: 'hall', fee: teleportFee('village', 'hall') })
   })
   it('hall은 돈으로 여는 지역이 아니다', () => {
     expect(err(play(fresh(), { type: 'unlockArea', area: 'hall', price: 0 } as unknown as Action, ctx(T0, 10 ** 9)))).toBeTruthy()
