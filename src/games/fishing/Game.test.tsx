@@ -1217,10 +1217,10 @@ describe('fishing Game: walking and interaction', () => {
     expect(actionButton()).not.toHaveAttribute('disabled')
   })
 
-  test('the bottom row has bag, dex, challenges, map, emote and fullscreen but no shop; the bag says where to sell', async () => {
+  test('the bottom row has bag, dex, challenges, map, talk, emote and fullscreen but no shop; the bag says where to sell', async () => {
     const { container } = await mount()
     const bottom = container.querySelector('.fish-bottom') as HTMLElement
-    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '이모트', '전체화면'])
+    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '말', '이모트', '전체화면'])
     expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
@@ -3088,5 +3088,66 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     await flush()
     expect(calls('discard')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discard', index: 0, fee, species: 'mackerel', sizeCm: 40 } }])
     expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+  })
+})
+
+describe('fishing Game: 말풍선 (설계 2026-11-25-fishing-chat)', () => {
+  const peer = (over: Record<string, unknown> = {}) => ({
+    id: 'u2', handle: 'son', x: SAND.pos.x, y: SAND.pos.y, facing: 'down', moving: false, act: 'walk', outfit: '{}', ...over,
+  })
+  const lastTick = () => roomGate.joins.at(-1)!.room.tick.mock.calls.at(-1)![1] as { show?: string }
+  const tagOf = (c: HTMLElement, id: string) => c.querySelector<HTMLElement>(`span.fish-peer-tag[data-id="${id}"]`)
+  const say = (text: string) => {
+    fireEvent.change(screen.getByRole('textbox', { name: '할 말' }), { target: { value: text } })
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+  }
+  beforeEach(() => {
+    roomGate.joins = []
+    roomGate.peers = []
+    roomGate.hidden = false
+    authGate.admin = false
+  })
+
+  test('말 → 입력 → 보내기: 5초 동안 내 머리 위 말풍선과 tick show, 입력칸은 비고 열린 채', async () => {
+    const { container } = await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '말' }))
+    say('  안녕\n 친구들 ')
+    await advance(50)
+    expect(lastTick().show).toBe('c:안녕 친구들')
+    expect(tagOf(container, 'u1')!.querySelector('.fish-peer-say')?.textContent).toBe('안녕 친구들')
+    expect(screen.getByRole('textbox', { name: '할 말' })).toHaveValue('')
+    await advance(5100)
+    expect(lastTick().show).toBeUndefined()
+  })
+
+  test('3초 안에 다시 말하면 보내지 않고 알린다; 3초 뒤에는 된다', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '말' }))
+    say('하나')
+    await advance(1000)
+    say('둘')
+    await advance(50)
+    expect(lastTick().show).toBe('c:하나')
+    expect(screen.getByText('잠시 뒤에 다시 말할 수 있어요')).toBeInTheDocument()
+    await advance(2100)
+    say('셋')
+    await advance(50)
+    expect(lastTick().show).toBe('c:셋')
+  })
+
+  test('빈 말은 보내지 않는다; 입력칸은 40자까지', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '말' }))
+    expect(screen.getByRole('textbox', { name: '할 말' })).toHaveAttribute('maxLength', '40')
+    say('   ')
+    await advance(50)
+    expect(lastTick().show).toBeUndefined()
+  })
+
+  test('친구 말풍선', async () => {
+    roomGate.peers = [peer({ show: 'c:3:2로 이김' })]
+    const { container } = await mount(makeView(), SAND)
+    await advance(50)
+    expect(tagOf(container, 'u2')!.querySelector('.fish-peer-say')?.textContent).toBe('3:2로 이김')
   })
 })

@@ -8,7 +8,7 @@ import { getWorld } from '../index.ts'
 import { joinWorldRoom, type WorldRoom } from '../../platform/world/room.ts'
 import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../platform/world/presence.ts'
 import { syncTags, type Tag } from './peerTags.ts'
-import { BRAG_MS, bragCard, EMOTE_MS, EMOTES, encodeBrag, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
+import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
@@ -318,6 +318,11 @@ export function Game({ gameId }: WorldGameProps) {
   /** 지금 내 자랑·이모트(설계 2026-11-25-fishing-brag-discard). until은 Date.now() 기준 끝 시각 */
   const showRef = useRef<{ code: string; show: Show; until: number } | null>(null)
   const [emoteOpen, setEmoteOpen] = useState(false)
+  /** 말풍선 입력칸(설계 2026-11-25-fishing-chat) */
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatText, setChatText] = useState('')
+  const [chatHint, setChatHint] = useState<string | null>(null)
+  const lastChatAt = useRef(-Infinity)
   const tagsRef = useRef<HTMLDivElement>(null)
   const peerOutfits = useRef(new Map<string, Outfit>())
   // 다른 지역까지 포함한 접속 중 친구(온라인 2단계-1): 게임 전체 프레즌스, 지역과 무관하게 한 번 들어간다
@@ -892,6 +897,7 @@ export function Game({ gameId }: WorldGameProps) {
       const t: Tag = { id, handle, x, y, visible: x >= 0 && x <= fit.w * fit.scale && y >= 0 && y <= fit.h * fit.scale }
       if (show?.kind === 'brag') t.card = bragCard(show)
       if (show?.kind === 'emote') t.emote = show.char
+      if (show?.kind === 'chat') t.say = show.text
       return t
     }
     // 내 자랑·이모트는 친구가 없어도 내 화면에 보인다(이름표도 그동안만)
@@ -1197,6 +1203,24 @@ export function Game({ gameId }: WorldGameProps) {
     const show = parseShow(code)
     if (show) showRef.current = { code, show, until: Date.now() + EMOTE_MS }
     setEmoteOpen(false)
+  }
+
+  /** 말하기: 정리한 말이 비면 무시, 3초에 한 번. 보낸 뒤 입력칸은 비우고 열어 둔다 */
+  function chat() {
+    const text = cleanChat(chatText)
+    if (!text) return
+    const now = Date.now()
+    if (now - lastChatAt.current < CHAT_GAP_MS) {
+      setChatHint('잠시 뒤에 다시 말할 수 있어요')
+      return
+    }
+    const code = encodeChat(text)
+    const show = parseShow(code)
+    if (!show) return
+    lastChatAt.current = now
+    showRef.current = { code, show, until: now + CHAT_MS }
+    setChatText('')
+    setChatHint(null)
   }
 
   async function discard(index: number, fee: number) {
@@ -1564,6 +1588,31 @@ export function Game({ gameId }: WorldGameProps) {
       {!fullscreen && notices}
 
       <div className="fish-bottom" ref={bottomRef}>
+        {chatOpen && (
+          <form
+            className="fish-chat"
+            onSubmit={(e) => {
+              e.preventDefault()
+              chat()
+            }}
+          >
+            <input
+              className="input"
+              type="text"
+              aria-label="할 말"
+              placeholder="같은 지역 친구에게 5초 동안 보여요"
+              maxLength={CHAT_MAX}
+              value={chatText}
+              enterKeyHint="send"
+              autoComplete="off"
+              onChange={(e) => setChatText(e.target.value)}
+            />
+            <button type="submit" className="btn btn-primary btn-sm">
+              보내기
+            </button>
+            {chatHint && <p className="fish-shop-note" role="status">{chatHint}</p>}
+          </form>
+        )}
         {emoteOpen && (
           <div className="fish-emotes" role="group" aria-label="이모트">
             {EMOTES.map((e) => (
@@ -1589,6 +1638,18 @@ export function Game({ gameId }: WorldGameProps) {
               {MENU_LABELS[m]}
             </button>
           ))}
+          <button
+            type="button"
+            className={`btn btn-sm ${chatOpen ? 'btn-primary' : 'btn-ghost'}`}
+            aria-pressed={chatOpen}
+            aria-expanded={chatOpen}
+            onClick={() => {
+              setChatOpen((o) => !o)
+              setChatHint(null)
+            }}
+          >
+            말
+          </button>
           <button
             type="button"
             className={`btn btn-sm ${emoteOpen ? 'btn-primary' : 'btn-ghost'}`}
