@@ -96,6 +96,16 @@ describe('joinWorldRoom', () => {
     }
   })
 
+  test('멈춰 있어도 show가 바뀌면 움직임 간격 뒤 바로 보낸다(2.5초를 기다리지 않음)', () => {
+    const r = joinWorldRoom('fishing', 'village', 'me')
+    fake.status?.('SUBSCRIBED')
+    sync('me', 'u2')
+    r.tick(5000, me)
+    r.tick(5300, { ...me, show: 'e:like' })
+    expect(fake.send).toHaveBeenCalledTimes(2)
+    expect(fake.send).toHaveBeenLastCalledWith({ type: 'broadcast', event: 'pos', payload: { ...me, show: 'e:like', t: 5300 } })
+  })
+
   test('구독 전에는 프레즌스가 있어도 보내지 않는다', () => {
     const r = joinWorldRoom('fishing', 'village', 'me')
     sync('me', 'u2')
