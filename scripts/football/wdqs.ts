@@ -42,7 +42,9 @@ export async function query(sparql: string, cache: Cache): Promise<Row[]> {
 }
 
 /** 목록을 size개씩 나눠 질의한다. 시간 초과면 그 묶음을 반으로 나눠 다시 보낸다 */
-export async function batched(label: string, items: readonly string[], size: number, build: (chunk: string[]) => string, cache: Cache): Promise<Row[]> {
+/** onChunk가 있으면 묶음마다 결과를 넘기고(자세한 진행 표시), 없으면 "label n/전체"만 찍는다 */
+export async function batched(label: string, items: readonly string[], size: number, build: (chunk: string[]) => string, cache: Cache,
+  onChunk?: (rows: Row[], done: number, total: number) => void): Promise<Row[]> {
   const out: Row[] = []
   const run = async (chunk: string[]): Promise<void> => {
     try {
@@ -57,8 +59,10 @@ export async function batched(label: string, items: readonly string[], size: num
   }
   const sorted = [...items].sort()
   for (let i = 0; i < sorted.length; i += size) {
-    log(`${label} ${Math.min(i + size, sorted.length)}/${sorted.length}`)
+    const before = out.length
+    if (!onChunk) log(`${label} ${Math.min(i + size, sorted.length)}/${sorted.length}`)
     await run(sorted.slice(i, i + size))
+    onChunk?.(out.slice(before), Math.min(i + size, sorted.length), sorted.length)
   }
   return out
 }

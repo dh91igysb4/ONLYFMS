@@ -107,3 +107,44 @@ describe('real data', () => {
     expect(at(LIVERPOOL).has(id('Jordan Henderson')), 'Henderson').toBe(false)
   })
 })
+
+// 옛 선수의 열린 경력 (설계 2026-11-25 §3.4): 오늘 기준 만 40세가 넘었으면 max(시작 + 1년, 만 38세 해 6/30)에서 닫는다
+describe('옛 선수의 열린 경력', () => {
+  const NOW = '2026-11-25'
+  const old = (spells: SpellInput[], birth?: string) =>
+    deriveMemberships(spells, NATIONS, { from: 1990, to: 2026, today: NOW, birth: birth ? new Map([['P', birth]]) : undefined })
+
+  it('은퇴 선수형: 38세 해 6/30에서 닫고 추정으로 표시', () => {
+    const r = old([sp('ENG1', '1996-07-01')], '1965-03-01')
+    expect(teamsIn(r, 2002)).toEqual(['ENG1'])
+    expect(teamsIn(r, 2003)).toEqual([])
+    expect(r.filter((m) => Number(m.season) >= 2012)).toEqual([])
+    expect(r.find((m) => m.season === '2002')!.estimated).toBe('true')
+  })
+
+  it('생일 없음: 지금처럼 오늘까지 열린다', () => {
+    const r = old([sp('ENG1', '1996-07-01')])
+    expect(teamsIn(r, 2026)).toEqual(['ENG1'])
+  })
+
+  it('40세 이하: 그대로 열린다', () => {
+    const r = old([sp('ENG1', '2024-07-01')], '1990-05-05')
+    expect(teamsIn(r, 2026)).toEqual(['ENG1'])
+  })
+
+  it('호날두형: 40세가 넘었어도 최근 5년 안에 시작한 열린 경력은 그대로', () => {
+    const r = old([sp('ENG1', '2023-01-01')], '1985-02-05')
+    expect(teamsIn(r, 2026)).toEqual(['ENG1'])
+  })
+
+  it('노이어형: manual/active_players.csv의 현역은 닫지 않는다', () => {
+    const r = deriveMemberships([sp('ENG1', '2011-07-01')], NATIONS, { from: 1990, to: 2026, today: NOW, birth: new Map([['P', '1986-03-27']]), active: new Set(['P']) })
+    expect(teamsIn(r, 2026)).toEqual(['ENG1'])
+  })
+
+  it('38세 이후 시작: 시작 + 1년에서 닫는다', () => {
+    const r = old([sp('ENG1', '2000-07-01')], '1960')
+    expect(teamsIn(r, 2000)).toEqual(['ENG1'])
+    expect(teamsIn(r, 2001)).toEqual([])
+  })
+})

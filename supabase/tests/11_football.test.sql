@@ -29,7 +29,7 @@ select has_table('public', 'football_meta', 'tables_exist: football_meta');
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'football\_%' and c.relrowsecurity),
-  11, 'rls_enabled: all 11 football tables');
+  12, 'rls_enabled: all 12 football tables (2026-11-25 competition_eras 추가)');
 select col_is_pk('public', 'football_spells', 'source_ref', 'spells pk is source_ref');
 select has_index('public', 'football_aliases', 'football_aliases_alias_norm_trgm', 'alias_norm trigram index');
 

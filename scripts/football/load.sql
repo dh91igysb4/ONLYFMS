@@ -10,6 +10,7 @@ create temp table s_nations (id text, name_ko text, name_en text, iso2 text, con
 create temp table s_competitions (id text, name_ko text, name_en text, kind text, nation_id text, tier text) on commit drop;
 create temp table s_teams (id text, kind text, name_ko text, name_en text, short_name text, nation_id text, colors text, founded text, retired text) on commit drop;
 create temp table s_team_competitions (team_id text, competition_id text, season text) on commit drop;
+create temp table s_competition_eras (competition_id text, from_season text, to_season text, nation_id text, tier text) on commit drop;
 create temp table s_players (id text, name_ko text, name_en text, birth_date text, birth_precision text, nation_id text, position text,
   position_detail text, foot text, height_cm text, shirt_number text, popularity text, retired text) on commit drop;
 create temp table s_aliases (entity_id text, alias text, lang text) on commit drop;
@@ -23,6 +24,7 @@ create temp table s_honours (honour text, season text, team_id text, player_id t
 \copy s_competitions from 'competitions.csv' with (format csv, header match)
 \copy s_teams from 'teams.csv' with (format csv, header match)
 \copy s_team_competitions from 'team_competitions.csv' with (format csv, header match)
+\copy s_competition_eras from 'competition_eras.csv' with (format csv, header match)
 \copy s_players from 'players.csv' with (format csv, header match)
 \copy s_aliases from 'aliases.csv' with (format csv, header match)
 \copy s_external_ids from 'external_ids.csv' with (format csv, header match)
@@ -82,9 +84,13 @@ delete from public.football_spells;
 delete from public.football_external_ids;
 delete from public.football_aliases;
 delete from public.football_team_competitions;
+delete from public.football_competition_eras;
 
 insert into public.football_team_competitions (team_id, competition_id, season)
 select team_id, competition_id, season::int from s_team_competitions;
+
+insert into public.football_competition_eras (competition_id, from_season, to_season, nation_id, tier)
+select competition_id, from_season::int, nullif(to_season, '')::int, nullif(nation_id, ''), tier::int from s_competition_eras;
 
 insert into public.football_aliases (entity_id, alias, lang)
 select entity_id, alias, nullif(lang, '') from s_aliases;
@@ -115,6 +121,7 @@ from (
   union all select 'teams', 3, count(*) from public.football_teams
   union all select 'players', 4, count(*) from public.football_players
   union all select 'team_competitions', 5, count(*) from public.football_team_competitions
+  union all select 'competition_eras', 5, count(*) from public.football_competition_eras
   union all select 'aliases', 6, count(*) from public.football_aliases
   union all select 'external_ids', 7, count(*) from public.football_external_ids
   union all select 'spells', 8, count(*) from public.football_spells

@@ -67,10 +67,27 @@ function baseOf(spell: SpellInput, cal: Calendar, today: string): Built {
 }
 
 /**
- * 선수 한 명의 경력을 판정용 구간으로. 열린 경력은 그 뒤 다른 팀 완전 이적(임대는 아무 경력) 시작일로 닫고, 없으면 오늘까지.
+ * 뒤 경력이 없는 열린 구간의 끝. 생일이 있고 오늘 기준 만 40세를 넘었고 구간이 5년 이상 전에 시작했으면
+ * max(시작 + 1년, 만 38세 해 6월 30일)에서 닫는다(은퇴 선수의 종료일 누락, 설계 2026-11-25 §3.4).
+ * 최근 5년 안에 시작한 구간은 40세 넘어 뛰는 현역(호날두 등)일 수 있어 연다. 아니면 null(오늘까지 연다). 연도만 있는 생일은 그해 1월 1일.
+ */
+export function openEndFor(from: string, birth: string | undefined, today: string): string | null {
+  if (!birth || !/^\d{4}/.test(birth)) return null
+  const b = birth.length === 4 ? `${birth}-01-01` : birth.slice(0, 10)
+  const by = Number(b.slice(0, 4))
+  const turned40 = `${by + 40}${b.slice(4)}`
+  if (today <= turned40) return null
+  if (from > `${Number(today.slice(0, 4)) - 5}${today.slice(4)}`) return null
+  const plusYear = `${Number(from.slice(0, 4)) + 1}${from.slice(4)}`
+  return max(plusYear, `${by + 38}-06-30`)
+}
+
+/**
+ * 선수 한 명의 경력을 판정용 구간으로. 열린 경력은 그 뒤 다른 팀 완전 이적(임대는 아무 경력) 시작일로 닫고, 없으면 오늘까지
+ * (birth가 있고 40세가 넘었으면 openEndFor로 닫는다).
  * 원 소속 구간에서는 다른 팀 임대 구간을 뺀다. 결과는 팀별 구간 목록.
  */
-export function playerIntervals(spells: readonly SpellInput[], calOf: (teamId: string) => Calendar, today: string): { team_id: string; intervals: Interval[] }[] {
+export function playerIntervals(spells: readonly SpellInput[], calOf: (teamId: string) => Calendar, today: string, birth?: string): { team_id: string; intervals: Interval[] }[] {
   const built = spells.map((s) => baseOf(s, calOf(s.team_id), today))
   for (const b of built) {
     if (b.to !== null) continue
@@ -78,7 +95,8 @@ export function playerIntervals(spells: readonly SpellInput[], calOf: (teamId: s
     const next = built
       .filter((o) => o !== b && o.spell.team_id !== b.spell.team_id && o.from > b.from && (isLoan || o.spell.loan !== 'true'))
       .map((o) => o.from).sort()[0]
-    if (next !== undefined) { b.to = next; b.estimated = true } else b.to = max(today, b.from)
+    const closed = next === undefined ? openEndFor(b.from, birth, today) : null
+    if (next !== undefined) { b.to = next; b.estimated = true } else if (closed !== null) { b.to = closed; b.estimated = true } else b.to = max(today, b.from)
   }
   const done = built.filter((b) => b.to! > b.from) as (Built & { to: string })[]
   const loans = done.filter((b) => b.spell.loan === 'true')
@@ -110,7 +128,7 @@ export function playerIntervals(spells: readonly SpellInput[], calOf: (teamId: s
 export function deriveMemberships(
   spells: readonly SpellInput[],
   teamNation: ReadonlyMap<string, string>,
-  opts: { from: number; to: number; today: string },
+  opts: { from: number; to: number; today: string; birth?: ReadonlyMap<string, string>; active?: ReadonlySet<string> },
 ): Membership[] {
   const calOf = (t: string) => calendarOf(teamNation.get(t))
   const byPlayer = new Map<string, SpellInput[]>()
@@ -122,7 +140,7 @@ export function deriveMemberships(
   for (const [player, list] of byPlayer) {
     type Acc = { team: string; days: number; estimated: boolean; arrived: string }
     const seasons = new Map<number, Map<string, Acc>>()
-    for (const { team_id, intervals } of playerIntervals(list, calOf, opts.today)) {
+    for (const { team_id, intervals } of playerIntervals(list, calOf, opts.today, opts.active?.has(player) ? undefined : opts.birth?.get(player))) {
       const cal = calOf(team_id)
       for (const iv of intervals) {
         const first = Math.max(opts.from, Number(iv.from.slice(0, 4)) - 1)
