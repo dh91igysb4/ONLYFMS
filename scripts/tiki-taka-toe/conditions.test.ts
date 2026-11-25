@@ -161,13 +161,22 @@ describe('buildConditions', () => {
 
   test('manager_club_and_national', () => {
     const d = data({
-      manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1997', 'Q47576,NB,2002,2002'),
+      manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1997', 'Q47576,NB,2001,2002'),
       season_memberships: ms('P2,1996,CA', 'P3,1998,CA', 'P4,1997,CA', 'P4,1997,CC'),
       honours: hs('squad:Q19317,2002,NB,P5', 'squad:Q19317,2006,NB,P1'),
     })
     const r = buildConditions(d)
     expect([...r.players.get('manager:Q47576')!].sort()).toEqual(['P2', 'P5'])
     expect(r.conditions.find((c) => c.id === 'manager:Q47576')!.label_ko).toBe('벵거 감독')
+  })
+
+  test('manager_national_excludes_tournament_before_takeover', () => {
+    // 대표팀 감독 기간이 2002~2006이면 2002 대회는 부임 직전에 끝난 대회 → 빼고, 2006은 넣는다
+    const d = data({
+      manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,NB,2002,2006'),
+      honours: hs('squad:Q19317,2002,NB,P2', 'squad:Q19317,2006,NB,P3', 'squad:Q19317,2010,NB,P4'),
+    })
+    expect([...setOf(d, 'manager:Q47576')].sort()).toEqual(['P3'])
   })
 
   test('title_threshold', () => {
@@ -294,6 +303,14 @@ describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
     const labels = r.conditions.map((c) => c.label_ko)
     expect(new Set(labels).size).toBe(labels.length)
     expect(r.conditions.filter((c) => c.kind === 'teammate')).toHaveLength(150)
+  }, 60_000)
+
+  test('national_manager_excludes_predecessor_tournament', () => {
+    const r = buildConditions(readFootballData(REAL))
+    // 뢰브(2006~)는 2006 월드컵(클린스만) 엔트리 칸을 빼고, 데샹(2012~)은 유로 2012(블랑) 엔트리 나스리를 뺀다
+    expect(r.players.get('manager:Q4462')?.has('Q131261')).toBe(false)
+    expect(r.players.get('manager:Q508711')?.has('Q1920')).toBe(false)
+    expect(r.players.get('manager:Q4462')?.size).toBeGreaterThan(0)
   }, 60_000)
 
   test('continent_table_complete', () => {

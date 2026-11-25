@@ -340,7 +340,9 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
       if (clubIds.has(s.team_id)) {
         for (let y = from; y <= Math.min(to, 2100); y++) for (const p of singleAt.get(`${s.team_id}|${y}`) ?? []) set.add(p)
       } else if (teams.get(s.team_id)?.kind === 'national') {
-        for (const e of squadsOf.get(s.team_id) ?? []) if (from <= e.season && e.season <= to) set.add(e.player)
+        // 대표팀은 부임한 해의 대회를 넣지 않는다(시즌 = 대회 연도, 대회 직후 부임이 보통이라 그 대회는 전임 감독의 것)
+        const start = Number(s.from_season)
+        for (const e of squadsOf.get(s.team_id) ?? []) if (start < e.season && from <= e.season && e.season <= to) set.add(e.player)
       }
     }
     const ko = c.name_ko || c.name_en
