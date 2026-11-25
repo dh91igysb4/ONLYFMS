@@ -5,7 +5,9 @@
 // - 9칸 모두 정답 수 minAnswers~maxAnswers, 인지도 knownPopularity 이상 정답 minKnown명 이상.
 // - 머리칸 6개 중 클럽이 clubs[0]~clubs[1]개. 한 축에 같은 종류 셋은 없다. 같은 조건 두 번 없음.
 // - 겹치는 조건은 한 판에 두지 않는다(family): 같은 대회의 리그·우승·출전·결승 득점(예: PL 우승과 PL 3회 이상 우승),
-//   PL과 잉글랜드 1부(eng-top, PL을 포함), PL 득점왕과 잉글랜드 1부 득점왕.
+//   PL과 잉글랜드 1부(eng-top, PL을 포함), 리그 득점왕과 그 리그(PL 득점왕·잉글랜드 1부 득점왕은 PL 묶음),
+//   월드컵 골든볼·골든부트와 월드컵.
+// - 두 머리칸의 선수 집합이 한쪽에 포함되면(예: 국적과 그 대륙, 한 리그에만 있던 클럽과 그 리그) 한 판에 두지 않는다.
 // 생성(generatePuzzles): 시드 고정 난수로 클럽 3~4개 모양을 고르고, 첫 행 클럽 → 그와 맞는 열 셋 → 열 셋 모두와 맞는
 // 나머지 행 둘 순으로 뽑는다. 칸이 맞는지는 테마 조건 쌍마다 한 번 미리 센다. 많이 쓴 조건일수록 덜 뽑아 고르게 쓴다.
 import type { Condition, Theme } from './conditions.ts'
@@ -20,13 +22,20 @@ export const KIND_WEIGHTS: Record<string, number> = {
 }
 
 const COMPETITION_KINDS = new Set(['league', 'title', 'squad', 'final_goal'])
-const PL_TOP_SCORER = new Set(['award:Q794775', 'award:x-england-top-flight-top-scorer'])
+/** 대회에 딸린 상 → 그 대회 id(같은 묶음). 리그 득점왕은 그 리그, 월드컵 골든볼·골든부트는 월드컵 */
+export const AWARD_COMPETITION: Record<string, string> = {
+  'award:Q794775': 'Q9448', 'award:x-england-top-flight-top-scorer': 'Q9448',
+  'award:Q729513': 'Q324867', 'award:Q461306': 'Q15804', 'award:x-bundesliga-top-scorer': 'Q82595',
+  'award:Q3296848': 'Q182994', 'award:x-ligue1-top-scorer': 'Q13394', 'award:x-eredivisie-top-scorer': 'Q167541',
+  'award:x-belgian-top-scorer': 'Q216022', 'award:x-super-lig-top-scorer': 'Q485568',
+  'award:x-wc-golden-boot': 'Q19317', 'award:Q17355204': 'Q19317',
+}
 
 /** 한 판에 함께 둘 수 없는 조건 묶음 키. 없으면 null */
 export function family(id: string): string | null {
   const [kind, ref] = id.split(':')
   if (COMPETITION_KINDS.has(kind)) return `comp:${ref === 'eng-top' ? 'Q9448' : ref}`
-  if (PL_TOP_SCORER.has(id)) return 'award:pl-top-scorer'
+  if (id in AWARD_COMPETITION) return `comp:${AWARD_COMPETITION[id]}`
   return null
 }
 
@@ -43,8 +52,18 @@ export function cellStats(a: ReadonlySet<string>, b: ReadonlySet<string>, popula
   return { n, known }
 }
 
-const cellOk = (s: { n: number; known: number }, rules: PuzzleRules) =>
-  s.n >= rules.minAnswers && s.n <= rules.maxAnswers && s.known >= rules.minKnown
+/** 한쪽 집합이 다른 쪽에 포함되나 */
+export function isSubsetPair(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a]
+  for (const p of small) if (!big.has(p)) return false
+  return true
+}
+
+/** 칸이 되는 두 머리칸: 정답 수·아는 선수 수 규칙을 지키고, 부분집합이 아니다 */
+export function cellOk(a: ReadonlySet<string>, b: ReadonlySet<string>, popularity: ReadonlyMap<string, number>, rules: PuzzleRules = DEFAULT_RULES): boolean {
+  const s = cellStats(a, b, popularity, rules)
+  return s.n >= rules.minAnswers && s.n <= rules.maxAnswers && s.known >= rules.minKnown && s.n < Math.min(a.size, b.size)
+}
 
 export function validPuzzle(
   p: Puzzle, sets: ReadonlyMap<string, ReadonlySet<string>>, kinds: ReadonlyMap<string, string>,
@@ -58,7 +77,8 @@ export function validPuzzle(
   for (const axis of [p.rows, p.cols]) if (new Set(axis.map((id) => kinds.get(id))).size === 1) return false
   const fams = all.map(family).filter((f) => f !== null)
   if (new Set(fams).size !== fams.length) return false
-  for (const r of p.rows) for (const c of p.cols) if (!cellOk(cellStats(sets.get(r)!, sets.get(c)!, popularity, rules), rules)) return false
+  for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) if (isSubsetPair(sets.get(all[i])!, sets.get(all[j])!)) return false
+  for (const r of p.rows) for (const c of p.cols) if (!cellOk(sets.get(r)!, sets.get(c)!, popularity, rules)) return false
   return true
 }
 
@@ -113,7 +133,7 @@ export function generatePuzzles(
     const si = sets.get(pool[i].id)!
     for (let j = i + 1; j < N; j++) {
       if (fam[i] !== null && fam[i] === fam[j]) continue
-      if (!cellOk(cellStats(si, sets.get(pool[j].id)!, popularity, rules), rules)) continue
+      if (!cellOk(si, sets.get(pool[j].id)!, popularity, rules)) continue
       ok[i * N + j] = ok[j * N + i] = 1
       neighbors[i].push(j)
       neighbors[j].push(i)

@@ -11,6 +11,8 @@ const KINDS: Record<string, ConditionKind> = {
   'league:Q9448': 'league', 'league:eng-top': 'league',
   'title:Q9448:1': 'title', 'title:eng-top:1': 'title', 'title:Q9448:3': 'title',
   'award:Q794775': 'award', 'award:x-england-top-flight-top-scorer': 'award',
+  'award:Q729513': 'award', 'league:Q324867': 'league', 'award:Q17355204': 'award', 'squad:Q19317': 'squad',
+  'continent:europe': 'continent',
 }
 const kinds = new Map(Object.entries(KINDS))
 
@@ -96,6 +98,33 @@ describe('validPuzzle', () => {
     expect(v('league:Q9448', 'title:eng-top:1')).toBe(false)
     // 같은 축이라도
     expect(validPuzzle({ ...BASE, rows: ['club:A', 'league:Q9448', 'league:eng-top'] }, sets, kinds, popularity)).toBe(false)
+    // 리그 득점왕은 그 리그와 한 묶음
+    expect(v('award:Q794775', 'title:Q9448:1')).toBe(false)
+    expect(v('award:x-england-top-flight-top-scorer', 'league:Q9448')).toBe(false)
+    expect(v('award:Q729513', 'league:Q324867')).toBe(false)
+    expect(v('award:Q729513', 'league:Q9448')).toBe(true)
+    expect(v('award:Q17355204', 'squad:Q19317')).toBe(false)
+  })
+
+  test('rejects_subset_pairs', () => {
+    // nation:N1의 선수가 모두 continent:europe에도 있으면(부분집합) 칸이든 같은 축이든 한 판에 두지 않는다
+    const base = pairSets(ALL)
+    const withSub = () => {
+      const sets = new Map([...base.sets].map(([k, v]) => [k, new Set(v)]))
+      for (const p of sets.get('nation:N1')!) sets.get('continent:europe')!.add(p)
+      return sets
+    }
+    const sets = withSub()
+    const v = (rows: string[], cols: string[]) => validPuzzle({ ...BASE, rows: rows as Puzzle['rows'], cols: cols as Puzzle['cols'] }, sets, kinds, base.popularity)
+    expect(v(['club:A', 'club:B', 'continent:europe'], ['club:C', 'manager:M1', 'nation:N2'])).toBe(true)
+    expect(v(['club:A', 'club:B', 'continent:europe'], ['club:C', 'manager:M1', 'nation:N1'])).toBe(false)
+    expect(v(['club:A', 'nation:N1', 'continent:europe'], ['club:C', 'club:D', 'nation:N2'])).toBe(false)
+    // 생성도 부분집합 칸을 만들지 않는다
+    const conds = ALL.map((id) => ({ id, kind: KINDS[id], label_ko: id, label_en: id, ref: id.split(':')[1], themes: ['eng'] }) as Condition)
+    for (const p of generatePuzzles('eng', 30, conds, sets, base.popularity, 3)) {
+      const all = [...p.rows, ...p.cols]
+      expect(all.includes('nation:N1') && all.includes('continent:europe')).toBe(false)
+    }
   })
 
   test('rules_are_the_spec_values', () => {
