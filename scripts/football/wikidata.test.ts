@@ -441,3 +441,8 @@ test('applyLeagueNations_uses_era_competitions_too', () => {
   expect(n).toBe(1)
   expect(t.nation_id).toBe(PL.nation_id)
 })
+
+test('mergeTeamComps_ignores_extra_manual_columns', () => {
+  const m = mergeTeamComps([], [{ team_id: 'Q1', competition_id: 'Q9448', season: '1995', source_url: 'https://en.wikipedia.org/wiki/1995%E2%80%9396_FA_Premier_League' }])
+  expect(m).toEqual([{ team_id: 'Q1', competition_id: 'Q9448', season: '1995' }])
+})

@@ -17,7 +17,7 @@ import { HISTORY_FROM, LEAGUES, type League } from './leagues.ts'
 import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
-  competitionList, competitionWindows, coverage, currentSeason, historyStarts, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
+  competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
   qPlayersAtTeams, qSeasons, qSpells, qTeams, teamStarts, toCsv, type Row, type Team, type TeamCompetition, type Window,
 } from './wikidata.ts'
 import { batched, log, query } from './wdqs.ts'
@@ -167,6 +167,7 @@ async function main() {
   const honours = [...seasons.honours.filter((h) => keptIds.has(h.team_id)), ...awards]
   const out: Record<FileName, object[]> = {
     competitions: competitionList(o.leagues),
+    competition_eras: competitionEras(o.leagues, o.windows),
     nations,
     teams: keptTeams,
     team_competitions: teamComps.filter((t) => keptIds.has(t.team_id)),

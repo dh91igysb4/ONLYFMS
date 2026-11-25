@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
+import { checkDataset, checkHistoryClubs, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
 import { parseCsv, toCsv, type Row } from './wikidata.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -158,11 +158,50 @@ describe('rules', () => {
   })
 })
 
+describe('competition_eras and manual files (설계 2026-11-25)', () => {
+  test('competition_eras_refs', () => {
+    const e = check((d) => { d.files.competition_eras[0].competition_id = 'Q1'; d.files.competition_eras[1].nation_id = 'Q2' })
+    expect(e.some((m) => /^competition_eras:2: competition_id Q1 없음/.test(m))).toBe(true)
+    expect(e.some((m) => /^competition_eras:3: nation_id Q2 없음/.test(m))).toBe(true)
+  })
+
+  test('competition_eras_to_before_from', () => {
+    const e = check((d) => { d.files.competition_eras[0].to_season = '1980' })
+    expect(e.some((m) => /^competition_eras:2: to_season 1980.*from_season/.test(m))).toBe(true)
+  })
+
+  test('competition_eras_overlap_in_same_competition', () => {
+    const e = check((d) => {
+      const first = d.files.competition_eras[0]
+      first.to_season = '2000'
+      d.files.competition_eras.splice(1, 0, { ...first, from_season: '1995', to_season: '' })
+    })
+    expect(e.some((m) => /^competition_eras:3: .*겹침/.test(m))).toBe(true)
+  })
+
+  test('team_competitions_unknown_team_points_to_history_clubs', () => {
+    const e = check((d) => { d.files.team_competitions[0].team_id = 'Q999999' })
+    expect(e.some((m) => /^team_competitions:2: team_id Q999999 없음.*manual\/history_clubs\.csv/.test(m))).toBe(true)
+  })
+
+  test('history_clubs_rows', () => {
+    expect(checkHistoryClubs([{ team_id: 'Q1', from: '', note: '' }, { team_id: 'Q2', from: '1990', note: '' }], 2026)).toEqual([])
+    const e = checkHistoryClubs([{ team_id: 'x', from: '', note: '' }, { team_id: 'Q2', from: '1900', note: '' }, { team_id: 'Q2', from: '', note: '' }], 2026)
+    expect(e).toEqual([
+      expect.stringMatching(/^history_clubs:2: team_id x/),
+      expect.stringMatching(/^history_clubs:3: from 1900/),
+      expect.stringMatching(/^history_clubs:4: team_id Q2 중복/),
+    ])
+  })
+})
+
 describe('real data', () => {
   const has = existsSync(join(REAL, 'players.csv'))
   test.skipIf(!has)('data_football_passes', () => {
     const legendsFile = join(REAL, 'manual', 'legends.csv')
     const legends = existsSync(legendsFile) ? parseCsv(readFileSync(legendsFile, 'utf8')) : []
     expect(checkDataset(load(REAL), legends)).toEqual([])
+    const hcFile = join(REAL, 'manual', 'history_clubs.csv')
+    if (existsSync(hcFile)) expect(checkHistoryClubs(parseCsv(readFileSync(hcFile, 'utf8')), new Date().getFullYear())).toEqual([])
   })
 })

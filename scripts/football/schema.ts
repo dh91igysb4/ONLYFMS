@@ -3,7 +3,7 @@
 import { cmp, type Row } from './wikidata.ts'
 
 export const FILE_NAMES = [
-  'nations', 'competitions', 'teams', 'team_competitions', 'players', 'aliases', 'external_ids', 'spells', 'caps', 'honours',
+  'nations', 'competitions', 'competition_eras', 'teams', 'team_competitions', 'players', 'aliases', 'external_ids', 'spells', 'caps', 'honours',
 ] as const
 export type FileName = typeof FILE_NAMES[number]
 
@@ -14,6 +14,7 @@ export type FileName = typeof FILE_NAMES[number]
 export const FILES: Record<FileName, { columns: string[]; key: string[]; order: string[] }> = {
   nations: { columns: ['id', 'name_ko', 'name_en', 'iso2', 'confederation'], key: ['id'], order: ['id'] },
   competitions: { columns: ['id', 'name_ko', 'name_en', 'kind', 'nation_id', 'tier'], key: ['id'], order: ['id'] },
+  competition_eras: { columns: ['competition_id', 'from_season', 'to_season', 'nation_id', 'tier'], key: ['competition_id', 'from_season'], order: ['competition_id', 'from_season'] },
   teams: { columns: ['id', 'kind', 'name_ko', 'name_en', 'short_name', 'nation_id', 'colors', 'founded', 'retired'], key: ['id'], order: ['id'] },
   team_competitions: { columns: ['team_id', 'competition_id', 'season'], key: ['team_id', 'competition_id', 'season'], order: ['competition_id', 'season', 'team_id'] },
   players: {
@@ -141,12 +142,20 @@ export function checkDataset({ files, headers }: Dataset, legends: readonly Row[
         case 'competitions':
           entityId('id'); required('name_ko'); required('name_en'); oneOf('kind', ENUMS.competitionKind); ref('nation_id', nations); int('tier')
           break
+        case 'competition_eras': {
+          ref('competition_id', competitions, false); ref('nation_id', nations); year('from_season', false); year('to_season'); required('tier'); int('tier')
+          if (r.to_season !== '' && Number(r.to_season) < Number(r.from_season)) err(`to_season ${r.to_season}가 from_season ${r.from_season}보다 앞`)
+          const prev = i > 0 ? files.competition_eras[i - 1] : undefined
+          if (prev && prev.competition_id === r.competition_id && (prev.to_season === '' || Number(prev.to_season) >= Number(r.from_season)))
+            err(`${r.competition_id}의 시기 ${prev.from_season}~${prev.to_season || '진행 중'}와 ${r.from_season}~ 겹침`)
+          break
+        }
         case 'teams':
           entityId('id'); oneOf('kind', ENUMS.teamKind); required('name_en'); ref('nation_id', nations); year('founded'); oneOf('retired', ENUMS.bool)
           if (r.colors !== '' && !validColors(r.colors)) err(`colors 형식이 틀림 (JSON 배열 [{"hex":"#RRGGBB","share":숫자}])`)
           break
         case 'team_competitions':
-          if (!teamKind.has(r.team_id)) err(`team_id ${r.team_id || '(빈 값)'} 없음`)
+          if (!teamKind.has(r.team_id)) err(`team_id ${r.team_id || '(빈 값)'} 없음 (선수 수집 대상에 넣으려면 manual/history_clubs.csv에 추가하고 다시 수집)`)
           ref('competition_id', competitions, false); year('season', false)
           break
         case 'players':
@@ -200,5 +209,21 @@ export function checkDataset({ files, headers }: Dataset, legends: readonly Row[
     if (/^Q\d+$/.test(id) && !players.has(id)) errors.push(`legends:${i + 2}: ${id}이(가) players.csv에 없음 (다시 수집하거나 명단 확인)`)
   })
 
+  return errors
+}
+
+/** manual/history_clubs.csv(team_id,from,note) 검사: QID, from은 비거나 1950~올해, team_id 중복 없음 (설계 2026-11-25 §3.6) */
+export function checkHistoryClubs(rows: readonly Row[], thisYear: number): string[] {
+  const errors: string[] = []
+  const seen = new Set<string>()
+  rows.forEach((r, i) => {
+    const at = `history_clubs:${i + 2}: `
+    const id = r.team_id ?? ''
+    if (!/^Q\d+$/.test(id)) errors.push(at + `team_id ${id || '(빈 값)'} 형식이 틀림 (Q숫자)`)
+    else if (seen.has(id)) errors.push(at + `team_id ${id} 중복`)
+    seen.add(id)
+    const f = r.from ?? ''
+    if (f !== '' && !(YEAR.test(f) && Number(f) >= 1950 && Number(f) <= thisYear)) errors.push(at + `from ${f} 범위 밖 (1950~${thisYear} 또는 빈 값)`)
+  })
   return errors
 }
