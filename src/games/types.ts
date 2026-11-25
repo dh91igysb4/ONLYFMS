@@ -61,8 +61,12 @@ export type Manifest = {
   avatar?: { label: string }
   /** 지속형 게임이 메인 화면 미리보기를 그린다(`getWorldPreview`와 함께). 메인 미리보기 설계 §5.1 */
   preview?: true
-  /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
-  duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
+  /**
+   * 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부.
+   * prepare: 판 준비 RPC 이름(`^[a-z_]+$`). 있으면 대국을 시작할 때 `public.<prepare>(options jsonb)`를 불러
+   * 결과를 `DuelLogic.init`의 세 번째 인자로 넘긴다(서버는 join 트랜잭션 안에서, 한 화면 대전은 브라우저에서 `p_options`로).
+   */
+  duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean; prepare?: string }
   /**
    * 자유 플레이 기록을 보여 주는 방식. 생략하면 'solve'(정답·정답률·연속).
    * 'score'는 점수 게임: 리더보드는 플레이·평균·최고만, 최고 점수 순으로 고정한다.
@@ -96,7 +100,8 @@ export type DuelResult = { over: false } | { over: true; winner: Seat | null; sc
 export interface DuelLogic<State, Action, View> {
   /** 규칙을 바꿀 때마다 1씩 올린다 */
   version: number
-  init(rng: () => number, options: Record<string, string>): State
+  /** prepared: manifest `duel.prepare` RPC의 결과(없으면 undefined). 쓰지 않는 게임은 무시한다 */
+  init(rng: () => number, options: Record<string, string>, prepared?: unknown): State
   /** 지금 행동할 좌석 */
   toMove(state: State): Seat
   /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */

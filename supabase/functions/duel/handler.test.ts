@@ -79,6 +79,20 @@ extra.set('coin-tomove-throws', {
   logic: { ...base, toMove: (s) => (s.picks[0] === 7 ? (() => { throw new Error('toMove boom') })() : base.toMove(s)) },
 })
 for (const [id, logic] of Object.entries(brokenLogics)) extra.set(id, { manifest: coinManifest(id, false), logic })
+// 판 준비 RPC(manifest duel.prepare)를 쓰는 게임: init이 세 번째 인자(prepared)를 상태에 담는다
+type PrepState = CoinState & { prepared: unknown }
+const prepLogic: DuelLogic<PrepState, CoinAction, PrepState> = {
+  ...(base as unknown as DuelLogic<PrepState, CoinAction, PrepState>),
+  init: (_rng, _options, prepared) => ({ seat: 0 as Seat, picks: [null, null], prepared }),
+}
+const prepManifest = (id: string, prepare: string): Manifest => ({
+  ...coinManifest(id, false),
+  options: [{ key: 'theme', label: '테마', choices: [{ value: 'epl', label: 'EPL' }, { value: 'ucl', label: 'UCL' }], default: 'epl' }],
+  duel: { turnSeconds: { choices: [30, 60, 90], default: 60 }, sameScreen: true, prepare },
+})
+extra.set('coin-prep', { manifest: prepManifest('coin-prep', 'test_prepare'), logic: prepLogic })
+extra.set('coin-prep-null', { manifest: prepManifest('coin-prep-null', 'test_prepare_null'), logic: prepLogic })
+extra.set('coin-prep-throws', { manifest: prepManifest('coin-prep-throws', 'test_prepare_throws'), logic: prepLogic })
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -191,6 +205,10 @@ const move = (uid: string, id: string, n: number, payload: unknown, now: number)
 // (숨김 검사는 coin-hidden으로), coin-hidden을 숨긴다. teardown에서 되돌린다.
 await sql`delete from public.hidden_games where game_id = 'yacht'`
 await sql`insert into public.hidden_games (game_id) values ('coin-hidden') on conflict do nothing`
+// 판 준비 RPC 테스트용 함수 (teardown에서 지운다)
+await sql`create or replace function public.test_prepare(p jsonb) returns jsonb language sql as $$ select jsonb_build_object('theme', p->>'theme') $$`
+await sql`create or replace function public.test_prepare_null(p jsonb) returns jsonb language sql as $$ select null::jsonb $$`
+await sql`create or replace function public.test_prepare_throws(p jsonb) returns jsonb language plpgsql as $$ begin raise exception 'no puzzle'; end $$`
 
 // ---------------------------------------------------------------- auth / errors
 t('unapproved_403', async () => {
@@ -827,7 +845,44 @@ t('state_never_in_response', async () => {
   for (const b of allBodies) check(b)
 })
 
+// ---------------------------------------------------------------- prepare (판 준비 RPC)
+t('prepare_passed_to_init', async () => {
+  const s = await started({ game: 'coin-prep', options: { theme: 'ucl' } })
+  const m = await row(s.id)
+  assert.equal(m.status, 'active')
+  assert.deepEqual(m.state.prepared, { theme: 'ucl' })
+})
+
+t('prepare_failure_rolls_back', async () => {
+  for (const game of ['coin-prep-null', 'coin-prep-throws']) {
+    const a = await user()
+    const b = await user()
+    for (const u of [a, b]) await sql`select public._gold_move(${u}, 1000, 'admin', ${crypto.randomUUID()})`
+    const c = await call(a, { action: 'create', game_id: game, options: { theme: 'epl' }, rated: false, visibility: 'invite', turn_seconds: 60, stake: 100 }, T0)
+    assert.equal(c.status, 200, JSON.stringify(c.body))
+    const id = c.body.match_id as string
+    const j = await call(b, { action: 'join', match_id: id, stake: 100 }, T0 + SEC)
+    assert.equal(j.status, 409, game)
+    assert.equal(j.body.error, 'prepare_failed')
+    const m = await row(id)
+    assert.equal(m.status, 'waiting')
+    assert.equal(m.state, null)
+    const rows = await sql`select 1 from public.gold_ledger where user_id = ${b} and ref = ${id}`
+    assert.equal(rows.length, 0)
+    const [w] = await sql`select balance from public.wallets where user_id = ${b}`
+    assert.equal(Number(w.balance), 1000)
+  }
+})
+
+t('yacht_unchanged', async () => {
+  const s = await started({ game: 'yacht', rated: false })
+  assert.equal(s.view.status, 'active')
+  const m = await row(s.id)
+  assert.equal(m.state.prepared, undefined)
+})
+
 t('teardown', async () => {
+  await sql`drop function if exists public.test_prepare(jsonb), public.test_prepare_null(jsonb), public.test_prepare_throws(jsonb)`
   await sql`delete from public.hidden_games where game_id = 'coin-hidden'`
   await sql`insert into public.hidden_games (game_id) values ('yacht') on conflict do nothing`
   await sql.end()

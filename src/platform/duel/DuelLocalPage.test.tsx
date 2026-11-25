@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -35,13 +35,24 @@ vi.mock('../../games/index.ts', async (orig) => {
       result: () => ({ over: false }),
     },
   }
+  // 판 준비 RPC를 쓰는 가짜 게임: init이 prepared를 상태에 담고, 보드가 그것을 그린다
+  const prep = {
+    manifest: { ...fake.manifest, id: 'prep-fake', name: '준비 게임', duel: { ...fake.manifest.duel, prepare: 'prep_fake' } },
+    logic: { ...fake.logic, init: (_r: unknown, o: unknown, p: unknown) => ({ o, p }), view: (s: unknown) => s },
+  }
   const { withHiddenDuel } = await import('../../test-fixtures/duel.ts')
   const withHidden = withHiddenDuel(real)
-  return { ...withHidden, getDuel: (id: string) => (id === 'opt-fake' ? fake : withHidden.getDuel(id)) }
+  const fakes: Record<string, unknown> = { 'opt-fake': fake, 'prep-fake': prep }
+  return { ...withHidden, getDuel: (id: string) => fakes[id] ?? withHidden.getDuel(id) }
 })
 vi.mock('../../games/ui.ts', async (orig) => {
   const real = await orig<typeof import('../../games/ui.ts')>()
-  return { ...real, getDuelComponent: (id: string) => (id === 'opt-fake' ? () => null : real.getDuelComponent(id === 'hidden-duel' ? 'yacht' : id)) }
+  const PrepBoard = ({ view }: { view: { p: { theme: string } } }) => <p data-testid="prep-board">{view.p.theme}</p>
+  return {
+    ...real,
+    getDuelComponent: (id: string) =>
+      id === 'opt-fake' ? () => null : id === 'prep-fake' ? PrepBoard : real.getDuelComponent(id === 'hidden-duel' ? 'yacht' : id),
+  }
 })
 
 import { DuelLocalPage } from './DuelLocalPage.tsx'
@@ -126,4 +137,32 @@ test('restart_first_roll_has_no_stale_keep', () => {
   click(/^굴리기/)
   expect(screen.queryByRole('alert')).toBeNull()
   expect(screen.getAllByRole('button', { name: /^주사위/ }).every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true)
+})
+
+test('local_prepare_states', async () => {
+  let reject!: (e: unknown) => void
+  rpcMock.mockReturnValueOnce(new Promise((_res, rej) => { reject = rej }))
+  renderLocal('prep-fake')
+  expect(screen.getByText('판을 준비하고 있어요')).toBeTruthy()
+  expect(rpcMock).toHaveBeenCalledWith('prep_fake', { p_options: { size: 'l' } })
+  expect(screen.queryByTestId('prep-board')).toBeNull()
+  reject(new Error('down'))
+  expect(await screen.findByText('판을 불러오지 못했어요')).toBeTruthy()
+  expect(screen.queryByTestId('prep-board')).toBeNull()
+  // 다시 시도: null도 실패로 본다
+  rpcMock.mockResolvedValueOnce(null)
+  click('다시 시도')
+  expect(await screen.findByText('판을 불러오지 못했어요')).toBeTruthy()
+  rpcMock.mockResolvedValueOnce({ theme: 'epl' })
+  click('다시 시도')
+  expect((await screen.findByTestId('prep-board')).textContent).toBe('epl')
+  expect(rpcMock).toHaveBeenCalledTimes(3)
+  expect(screen.queryByText('판을 준비하고 있어요')).toBeNull()
+})
+
+test('local_prepare_called_once', async () => {
+  rpcMock.mockResolvedValueOnce({ theme: 'a' })
+  renderLocal('prep-fake')
+  expect((await screen.findByTestId('prep-board')).textContent).toBe('a')
+  await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1))
 })

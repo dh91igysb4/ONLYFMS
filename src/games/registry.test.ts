@@ -79,6 +79,14 @@ test('duel modules: category duel, all solo modes off, turnSeconds default in ch
   expect(getDuel('nope')).toBeUndefined()
 })
 
+test('duel prepare RPC names are lowercase letters and underscores (서버가 SQL에 끼우는 이름)', () => {
+  for (const d of duels) {
+    const p = d.manifest.duel?.prepare
+    if (p !== undefined) expect(p).toMatch(/^[a-z_]+$/)
+  }
+  for (const g of [...games, ...worlds]) expect(g.manifest.duel?.prepare).toBeUndefined()
+})
+
 test('world modules: category world, all modes off, ids unique across all registries', () => {
   for (const w of worlds) {
     expect(w.manifest.category).toBe('world')
