@@ -2473,8 +2473,12 @@ describe('내 섬 B단계 (v23, 설계 2026-11-26-my-isle-b §5.3)', () => {
     const broken = { layout: 'crescent', cleared: 99, tools: { axe: 9, pick: 'x' }, mats: { wood: -3, stone: 2000, iron: 1.5 }, gathered: { day: 5, ids: ['zzz', tree0.id] } }
     expect(logic.migrate({ ...logic.init(), isle: broken }, 23).isle).toEqual(isle({ cleared: 8, tools: { axe: 3, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 999, iron: 1 }, gathered: { day: '', ids: [tree0.id] } }))
   })
-  it('기록 isle_cleared(섬이 있을 때만)', () => {
+  it('craft: 낚는 중이면 busy', () => {
+    expect(err(play(withPending({ gold: 1e6, isle: isle({ mats: { wood: 99, stone: 0, iron: 99 } }) }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))).toBe('busy')
+  })
+  it('기록 isle_cleared(한 구역이라도 치웠을 때만)', () => {
     expect(logic.records!(fresh()).map((r) => r.key)).not.toContain('isle_cleared')
+    expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('isle_cleared')
     expect(logic.records!(fresh({ isle: isle({ cleared: 4 }) })).find((r) => r.key === 'isle_cleared')).toEqual({ key: 'isle_cleared', value: 4, detail: '4/8' })
   })
 })

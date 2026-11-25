@@ -841,7 +841,8 @@ function records(state: State): WorldRecord[] {
     biggest,
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
     { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
-    ...(state.isle ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
+    // 0구역은 기록하지 않는다(섬만 고른 사람이 명예의 전당 0구역 줄에 몰리지 않게)
+    ...(state.isle && state.isle.cleared > 0 ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
   ]
 }
 
@@ -863,8 +864,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
-  // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
   // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
+  // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
   version: 23,
   wallet: true,
   init,
@@ -930,6 +931,7 @@ function gather(state: State, a: Record<string, unknown>, now: number): Out {
 
 /** 작업대에서 도구를 한 단계 올린다 */
 function craft(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
   const isle = state.isle
   if (!isle) return { error: 'no_isle' }
   if (!TOOL_IDS.includes(a.tool as ToolId)) return { error: 'bad_tool' }

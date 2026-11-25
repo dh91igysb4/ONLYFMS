@@ -3719,6 +3719,14 @@ describe('내 섬 B단계: 캐기·작업대·개간 (설계 2026-11-26-my-isle-
     expect(screen.getByText('개간했어요 (1/8)')).toBeInTheDocument()
   })
 
+  test('옛 서버(v22, isle에 재료 없음)여도 작업대 창이 죽지 않고 새로고침 안내', async () => {
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(makeView({ isle: { layout: 'twin' } as unknown as View['isle'] }), { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    await interact()
+    expect(screen.getByText('게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요')).toBeInTheDocument()
+  })
+
   test('저장 위치가 개간한 칸이면 서버 cleared로 그 맵에서 시작', async () => {
     const [k] = [...isleZoneTiles('twin')].find(([, z]) => z === 1)!
     const [x, y] = k.split(',').map(Number)

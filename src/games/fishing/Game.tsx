@@ -242,6 +242,9 @@ const FISHING_MESSAGES: Record<string, string> = {
   need_tool: '도구 단계가 모자라요',
   node_locked: '아직 갈 수 없는 곳이에요',
   no_isle: '먼저 내 섬을 골라 주세요',
+  bad_node: '캘 수 없는 곳이에요. 새로고침해 주세요',
+  bad_zone: '개간 순서가 바뀌었어요. 새로고침해 주세요',
+  bad_tool: '없는 도구예요. 새로고침해 주세요',
   fridge_changed: '냉장고가 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
@@ -1874,7 +1877,10 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 />
               )}
               {menu === 'isle' && <IsleChoosePanel busy={busy} onChoose={(l) => void chooseIsle(l)} />}
-              {menu === 'workbench' && view.isle && (
+              {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats) && (
+                <p className="muted">게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요</p>
+              )}
+              {menu === 'workbench' && view.isle?.tools && view.isle.mats && (
                 <WorkbenchPanel isle={view.isle} gold={view.gold} busy={busy} onCraft={(t, tier, p) => void craftTool(t, tier, p)} onClear={(z, p) => void clearIsle(z, p)} />
               )}
               {menu === 'unlock' && unlockTarget && (

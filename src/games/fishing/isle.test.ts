@@ -150,3 +150,12 @@ describe('내 섬 B: 자원 칸·구역·작업대 (설계 2026-11-26-my-isle-b 
     })
   }
 })
+
+describe('내 섬 구역·자원 칸 고정(세이브의 cleared·자원 칸 id가 가리키는 것이 바뀌면 안 된다)', () => {
+  it('자원 칸 id·위치·구역과 구역 칸 수가 그대로', () => {
+    for (const { id } of ISLE_LAYOUTS) {
+      expect(isleNodes(id).map((n) => `${n.id}@${n.tx},${n.ty}:${n.kind}:${n.zone}`)).toMatchSnapshot()
+      expect([...isleZoneTiles(id)].map(([k, z]) => `${k}=${z}`).join(' ')).toMatchSnapshot()
+    }
+  })
+})

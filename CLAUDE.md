@@ -61,6 +61,7 @@
 - 명예의 전당 데이터는 RPC `hall_of_fame`과 플랫폼 `src/platform/world/hallOfFame.ts`(게시판). 지속형 게임 화면은 `WorldGameProps.onOpenGames`로 게임 목록에 갈 수 있다.
 
 ## 낚시 데이터 갱신 (`fishing`)
+- 내 섬(`isle.ts`·`maps/isle-*.ts`)의 행·`NODE_SPOTS`·`SMALL_CLUSTER`를 바꾸면 세이브의 `cleared`(치운 구역 수)와 자원 칸 id가 가리키는 칸이 바뀐다. `isle.test.ts`의 고정 스냅숏이 깨지면 그냥 갱신하지 말고, `logic.version`을 올리고 `migrate`로 옛 세이브를 맞춘 뒤 `world`를 다시 배포한다.
 `src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
 1. `logic.ts`의 `logic.version`을 올린다.
 2. `migrate`가 옛 버전 세이브를 읽는지 `logic.test.ts`에 테스트를 추가한다 (세이브는 서버에 계속 남아 있다).
