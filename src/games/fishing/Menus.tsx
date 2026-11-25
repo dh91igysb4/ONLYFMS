@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { freeBonus, sellPrice, teleporterOpen, type View } from './logic.ts'
+import { freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -24,6 +24,15 @@ export const buffsOf = (view: Pick<View, 'buffs'>): BuffId[] => view.buffs ?? []
 /** 화면용 가격(실제로 팔리는 값, 용왕의 여의주 포함): 모르는 어종이면 null(price는 모르는 id에 throw한다) */
 const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): number | null =>
   knownSpecies(f.species) ? sellPrice(f, buffs) : null
+/**
+ * 전부 팔기 예상(서버 sell과 같은 규칙, 판매 마릿수 감쇠 v15): 오늘 before마리 판 뒤 가방 순서대로 한 마리씩 배율.
+ * 모르는 어종은 금액에서 빼되 마릿수에는 센다(서버는 팔 때 센다)
+ */
+const saleEstimate = (fish: readonly { species: string; sizeCm: number; perfect: boolean }[], buffs: readonly BuffId[], before: number): number =>
+  fish.reduce((sum, f, i) => {
+    const v = fishPrice(f, buffs)
+    return v === null ? sum : sum + Math.round((v * sellRatePct(before + i + 1)) / 100)
+  }, 0)
 const priceLabel = (f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): string => {
   const v = fishPrice(f, buffs)
   return v === null ? '—' : gold(v)
@@ -182,8 +191,9 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
-  // 모르는 어종은 예상 금액에서 뺀다(서버가 팔 때 값을 정한다)
-  const bagValue = selling.reduce((sum, f) => sum + (fishPrice(f, buffsOf(view)) ?? 0), 0)
+  // 옛 서버 응답(sold 없음)·어제 기록은 0마리. 날짜는 브라우저 시계로 다시 본다
+  const soldNow = soldToday(view.sold ?? { day: '', n: 0 }, Date.now())
+  const bagValue = saleEstimate(selling, buffsOf(view), soldNow)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
   const slots = tackleSlots(view.rodTier)
@@ -195,6 +205,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
         <p className="muted">
           {`팔 물고기 ${selling.length}마리${lockedCount > 0 ? ` · 잠금 ${lockedCount}마리` : ''} · 예상 ${gold(bagValue)}`}
         </p>
+        <p className="muted">{`오늘 판 물고기 ${soldNow.toLocaleString('ko-KR')}마리 · 지금 판매가 ${sellRatePct(soldNow + 1)}%`}</p>
         <button type="button" className="btn btn-primary" disabled={busy || selling.length === 0} onClick={onSell}>
           전부 팔기
         </button>

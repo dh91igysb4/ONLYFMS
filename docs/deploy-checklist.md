@@ -560,6 +560,18 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 낚시 판매 마릿수 감쇠·후반 가격 (`feat/fishing-sell-decay`, 낚시 logic.version 15)
+1. PR 머지 뒤 main을 pull하고 `npx -y supabase@2 db push`로 `20261125040000_fishing_out_of_soft_cap.sql`을 적용한다(낚시 수입을 사이트 하루 상한에서 뺀다).
+2. `npx supabase@2 functions deploy world --no-verify-jwt` — 함수가 낚시 로직·가격을 번들한다. 이것 전에는 서버가 옛 가격·감쇠 없는 판매로 판정한다.
+3. Vercel 배포를 확인하고, 낚시 상점에 "오늘 판 물고기 n마리 · 지금 판매가 x%"가 보이는지, 백골 낚싯대가 448,000 G인지 본다.
+4. 순서가 바뀌어 Vercel이 먼저 뜨면 화면 예상가와 실제 판매가가 잠깐 다를 수 있다(서버가 원본).
+
+## 마이그레이션이 건너뛰어졌을 때 (`inserted before the last migration`)
+두 사람이 따로 만든 마이그레이션 중 이름이 늦은 쪽이 먼저 운영에 적용되면, 이름이 앞선 파일은 보통의 `db push`가 건너뛴다(2026-11-24 `free_gold_tenth`가 이렇게 빠져 미니게임 골드가 10배로 나갔다).
+1. `npx -y supabase@2 db push --dry-run`에 `Found local migration files to be inserted before the last migration`이 나오면 그 파일을 연다.
+2. 함수(`_economy` 등)를 다시 정의하지 않고 행만 바꾸면 `npx -y supabase@2 db push --include-all`로 적용한다.
+3. 함수를 다시 정의하면, 늦게 적용되며 그 뒤의 변경을 덮는지 확인하고 필요하면 바로잡는 마이그레이션을 하나 더 만든다.
+
 ## 펨타듀 밸리 온라인 2단계-1: 다른 지역 친구 위치 (`feat/fishing-online-2`)
 
 설계 `docs/superpowers/specs/2026-11-24-fishing-online-2a-design.md`. DB·Edge Function 없음, Vercel만.

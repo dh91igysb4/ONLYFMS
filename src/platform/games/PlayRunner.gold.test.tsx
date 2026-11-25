@@ -94,18 +94,18 @@ test('game_daily_cap_reached_message', async () => {
 test('site_cap_partial', async () => {
   setWallet({ balance: 0, today: {}, earnedToday: 30750 })
   await playTo(3)
-  await goldLine('+6 G · 오늘 상한을 넘어 일부만')
+  await goldLine('+22 G · 오늘 상한을 넘어 일부만') // 30 × 0.75 내림
 })
 
 test('site_cap_straddle', async () => {
   setWallet({ balance: 0, today: {}, earnedToday: 30740 })
   await playTo(3)
-  await goldLine('+14 G · 오늘 상한을 넘어 일부만')
+  await goldLine('+25 G · 오늘 상한을 넘어 일부만') // 10 + 20 × 0.75
 })
 
 test('site_cap_rounds_to_zero', async () => {
-  // 게임별 남은 몫 3 → 20% 구간에서 floor(0.6) = 0
-  setWallet({ balance: 0, today: { 'test-guess': 117 }, earnedToday: 31000 })
+  // 게임별 남은 몫 1 → 75% 구간에서 floor(0.75) = 0
+  setWallet({ balance: 0, today: { 'test-guess': 119 }, earnedToday: 31000 })
   await playTo(3)
   await goldLine('+0 G · 오늘 골드 상한을 넘었어요')
 })

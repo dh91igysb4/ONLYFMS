@@ -329,11 +329,11 @@ describe('MapPanel', () => {
     expect(screen.queryByText(/썰물\(/)).not.toBeInTheDocument()
   })
 
-  it('잠긴 난파선 탭: 원양 어선 · 150,000 G, 섬의 선착장, 백골 낚싯대 이상', () => {
+  it('잠긴 난파선 탭: 원양 어선 · 330,000 G(v15), 섬의 선착장, 백골 낚싯대 이상', () => {
     mount(makeView({ areas: ['village', 'river', 'forest', 'island'] }))
     fireEvent.click(tab(/난파선/))
     expect(within(panel()).getByText('난파선 앞바다는 아직 못 가요')).toBeInTheDocument()
-    expect(within(panel()).getByText('150,000 G')).toBeInTheDocument()
+    expect(within(panel()).getByText('330,000 G')).toBeInTheDocument()
     expect(within(panel()).getByText(/섬의 선착장 앞에서/)).toBeInTheDocument()
     expect(within(panel()).getByText('백골 낚싯대 이상이 있어야 해요')).toBeInTheDocument()
   })
