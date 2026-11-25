@@ -65,8 +65,11 @@ export function getDuelComponent(id: string): ComponentType<DuelGameProps> | und
   return duelComponents[id]
 }
 
-/** 지속형(world) 게임 화면이 받는 props. 저장·행동 요청은 화면이 플랫폼 데이터 계층으로 직접 한다. */
-export type WorldGameProps = { gameId: string }
+/**
+ * 지속형(world) 게임 화면이 받는 props. 저장·행동 요청은 화면이 플랫폼 데이터 계층으로 직접 한다.
+ * onOpenGames: 플랫폼의 게임 목록 화면으로 간다(게임 안의 출구, 예: 낚시 마을회관 노트북).
+ */
+export type WorldGameProps = { gameId: string; onOpenGames?: () => void }
 
 /** 지속형 게임 화면 등록부. 새 지속형 게임 화면을 여기에 한 줄씩 등록한다. */
 const worldComponents: Record<string, ComponentType<WorldGameProps>> = {
