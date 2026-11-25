@@ -2,7 +2,8 @@
 -- (설계 docs/superpowers/specs/2026-11-26-tiki-taka-toe-design.md §5.2, §5.3, §8).
 --
 --   * 데이터는 scripts/tiki-taka-toe/load.sh가 data/tiki-taka-toe/*.csv를 한 트랜잭션으로 통째 교체한다.
---     축구 데이터를 다시 적재하면 생성 → 적재를 다시 한다. 선수가 지워지면 player_id FK로 실패해 알 수 있다.
+--     축구 데이터를 다시 적재하면 생성(npm run ttt:generate) → 적재를 다시 한다. 축구 적재는 CSV에서 빠진 선수를
+--     지우지 않고 retired로 표시하므로 FK는 실패하지 않는다. 다시 생성하기 전까지 그 선수는 계속 정답으로 남는다.
 --   * 세 테이블은 클라이언트가 직접 읽지 못한다(RLS on, 정책·권한 없음). 판은 ttt_pick_puzzle로만 나간다.
 --   * game_modes: 솔로 모드는 모두 끔. hidden_games: 처음에는 숨김(관리자 확인 뒤 새 마이그레이션으로 공개).
 --     src/games/registry.test.ts가 이 시드와 등록부(duels)가 같은지 검사한다.
@@ -21,7 +22,7 @@ create table public.ttt_condition_players (
   primary key (condition_id, player_id)
 );
 
--- FK 검사(선수 삭제)용
+-- 선수별 조회·FK 검사용
 create index ttt_condition_players_player on public.ttt_condition_players (player_id);
 
 create table public.ttt_puzzles (
@@ -48,7 +49,7 @@ end
 $$;
 
 -- 판 하나를 무작위로 골라 src/games/tiki-taka-toe/logic.ts의 Prepared 모양으로 돌려준다:
---   { puzzle_id, rows: [{id,kind,label}]×3, cols: [...]×3, answers: [[player_id…]×9], examples: [[이름…]×9] }
+--   { puzzle_id, theme, rows: [{id,kind,label}]×3, cols: [...]×3, answers: [[player_id…]×9], examples: [[이름…]×9] }
 --   칸 순서는 행 우선(칸 i = 행 i/3 × 열 i%3). answers는 두 조건 선수 교집합(player_id 순),
 --   examples는 그 칸 정답의 인지도 순 상위 5명 coalesce(name_ko, name_en). 테마가 없거나 판이 없으면 null.
 -- 호출자:
@@ -108,6 +109,7 @@ begin
   )
   select jsonb_build_object(
     'puzzle_id', pz.id,
+    'theme', pz.theme,
     'rows', (select jsonb_agg(obj order by ord) from heads where is_row),
     'cols', (select jsonb_agg(obj order by ord) from heads where not is_row),
     'answers', (select jsonb_agg(answers order by i) from filled),

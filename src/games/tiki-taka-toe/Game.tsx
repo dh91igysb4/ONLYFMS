@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DuelGameProps } from '../ui.ts'
 import type { Action, Last, View } from './logic.ts'
+import { manifest } from './manifest.ts'
 import { searchPlayers, type PlayerHit } from './search.ts'
 import './ttt.css'
 
 const DEBOUNCE_MS = 250
+/** 테마 이름은 manifest 설정 선택지의 라벨을 쓴다(잉글랜드·스페인·이탈리아·독일·유럽 전체) */
+const THEME_LABELS = new Map((manifest.options.find((o) => o.key === 'theme')?.choices ?? []).map((c) => [c.value, c.label]))
 
 function lastLine(last: Last, names: [string, string]): string {
   const who = names[last.seat]
@@ -121,6 +124,8 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
   const rowLabel = (i: number) => v.rows[Math.floor(i / 3)].label
   const colLabel = (i: number) => v.cols[i % 3].label
 
+  const theme = (v.theme && THEME_LABELS.get(v.theme)) || ''
+
   const offeredToMe = mine && other !== null && v.drawOffer === other
 
   return (
@@ -128,7 +133,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
       {header && <div className="stack ttt-head">{header}</div>}
 
       <div className="ttt-board" role="group" aria-label="판">
-        <div className="ttt-corner" aria-hidden="true" />
+        <div className="ttt-corner" data-testid="ttt-corner">{theme}</div>
         {v.cols.map((c) => <div key={c.id} className="ttt-label ttt-col">{c.label}</div>)}
         {v.rows.map((r, ri) => (
           <div key={r.id} className="ttt-row-wrap">
@@ -153,7 +158,7 @@ export function Game({ view, mySeat, toMove, finished, busy, error, onAction, na
                   {mine && isOpp && <span className="ttt-steal">스틸(남은 {mySteals}번)</span>}
                   {ex && (
                     <span className="ttt-ex" data-testid={`ttt-examples-${i}`}>
-                      {ex.length === 0 ? <span>예시 없음</span> : ex.map((n) => <span key={n}>{n}</span>)}
+                      {ex.length === 0 ? <span>예시 없음</span> : ex.map((n, k) => <span key={k}>{n}</span>)}
                     </span>
                   )}
                 </button>

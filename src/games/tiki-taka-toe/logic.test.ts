@@ -11,6 +11,7 @@ const prepared: Prepared = {
   cols: [0, 1, 2].map((i) => hdr('c', i)),
   answers: Array.from({ length: 9 }, (_, k) => [`P${k}`, `S${k}`, 'X']),
   examples: Array.from({ length: 9 }, (_, k) => [`예시${k}`]),
+  theme: 'eng',
 }
 const fresh = () => logic.init(rng, { theme: 'eur' }, prepared)
 const guess = (cell: number, playerId: string, extra: Partial<Action> = {}): Action =>
@@ -59,7 +60,7 @@ describe('tiki-taka-toe logic', () => {
 
   test('reuse_rejected', () => {
     let s = step(fresh(), 0, guess(0, 'X'))
-    expect(err(s, 1, guess(1, 'X'))).not.toBeNull()
+    expect(err(s, 1, guess(1, 'X'))).toBe('이미 쓴 선수예요')
     expect(logic.toMove(s)).toBe(1)
     // 틀린 답으로 낸 선수는 다시 낼 수 있다
     s = step(fresh(), 0, guess(0, 'P5'))
@@ -88,13 +89,16 @@ describe('tiki-taka-toe logic', () => {
     s.steals = [0, 0]
     s = step(s, 0, guess(0, 'P0'))
     const before = JSON.stringify(s)
-    expect(err(s, 1, guess(0, 'S0'))).not.toBeNull() // 스틸 0
-    expect(err(s, 1, guess(9, 'P0'))).not.toBeNull()
-    expect(err(s, 1, guess(-1, 'P0'))).not.toBeNull()
+    expect(err(s, 1, guess(0, 'S0'))).toBe('스틸을 다 썼어요')
+    expect(err(s, 1, guess(9, 'P0'))).toBe('이 칸은 고를 수 없어요')
+    expect(err(s, 1, guess(-1, 'P0'))).toBe('이 칸은 고를 수 없어요')
+    expect(err(s, 1, guess(1, ''))).toBe('선수를 목록에서 골라 주세요')
+    expect(err(s, 1, { type: 'nope' } as unknown as Action)).toBe('할 수 없는 행동이에요')
+    expect(err(s, 1, null as unknown as Action)).toBe('할 수 없는 행동이에요')
     let t = step(fresh(), 0, guess(0, 'P0'))
     t = step(t, 1, pass)
-    expect(err(t, 0, guess(0, 'S0'))).not.toBeNull() // 내 칸
-    expect(err(t, 1, guess(1, 'P1'))).not.toBeNull() // 내 차례 아님
+    expect(err(t, 0, guess(0, 'S0'))).toBe('이미 내 칸이에요')
+    expect(err(t, 1, guess(1, 'P1'))).toBe('상대 차례예요')
     expect(JSON.stringify(s)).toBe(before)
   })
 
@@ -113,7 +117,7 @@ describe('tiki-taka-toe logic', () => {
     expect(r).toMatchObject({ over: true, winner: 0 })
     expect(logic.result(play([2, 4, 6]))).toMatchObject({ over: true, winner: 0 })
     expect(logic.result(play([0, 1]))).toEqual({ over: false })
-    expect(err(play([0, 1, 2]), 1, pass)).not.toBeNull()
+    expect(err(play([0, 1, 2]), 1, pass)).toBe('이미 끝난 대국이에요')
   })
 
   test('full_board_draw', () => {
@@ -153,15 +157,15 @@ describe('tiki-taka-toe logic', () => {
     let s = step(fresh(), 0, { type: 'pass', offerDraw: true })
     expect(logic.view(s, 1).drawOffer).toBe(0)
     expect(logic.result(step(s, 1, { type: 'acceptDraw' }))).toEqual({ over: true, winner: null })
-    expect(err(fresh(), 0, { type: 'acceptDraw' })).not.toBeNull()
+    expect(err(fresh(), 0, { type: 'acceptDraw' })).toBe('받을 무승부 제안이 없어요')
     // 내 자신 제안은 수락 못 함: 좌석 0 제안 뒤는 좌석 1 차례라 not_your_turn
     // 거절
     s = step(s, 1, pass)
     expect(logic.view(s, 0).drawOffer).toBeNull()
     expect(logic.view(s, 0).canOffer).toEqual([false, true])
-    expect(err(s, 0, { type: 'pass', offerDraw: true })).not.toBeNull()
-    expect(err(s, 0, guess(0, 'P0', { offerDraw: true }))).not.toBeNull()
-    expect(err(s, 0, { type: 'acceptDraw' })).not.toBeNull()
+    expect(err(s, 0, { type: 'pass', offerDraw: true })).toBe('이번 차례엔 무승부를 다시 제안할 수 없어요')
+    expect(err(s, 0, guess(0, 'P0', { offerDraw: true }))).toBe('이번 차례엔 무승부를 다시 제안할 수 없어요')
+    expect(err(s, 0, { type: 'acceptDraw' })).toBe('받을 무승부 제안이 없어요')
     s = step(s, 0, pass)
     expect(logic.view(s, 0).canOffer).toEqual([true, true])
     s = step(s, 1, pass)
@@ -178,6 +182,34 @@ describe('tiki-taka-toe logic', () => {
     s = step(s, 0, { type: 'acceptDraw' })
     v = logic.view(s, null)
     expect(v.examples).toEqual(prepared.examples)
+  })
+
+  test('view_shows_examples_when_ended_by_platform', () => {
+    // 기권·시간 초과 패·무효: 로직 결과는 진행 중이지만 플랫폼이 끝났다고 알려 주면 예시를 보인다
+    const s = step(fresh(), 0, guess(0, 'P0'))
+    expect(logic.result(s).over).toBe(false)
+    expect(logic.view(s, null, true).examples).toEqual(prepared.examples)
+    expect(logic.view(s, null, false).examples).toBeNull()
+    expect(logic.view(s, null).examples).toBeNull()
+    expect(logic.view(s, 0).examples).toBeNull()
+    // 끝났으면 무승부 제안도 할 수 없다
+    expect(logic.view(s, null, true).canOffer).toEqual([false, false])
+  })
+
+  test('theme_kept_in_state_and_view', () => {
+    expect(fresh().theme).toBe('eng')
+    expect(logic.view(fresh(), 0).theme).toBe('eng')
+    // 옛 판 준비 결과(테마 없음)도 init이 받는다
+    const { theme: _t, ...old } = prepared
+    void _t
+    const s = logic.init(rng, { theme: 'eur' }, old)
+    expect(s.theme).toBeNull()
+    expect(logic.view(s, 0).theme).toBeNull()
+    // 옛 상태(테마 필드 없음)도 view가 null로 보인다
+    const { theme: _s, ...oldState } = fresh()
+    void _s
+    expect(logic.view(oldState as State, 0).theme).toBeNull()
+    expect(() => logic.init(rng, {}, { ...prepared, theme: 3 })).toThrow()
   })
 
   test('timeout_is_pass', () => {

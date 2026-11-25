@@ -2,8 +2,15 @@
 import type { DuelLogic, DuelResult, Seat } from '../types.ts'
 
 export type Header = { id: string; kind: string; label: string }
-/** 칸 순서는 행 우선 0..8 */
-export type Prepared = { puzzle_id: string; rows: Header[]; cols: Header[]; answers: string[][]; examples: string[][] }
+/** 칸 순서는 행 우선 0..8. theme은 판 고르기 RPC가 고른 문제의 테마(옛 RPC 결과에는 없을 수 있다) */
+export type Prepared = {
+  puzzle_id: string
+  rows: Header[]
+  cols: Header[]
+  answers: string[][]
+  examples: string[][]
+  theme?: string | null
+}
 
 export type Action =
   | { type: 'guess'; cell: number; playerId: string; name: string; offerDraw?: true }
@@ -31,10 +38,13 @@ export type View = {
   last: Last | null
   quiet: number
   examples: string[][] | null
+  /** 문제 테마(eng·esp·ita·ger·eur). 모르면 null */
+  theme: string | null
 }
 
 export type State = {
   puzzleId: string
+  theme: string | null
   rows: Header[]
   cols: Header[]
   answers: string[][]
@@ -69,6 +79,20 @@ const LINES = [
   [2, 4, 6],
 ]
 
+/** 거절 이유는 화면에 그대로 보이는 한국어 문장이다(플랫폼이 invalid_action의 message로 띄운다) */
+export const ERR = {
+  gameOver: '이미 끝난 대국이에요',
+  notYourTurn: '상대 차례예요',
+  invalid: '할 수 없는 행동이에요',
+  noDrawOffer: '받을 무승부 제안이 없어요',
+  offerCooldown: '이번 차례엔 무승부를 다시 제안할 수 없어요',
+  badCell: '이 칸은 고를 수 없어요',
+  badPlayer: '선수를 목록에서 골라 주세요',
+  ownCell: '이미 내 칸이에요',
+  noSteals: '스틸을 다 썼어요',
+  used: '이미 쓴 선수예요',
+} as const
+
 const isHeaders = (h: unknown): h is Header[] =>
   Array.isArray(h) &&
   h.length === 3 &&
@@ -85,12 +109,14 @@ function init(_rng: () => number, _options: Record<string, string>, prepared?: u
     !isHeaders(p.rows) ||
     !isHeaders(p.cols) ||
     !isGrid(p.answers) ||
-    !isGrid(p.examples)
+    !isGrid(p.examples) ||
+    (p.theme != null && typeof p.theme !== 'string')
   ) {
     throw new Error('invalid_prepared')
   }
   return {
     puzzleId: p.puzzle_id,
+    theme: p.theme ?? null,
     rows: p.rows,
     cols: p.cols,
     answers: p.answers,
@@ -131,13 +157,13 @@ function result(s: State): DuelResult {
 }
 
 function apply(state: State, seat: Seat, action: Action, _rng: () => number): { state: State } | { error: string } {
-  if (result(state).over) return { error: 'game_over' }
-  if (seat !== state.seat) return { error: 'not_your_turn' }
-  if (typeof action !== 'object' || action === null) return { error: 'invalid_action' }
+  if (result(state).over) return { error: ERR.gameOver }
+  if (seat !== state.seat) return { error: ERR.notYourTurn }
+  if (typeof action !== 'object' || action === null) return { error: ERR.invalid }
   const other = (1 - seat) as Seat
 
   if (action.type === 'acceptDraw') {
-    if (state.drawOffer !== other) return { error: 'no_draw_offer' }
+    if (state.drawOffer !== other) return { error: ERR.noDrawOffer }
     return {
       state: {
         ...state,
@@ -148,10 +174,10 @@ function apply(state: State, seat: Seat, action: Action, _rng: () => number): { 
       },
     }
   }
-  if (action.type !== 'guess' && action.type !== 'pass') return { error: 'invalid_action' }
+  if (action.type !== 'guess' && action.type !== 'pass') return { error: ERR.invalid }
 
   const offer = action.offerDraw === true
-  if (offer && state.noOffer === seat) return { error: 'draw_offer_cooldown' }
+  if (offer && state.noOffer === seat) return { error: ERR.offerCooldown }
 
   const next: State = {
     ...state,
@@ -174,13 +200,13 @@ function apply(state: State, seat: Seat, action: Action, _rng: () => number): { 
   }
 
   const { cell, playerId } = action
-  if (!Number.isInteger(cell) || cell < 0 || cell > 8) return { error: 'invalid_cell' }
-  if (typeof playerId !== 'string' || playerId === '') return { error: 'invalid_player' }
+  if (!Number.isInteger(cell) || cell < 0 || cell > 8) return { error: ERR.badCell }
+  if (typeof playerId !== 'string' || playerId === '') return { error: ERR.badPlayer }
   const owner = state.owners[cell]
-  if (owner === seat) return { error: 'own_cell' }
+  if (owner === seat) return { error: ERR.ownCell }
   const steal = owner !== null
-  if (steal && state.steals[seat] <= 0) return { error: 'no_steals_left' }
-  if (state.used.includes(playerId)) return { error: 'player_used' }
+  if (steal && state.steals[seat] <= 0) return { error: ERR.noSteals }
+  if (state.used.includes(playerId)) return { error: ERR.used }
 
   if (steal) next.steals[seat] -= 1
   const correct = state.answers[cell].includes(playerId)
@@ -197,8 +223,9 @@ function apply(state: State, seat: Seat, action: Action, _rng: () => number): { 
   return { state: next }
 }
 
-function view(s: State, _viewer: Seat | null): View {
-  const over = result(s).over
+/** ended: 플랫폼이 대국을 끝냈다(기권·시간 초과 패·무효 포함). 그때도 예시 답을 보인다 */
+function view(s: State, _viewer: Seat | null, ended?: boolean): View {
+  const over = result(s).over || ended === true
   const canOff = (x: Seat) => !over && s.noOffer !== x
   return {
     rows: s.rows,
@@ -211,6 +238,7 @@ function view(s: State, _viewer: Seat | null): View {
     last: s.last,
     quiet: s.quiet,
     examples: over ? s.examples : null,
+    theme: s.theme ?? null,
   }
 }
 

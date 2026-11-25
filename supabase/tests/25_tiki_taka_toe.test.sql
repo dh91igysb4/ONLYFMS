@@ -1,7 +1,7 @@
 -- 티키타카토 테이블·판 고르기 RPC (설계 2026-11-26-tiki-taka-toe-design.md §5.2).
 -- db-test.sh가 축구 픽스처 다음에 supabase/tests/fixtures/tiki-taka-toe를 적재해 둔다 (판 eur-0001 하나).
 begin;
-select plan(23);
+select plan(24);
 
 \set AP '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}'
 \set PE '{"sub":"00000000-0000-0000-0000-0000000000e2","role":"authenticated"}'
@@ -35,6 +35,7 @@ select set_config('request.jwt.claims', :'AP', true);
 create temp table pick on commit drop as select public.ttt_pick_puzzle('{"theme":"eur"}') p;
 
 select is((select p ->> 'puzzle_id' from pick), 'eur-0001', 'picks the eur puzzle');
+select is((select p ->> 'theme' from pick), 'eur', 'returns the puzzle theme');
 select is((select p -> 'rows' -> 0 from pick), '{"id":"club:x-r","kind":"club","label":"행 클럽"}'::jsonb, 'row header shape, Korean label');
 select is((select array[jsonb_array_length(p -> 'rows'), jsonb_array_length(p -> 'cols'), jsonb_array_length(p -> 'answers'), jsonb_array_length(p -> 'examples')] from pick),
   array[3, 3, 9, 9], '3 rows, 3 cols, 9 answer cells, 9 example cells');

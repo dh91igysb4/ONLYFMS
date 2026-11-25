@@ -31,6 +31,7 @@ function base(over: Partial<View> = {}): View {
     last: null,
     quiet: 0,
     examples: null,
+    theme: 'eng',
     ...over,
   }
 }
@@ -154,6 +155,33 @@ describe('tiki-taka-toe Game', () => {
       expect(within(screen.getByTestId(`ttt-examples-${i}`)).getByText(new RegExp(`예시${i}가`))).toBeTruthy()
     }
     expect(screen.queryByRole('button', { name: '턴 넘기기' })).toBeNull()
+  })
+
+  test('examples_duplicate_names_no_key_warning', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const examples = Array.from({ length: 9 }, () => ['같은 이름', '같은 이름'])
+    render(<Game {...props(base({ examples }), { finished: true })} />)
+    expect(within(screen.getByTestId('ttt-examples-0')).getAllByText('같은 이름')).toHaveLength(2)
+    expect(spy.mock.calls.some((c) => String(c[0]).includes('same key'))).toBe(false)
+    spy.mockRestore()
+  })
+
+  test('theme_label_in_corner', () => {
+    const a = render(<Game {...props(base())} />)
+    expect(screen.getByTestId('ttt-corner').textContent).toBe('잉글랜드')
+    a.unmount()
+    const labels: [string, string][] = [['esp', '스페인'], ['ita', '이탈리아'], ['ger', '독일'], ['eur', '유럽 전체']]
+    for (const [t, l] of labels) {
+      const r = render(<Game {...props(base({ theme: t }))} />)
+      expect(screen.getByTestId('ttt-corner').textContent).toBe(l)
+      r.unmount()
+    }
+    // 테마를 모르면(옛 판) 비운다
+    const c = render(<Game {...props(base({ theme: null }))} />)
+    expect(screen.getByTestId('ttt-corner').textContent).toBe('')
+    c.unmount()
+    render(<Game {...props(base({ theme: 'zzz' }))} />)
+    expect(screen.getByTestId('ttt-corner').textContent).toBe('')
   })
 
   test('last_move_line', () => {
