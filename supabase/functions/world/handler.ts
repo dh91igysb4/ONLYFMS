@@ -2,8 +2,8 @@
 // 매 요청은 저장 행을 `for update`로 잠근 한 트랜잭션이다. 게임 id로 분기하지 않는다(등록부·logic이 차이를 푼다).
 // 지갑(설계 docs/superpowers/specs/2026-11-23-wallet-design.md §6): logic.wallet이 true인 게임만
 //   세이브 행 → 지갑 행 순서로 잠그고(act), 옛 세이브의 골드를 legacyGold로 한 번 옮기고(reason migrate),
-//   apply가 돌려준 gold 증감을 _gold_move(reason world)로 장부에 반영한다. 사이트 하루 상한은 _gold_move가 적용하고
-//   핸들러는 실제 들어간 양(잔액 차이)만 보고 gold_capped를 알린다. wallet이 없는 게임은 지갑을 건드리지 않는다.
+//   apply가 돌려준 gold 증감을 _gold_move(reason world)로 장부에 반영한다. 2026-11-25부터 사이트 하루 상한은 world에 걸리지 않지만
+//   (낚시는 판매 마릿수 감쇠), 핸들러는 그대로 실제 들어간 양(잔액 차이)만 보고 줄었으면 gold_capped를 알린다. wallet이 없는 게임은 지갑을 건드리지 않는다.
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getWorld } from '../../../src/games/index.ts'

@@ -4,6 +4,10 @@ import assert from 'node:assert/strict'
 import postgres from 'postgres'
 import { handle, type WorldDeps } from './handler.ts'
 import type { Manifest, WorldLogic, WorldModule } from '../../../src/games/types.ts'
+import { logic as fishingLogic } from '../../../src/games/fishing/logic.ts'
+
+/** 지금 낚시 로직 버전(v14 지갑 이전 뒤 세이브는 이 버전으로 저장된다) */
+const FISHING_V = fishingLogic.version
 
 const url = Deno.env.get('TEST_DB_URL')
 if (!url) throw new Error('TEST_DB_URL is required (npm run fn:test)')
@@ -273,14 +277,14 @@ t('save newer than the code → 409 version_newer, nothing is migrated down or w
   assert.equal((await sql`select 1 from public.game_records where user_id = ${u}`).length, 0)
 })
 
-t('real fishing: a v15 save (newer than this code) is refused, gold and save untouched', async () => {
+t('real fishing: a save newer than this code is refused, gold and save untouched', async () => {
   const u = await user('approved', true)
   await sql`insert into public.world_saves (user_id, game_id, state, logic_version)
-            values (${u}, 'fishing', ${sql.json({ totalEarned: 5, gold: 999 })}, 15)`
+            values (${u}, 'fishing', ${sql.json({ totalEarned: 5, gold: 999 })}, ${FISHING_V + 1})`
   const r = await realCall(u, { game: 'fishing', action: 'load' })
   assert.equal(r.status, 409)
   assert.equal(r.body.error, 'version_newer')
-  assert.equal((await save(u, 'fishing'))[0].logic_version, 15)
+  assert.equal((await save(u, 'fishing'))[0].logic_version, FISHING_V + 1)
   assert.equal(await balance(u), 0)
   assert.equal((await ledger(u)).length, 0)
 })
@@ -394,7 +398,7 @@ t('real fishing registry: load, cast, resolve, sell writes game_records', async 
   const led = await ledger(admin)
   assert.deepEqual(led.map((l) => [l.reason, Number(l.delta), l.game_id]), [['world', gold, 'fishing']])
   const [sv] = await save(admin, game)
-  assert.equal(sv.logic_version, 14)
+  assert.equal(sv.logic_version, FISHING_V)
   assert.equal('gold' in (sv.state as Record<string, unknown>), false)
   assert.ok(gold < 800)
   const bag = await real({ game, action: 'act', payload: { type: 'buyBag', tier: 2 } })
@@ -473,7 +477,7 @@ t('real fishing: v13 save gold moves to the wallet once on first load (floor), s
   assert.equal((r.body.view as { gold: number }).gold, 12345)
   assert.equal('gold_capped' in r.body, false)
   const [sv] = await save(u, 'fishing')
-  assert.equal(sv.logic_version, 14)
+  assert.equal(sv.logic_version, FISHING_V)
   const st = sv.state as Record<string, unknown>
   assert.equal('gold' in st, false)
   assert.equal(st.totalEarned, 50_000)
@@ -534,7 +538,7 @@ t('real fishing: first request is a failing act → migration (gold + v14 save) 
   assert.equal(r.body.error, 'not_enough_gold')
   assert.equal(await balance(u), 300)
   const [sv] = await save(u, 'fishing')
-  assert.equal(sv.logic_version, 14)
+  assert.equal(sv.logic_version, FISHING_V)
   assert.equal('gold' in (sv.state as Record<string, unknown>), false)
   const again = await realCall(u, { game: 'fishing', action: 'load' })
   assert.equal(again.body.gold, 300)
@@ -549,7 +553,7 @@ t('real fishing: v13 save with bad or zero gold moves nothing (no ledger row), s
     assert.equal(r.status, 200)
     assert.equal(r.body.gold, 0)
     assert.equal((await ledger(u)).length, 0)
-    assert.equal((await save(u, 'fishing'))[0].logic_version, 14)
+    assert.equal((await save(u, 'fishing'))[0].logic_version, FISHING_V)
   }
 })
 
@@ -703,21 +707,21 @@ t('wallet concurrent earn 10 × 5 → 50', async () => {
   assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 50 })
 })
 
-t('wallet site daily cap: gold_capped, ledger raw_delta, game state unreduced', async () => {
+// 2026-11-25부터 사이트 하루 상한은 free에만 걸린다(설계 2026-11-25-fishing-sell-decay-design.md): world 수입은 줄지 않는다
+t('wallet world earnings are outside the site daily cap: no gold_capped, no raw_delta', async () => {
   const u = await user()
   const a = await act(u, { type: 'earn', n: 30000 }, W)
   assert.equal('gold_capped' in a.body, false)
-  const b = await act(u, { type: 'earn', n: 1000 }, W)
+  const b = await act(u, { type: 'earn', n: 20000 }, W)
   assert.equal(b.status, 200)
-  assert.equal(b.body.gold, 30800)
-  assert.deepEqual(b.body.gold_capped, { asked: 1000, got: 800 })
+  assert.equal(b.body.gold, 50000)
+  assert.equal('gold_capped' in b.body, false)
   const last = (await ledger(u)).at(-1)!
-  assert.equal(last.delta, '800')
-  assert.equal(last.raw_delta, '1000')
-  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 31000 })
+  assert.equal(last.delta, '20000')
+  assert.equal(last.raw_delta, null)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 50000 })
   const sp = await act(u, { type: 'spend', n: 500 }, W)
-  assert.equal(sp.body.gold, 30300)
-  assert.equal('gold_capped' in sp.body, false)
+  assert.equal(sp.body.gold, 49500)
 })
 
 t('wallet migrate does not count toward the cap', async () => {
@@ -729,21 +733,21 @@ t('wallet migrate does not count toward the cap', async () => {
   assert.equal('gold_capped' in r.body, false)
 })
 
-t('wallet concurrent earn 20,000 × 2 → 32,600', async () => {
+t('wallet concurrent earn 20,000 × 2 → 40,000, ledger 2 rows', async () => {
   const u = await user()
   const rs = await Promise.all([act(u, { type: 'earn', n: 20000 }, W), act(u, { type: 'earn', n: 20000 }, W)])
   assert.ok(rs.every((r) => r.status === 200))
-  assert.equal(await balance(u), 32600)
-  assert.equal(rs.filter((r) => 'gold_capped' in r.body).length, 1)
+  assert.equal(await balance(u), 40000)
+  assert.equal((await ledger(u)).length, 2)
 })
 
 // 서로 다른 지갑 게임은 세이브 행이 달라 세이브 잠금으로 줄 서지 않는다 → 지갑 잠금이 상한·음수를 지킨다
-t('wallet concurrent earn across two wallet games → 32,600', async () => {
+t('wallet concurrent earn across two wallet games → 40,000', async () => {
   const v = await user()
   await load(v, W2)
   const rs = await Promise.all([act(v, { type: 'earn', n: 20000 }, W), act(v, { type: 'earn', n: 20000 }, W2)])
   assert.ok(rs.every((r) => r.status === 200))
-  assert.equal(await balance(v), 32600)
+  assert.equal(await balance(v), 40000)
 })
 
 t('wallet concurrent force-spend across two wallet games: one 400, balance 20', async () => {
