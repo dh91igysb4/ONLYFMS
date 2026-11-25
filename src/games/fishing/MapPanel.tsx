@@ -78,7 +78,8 @@ type MapPanelProps = {
 
 /** 머리줄·목록 갱신 단위: 시계 표시(10분) 또는 날짜·계절·날씨가 바뀔 때만 새 값 */
 /** 큰 지도 탭: 세계 지도에 그리는 맵이 있는 지역(실내 마을회관 제외) */
-const MAP_AREAS = AREAS.filter((a) => mapFor(a.id)?.onWorldMap !== false)
+// 세계 지도에 그리는 지역만(마을회관 실내·모양별 맵인 내 섬 제외)
+const MAP_AREAS = AREAS.filter((a) => mapFor(a.id)?.onWorldMap === true)
 
 const condKey = (c: Conditions) => `${c.gameDay}|${formatClock(c.gameMinute)}|${c.season}|${c.weather}`
 

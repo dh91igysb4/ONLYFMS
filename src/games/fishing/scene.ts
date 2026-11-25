@@ -709,13 +709,14 @@ function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: nu
       if (tileAt(map, tx, ty) === 'pier') drawPierExtras(ctx, g, tx, ty)
     }
   }
-  // 마을회관 외관: 건물 사각형 왼쪽 아래에 맞춰(위로는 사각형을 넘을 수 있다)
+  // 건물 외관(마을회관·텐트): 건물 사각형 왼쪽 아래에 맞춰(위로는 사각형을 넘을 수 있다)
   const b = map.building
-  if (b) {
+  const art = SPRITES[map.buildingSprite]
+  if (b && art) {
     const right = b.tx + b.w - 1
     const bottom = b.ty + b.h - 1
     if (b.tx <= x1 && right >= x0 && b.ty <= y1 && bottom >= y0) {
-      drawSprite(ctx, 'hall-exterior', b.tx * TILE, (b.ty + b.h) * TILE - SPRITES['hall-exterior'].h, 1)
+      drawSprite(ctx, map.buildingSprite, b.tx * TILE, (b.ty + b.h) * TILE - art.h, 1)
     }
   }
 }

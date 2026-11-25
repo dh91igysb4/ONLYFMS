@@ -23,7 +23,8 @@ const row = (rows: FishRow[], id: string) => rows.find((r) => r.species.id === i
 
 describe('spotAnchors', () => {
   it('모든 맵 × 모든 자리에 대표점이 하나씩 있고, 걸을 수 있는 칸에서 네 방향 중 하나로 그 자리 낚시가 된다(물때 자리는 썰물)', () => {
-    for (const a of AREAS) {
+    // 내 섬(isle)은 모양별 맵이라 등록부에 없다(isle.test.ts)
+    for (const a of AREAS.filter((x) => MAPS[x.id])) {
       const anchors = spotAnchors(map(a.id))
       expect(anchors.map((x) => x.spot), a.id).toEqual([...a.spots])
       for (const an of anchors) {
@@ -49,7 +50,7 @@ describe('spotAnchors', () => {
   })
 
   it('대표점끼리·대표점과 고정 표시가 3칸 이상 떨어져 있다(목표 MARKER_GAP), 두 번 부르면 같은 배열', () => {
-    for (const a of AREAS) {
+    for (const a of AREAS.filter((x) => MAPS[x.id])) {
       const m = map(a.id)
       const anchors = spotAnchors(m)
       const others = [...fixedCells(m)]

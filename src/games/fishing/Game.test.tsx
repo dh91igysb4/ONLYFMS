@@ -1862,7 +1862,7 @@ describe('fishing Game: 지역 전환', () => {
   test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
     await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
     await advance(50)
-    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'lake', 'river', 'village'])
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'isle', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {

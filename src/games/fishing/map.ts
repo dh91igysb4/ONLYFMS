@@ -194,6 +194,8 @@ export type MapDef = {
   onWorldMap: boolean
   /** 칸 그림 대신 정적 레이어에 (0,0)부터 그릴 스프라이트 이름. 없으면 null */
   backdrop: string | null
+  /** 건물 외관 스프라이트(건물 사각형 왼쪽 아래에 맞춰 그린다). 기본 마을회관 'hall-exterior', 내 섬은 'tent' */
+  buildingSprite: string
 }
 
 export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
@@ -286,7 +288,7 @@ type MapOpts = {
   spots?: MapDef['spots']; exits?: Exit[]; gates?: Gate[]; docks?: Dock[]; indoor?: boolean
   world?: MapDef['world']; teleporter?: Teleporter
   tidal?: boolean; fog?: boolean; snowy?: boolean
-  walls?: WallSpec; fixtures?: Fixture[]; onWorldMap?: boolean; backdrop?: string
+  walls?: WallSpec; fixtures?: Fixture[]; onWorldMap?: boolean; backdrop?: string; buildingSprite?: string
 }
 
 const rectInside = (map: MapDef, r: Rect): boolean =>
@@ -339,6 +341,7 @@ export function defineMap(id: AreaId, rows: readonly string[], opts: MapOpts = {
     world: opts.world ?? { tx: 0, ty: 0 }, teleporter: opts.teleporter ?? null,
     tidal: opts.tidal ?? false, fog: opts.fog ?? false, snowy: opts.snowy ?? false,
     walls: wallKeys(opts.walls), fixtures: opts.fixtures ?? [], onWorldMap: opts.onWorldMap ?? true, backdrop: opts.backdrop ?? null,
+    buildingSprite: opts.buildingSprite ?? 'hall-exterior',
   }
   checkPlaces(map)
   map.building = computeBuilding(map)

@@ -63,8 +63,9 @@ export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
   }
   for (const g of map.gates) if (!opened.has(g.area)) out.push({ kind: 'gate', ...rectMid(g.tiles), area: g.area })
   for (const d of map.docks) out.push({ kind: 'dock', tx: d.front.tx, ty: d.front.ty, target: d.target })
+  // 들어가는 건물(문에 출구가 있는 마을회관)만. 내 섬 텐트처럼 못 들어가는 건물은 표시하지 않는다
   const shop = doorSpot(map)
-  if (shop) out.push({ kind: 'shop', ...shop })
+  if (shop && map.exits.some(atDoor)) out.push({ kind: 'shop', ...shop })
   const tp = teleporterCell(map)
   if (tp) out.push({ kind: 'teleporter', ...tp })
   return out
