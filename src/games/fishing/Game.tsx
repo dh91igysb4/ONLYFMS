@@ -11,7 +11,7 @@ import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
-import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
+import { sellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
@@ -29,6 +29,7 @@ import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPan
 import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
 import { WardrobePanel } from './WardrobePanel.tsx'
 import { ElevatorPanel, FamePanel } from './HallPanels.tsx'
+import { FridgePanel } from './FridgePanel.tsx'
 import { allBoards, boardIndexFor, fameFrames, type FameFrame } from './fame.ts'
 import { loadHallOfFame, type HallOfFame } from '../../platform/world/hallOfFame.ts'
 import { releaseMinimapCache } from './minimap.ts'
@@ -94,7 +95,7 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator'
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const outfitMemo = new WeakMap<object, Outfit>()
 /** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
@@ -106,7 +107,7 @@ function outfitOf(view: View | null): Outfit {
   outfitMemo.set(view, o)
   return o
 }
-const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator'])
+const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
@@ -195,6 +196,8 @@ function ignoreRejection(fn: () => Promise<void> | void): void {
   }
 }
 
+/** 화면 목록이 서버와 어긋났다는 뜻의 오류: 다시 불러온다 */
+const STALE_CODES: ReadonlySet<string> = new Set(['bag_changed', 'fridge_changed', 'fridge_full', 'bag_full'])
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 전설·신화 어종인가(legend 필드). 모르는 어종(더 새 서버)은 아니다 */
@@ -216,6 +219,9 @@ const FISHING_MESSAGES: Record<string, string> = {
   not_enough_gold: '골드가 부족해요',
   price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 해 주세요',
   bag_changed: '가방이 바뀌었어요. 다시 골라 주세요',
+  fridge_full: '냉장고가 가득 찼어요',
+  bag_full: '가방이 가득 찼어요',
+  fridge_changed: '냉장고가 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
   too_early: RETRY,
@@ -307,7 +313,7 @@ function interactionKey(i: Interaction): string {
 }
 /** 마을회관 고정물 앞 행동 버튼 이름 */
 const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], ActionLabel>>> = {
-  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기',
+  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통',
 }
 /** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
 const tpOpen = (view: View | null, area: AreaId): boolean =>
@@ -703,6 +709,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       } else if (at.kind === 'wardrobe') {
         setNotice(null)
         setMenu('wardrobe')
+      } else if (at.kind === 'fridge' || at.kind === 'trash') {
+        setNotice(null)
+        setMenu(at.kind)
       } else if (at.kind === 'elevator') {
         setNotice(null)
         setMenu('elevator')
@@ -1277,16 +1286,35 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     setChatHint(null)
   }
 
-  async function discard(index: number, fee: number) {
+  async function discard(index: number, fee: number, at: DiscardAt) {
     setNotice(null)
     const f = viewRef.current?.bag[index]
     if (!f) return
     try {
-      const res = await act<{ fee: number }>({ type: 'discard', index, fee, species: f.species, sizeCm: f.sizeCm })
+      const res = await act<{ fee: number }>({ type: 'discard', index, fee, species: f.species, sizeCm: f.sizeCm, at })
       if (alive.current && res.result) setNotice({ kind: 'info', text: `버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+      await failMove(codeOf(e))
     }
+  }
+
+  /** 마을회관 냉장고: 가방 칸 넣기(store)·냉장고 칸 꺼내기(takeOut) */
+  async function moveFish(type: 'store' | 'takeOut', index: number) {
+    setNotice(null)
+    const v = viewRef.current
+    const f = type === 'store' ? v?.bag[index] : v?.fridge?.[index]
+    if (!f) return
+    try {
+      await act({ type, index, species: f.species, sizeCm: f.sizeCm })
+    } catch (e) {
+      await failMove(codeOf(e))
+    }
+  }
+
+  /** 가방·냉장고 칸 행동 실패: 화면이 본 목록이 서버와 다르면(다른 탭 등) 다시 불러온 뒤 알린다 */
+  async function failMove(code: string) {
+    if (STALE_CODES.has(code)) await reload()
+    if (alive.current) setNotice({ kind: 'error', text: fishingMessage(code) })
   }
 
   async function lockFish(index: number, locked: boolean) {
@@ -1505,7 +1533,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1600,7 +1628,13 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 </button>
               </div>
               {menu === 'bag' && (
-                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} onBrag={brag} onDiscard={(i, fee) => void discard(i, fee)} />
+                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} onBrag={brag} onDiscard={(i, fee, at) => void discard(i, fee, at)} />
+              )}
+              {menu === 'trash' && (
+                <BagPanel view={view} atShop={false} busy={busy} discardAt="trash" onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onDiscard={(i, fee, at) => void discard(i, fee, at)} />
+              )}
+              {menu === 'fridge' && (
+                <FridgePanel view={view} busy={busy} onStore={(i) => void moveFish('store', i)} onTakeOut={(i) => void moveFish('takeOut', i)} />
               )}
               {menu === 'shop' && (
                 <ShopPanel

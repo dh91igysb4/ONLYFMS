@@ -11,6 +11,9 @@ const many = (cells: readonly (readonly [number, number])[], facing: Facing, act
 const FIXTURES: Fixture[] = [
   // 자판기 = 상점(왼쪽 벽, 오른쪽을 본다)
   ...many([[2, 1], [2, 2], [2, 3]], 'left', { kind: 'shop' }),
+  // 1번 방: 냉장고(오른쪽 벽, 개인 보관함) · 쓰레기통(왼쪽 벽, 버리기 부담금 5%)
+  ...many([[13, 1], [13, 2], [13, 3]], 'right', { kind: 'fridge' }),
+  ...many([[11, 1], [11, 2], [11, 3]], 'left', { kind: 'trash' }),
   // 명예의 전당: 박제(최대어, 2칸) · 누적 수익 · 도감 · 도전과제, 게임 액자 11칸(x24~34)
   ...many([[16, 2], [17, 2]], 'up', { kind: 'fame', slot: { group: 'record', key: 'biggest' } }),
   at(18, 2, 'up', { kind: 'fame', slot: { group: 'record', key: 'total_earned' } }),
@@ -54,8 +57,10 @@ export const HALL = defineMap('hall', [
   indoor: true,
   onWorldMap: false,
   backdrop: 'hall-interior',
-  // 세계 좌표는 마을 안 회관 건물 자리(순간이동 요금 계산용, 2차)
+  // 세계 좌표는 마을 안 회관 건물 자리(순간이동 요금 계산용)
   world: { tx: 7, ty: 1 },
+  // 왼쪽 벽 로비 이동기(과제 없이 켜진다, logic.version 18). 도착하면 앞 칸에서 오른쪽을 본다
+  teleporter: { tiles: { tx: 1, ty: 8, w: 2, h: 2 }, front: { tx: 3, ty: 8, facing: 'right' } },
   exits: [
     { edge: 's', from: 3, to: 5, target: 'village', entry: { tx: 13, ty: 8, facing: 'down' } },
     { edge: 's', from: 31, to: 33, target: 'village', entry: { tx: 13, ty: 8, facing: 'down' } },

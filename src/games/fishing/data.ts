@@ -61,6 +61,9 @@ export const AREAS: readonly AreaDef[] = [
   // 마을회관(실내, 낚시 자리 없음). 낚시 자리가 빈 지역은 낚시 지역이 아니다(물고기 목록·경제 계산에서 뺀다)
   { id: 'hall', name: '마을회관', spots: [] },
 ]
+/** 마을회관 냉장고: 1인당 보관 칸(고정, 마을회관 설계 §5) */
+export const FRIDGE_SIZE = 15
+
 /** 낚시 자리가 있는 지역(물고기 목록·도전과제·경제 계산 대상). 마을회관처럼 자리가 빈 지역은 빠진다 */
 export const FISHING_AREAS: readonly AreaDef[] = AREAS.filter((a) => a.spots.length > 0)
 export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest', 'hall']

@@ -3,7 +3,7 @@ import { rngFromSeed } from '../../shared/rng.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { AREAS, FISHING_AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
@@ -324,7 +324,7 @@ function migrateW(raw: unknown, from: number): WS {
 }
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
 // v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
-const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 } }
+const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[] }
 const ok = (r: Played) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
   return r
@@ -341,7 +341,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(17)
+    expect(logic.version).toBe(18)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -1593,7 +1593,7 @@ describe('migrate 버프 (v11)', () => {
   })
   it('v10(옷장) 세이브: 산 옷·업적 옷·입은 옷이 그대로 남고 buffs []', () => {
     const v10 = { ...v9, wardrobe: ['hat:straw', 'top:marine', 'hat:crown'], outfit: { ...DEFAULT_OUTFIT, hat: 'straw', top: 'marine' } }
-    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 } })
+    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 }, fridge: [] })
     // 옷장 행동은 v11에서도 그대로
     const s = migrateW(v10, 10)
     const r = play(s, { type: 'wear', slot: 'hat', id: 'crown' }, { now: T0, rng: fixedRng })
@@ -1985,7 +1985,7 @@ describe('v14 지갑 계약', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
-    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 } })
+    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [] })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2112,11 +2112,23 @@ describe('구매 가격 확인 (v15)', () => {
 // ---------------------------------------------------------------- 버리기·환경부담금 (설계 2026-11-25-fishing-brag-discard, v16)
 describe('버리기', () => {
   const mack = (sizeCm = 40): Fish => ({ species: 'mackerel', sizeCm, perfect: false })
-  it('discardFee: 판매가(감쇠 전, 버프 포함)의 10% 올림, 최소 1', () => {
-    expect(discardFee(mack(), [])).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 10)))
-    expect(discardFee({ species: 'anchovy', sizeCm: 8, perfect: false }, [])).toBeGreaterThanOrEqual(1)
+  it('discardFee(v18): 가방은 판매가(감쇠 전, 버프 포함)의 50% 올림, 쓰레기통은 5% 올림, 최소 1', () => {
+    expect(discardFee(mack(), [])).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 2)))
+    expect(discardFee(mack(), [], 'bag')).toBe(discardFee(mack(), []))
+    expect(discardFee(mack(), [], 'trash')).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 20)))
+    expect(discardFee({ species: 'anchovy', sizeCm: 8, perfect: false }, [], 'trash')).toBeGreaterThanOrEqual(1)
     const g = { species: 'grouper', sizeCm: 140, perfect: true }
-    expect(discardFee(g, ['dragon-pearl'])).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 10))
+    expect(discardFee(g, ['dragon-pearl'])).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 2))
+    expect(discardFee(g, ['dragon-pearl'], 'trash')).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 20))
+  })
+  it('discard at: trash면 5%, 없으면 가방 50%, 옛 10% 요금은 price_changed, 모르는 at은 bad_action', () => {
+    const s = fresh({ gold: 10 ** 6, bag: [mack()] })
+    const base = { type: 'discard', index: 0, species: 'mackerel', sizeCm: 40 }
+    expect(ok(play(s, { ...base, at: 'trash', fee: discardFee(mack(), [], 'trash') }, ctx())).result).toEqual({ fee: discardFee(mack(), [], 'trash') })
+    expect(ok(play(s, { ...base, fee: discardFee(mack(), []) }, ctx())).result).toEqual({ fee: discardFee(mack(), []) })
+    expect(err(play(s, { ...base, fee: Math.max(1, Math.ceil(sellPrice(mack()) / 10)) }, ctx()))).toBe('price_changed')
+    expect(err(play(s, { ...base, at: 'bag', fee: discardFee(mack(), [], 'trash') }, ctx()))).toBe('price_changed')
+    expect(err(play(s, { ...base, at: 'zzz', fee: discardFee(mack(), []) }, ctx()))).toBe('bad_action')
   })
   it('discard: 그 칸만 빠지고 골드에서 부담금, 판 마릿수·totalEarned 그대로', () => {
     const fee = discardFee(mack(), [])
@@ -2144,10 +2156,58 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 16', () => {
-    expect(logic.version).toBe(17)
+  it('version 18', () => {
+    expect(logic.version).toBe(18)
   })
 })
+
+describe('냉장고 (logic.version 18)', () => {
+  const f = (sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ species: 'mackerel', sizeCm, perfect: false, ...extra })
+  const store = (index: unknown, fish: Fish) => ({ type: 'store', index, species: fish.species, sizeCm: fish.sizeCm })
+  const takeOut = (index: unknown, fish: Fish) => ({ type: 'takeOut', index, species: fish.species, sizeCm: fish.sizeCm })
+  it('FRIDGE_SIZE 15, 처음엔 빈 냉장고, view에 fridge', () => {
+    expect(FRIDGE_SIZE).toBe(15)
+    expect(logic.init().fridge).toEqual([])
+    expect(logic.view(fresh({ fridge: [f(30)] }), { gold: 0 } as never).fridge).toEqual([f(30)])
+  })
+  it('store: 가방 칸을 빼서 냉장고 끝에(잠금 유지), takeOut: 냉장고 칸을 빼서 가방 끝에', () => {
+    const s = fresh({ bag: [f(30), f(40, { locked: true })], fridge: [f(50)] })
+    const a = ok(play(s, store(1, f(40)), ctx())).state
+    expect(a.bag).toEqual([f(30)])
+    expect(a.fridge).toEqual([f(50), f(40, { locked: true })])
+    const b = ok(play(a, takeOut(0, f(50)), ctx())).state
+    expect(b.fridge).toEqual([f(40, { locked: true })])
+    expect(b.bag).toEqual([f(30), f(50)])
+  })
+  it('가득 참: 냉장고 15칸이면 fridge_full, 가방이 bagSize면 bag_full', () => {
+    const full = Array.from({ length: 15 }, (_, i) => f(10 + i))
+    expect(err(play(fresh({ bag: [f(99)], fridge: full }), store(0, f(99)), ctx()))).toBe('fridge_full')
+    const bag = Array.from({ length: bagSize(1) }, (_, i) => f(10 + i))
+    expect(err(play(fresh({ bag, fridge: [f(99)] }), takeOut(0, f(99)), ctx()))).toBe('bag_full')
+  })
+  it('오래된 칸: 가방이 다르면 bag_changed, 냉장고가 다르면 fridge_changed, 범위 밖은 bad_action', () => {
+    const s = fresh({ bag: [f(30)], fridge: [f(50)] })
+    expect(err(play(s, store(0, f(31)), ctx()))).toBe('bag_changed')
+    expect(err(play(s, takeOut(0, f(51)), ctx()))).toBe('fridge_changed')
+    for (const i of [-1, 1, 0.5, '0', undefined]) {
+      expect(err(play(s, store(i, f(30)), ctx())), `store ${String(i)}`).toBe('bad_action')
+      expect(err(play(s, takeOut(i, f(50)), ctx())), `takeOut ${String(i)}`).toBe('bad_action')
+    }
+  })
+  it('낚는 중에는 넣기·꺼내기 busy', () => {
+    const s = withPending({ bag: [f(30)], fridge: [f(50)] })
+    expect(err(play(s, store(0, f(30)), ctx()))).toBe('busy')
+    expect(err(play(s, takeOut(0, f(50)), ctx()))).toBe('busy')
+  })
+  it('migrate: v17 → fridge [], 저장된 냉장고는 가방 규칙(모르는 어종 버림, 잠금 유지), 15개까지', () => {
+    expect(migrateW({ ...logic.init(), fridge: undefined }, 17).fridge).toEqual([])
+    const saved = [{ species: 'zzz', sizeCm: 1, perfect: false }, ...Array.from({ length: 16 }, (_, i) => f(10 + i, i === 0 ? { locked: true } : {}))]
+    const m = migrateW({ ...logic.init(), fridge: saved }, 18)
+    expect(m.fridge).toHaveLength(15)
+    expect(m.fridge[0]).toEqual(f(10, { locked: true }))
+  })
+})
+
 
 describe('마을회관 지역 (logic.version 17)', () => {
   it('v16 세이브 migrate → areas에 hall', () => {
@@ -2158,6 +2218,16 @@ describe('마을회관 지역 (logic.version 17)', () => {
   it('hall에서 cast는 거절', () => {
     expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5, spot: 'x' } as unknown as Action, ctx()))).toBeTruthy()
     expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5 } as unknown as Action, ctx()))).toBeTruthy()
+  })
+  it('회관 이동기는 과제 없이 켜지고(v18), 마을과 오가는 요금은 TP 공식', () => {
+    expect(teleporterOpen(fresh(), 'hall')).toBe(true)
+    expect(teleporterOpen({ areas: ['village'], challenges: {} }, 'hall')).toBe(false)
+    const p = teleporterWorld('village')!
+    const q = teleporterWorld('hall')!
+    expect(teleportFee('village', 'hall')).toBe(TP_BASE + Math.ceil(Math.hypot(p.x - q.x, p.y - q.y) / 10) * TP_PER_10)
+    const done = { 'pier-perfect': { progress: 5, done: true } }
+    const r = ok(play(fresh({ gold: 10_000, challenges: done }), { type: 'teleport', from: 'village', to: 'hall' }, ctx()))
+    expect(r.result).toEqual({ from: 'village', to: 'hall', fee: teleportFee('village', 'hall') })
   })
   it('hall은 돈으로 여는 지역이 아니다', () => {
     expect(err(play(fresh(), { type: 'unlockArea', area: 'hall', price: 0 } as unknown as Action, ctx(T0, 10 ** 9)))).toBeTruthy()

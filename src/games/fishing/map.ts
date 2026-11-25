@@ -141,6 +141,8 @@ export type FixtureAct =
   | { kind: 'elevator' }
   | { kind: 'notice'; text: string }
   | { kind: 'fame'; slot: FameSlot }
+  | { kind: 'fridge' }
+  | { kind: 'trash' }
 /** front 칸에 서서 front.facing을 보면 act */
 export type Fixture = { front: TileFacing; act: FixtureAct }
 /**

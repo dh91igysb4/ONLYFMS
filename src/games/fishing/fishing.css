@@ -471,3 +471,4 @@
 .fish-fame-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fish-elevator { display: flex; flex-direction: column; gap: 6px; }
 .fish-elevator .btn { justify-content: space-between; }
+.fish-fridge { display: flex; flex-direction: column; gap: 8px; }
