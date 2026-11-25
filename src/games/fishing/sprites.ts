@@ -2721,6 +2721,44 @@ const TENT = sprite(TENT_PALETTE, [
   '.p............................................p.',
 ])
 
+// 내 섬 B: 작업대(16×16, 풀밭 위)·철광 무늬(16×16, 바위 위에 겹침)
+const WORKBENCH = sprite({ o: '#4a3020', t: '#b07a45', T: '#8b5a2b', s: '#9aa3ad', h: '#6b4a2b' }, [
+  '................',
+  '................',
+  '................',
+  '..oooooooooooo..',
+  '.otttttttttttto.',
+  '.otttsstttthhto.',
+  '.otttsstttthhto.',
+  '.oTTTTTTTTTTTTo.',
+  '..oooooooooooo..',
+  '...oTo....oTo...',
+  '...oTo....oTo...',
+  '...oTo....oTo...',
+  '...oTo....oTo...',
+  '...oTo....oTo...',
+  '...ooo....ooo...',
+  '................',
+])
+const IRON_ORE = sprite({ i: '#c9b8a6', I: '#8f6e55' }, [
+  '................',
+  '................',
+  '................',
+  '................',
+  '......i.........',
+  '.....iI....i....',
+  '...........Ii...',
+  '....i...........',
+  '...iI.....i.....',
+  '..........Ii....',
+  '.......i........',
+  '......iI........',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+
 const TELEPORTER_PALETTE: Record<string, string> = {
   k: '#2a2135', // 외곽선
   x: '#1f2a1c55', // 바닥 그림자
@@ -5345,6 +5383,8 @@ export const SPRITES: Record<string, Sprite> = {
   'tile-tree': TILE_TREE,
   'hall-exterior': HALL_EXTERIOR,
   tent: TENT,
+  workbench: WORKBENCH,
+  'iron-ore': IRON_ORE,
   'hall-interior': HALL_INTERIOR,
   'map-you': MAP_YOU,
   'map-spot': MAP_SPOT,
