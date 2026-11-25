@@ -109,6 +109,11 @@ function outfitOf(view: View | null): Outfit {
 }
 const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
+/** 컴퓨터 단축키(e.code → 할 일) */
+const HOTKEYS: Record<string, 'map' | 'bag' | 'dex' | 'challenges' | 'chat' | 'emote'> = {
+  KeyM: 'map', KeyE: 'bag', KeyQ: 'dex', KeyG: 'challenges', KeyT: 'chat', KeyY: 'emote',
+}
+const HOTKEY_LABEL = { map: 'M', bag: 'E', dex: 'Q', challenges: 'G', chat: 'T', emote: 'Y' } as const
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
 type Outcome =
@@ -336,6 +341,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   const [chatOpen, setChatOpen] = useState(false)
   const [chatText, setChatText] = useState('')
   const [chatHint, setChatHint] = useState<string | null>(null)
+  const chatInputRef = useRef<HTMLInputElement>(null)
   const lastChatAt = useRef(-Infinity)
   const tagsRef = useRef<HTMLDivElement>(null)
   const peerOutfits = useRef(new Map<string, Outfit>())
@@ -1002,8 +1008,17 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   const closeMap = () => {
     if (menuRef.current === 'map') closeMenu()
   }
-  const handlers = useRef({ press, release, frame, toggleMap, closeMap })
-  handlers.current = { press, release, frame, toggleMap, closeMap }
+  /** 단축키: 가방·도감·과제는 열고 닫기, 말은 열고 입력칸에 초점, 이모트는 열고 닫기 */
+  const hotkey = (k: 'bag' | 'dex' | 'challenges' | 'chat' | 'emote') => {
+    if (k === 'chat') {
+      setChatHint(null)
+      if (chatOpen) chatInputRef.current?.focus()
+      else setChatOpen(true)
+    } else if (k === 'emote') setEmoteOpen((o) => !o)
+    else toggleMenu(k)
+  }
+  const handlers = useRef({ press, release, frame, toggleMap, closeMap, hotkey })
+  handlers.current = { press, release, frame, toggleMap, closeMap, hotkey }
 
   // ------------------------------------------------------------ 효과
   useEffect(() => {
@@ -1219,15 +1234,24 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     window.addEventListener('keydown', esc, true)
     return () => window.removeEventListener('keydown', esc, true)
   }, [])
+  // 단축키(e.code라 한글 입력 상태에서도): M 지도, E 가방, Q 도감, G 과제(다시 누르면 닫기), T 말 입력칸, Y 이모트.
+  // 입력칸에서 칠 때·낚시 중·다른 창이 열려 있을 때는 무시한다(말·이모트는 창이 열려 있어도 된다)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const k = HOTKEYS[e.code]
+      if (!k || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const t = e.target
       if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select') !== null)) return
       if (rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting') return
-      if (menuRef.current && menuRef.current !== 'map') return
+      if (k === 'chat' || k === 'emote') {
+        e.preventDefault()
+        handlers.current.hotkey(k)
+        return
+      }
+      if (menuRef.current && menuRef.current !== k) return
       e.preventDefault()
-      handlers.current.toggleMap()
+      if (k === 'map') handlers.current.toggleMap()
+      else handlers.current.hotkey(k)
     }
     window.addEventListener('keydown', down)
     return () => window.removeEventListener('keydown', down)
@@ -1695,6 +1719,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             }}
           >
             <input
+              ref={chatInputRef}
+              autoFocus
               className="input"
               type="text"
               aria-label="할 말"
@@ -1731,6 +1757,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
               className={`btn btn-sm ${menu === m ? 'btn-primary' : 'btn-ghost'}`}
               aria-pressed={menu === m}
               disabled={menuLocked}
+              title={`단축키 ${HOTKEY_LABEL[m]}`}
+              aria-keyshortcuts={HOTKEY_LABEL[m]}
               onClick={() => (m === 'map' ? toggleMap() : toggleMenu(m))}
             >
               {MENU_LABELS[m]}
@@ -1741,6 +1769,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             className={`btn btn-sm ${chatOpen ? 'btn-primary' : 'btn-ghost'}`}
             aria-pressed={chatOpen}
             aria-expanded={chatOpen}
+            title="단축키 T"
+            aria-keyshortcuts="T"
             onClick={() => {
               setChatOpen((o) => !o)
               setChatHint(null)
@@ -1753,6 +1783,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             className={`btn btn-sm ${emoteOpen ? 'btn-primary' : 'btn-ghost'}`}
             aria-pressed={emoteOpen}
             aria-expanded={emoteOpen}
+            title="단축키 Y"
+            aria-keyshortcuts="Y"
             onClick={() => setEmoteOpen((o) => !o)}
           >
             이모트
