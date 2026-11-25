@@ -36,6 +36,7 @@ export function FridgePanel({ view, busy, onStore, onTakeOut }: Props) {
   return (
     <section className="fish-panel-body fish-fridge" aria-label="냉장고">
       <h3 className="fish-panel-sub">{`냉장고 ${fridge.length}/${FRIDGE_SIZE}`}</h3>
+      {view.pending !== null && <p className="fish-shop-note">낚시를 마친 뒤에 쓸 수 있어요</p>}
       {fridgeFull && <p className="fish-shop-note">냉장고가 가득 찼어요</p>}
       {fridge.length === 0 ? (
         <p className="muted">냉장고가 비어 있어요</p>

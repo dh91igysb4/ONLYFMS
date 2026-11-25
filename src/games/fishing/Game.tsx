@@ -196,6 +196,8 @@ function ignoreRejection(fn: () => Promise<void> | void): void {
   }
 }
 
+/** 화면 목록이 서버와 어긋났다는 뜻의 오류: 다시 불러온다 */
+const STALE_CODES: ReadonlySet<string> = new Set(['bag_changed', 'fridge_changed', 'fridge_full', 'bag_full'])
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : 'network')
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 전설·신화 어종인가(legend 필드). 모르는 어종(더 새 서버)은 아니다 */
@@ -218,6 +220,7 @@ const FISHING_MESSAGES: Record<string, string> = {
   price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 해 주세요',
   bag_changed: '가방이 바뀌었어요. 다시 골라 주세요',
   fridge_full: '냉장고가 가득 찼어요',
+  bag_full: '가방이 가득 찼어요',
   fridge_changed: '냉장고가 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
@@ -1291,7 +1294,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const res = await act<{ fee: number }>({ type: 'discard', index, fee, species: f.species, sizeCm: f.sizeCm, at })
       if (alive.current && res.result) setNotice({ kind: 'info', text: `버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+      await failMove(codeOf(e))
     }
   }
 
@@ -1304,8 +1307,14 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     try {
       await act({ type, index, species: f.species, sizeCm: f.sizeCm })
     } catch (e) {
-      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+      await failMove(codeOf(e))
     }
+  }
+
+  /** 가방·냉장고 칸 행동 실패: 화면이 본 목록이 서버와 다르면(다른 탭 등) 다시 불러온 뒤 알린다 */
+  async function failMove(code: string) {
+    if (STALE_CODES.has(code)) await reload()
+    if (alive.current) setNotice({ kind: 'error', text: fishingMessage(code) })
   }
 
   async function lockFish(index: number, locked: boolean) {

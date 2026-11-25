@@ -3132,6 +3132,32 @@ describe('마을회관 냉장고·쓰레기통 (v18)', () => {
     expect(calls('takeOut')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'takeOut', index: 0, species: 'mackerel', sizeCm: 50 } }])
   })
 
+  test('냉장고가 바뀌었으면(다른 탭) 안내하고 다시 불러와 목록을 새로 그린다; 가방 가득은 한국어 안내', async () => {
+    stubTouch()
+    const view = makeView({ bag: [mk(30)], fridge: [mk(50)] })
+    await mount(view, { area: 'hall', pos: tileCenter(13, 2), facing: 'right' })
+    await act1()
+    const fresh = makeView({ bag: [mk(30)], fridge: [mk(60)] })
+    route({ takeOut: () => Promise.reject(new ApiError('fridge_changed', 400)), load: () => ok(fresh) })
+    fireEvent.click(within(screen.getByRole('region', { name: '냉장고' })).getByRole('button', { name: '고등어 50cm 꺼내기' }))
+    await flush()
+    await flush()
+    expect(screen.getByText('냉장고가 바뀌었어요. 다시 골라 주세요')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '냉장고' })).getByRole('button', { name: '고등어 60cm 꺼내기' })).toBeInTheDocument()
+    route({ takeOut: () => Promise.reject(new ApiError('bag_full', 400)), load: () => ok(fresh) })
+    fireEvent.click(within(screen.getByRole('region', { name: '냉장고' })).getByRole('button', { name: '고등어 60cm 꺼내기' }))
+    await flush()
+    await flush()
+    expect(screen.getByText('가방이 가득 찼어요')).toBeInTheDocument()
+  })
+
+  test('낚시가 걸려 있으면(남은 pending) 냉장고 버튼이 꺼지고 이유를 알린다', async () => {
+    stubTouch()
+    await mount(makeView({ bag: [mk(30)], pending: pending() }), { area: 'hall', pos: tileCenter(13, 2), facing: 'right' })
+    await act1()
+    expect(within(screen.getByRole('region', { name: '냉장고' })).getByText('낚시를 마친 뒤에 쓸 수 있어요')).toBeInTheDocument()
+  })
+
   test('쓰레기통 앞: 행동 쓰레기통 → 버리기 모드, 5% 요금으로 at trash', async () => {
     stubTouch()
     const view = makeView({ gold: 1000, bag: [mk(40)] })
