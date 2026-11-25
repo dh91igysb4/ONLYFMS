@@ -7,6 +7,7 @@ import { ISLE_LAYOUTS, type IsleLayoutId } from './data.ts'
 import { isleMap } from './isle.ts'
 import { HOUSE_MAX, ISLE_ZONES, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Cost, type Mats, type ToolId } from './isleEcon.ts'
 import { FURNITURE, type FurnId } from './home.ts'
+import { DECOS, type DecoId } from './deco.ts'
 import type { IsleState } from './logic.ts'
 
 type BoatProps = {
@@ -97,13 +98,14 @@ type WorkbenchProps = {
   onClear: (zone: number, price: number) => void
   onBuild: (level: number, price: number) => void
   onMake: (id: FurnId, price: number) => void
+  onMakeDeco: (id: DecoId, price: number) => void
 }
 const HOUSE_NAMES = ['텐트', '오두막', '작은 집', '집', '큰 집'] as const
-type BenchTab = 'tools' | 'clear' | 'house' | 'furn'
-const BENCH_TABS: readonly [BenchTab, string][] = [['tools', '도구'], ['clear', '개간'], ['house', '집'], ['furn', '가구']]
+type BenchTab = 'tools' | 'clear' | 'house' | 'furn' | 'deco'
+const BENCH_TABS: readonly [BenchTab, string][] = [['tools', '도구'], ['clear', '개간'], ['house', '집'], ['furn', '가구'], ['deco', '꾸미기']]
 
 /** 작업대(내 섬 B 설계 §5.5): 도구 올리기·다음 구역 개간. 가진 재료를 맨 위에 */
-export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear, onBuild, onMake }: WorkbenchProps) {
+export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear, onBuild, onMake, onMakeDeco }: WorkbenchProps) {
   const [tab, setTab] = useState<BenchTab>('tools')
   const next = isle.cleared + 1
   return (
@@ -180,6 +182,37 @@ export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear, onBuild, on
             </li>
           ))}
         </ul>
+      )}
+      {tab === 'deco' && (
+        <ul className="fish-workbench-list">
+          {DECOS.map((d) => (
+            <li key={d.id} className="fish-rod">
+              <div className="fish-rod-info">
+                <strong>{`${d.name} · 가진 것 ${isle.decoBox?.[d.id] ?? 0}`}</strong>
+                <span className="muted">{costLine(d.cost)}</span>
+              </div>
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy || !enough(isle.mats, gold, d.cost)} onClick={() => onMakeDeco(d.id, d.cost.gold)}>만들기</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/** 섬 꾸미기 놓기 창: 보관함의 꾸미기를 골라 앞 칸에 놓는다 */
+export function DecoPanel({ box, busy, onPick }: { box: Partial<Record<DecoId, number>>; busy: boolean; onPick: (id: DecoId) => void }) {
+  const have = DECOS.filter((d) => (box[d.id] ?? 0) > 0)
+  return (
+    <section className="fish-panel-body fish-furn" aria-label="꾸미기 놓기">
+      {have.length === 0 ? (
+        <p className="muted">보관함이 비었어요. 작업대에서 꾸미기를 만들어 주세요</p>
+      ) : (
+        <div className="fish-furn-list">
+          {have.map((d) => (
+            <button key={d.id} type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onPick(d.id)}>{`${d.name} ${box[d.id]}개`}</button>
+          ))}
+        </div>
       )}
     </section>
   )

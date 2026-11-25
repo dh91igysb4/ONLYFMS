@@ -11,9 +11,10 @@ import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type IsleLayoutId, type TackleId } from './data.ts'
-import { isleArrival, placeKey, placeName, type IsleShape } from './isle.ts'
+import { canDecorate, isleArrival, placeKey, placeName, type IsleShape } from './isle.ts'
 import { canPlace, type FurnId, type Placed } from './home.ts'
-import { BoatPanel, FurnPanel, IsleChoosePanel, WorkbenchPanel } from './IslePanels.tsx'
+import { BoatPanel, DecoPanel, FurnPanel, IsleChoosePanel, WorkbenchPanel } from './IslePanels.tsx'
+import type { DecoId, DecoPlaced } from './deco.ts'
 import { ISLE_ZONES, type ToolId } from './isleEcon.ts'
 import { PREVIEW_ISLE_KEY, sellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
@@ -99,7 +100,7 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash' | 'boat' | 'isle' | 'workbench' | 'furn'
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash' | 'boat' | 'isle' | 'workbench' | 'furn' | 'deco'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const outfitMemo = new WeakMap<object, Outfit>()
 /** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
@@ -111,7 +112,7 @@ function outfitOf(view: View | null): Outfit {
   outfitMemo.set(view, o)
   return o
 }
-const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash', 'boat', 'isle', 'workbench', 'furn'])
+const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash', 'boat', 'isle', 'workbench', 'furn', 'deco'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
 /** 컴퓨터 단축키(e.code → 할 일) */
 const HOTKEYS: Record<string, 'map' | 'bag' | 'dex' | 'challenges' | 'chat' | 'emote'> = {
@@ -132,9 +133,9 @@ type Source = 'action' | 'canvas'
 /** 렌더와 무관하게 프레임·타이머가 읽고 쓰는 진행 상태 */
 /** 섬으로 가는 전환: 모양·치운 구역 수·주인(내 섬이면 null) */
 type IsleGo = IsleShape & { owner: string | null }
-type IsleLike = { layout: IsleLayoutId; cleared?: number; house?: number; placed?: readonly Placed[] } | null | undefined
+type IsleLike = { layout: IsleLayoutId; cleared?: number; house?: number; placed?: readonly Placed[]; deco?: readonly DecoPlaced[] } | null | undefined
 /** 서버 섬 값(내 view.isle 또는 남의 publicView.isle) → 맵을 정하는 값. 옛 응답의 빠진 값은 0·없음 */
-const shapeOf = (i: IsleLike): IsleShape | null => (i ? { layout: i.layout, cleared: i.cleared ?? 0, house: i.house ?? 0, placed: i.placed ?? [] } : null)
+const shapeOf = (i: IsleLike): IsleShape | null => (i ? { layout: i.layout, cleared: i.cleared ?? 0, house: i.house ?? 0, placed: i.placed ?? [], deco: i.deco ?? [] } : null)
 type Runtime = {
   phase: Phase
   busy: boolean
@@ -258,6 +259,11 @@ const FISHING_MESSAGES: Record<string, string> = {
   no_furn_here: '거기에 가구가 없어요',
   furn_full: '보관함이 가득 찼어요(종류마다 최대 99)',
   bad_furn: '없는 가구예요. 새로고침해 주세요',
+  bad_deco: '없는 꾸미기예요. 새로고침해 주세요',
+  deco_full: '보관함이 가득 찼어요(종류마다 최대 99)',
+  no_deco: '보관함에 그 꾸미기가 없어요',
+  isle_full: '섬에 더 놓을 수 없어요(최대 150개)',
+  no_deco_here: '거기에 꾸미기가 없어요',
   fridge_changed: '냉장고가 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
@@ -359,6 +365,8 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'node') return `node-${i.id}`
   if (i.kind === 'furn') return `furn-${i.tx},${i.ty}`
   if (i.kind === 'furnSpot') return `spot-${i.tx},${i.ty}`
+  if (i.kind === 'decoSpot') return `dspot-${i.tx},${i.ty}`
+  if (i.kind === 'decoHere') return `deco-${i.tx},${i.ty}`
   if (i.kind === 'notice') return `notice-${i.text}`
   if (i.kind === 'fame') return i.slot.group === 'record' ? `fame-record-${i.slot.key}` : `fame-site-${i.slot.index}`
   return i.kind
@@ -516,6 +524,16 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const sh = shapeOf(viewRef.current?.isle)
       if (!sh || !canPlace(sh.house ?? 0, sh.placed ?? [], at.tx, at.ty)) return null
     }
+    // 꾸미기 모드(내 섬, 다른 행동이 없을 때): 앞 칸의 꾸미기는 치우기, 놓을 수 있는 땅은 놓기
+    if (!at && decoModeRef.current && rt.map.id === 'isle' && rt.owner === null) {
+      const sh = shapeOf(viewRef.current?.isle)
+      const { tx, ty } = tileOf(rt.player.pos)
+      const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[rt.player.facing]
+      const fx = tx + dx
+      const fy = ty + dy
+      if (sh?.deco?.some((d) => d.tx === fx && d.ty === fy)) return { kind: 'decoHere', tx: fx, ty: fy }
+      if (sh && canDecorate(sh, fx, fy, 'path')) return { kind: 'decoSpot', tx: fx, ty: fy }
+    }
     return at
   }
   /** 위치 저장. 남의 섬 위치는 저장하지 않는다(다음 접속은 그 전 저장 위치에서) */
@@ -533,6 +551,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     const start = startPosition(savedStart.current, areas, shape)
     rt.map = mapFor(start.area, shape) ?? VILLAGE
     rt.player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
+    syncOwnIsle()
     enteredMap(rt.map)
     const at = hereAt(areas, dynNow())
     rt.hereKey = interactionKey(at)
@@ -802,6 +821,12 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         setMenu('furn')
       } else if (at.kind === 'furn') {
         void pickUpFurn(at.tx, at.ty)
+      } else if (at.kind === 'decoSpot') {
+        setNotice(null)
+        furnSpotRef.current = { tx: at.tx, ty: at.ty }
+        setMenu('deco')
+      } else if (at.kind === 'decoHere') {
+        void ownAct({ type: 'undecorate', tx: at.tx, ty: at.ty })
       } else if (at.kind === 'workbench') {
         setNotice(null)
         setMenu('workbench')
@@ -1025,6 +1050,26 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     })
   }
   const pickUpFurn = (tx: number, ty: number) => void ownAct({ type: 'pickUp', tx, ty })
+  // 내 섬 D: 꾸미기 모드(내 섬에서만 버튼이 보인다)
+  const decoModeRef = useRef(false)
+  const [decoMode, setDecoMode] = useState(false)
+  const [onOwnIsle, setOnOwnIsle] = useState(false)
+  const syncOwnIsle = () => {
+    const own = rt.map.id === 'isle' && rt.owner === null
+    setOnOwnIsle(own)
+    if (!own && decoModeRef.current) {
+      decoModeRef.current = false
+      setDecoMode(false)
+    }
+  }
+  const placeDeco = (id: DecoId) => {
+    const spot = furnSpotRef.current
+    if (!spot) return
+    void ownAct({ type: 'decorate', id, tx: spot.tx, ty: spot.ty }, () => {
+      snapToTile()
+      if (menuRef.current === 'deco') closeMenu()
+    })
+  }
 
   async function chooseIsle(layout: IsleLayoutId) {
     setNotice(null)
@@ -1071,6 +1116,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         rt.drill = null
       }
       rt.map = next
+      syncOwnIsle()
       if (changed) enteredMap(next)
       rt.player = { pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing, moving: false, walkMs: 0 }
       savePlayer()
@@ -1803,8 +1849,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       : here?.kind === 'teleporter' ? (tpOpen(view, rt.map.id) ? TELEPORT_ACTION : GATE_ACTION)
         : here?.kind === 'drill' ? DRILL_ACTION
           : here?.kind === 'node' ? (here.res === 'tree' ? '베기' : '캐기')
-            : here?.kind === 'furnSpot' ? '놓기'
-              : here?.kind === 'furn' ? '치우기'
+            : here?.kind === 'furnSpot' || here?.kind === 'decoSpot' ? '놓기'
+              : here?.kind === 'furn' || here?.kind === 'decoHere' ? '치우기'
             : here && !deadFame(here) ? FIXTURE_ACTION[here.kind] ?? null
             : null
   const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
@@ -1820,7 +1866,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1958,11 +2004,12 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 />
               )}
               {menu === 'isle' && <IsleChoosePanel busy={busy} onChoose={(l) => void chooseIsle(l)} />}
+              {menu === 'deco' && <DecoPanel box={view.isle?.decoBox ?? {}} busy={busy} onPick={placeDeco} />}
               {menu === 'furn' && <FurnPanel furniture={view.isle?.furniture ?? {}} busy={busy} onPick={placeFurn} />}
-              {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats && view.isle.furniture && typeof view.isle.house === 'number') && (
+              {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats && view.isle.furniture && view.isle.decoBox && typeof view.isle.house === 'number') && (
                 <p className="muted">게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요</p>
               )}
-              {menu === 'workbench' && view.isle?.tools && view.isle.mats && view.isle.furniture && typeof view.isle.house === 'number' && (
+              {menu === 'workbench' && view.isle?.tools && view.isle.mats && view.isle.furniture && view.isle.decoBox && typeof view.isle.house === 'number' && (
                 <WorkbenchPanel
                   isle={view.isle}
                   gold={view.gold}
@@ -1971,6 +2018,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   onClear={(z, p) => void clearIsle(z, p)}
                   onBuild={(level, price) => void ownAct({ type: 'build', level, price })}
                   onMake={(id, price) => void ownAct({ type: 'makeFurn', id, price })}
+                  onMakeDeco={(id, price) => void ownAct({ type: 'makeDeco', id, price })}
                 />
               )}
               {menu === 'unlock' && unlockTarget && (
@@ -2070,6 +2118,20 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
           >
             말
           </button>
+          {onOwnIsle && (
+            <button
+              type="button"
+              className={`btn btn-sm ${decoMode ? 'btn-primary' : 'btn-ghost'}`}
+              aria-pressed={decoMode}
+              onClick={() => {
+                decoModeRef.current = !decoModeRef.current
+                setDecoMode(decoModeRef.current)
+                focusGame()
+              }}
+            >
+              꾸미기
+            </button>
+          )}
           <button
             type="button"
             className={`btn btn-sm ${emoteOpen ? 'btn-primary' : 'btn-ghost'}`}

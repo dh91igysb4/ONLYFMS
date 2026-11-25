@@ -3915,3 +3915,63 @@ describe('내 섬 C단계: 집 (설계 2026-11-26-my-isle-c §4.5)', () => {
     expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
   })
 })
+
+describe('내 섬 D단계: 바깥 꾸미기 (설계 2026-11-26-my-isle-d §4.5)', () => {
+  const arr = isleArrival('twin')
+  const spot = { tx: arr.tx - 2, ty: arr.ty - 1 }
+  const at: At = { area: 'isle', pos: tileCenter(spot.tx, spot.ty + 1), facing: 'up' }
+  beforeEach(() => {
+    roomGate.joins = []
+    vi.mocked(worldPlayers).mockReset().mockResolvedValue([])
+  })
+
+  test('꾸미기 버튼은 내 섬에서만, 켜면 빈 땅 앞 "놓기" → 고르기 창 → decorate, 놓은 것 앞 "치우기"', async () => {
+    stubTouch()
+    const isle = { ...newIsle('twin'), decoBox: { bench: 1 } }
+    const view = makeView({ isle })
+    await mount(view, at)
+    await advance(50)
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '꾸미기' }))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('놓기')
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await advance(300)
+    const deco = [{ id: 'bench' as const, ...spot }]
+    route({ decorate: () => ok({ ...view, isle: { ...isle, decoBox: {}, deco } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '꾸미기 놓기' })).getByRole('button', { name: '벤치 1개' }))
+    await flush()
+    expect(calls('decorate')[0]).toMatchObject({ payload: { type: 'decorate', id: 'bench', ...spot } })
+    await advance(50)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 0, deco))
+    expect(actionButton()).toHaveTextContent('치우기')
+    route({ undecorate: () => ok({ ...view, isle }) })
+    pointer('down', actionButton(), 4)
+    pointer('up', actionButton(), 4)
+    await flush()
+    expect(calls('undecorate')[0]).toMatchObject({ payload: { type: 'undecorate', ...spot } })
+  })
+
+  test('마을에서는 꾸미기 버튼이 없다', async () => {
+    await mount(makeView({ isle: newIsle('twin') }), SAND)
+    await advance(50)
+    expect(screen.queryByRole('button', { name: '꾸미기' })).not.toBeInTheDocument()
+  })
+
+  test('작업대 꾸미기 탭: 만들기', async () => {
+    const isle = { ...newIsle('twin'), mats: { wood: 50, stone: 50, iron: 50 } }
+    const view = makeView({ gold: 1e6, isle })
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(view, { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '꾸미기' }))
+    route({ makeDeco: () => ok({ ...view, isle: { ...isle, decoBox: { path: 1 } } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getAllByRole('button', { name: '만들기' })[0])
+    await flush()
+    expect(calls('makeDeco')[0]).toMatchObject({ payload: { type: 'makeDeco', id: 'path', price: 100 } })
+  })
+})
