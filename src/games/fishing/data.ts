@@ -397,7 +397,7 @@ export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curi
 
 /**
  * 판매 마릿수 감쇠(설계 2026-11-25-fishing-sell-decay-design.md): KST 하루에 판 n번째 물고기의 판매가 배율(%).
- * [이 마릿수까지, 배율] 차례. 후반 가격(장비 ×1.6, 지역 ×2.2, 갯벌 제외)과 함께 하루 1시간 약 30일에 맞췄다(econSim)
+ * [이 마릿수까지, 배율] 차례. 후반 가격(장비 ×1.6, 지역 ×2.2, 갯벌 제외)과 함께 하루 1시간 약 30일에 맞췄다(econSim). 어종 확장(v19)으로 약 25일이 됐고 그대로 받아들였다(2026-11-25-fishing-species-expansion-design.md)
  */
 export const SELL_DECAY: readonly (readonly [upTo: number, pct: number])[] = [
   [150, 100],
