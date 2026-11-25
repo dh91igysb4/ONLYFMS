@@ -8,7 +8,7 @@ import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
-import { discardFee, kstDay, price, type PendingView, type View } from './logic.ts'
+import { discardFee, kstDay, newIsle, price, type PendingView, type View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -3519,7 +3519,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
 
   test('친구 섬: visit 뒤 페이드로 친구 모양 섬에 도착, 방은 isle-<친구 id>, 도착 알림, 위치 저장 안 함, 텐트 안내 없음', async () => {
     playersMock.mockResolvedValue([{ id: FRIEND, handle: 'mj', avatar: null }])
-    visitMock.mockResolvedValue({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: { layout: 'twin' }, outfit: DEFAULT_OUTFIT } })
+    visitMock.mockResolvedValue({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: newIsle('twin'), outfit: DEFAULT_OUTFIT } })
     await openBoat(makeView())
     const before = localStorage.getItem(POS_KEY)
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '친구 섬' }))
@@ -3562,7 +3562,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     await advance(300)
     const panel = isleChoosePanel()
     expect(within(panel).getByText('고르면 바꿀 수 없어요')).toBeInTheDocument()
-    route({ isleChoose: () => ok({ ...view, isle: { layout: 'crescent' } }) })
+    route({ isleChoose: () => ok({ ...view, isle: newIsle('crescent') }) })
     fireEvent.click(within(panel).getByRole('button', { name: '초승달 섬' }))
     await flush()
     expect(calls('isleChoose')[0]).toMatchObject({ payload: { type: 'isleChoose', layout: 'crescent' } })
@@ -3604,7 +3604,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     fireEvent.click(within(boatPanel()).getByRole('button', { name: 'mj의 섬' }))
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    resolveVisit({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: { layout: 'twin' }, outfit: DEFAULT_OUTFIT } })
+    resolveVisit({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: newIsle('twin'), outfit: DEFAULT_OUTFIT } })
     await flush()
     await advance(400)
     expect(lastScene().map.id).toBe('village')
@@ -3617,20 +3617,20 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     fireEvent.click(within(isleChoosePanel()).getByRole('button', { name: '초승달 섬' }))
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    resolveChoose({ view: { ...view, isle: { layout: 'crescent' } }, result: null, server_now: Date.now() })
+    resolveChoose({ view: { ...view, isle: newIsle('crescent') }, result: null, server_now: Date.now() })
     await flush()
     await advance(400)
     expect(lastScene().map.id).toBe('village')
   })
 
   test('이미 고른 내 섬: 배 창의 내 섬은 바로 출발, 섬 선착장 → 마을 (42,28)', async () => {
-    await openBoat(makeView({ isle: { layout: 'twin' } }))
+    await openBoat(makeView({ isle: newIsle('twin') }))
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '내 섬' }))
     await advance(400)
     expect(lastScene().map).toBe(isleMap('twin'))
     cleanup()
     const d = isleMap('twin').docks[0]
-    await mount(makeView({ isle: { layout: 'twin' } }), { area: 'isle', pos: tileCenter(d.front.tx, d.front.ty), facing: d.front.facing })
+    await mount(makeView({ isle: newIsle('twin') }), { area: 'isle', pos: tileCenter(d.front.tx, d.front.ty), facing: d.front.facing })
     await advance(50)
     expect(lastScene().map).toBe(isleMap('twin'))
     await interact()
@@ -3642,7 +3642,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
   test('내 섬 텐트 앞은 살펴보기(안내)', async () => {
     stubTouch()
     const tent = isleMap('crescent').fixtures[0].front
-    await mount(makeView({ isle: { layout: 'crescent' } }), { area: 'isle', pos: tileCenter(tent.tx, tent.ty), facing: tent.facing })
+    await mount(makeView({ isle: newIsle('crescent') }), { area: 'isle', pos: tileCenter(tent.tx, tent.ty), facing: tent.facing })
     await advance(50)
     expect(actionButton()).toHaveTextContent('살펴보기')
   })

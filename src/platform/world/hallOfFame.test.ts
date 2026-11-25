@@ -26,7 +26,7 @@ describe('buildHallOfFame', () => {
   const hof = buildHallOfFame(raw, false)
 
   it('낚시 기록 게시판은 manifest records 순서, 키 avatar 같은 건 없다', () => {
-    expect(hof.records.map((b) => b.key)).toEqual(['total_earned', 'biggest', 'dex', 'challenges'])
+    expect(hof.records.map((b) => b.key)).toEqual(['total_earned', 'biggest', 'dex', 'challenges', 'isle_cleared'])
     expect(hof.records.every((b) => b.group === 'record' && b.gameId === 'fishing' && b.title === '펨타듀 낚시')).toBe(true)
   })
 
@@ -63,7 +63,7 @@ describe('buildHallOfFame', () => {
   it('모양이 틀린 raw는 게시판은 두고 행만 비운다', () => {
     for (const bad of [null, 'x', { records: 3 }, { records: [{ game_id: 'fishing' }] }]) {
       const h = buildHallOfFame(bad, false)
-      expect(h.records).toHaveLength(4)
+      expect(h.records).toHaveLength(5)
       expect(h.site).toHaveLength(6)
       expect([...h.records, ...h.site].every((b) => b.rows.length === 0), JSON.stringify(bad)).toBe(true)
     }

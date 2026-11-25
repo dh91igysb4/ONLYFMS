@@ -8,6 +8,9 @@ import {
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId, SHOES, type ShoeTier } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
+import { isleNodes } from './isle.ts'
+import { ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
+import type { NodeKind } from './map.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -231,7 +234,7 @@ export type State = {
   /** 마을회관 냉장고(보관만, FRIDGE_SIZE칸, v18). 잠금 표시는 그대로 둔다 */
   fridge: Fish[]
   /** 내 섬(v22): 고른 섬 모양. 처음 배를 타기 전엔 null */
-  isle: { layout: IsleLayoutId } | null
+  isle: IsleState | null
   pending: Pending | null
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
@@ -261,11 +264,30 @@ export type Action =
   | { type: 'wear'; slot: string; id: string }
   // 내 섬(v22): 섬 모양 고르기(한 번만, 무료)
   | { type: 'isleChoose'; layout: string }
+  // 내 섬 B(v23): 자원 칸 캐기(하루 한 번), 도구 올리기, 다음 구역 개간
+  | { type: 'gather'; id: string }
+  | { type: 'craft'; tool: string; tier: number; price: number }
+  | { type: 'clear'; zone: number; price: number }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
 // sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
 // shoesTier는 v20, isle은 v22 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 기본 장화(1)·섬 없음(null)으로 본다.
+/** 내 섬 상태(v22 A: layout, v23 B: 개간·도구·재료·오늘 캔 칸) */
+export type IsleState = {
+  layout: IsleLayoutId
+  /** 치운 구역 수 0..ISLE_ZONES(순서대로) */
+  cleared: number
+  /** 도구 단계 1..TOOL_MAX(처음 1) */
+  tools: Record<ToolId, number>
+  /** 재료 0..MAT_CAP. 팔 수 없다 */
+  mats: Mats
+  /** 오늘(KST) 캔 자원 칸 id */
+  gathered: { day: string; ids: string[] }
+}
+export const newIsle = (layout: IsleLayoutId): IsleState => ({
+  layout, cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] },
+})
 export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -742,10 +764,29 @@ function migrate(raw: unknown, fromVersion: number): State {
     sold: parseSold(raw.sold),
     fridge,
     // v21 이하에는 섬이 없다. 모르는 모양도 null(다시 고른다)
-    isle: isObj(raw.isle) && ISLE_LAYOUTS.some((l) => l.id === (raw.isle as Record<string, unknown>).layout)
-      ? { layout: (raw.isle as Record<string, unknown>).layout as IsleLayoutId }
-      : null,
+    isle: migrateIsle(raw.isle),
     pending: migratePending(raw.pending, fromVersion),
+  }
+}
+
+/** 내 섬: v21 이하에는 없다(null), v22는 {layout}만(B 기본값), 모르는 모양은 null. 깨진 값은 기본값·범위 안으로 */
+function migrateIsle(raw: unknown): IsleState | null {
+  if (!isObj(raw) || !ISLE_LAYOUTS.some((l) => l.id === raw.layout)) return null
+  const base = newIsle(raw.layout as IsleLayoutId)
+  const int = (v: unknown, lo: number, hi: number, d: number) => (isNum(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : d)
+  const t = isObj(raw.tools) ? raw.tools : {}
+  const m = isObj(raw.mats) ? raw.mats : {}
+  const g = isObj(raw.gathered) ? raw.gathered : {}
+  const known = new Set(isleNodes(base.layout).map((n) => n.id))
+  return {
+    layout: base.layout,
+    cleared: int(raw.cleared, 0, ISLE_ZONES, 0),
+    tools: { axe: int(t.axe, 1, TOOL_MAX, 1), pick: int(t.pick, 1, TOOL_MAX, 1), shovel: int(t.shovel, 1, TOOL_MAX, 1) },
+    mats: { wood: int(m.wood, 0, MAT_CAP, 0), stone: int(m.stone, 0, MAT_CAP, 0), iron: int(m.iron, 0, MAT_CAP, 0) },
+    gathered: {
+      day: typeof g.day === 'string' && DAY_RE.test(g.day) ? g.day : '',
+      ids: Array.isArray(g.ids) ? [...new Set(g.ids.filter((id): id is string => typeof id === 'string' && known.has(id)))] : [],
+    },
   }
 }
 
@@ -800,6 +841,7 @@ function records(state: State): WorldRecord[] {
     biggest,
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
     { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
+    ...(state.isle ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
   ]
 }
 
@@ -821,8 +863,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
+  // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
   // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
-  version: 22,
+  version: 23,
   wallet: true,
   init,
   migrate,
@@ -839,10 +882,12 @@ export const logic: WorldLogic<State, Action, View> = {
   avatar: (state) => JSON.stringify(state.outfit),
   previewData: (state) => ({
     [PREVIEW_AREAS_KEY]: state.areas.join(','),
-    ...(state.isle ? { [PREVIEW_ISLE_KEY]: state.isle.layout } : {}),
+    // 섬 모양:치운 구역 수(v23). 옛 값은 모양만이고 화면은 0으로 읽는다
+    ...(state.isle ? { [PREVIEW_ISLE_KEY]: `${state.isle.layout}:${state.isle.cleared}` } : {}),
   }),
   // 남의 섬 구경(world visit): 섬 모양과 옷차림만
-  publicView: (state) => ({ isle: state.isle, outfit: state.outfit }),
+  // 재료·도구·오늘 캔 칸은 남에게 보이지 않는다
+  publicView: (state) => ({ isle: state.isle && { layout: state.isle.layout, cleared: state.isle.cleared }, outfit: state.outfit }),
   freeBonus,
 }
 
@@ -856,7 +901,62 @@ function isleChoose(state: State, a: Record<string, unknown>): Out {
   if (state.isle) return { error: 'already_chosen' }
   const layout = ISLE_LAYOUTS.find((l) => l.id === a.layout)
   if (!layout) return { error: 'bad_layout' }
-  return { state: { ...state, isle: { layout: layout.id } } }
+  return { state: { ...state, isle: newIsle(layout.id) } }
+}
+
+const MAT_OF: Readonly<Record<NodeKind, keyof Mats>> = { tree: 'wood', rock: 'stone', iron: 'iron' }
+const hasMats = (have: Mats, need: Mats) => have.wood >= need.wood && have.stone >= need.stone && have.iron >= need.iron
+const minusMats = (have: Mats, need: Mats): Mats => ({ wood: have.wood - need.wood, stone: have.stone - need.stone, iron: have.iron - need.iron })
+
+/** 자원 칸 캐기: 오늘 처음이면 도구 단계만큼 재료(나무 → 도끼, 돌·철 → 곡괭이) */
+function gather(state: State, a: Record<string, unknown>, now: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const node = isleNodes(isle.layout).find((n) => n.id === a.id)
+  if (!node) return { error: 'bad_node' }
+  if (node.zone > isle.cleared) return { error: 'node_locked' }
+  const day = kstDay(now)
+  const ids = isle.gathered.day === day ? isle.gathered.ids : []
+  if (ids.includes(node.id)) return { error: 'gathered' }
+  const res = MAT_OF[node.kind]
+  const n = node.kind === 'tree' ? isle.tools.axe : isle.tools.pick
+  if (isle.mats[res] + n > MAT_CAP) return { error: 'mats_full' }
+  return {
+    state: { ...state, isle: { ...isle, mats: { ...isle.mats, [res]: isle.mats[res] + n }, gathered: { day, ids: [...ids, node.id] } } },
+    result: { res, n },
+  }
+}
+
+/** 작업대에서 도구를 한 단계 올린다 */
+function craft(state: State, a: Record<string, unknown>, gold: number): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!TOOL_IDS.includes(a.tool as ToolId)) return { error: 'bad_tool' }
+  const tool = a.tool as ToolId
+  if (!Number.isInteger(a.tier) || a.tier !== isle.tools[tool] + 1) return { error: 'bad_tier' }
+  const cost = toolCost(a.tier as number)
+  if (!cost) return { error: 'bad_tier' }
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, isle: { ...isle, tools: { ...isle.tools, [tool]: a.tier as number }, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold }
+}
+
+/** 다음 구역 개간 */
+function clearZone(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!Number.isInteger(a.zone) || a.zone !== isle.cleared + 1 || isle.cleared >= ISLE_ZONES) return { error: 'bad_zone' }
+  const k = a.zone as number
+  const need = zoneNeeds(k)
+  if (TOOL_IDS.some((t) => isle.tools[t] < need[t])) return { error: 'need_tool' }
+  const cost = clearCost(k)
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, isle: { ...isle, cleared: k, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold, result: { cleared: k } }
 }
 
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
@@ -900,6 +1000,12 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return wear(state, action)
     case 'isleChoose':
       return isleChoose(state, action)
+    case 'gather':
+      return gather(state, action, ctx.now)
+    case 'craft':
+      return craft(state, action, ctx.gold)
+    case 'clear':
+      return clearZone(state, action, ctx.gold)
     default:
       return { error: 'bad_action' }
   }
