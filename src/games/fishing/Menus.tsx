@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Rarity, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { freeBonus, sellPrice, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
@@ -29,6 +29,8 @@ const priceLabel = (f: { species: string; sizeCm: number; perfect: boolean }, bu
   return v === null ? '—' : gold(v)
 }
 
+/** 등급 이름(도감·지도 공용) */
+export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설', mythic: '신화' }
 /** 도감·지도 칸 테두리: 전설은 한 겹, 신화는 두 겹 */
 export const dexItemClass = (s: Species) =>
   `fish-dex-item${s.rarity === 'mythic' ? ' fish-dex-item-mythic' : s.legend ? ' fish-dex-item-legend' : ''}`
@@ -502,7 +504,7 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
                       <RarityBadge s={s} />
                     </strong>
                     <span className="muted">
-                      {entry.count}마리 · 최대 {entry.maxCm}cm
+                      {`${RARITY_NAMES[s.rarity]} · ${entry.count}마리 · 최대 ${entry.maxCm}cm`}
                     </span>
                     <span className="muted">{conditionLabel(s)}</span>
                     {s.legend && <span className="muted">세이브당 한 마리 · 잡았어요</span>}
