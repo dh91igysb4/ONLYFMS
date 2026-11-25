@@ -1,0 +1,1315 @@
+== Winners ==
+[[File:Lionel-Messi-Argentina-2022-FIFA-World-Cup (cropped).jpg|thumb|upright|[[Lionel Messi]] has won a record eight Ballons d'Or across three different decades, and holds the record for most consecutive wins, with four between [[2009 Ballon d'Or|2009]] and [[2012 FIFA Ballon d'Or|2012]].]]
+[[File:Cristiano Ronaldo WC2022 - 01 (cropped).jpg|thumb|upright|[[Cristiano Ronaldo]] has been nominated for the Ballon d'Or a record eighteen times and is a five-time winner.]]
+[[File:Stanley Matthews 1962 (crop).jpg|thumb|upright|[[Stanley Matthews]] was the inaugural recipient and remains the oldest winner of the award, aged {{ayd|1915|2|1|1956|12|18}}.]]
+[[File:Luis Suárez Miramontes.JPG|thumb|upright|[[Luis Suárez (Spanish footballer)|Luis Suárez]] was the first midfielder to win the award.]]
+[[File:LevYashin.JPG|thumb|upright|[[Lev Yashin]] is the only goalkeeper to have won the award.]]
+[[File:Johan Cruijff (1974).jpg|thumb|upright|[[Johan Cruyff]] was the first player to win the award three times.]]
+[[File:Franz Beckenbauer (1975).jpg|thumb|upright|[[Franz Beckenbauer]] is the only defender to have won the award twice.]]
+[[File:President George Weah in 2019 (cropped).jpg|thumb|upright|[[George Weah]]—the only African recipient—was the first non-European to win the award.]]
+[[File:Ronaldo 2002 cropped.jpg|thumb|upright|Two-time winner [[Ronaldo (Brazilian footballer)|Ronaldo]] was the first South American to win the award and remains the youngest recipient, aged {{ayd|1976|9|18|1997|12|23}}.]]
+[[File:Harry Kane 9 England v Ghana at 2026 Fifa World Cup by YantsImages 01 (cropped).jpg|thumb|upright|[[Harry Kane]] is the current award holder.]]
+'''Note:''' Until [[2021 Ballon d'Or|2021]], the Ballon d'Or was awarded based on player performance during the calendar year. Since [[2022 Ballon d'Or|2022]], jurors have been instructed to take into account the previous season.<ref name="DiarioAS2023" /><ref name="LEquipe2022" />
+{| class="wikitable"
+! align=center style="background-color:#cedff2"|{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}}
+| Denotes the player who set or tied the all-time record for the most Ballon d'Or wins at the time.
+|-
+| style="text-align:center" | '''Player''' {{small|'''(X)'''}}
+| Denotes the number of times the player had won the award at that time (for players with multiple wins).
+|}
+{| class="wikitable sortable plainrowheaders sticky-header"
+|+Ballon d'Or winners{{efn|Attributed to multiple sources:<ref name="UEFA2026" /><ref name="IOC2025" /><ref name="SportsIllustrated2026" /><ref name="RSSSF2025" /><ref name="LEquipe2026" /><ref name="FranceFootball2025" />}}
+!Year
+!Rank
+!Player
+!Team
+!{{Tooltip|Points|Points received by the player during the voting phase.}}
+|-
+! scope="row" style="text-align:center" colspan=5 |'''Ballon d'Or (1956–2009)'''
+|-
+|align="center" rowspan="3"|'''[[1956 Ballon d'Or|1956]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ENG}} '''[[Stanley Matthews]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}}
+|{{fbaicon|ENG}} '''[[Blackpool F.C.|Blackpool]]'''
+|align="center"|'''47'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP|1945}} [[Alfredo Di Stéfano]]{{refn|group=note|Born in Argentina, Di Stéfano acquired Spanish citizenship in 1956, thus becoming eligible for the award.}}
+|{{fbaicon|ESP|1945}} [[Real Madrid CF|Real Madrid]]
+|align="center"|44
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1830}} [[Raymond Kopa]]
+|{{fbaicon|ESP|1945}} [[Real Madrid CF|Real Madrid]]{{refn|group=note|Kopa was signed by Real Madrid from [[Stade de Reims|Reims]] during 1956.}}
+|align="center"|33
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="4"|'''[[1957 Ballon d'Or|1957]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ESP|1945}} '''[[Alfredo Di Stéfano]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(1)'''}}
+|{{fbaicon|ESP|1945}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''72'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Billy Wright (footballer, born 1924)|Billy Wright]]
+|{{fbaicon|ENG}} [[Wolverhampton Wanderers F.C.|Wolverhampton Wanderers]]
+|align="center"|19
+|-
+|rowspan="2" scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Duncan Edwards]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|rowspan="2" align="center"|16
+|-
+|{{flagicon|FRA|1830}} [[Raymond Kopa]]
+|{{fbaicon|ESP|1945}} [[Real Madrid CF|Real Madrid]]
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1958 Ballon d'Or|1958]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|FRA|1830}} '''[[Raymond Kopa]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}}
+|{{fbaicon|ESP|1945}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''71'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Helmut Rahn]]
+|{{fbaicon|FRG}} [[Rot-Weiss Essen]]
+|align="center"|40
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1830}} [[Just Fontaine]]
+|{{fbaicon|FRA|1830}} [[Stade de Reims|Reims]]
+|align="center"|23
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1959 Ballon d'Or|1959]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ESP|1945}} '''[[Alfredo Di Stéfano]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(2)'''}}
+|{{fbaicon|ESP|1945}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''80'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA|1830}} [[Raymond Kopa]]
+|{{fbaicon|FRA|1830}} [[Stade de Reims|Reims]]{{refn|group=note|Kopa was signed by Reims from [[Real Madrid CF|Real Madrid]] during 1959.}}
+|align="center"|42
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|WAL|1953}} [[John Charles]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|24
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1960 Ballon d'Or|1960]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ESP|1945}} '''[[Luis Suárez (Spanish footballer)|Luis Suárez]]'''
+|{{fbaicon|ESP|1945}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''54'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|HUN}} [[Ferenc Puskás]]
+|{{fbaicon|ESP|1945}} [[Real Madrid CF|Real Madrid]]
+|align="center"|37
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Uwe Seeler]]
+|{{fbaicon|FRG}} [[Hamburger SV]]
+|align="center"|33
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1961 Ballon d'Or|1961]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ITA}} '''[[Omar Sívori]]'''{{refn|group=note|Born in Argentina, Sívori acquired Italian citizenship in 1961, thus becoming eligible for the award.}}
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''46'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP|1945}} [[Luis Suárez (Spanish footballer)|Luis Suárez]]
+|{{fbaicon|ITA}} [[Inter Milan]]{{refn|group=note|Suárez was signed by Inter Milan from [[FC Barcelona|Barcelona]] during 1961.}}
+|align="center"|40
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Johnny Haynes]]
+|{{fbaicon|ENG}} [[Fulham F.C.|Fulham]]
+|align="center"|22
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1962 Ballon d'Or|1962]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|TCH}} '''[[Josef Masopust]]'''
+|{{fbaicon|TCH}} '''[[Dukla Prague]]'''
+|align="center"|'''65'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Eusébio]]
+|{{fbaicon|POR}} [[S.L. Benfica|Benfica]]
+|align="center"|53
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Karl-Heinz Schnellinger]]
+|{{fbaicon|FRG}} [[1. FC Köln]]
+|align="center"|33
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1963 Ballon d'Or|1963]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|URS}} '''[[Lev Yashin]]'''
+|{{fbaicon|URS}} '''[[FC Dynamo Moscow|Dynamo Moscow]]'''
+|align="center"|'''73'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Gianni Rivera]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|55
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Jimmy Greaves]]
+|{{fbaicon|ENG}} [[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+|align="center"|50
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1964 Ballon d'Or|1964]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|SCO}} '''[[Denis Law]]'''
+|{{fbaicon|ENG}} '''[[Manchester United F.C.|Manchester United]]'''
+|align="center"|'''61'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP|1945}} [[Luis Suárez (Spanish footballer)|Luis Suárez]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|43
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP|1945}} [[Amancio (footballer)|Amancio]]
+|{{fbaicon|ESP|1945}} [[Real Madrid CF|Real Madrid]]
+|align="center"|38
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1965 Ballon d'Or|1965]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Eusébio]]'''
+|{{fbaicon|POR}} '''[[S.L. Benfica|Benfica]]'''
+|align="center"|'''67'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Giacinto Facchetti]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|59
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP|1945}} [[Luis Suárez (Spanish footballer)|Luis Suárez]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|45
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1966 Ballon d'Or|1966]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ENG}} '''[[Bobby Charlton]]'''
+|{{fbaicon|ENG}} '''[[Manchester United F.C.|Manchester United]]'''
+|align="center"|'''81'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Eusébio]]
+|{{fbaicon|POR}} [[S.L. Benfica|Benfica]]
+|align="center"|80
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Franz Beckenbauer]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|59
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1967 Ballon d'Or|1967]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|HUN}} '''[[Flórián Albert]]'''
+|{{fbaicon|HUN}} '''[[Ferencvárosi TC|Ferencváros]]'''
+|align="center"|'''68'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Bobby Charlton]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|40
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|SCO}} [[Jimmy Johnstone]]
+|{{fbaicon|SCO}} [[Celtic F.C.|Celtic]]
+|align="center"|39
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1968 Ballon d'Or|1968]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|NIR}} '''[[George Best]]'''
+|{{fbaicon|ENG}} '''[[Manchester United F.C.|Manchester United]]'''
+|align="center"|'''61'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Bobby Charlton]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|53
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|YUG}} [[Dragan Džajić]]
+|{{fbaicon|YUG}} [[Red Star Belgrade]]
+|align="center"|46
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1969 Ballon d'Or|1969]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ITA}} '''[[Gianni Rivera]]'''
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''
+|align="center"|'''83'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Gigi Riva]]
+|{{fbaicon|ITA}} [[Cagliari Calcio|Cagliari]]
+|align="center"|79
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Gerd Müller]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|38
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1970 Ballon d'Or|1970]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRG}} '''[[Gerd Müller]]'''
+|{{fbaicon|FRG}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''77'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Bobby Moore]]
+|{{fbaicon|ENG}} [[West Ham United F.C.|West Ham United]]
+|align="center"|70
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ITA}} [[Gigi Riva]]
+|{{fbaicon|ITA}} [[Cagliari Calcio|Cagliari]]
+|align="center"|65
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1971 Ballon d'Or|1971]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|NED}} '''[[Johan Cruyff]]''' {{small|'''(1)'''}}
+|{{fbaicon|NED}} '''[[AFC Ajax|Ajax]]'''
+|align="center"|'''116'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Sandro Mazzola]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|57
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NIR}} [[George Best]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|56
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1972 Ballon d'Or|1972]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRG}} '''[[Franz Beckenbauer]]''' {{small|'''(1)'''}}
+|{{fbaicon|FRG}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''81'''
+|-
+|rowspan="2" scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Gerd Müller]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|rowspan="2" align="center"|79
+|-
+|{{flagicon|FRG}} [[Günter Netzer]]
+|{{fbaicon|FRG}} [[Borussia Mönchengladbach]]
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1973 Ballon d'Or|1973]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|NED}} '''[[Johan Cruyff]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(2)'''}}
+|{{fbaicon|ESP|1945}} '''[[FC Barcelona|Barcelona]]'''{{refn|group=note|Cruyff was signed by Barcelona from [[AFC Ajax|Ajax]] during 1973.}}
+|align="center"|'''96'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Dino Zoff]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|47
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Gerd Müller]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|44
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1974 Ballon d'Or|1974]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|NED}} '''[[Johan Cruyff]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(3)'''}}
+|{{fbaicon|ESP|1945}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''116'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Franz Beckenbauer]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|105
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|POL|1928}} [[Kazimierz Deyna]]
+|{{fbaicon|POL|1928}} [[Legia Warsaw]]
+|align="center"|35
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1975 Ballon d'Or|1975]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|URS}} '''[[Oleg Blokhin]]'''
+|{{fbaicon|URS}} '''[[FC Dynamo Kyiv|Dynamo Kyiv]]'''
+|align="center"|'''122'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Franz Beckenbauer]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|42
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Johan Cruyff]]
+|{{fbaicon|ESP|1945}} [[FC Barcelona|Barcelona]]
+|align="center"|27
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1976 Ballon d'Or|1976]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRG}} '''[[Franz Beckenbauer]]''' {{small|'''(2)'''}}
+|{{fbaicon|FRG}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''91'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|NED}} [[Rob Rensenbrink]]
+|{{fbaicon|BEL}} [[RSC Anderlecht|Anderlecht]]
+|align="center"|75
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|TCH}} [[Ivo Viktor]]
+|{{fbaicon|TCH}} [[Dukla Prague]]
+|align="center"|52
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1977 Ballon d'Or|1977]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|DEN}} '''[[Allan Simonsen]]'''
+|{{nowrap|{{fbaicon|FRG}} '''[[Borussia Mönchengladbach]]'''}}
+|align="center"|'''74'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Kevin Keegan]]
+|{{fbaicon|FRG}} [[Hamburger SV]]{{refn|group=note|Keegan was signed by Hamburger SV from [[Liverpool F.C.|Liverpool]] during 1977.}}
+|align="center"|71
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Michel Platini]]
+|{{fbaicon|FRA|1974}} [[AS Nancy Lorraine|Nancy]]
+|align="center"|70
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1978 Ballon d'Or|1978]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ENG}} '''[[Kevin Keegan]]''' {{small|'''(1)'''}}
+|{{fbaicon|FRG}} '''[[Hamburger SV]]'''
+|align="center"|'''87'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|AUT}} [[Hans Krankl]]
+|{{fbaicon|ESP|1977}} [[FC Barcelona|Barcelona]]{{refn|group=note|Krankl was signed by Barcelona from [[SK Rapid Wien|Rapid Wien]] during 1978.}}
+|align="center"|81
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Rob Rensenbrink]]
+|{{fbaicon|BEL}} [[RSC Anderlecht|Anderlecht]]
+|align="center"|50
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1979 Ballon d'Or|1979]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ENG}} '''[[Kevin Keegan]]''' {{small|'''(2)'''}}
+|{{fbaicon|FRG}} '''[[Hamburger SV]]'''
+|align="center"|'''118'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Karl-Heinz Rummenigge]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|52
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Ruud Krol]]
+|{{fbaicon|NED}} [[AFC Ajax|Ajax]]
+|align="center"|41
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1980 Ballon d'Or|1980]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRG}} '''[[Karl-Heinz Rummenigge]]''' {{small|'''(1)'''}}
+|{{fbaicon|FRG}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''122'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Bernd Schuster]]
+|{{fbaicon|ESP|1977}} [[FC Barcelona|Barcelona]]{{refn|group=note|Schuster was signed by Barcelona from [[1. FC Köln]] during 1980.}}
+|align="center"|34
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Michel Platini]]
+|{{fbaicon|FRA|1974}} [[AS Saint-Étienne|Saint-Étienne]]
+|align="center"|33
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1981 Ballon d'Or|1981]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRG}} '''[[Karl-Heinz Rummenigge]]''' {{small|'''(2)'''}}
+|{{fbaicon|FRG}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''106'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRG}} [[Paul Breitner]]
+|{{fbaicon|FRG}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|64
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Bernd Schuster]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|39
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1982 Ballon d'Or|1982]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ITA}} '''[[Paolo Rossi]]'''
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''115'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA|1974}} [[Alain Giresse]]
+|{{fbaicon|FRA|1974}} [[FC Girondins de Bordeaux|Bordeaux]]
+|align="center"|64
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|POL}} [[Zbigniew Boniek]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]{{refn|group=note|Boniek was signed by Juventus from [[Widzew Łódź]] during 1982.}}
+|align="center"|39
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1983 Ballon d'Or|1983]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA|1974}} '''[[Michel Platini]]''' {{small|'''(1)'''}}
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''110'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|SCO}} [[Kenny Dalglish]]
+|{{fbaicon|ENG}} [[Liverpool F.C.|Liverpool]]
+|align="center"|26
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|DEN}} [[Allan Simonsen]]
+|{{fbaicon|DEN}} [[Vejle Boldklub|Vejle]]{{refn|group=note|Simonsen was signed by Vejle from [[Charlton Athletic F.C.|Charlton Athletic]] during 1983.}}
+|align="center"|25
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1984 Ballon d'Or|1984]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA|1974}} '''[[Michel Platini]]''' {{small|'''(2)'''}}
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''110'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA|1974}} [[Jean Tigana]]
+|{{fbaicon|FRA|1974}} [[FC Girondins de Bordeaux|Bordeaux]]
+|align="center"|57
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|DEN}} [[Preben Elkjær]]
+|{{fbaicon|ITA}} [[Hellas Verona FC|Hellas Verona]]{{refn|group=note|Elkjær was signed by Hellas Verona from [[K.S.C. Lokeren Oost-Vlaanderen|Lokeren]] during 1984.}}
+|align="center"|48
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1985 Ballon d'Or|1985]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|FRA|1974}} '''[[Michel Platini]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(3)'''}}
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''127'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|DEN}} [[Preben Elkjær]]
+|{{fbaicon|ITA}} [[Hellas Verona FC|Hellas Verona]]
+|align="center"|71
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRG}} [[Bernd Schuster]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|46
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1986 Ballon d'Or|1986]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|URS}} '''[[Igor Belanov]]'''
+|{{fbaicon|URS}} '''[[FC Dynamo Kyiv|Dynamo Kyiv]]'''
+|align="center"|'''84'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Gary Lineker]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]{{refn|group=note|Lineker was signed by Barcelona from [[Everton F.C.|Everton]] during 1986.}}
+|align="center"|62
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Emilio Butragueño]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|59
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1987 Ballon d'Or|1987]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|NED}} '''[[Ruud Gullit]]'''
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''{{refn|group=note|Gullit was signed by AC Milan from [[PSV Eindhoven]] during 1987.}}
+|align="center"|'''106'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Paulo Futre]]
+|{{fbaicon|ESP}} [[Atlético Madrid]]{{refn|group=note|Futre was signed by Atlético Madrid from [[FC Porto|Porto]] during 1987.}}
+|align="center"|91
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Emilio Butragueño]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|61
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1988 Ballon d'Or|1988]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|NED}} '''[[Marco van Basten]]''' {{small|'''(1)'''}}
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''
+|align="center"|'''129'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|NED}} [[Ruud Gullit]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|88
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Frank Rijkaard]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]{{refn|group=note|Rijkaard was signed by AC Milan from [[Real Zaragoza|Zaragoza]] during 1988.}}
+|align="center"|45
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1989 Ballon d'Or|1989]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|NED}} '''[[Marco van Basten]]''' {{small|'''(2)'''}}
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''
+|align="center"|'''129'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Franco Baresi]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|80
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Frank Rijkaard]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|43
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1990 Ballon d'Or|1990]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|GER}} '''[[Lothar Matthäus]]'''
+|{{fbaicon|ITA}} '''[[Inter Milan]]'''
+|align="center"|'''137'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Salvatore Schillaci]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|84
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|GER}} [[Andreas Brehme]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|68
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="4"|'''[[1991 Ballon d'Or|1991]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA|1974}} '''[[Jean-Pierre Papin]]'''
+|{{fbaicon|FRA|1974}} '''[[Olympique de Marseille|Marseille]]'''
+|align="center"|'''141'''
+|-
+|rowspan="3" scope=col style="background-color:silver"|2nd
+|{{flagicon|YUG}} [[Dejan Savićević]]
+|{{fbaicon|YUG}} [[Red Star Belgrade]]
+|rowspan="3" align="center"|42
+|-
+|{{flagicon|YUG}} [[Darko Pančev]]
+|{{fbaicon|YUG}} [[Red Star Belgrade]]
+|-
+|{{flagicon|GER}} [[Lothar Matthäus]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1992 Ballon d'Or|1992]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|NED}} '''[[Marco van Basten]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(3)'''}}
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''
+|align="center"|'''98'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|BUL}} [[Hristo Stoichkov]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|80
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|NED}} [[Dennis Bergkamp]]
+|{{fbaicon|NED}} [[AFC Ajax|Ajax]]
+|align="center"|53
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1993 Ballon d'Or|1993]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ITA}} '''[[Roberto Baggio]]'''
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''142'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|NED}} [[Dennis Bergkamp]]
+|{{fbaicon|ITA}} [[Inter Milan]]{{refn|group=note|Bergkamp was signed by Inter Milan from [[AFC Ajax|Ajax]] during 1993.}}
+|align="center"|83
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Eric Cantona]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|34
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1994 Ballon d'Or|1994]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BUL}} '''[[Hristo Stoichkov]]'''
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''210'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Roberto Baggio]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|136
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ITA}} [[Paolo Maldini]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|109
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1995 Ballon d'Or|1995]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|LBR}} '''[[George Weah]]'''
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''{{refn|group=note|Weah was signed by AC Milan from [[Paris Saint-Germain F.C.|Paris Saint-Germain]] during 1995.}}
+|align="center"|'''144'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|GER}} [[Jürgen Klinsmann]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]{{refn|group=note|Klinsmann was signed by Bayern Munich from [[Tottenham Hotspur F.C.|Tottenham Hotspur]] during 1995.}}
+|align="center"|108
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FIN}} [[Jari Litmanen]]
+|{{fbaicon|NED}} [[AFC Ajax|Ajax]]
+|align="center"|67
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1996 Ballon d'Or|1996]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|GER}} '''[[Matthias Sammer]]'''
+|{{fbaicon|GER}} '''[[Borussia Dortmund]]'''
+|align="center"|'''144'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|BRA}} [[Ronaldo (Brazilian footballer)|Ronaldo]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]{{refn|group=note|Ronaldo was signed by Barcelona from [[PSV Eindhoven]] during 1996.}}
+|align="center"|143
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Alan Shearer]]
+|{{fbaicon|ENG}} [[Newcastle United F.C.|Newcastle United]]{{refn|group=note|Shearer was signed by Newcastle United from [[Blackburn Rovers F.C.|Blackburn Rovers]] during 1996.}}
+|align="center"|107
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1997 Ballon d'Or|1997]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BRA}} '''[[Ronaldo (Brazilian footballer)|Ronaldo]]''' {{small|'''(1)'''}}
+|{{fbaicon|ITA}} '''[[Inter Milan]]'''{{refn|group=note|Ronaldo was signed by Inter Milan from [[FC Barcelona|Barcelona]] during 1997.}}
+|align="center"|'''222'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRY}} [[Predrag Mijatović]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|68
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Zinedine Zidane]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|63
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1998 Ballon d'Or|1998]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA|1974}} '''[[Zinedine Zidane]]'''
+|{{fbaicon|ITA}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''244'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|CRO}} [[Davor Šuker]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|68
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|BRA}} [[Ronaldo (Brazilian footballer)|Ronaldo]]
+|{{fbaicon|ITA}} [[Inter Milan]]
+|align="center"|66
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[1999 Ballon d'Or|1999]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BRA}} '''[[Rivaldo]]'''
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''219'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[David Beckham]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|154
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{nowrap|{{flagicon|UKR}} [[Andriy Shevchenko]]}}
+|{{fbaicon|ITA}} [[AC Milan|Milan]]{{refn|group=note|Shevchenko was signed by AC Milan from [[FC Dynamo Kyiv|Dynamo Kyiv]] during 1999.}}
+|align="center"|64
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2000 Ballon d'Or|2000]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Luís Figo]]'''
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''{{refn|group=note|Figo was signed by Real Madrid from [[FC Barcelona|Barcelona]] during 2000.}}
+|align="center"|'''197'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA|1974}} [[Zinedine Zidane]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|181
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|UKR}} [[Andriy Shevchenko]]
+|{{fbaicon|ITA}} [[AC Milan|Milan]]
+|align="center"|85
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2001 Ballon d'Or|2001]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ENG}} '''[[Michael Owen]]'''
+|{{fbaicon|ENG}} '''[[Liverpool F.C.|Liverpool]]'''
+|align="center"|'''176'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP}} [[Raúl (footballer)|Raúl]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|140
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|GER}} [[Oliver Kahn]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|114
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2002 Ballon d'Or|2002]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BRA}} '''[[Ronaldo (Brazilian footballer)|Ronaldo]]''' {{small|'''(2)'''}}
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''{{refn|group=note|Ronaldo was signed by Real Madrid from [[Inter Milan]] during 2002.}}
+|align="center"|'''169'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|BRA}} [[Roberto Carlos]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|145
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|GER}} [[Oliver Kahn]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|110
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2003 Ballon d'Or|2003]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|CZE}} '''[[Pavel Nedvěd]]'''
+|{{fbaicon|ITA|2003}} '''[[Juventus FC|Juventus]]'''
+|align="center"|'''190'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA|1974}} [[Thierry Henry]]
+|{{fbaicon|ENG}} [[Arsenal F.C.|Arsenal]]
+|align="center"|128
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ITA|2003}} [[Paolo Maldini]]
+|{{fbaicon|ITA|2003}} [[AC Milan|Milan]]
+|align="center"|123
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2004 Ballon d'Or|2004]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|UKR}} '''[[Andriy Shevchenko]]'''
+|{{fbaicon|ITA|2003}} '''[[AC Milan|Milan]]'''
+|align="center"|'''175'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Deco]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]{{refn|group=note|Deco was signed by Barcelona from [[FC Porto|Porto]] during 2004.}}
+|align="center"|139
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|BRA}} [[Ronaldinho]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|133
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2005 Ballon d'Or|2005]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BRA}} '''[[Ronaldinho]]'''
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''225'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ENG}} [[Frank Lampard]]
+|{{fbaicon|ENG}} [[Chelsea F.C.|Chelsea]]
+|align="center"|148
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Steven Gerrard]]
+|{{fbaicon|ENG}} [[Liverpool F.C.|Liverpool]]
+|align="center"|142
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2006 Ballon d'Or|2006]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ITA}} '''[[Fabio Cannavaro]]'''
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''{{refn|group=note|Cannavaro was signed by Real Madrid from [[Juventus FC|Juventus]] during 2006.}}
+|align="center"|'''173'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ITA}} [[Gianluigi Buffon]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|124
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Thierry Henry]]
+|{{fbaicon|ENG}} [[Arsenal F.C.|Arsenal]]
+|align="center"|121
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2007 Ballon d'Or|2007]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|BRA}} '''[[Kaká]]'''
+|{{fbaicon|ITA}} '''[[AC Milan|Milan]]'''
+|align="center"|'''444'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ENG}} [[Manchester United F.C.|Manchester United]]
+|align="center"|277
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|255
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2008 Ballon d'Or|2008]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Cristiano Ronaldo]]''' {{small|'''(1)'''}}
+|{{fbaicon|ENG}} '''[[Manchester United F.C.|Manchester United]]'''
+|align="center"|'''446'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|281
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Fernando Torres]]
+|{{fbaicon|ENG}} [[Liverpool F.C.|Liverpool]]
+|align="center"|179
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2009 Ballon d'Or|2009]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ARG}} '''[[Lionel Messi]]''' {{small|'''(1)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''473'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]{{refn|group=note|Cristiano Ronaldo was signed by Real Madrid from [[Manchester United F.C.|Manchester United]] during 2009.}}
+|align="center"|233
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Xavi (footballer, born 1980)|Xavi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|170
+|-
+! scope="row" style="text-align:center" colspan=5 |'''[[FIFA Ballon d'Or]] (2010–2015)'''
+|-
+|align="center" rowspan="3"|'''[[2010 FIFA Ballon d'Or|2010]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ARG}} '''[[Lionel Messi]]''' {{small|'''(2)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''22.65%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP}} [[Andrés Iniesta]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|17.36%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Xavi (footballer, born 1980)|Xavi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|16.48%
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2011 FIFA Ballon d'Or|2011]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(3)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''47.88%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|21.60%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Xavi (footballer, born 1980)|Xavi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|9.23%
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2012 FIFA Ballon d'Or|2012]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(4)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''41.60%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|23.68%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Andrés Iniesta]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|10.91%
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2013 FIFA Ballon d'Or|2013]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Cristiano Ronaldo]]''' {{small|'''(2)'''}}
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''27.99%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|24.72%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Franck Ribéry]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|23.36%
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2014 FIFA Ballon d'Or|2014]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Cristiano Ronaldo]]''' {{small|'''(3)'''}}
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''37.66%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|15.76%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|GER}} [[Manuel Neuer]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|15.72%
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2015 FIFA Ballon d'Or|2015]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(5)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''41.33%'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|27.76%
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|BRA}} [[Neymar]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|7.86%
+|-
+! scope="row" style="text-align:center" colspan=5 |'''Ballon d'Or (2016–present)'''
+|-
+|align="center" rowspan="3"|'''[[2016 Ballon d'Or|2016]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|POR}} '''[[Cristiano Ronaldo]]''' {{small|'''(4)'''}}
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''745'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|316
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Antoine Griezmann]]
+|{{fbaicon|ESP}} [[Atlético Madrid]]
+|align="center"|198
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2017 Ballon d'Or|2017]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|POR}} '''[[Cristiano Ronaldo]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(5)'''}}
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''946'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ARG}} [[Lionel Messi]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|670
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|BRA}} [[Neymar]]
+|{{fbaicon|FRA|1974}} [[Paris Saint-Germain F.C.|Paris Saint-Germain]]{{refn|group=note|Neymar was signed by Paris Saint-Germain from [[FC Barcelona|Barcelona]] during 2017.}}
+|align="center"|361
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2018 Ballon d'Or|2018]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|CRO}} '''[[Luka Modrić]]'''
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''753'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]{{refn|group=note|Cristiano Ronaldo was signed by Juventus from [[Real Madrid CF|Real Madrid]] during 2018.}}
+|align="center"|476
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA|1974}} [[Antoine Griezmann]]
+|{{fbaicon|ESP}} [[Atlético Madrid]]
+|align="center"|414
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2019 Ballon d'Or|2019]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(6)'''}}
+|{{fbaicon|ESP}} '''[[FC Barcelona|Barcelona]]'''
+|align="center"|'''686'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|NED}} [[Virgil van Dijk]]
+|{{fbaicon|ENG}} [[Liverpool F.C.|Liverpool]]
+|align="center"|679
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|POR}} [[Cristiano Ronaldo]]
+|{{fbaicon|ITA}} [[Juventus FC|Juventus]]
+|align="center"|476
+|-
+!colspan="5"|
+|-
+|align="center"|'''{{gray|2020}}'''
+|align="center" colspan="4"|Not awarded due to the [[Impact of the COVID-19 pandemic on association football|COVID-19 pandemic]]<ref name="ESPN2020" /><ref name="FranceFootball2020a" />
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2021 Ballon d'Or|2021]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(7)'''}}
+|{{fbaicon|FRA}} '''[[Paris Saint-Germain F.C.|Paris Saint-Germain]]'''{{refn|group=note|Messi was signed by Paris Saint-Germain from [[FC Barcelona|Barcelona]] during 2021.}}
+|align="center"|'''613'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|POL}} [[Robert Lewandowski]]
+|{{fbaicon|GER}} [[FC Bayern Munich|Bayern Munich]]
+|align="center"|580
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ITA}} [[Jorginho (footballer, born December 1991)|Jorginho]]
+|{{fbaicon|ENG}} [[Chelsea F.C.|Chelsea]]
+|align="center"|460
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2022 Ballon d'Or|2022]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA}} '''[[Karim Benzema]]'''
+|{{fbaicon|ESP}} '''[[Real Madrid CF|Real Madrid]]'''
+|align="center"|'''549'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|SEN}} [[Sadio Mané]]
+|{{fbaicon|GER}} [[Bayern Munich]]{{refn|group=note|Mané was signed by Bayern Munich from [[Liverpool F.C.|Liverpool]] during 2022.}}
+|align="center"|193
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|BEL}} [[Kevin De Bruyne]]
+|{{fbaicon|ENG}} [[Manchester City F.C.|Manchester City]]
+|align="center"|175
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2023 Ballon d'Or|2023]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|style="background-color:#cedff2"|{{flagicon|ARG}} '''[[Lionel Messi]]'''{{dagger|alt=Set or tied the all-time record for the most Ballon d'Or wins at the time}} {{small|'''(8)'''}}
+|{{fbaicon|USA}} '''[[Inter Miami CF|Inter Miami]]'''{{refn|group=note|Messi was signed by Inter Miami from [[Paris Saint-Germain F.C.|Paris Saint-Germain]] during 2023.}}
+|align="center"|'''462'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|NOR}} [[Erling Haaland]]
+|{{fbaicon|ENG}} [[Manchester City F.C.|Manchester City]]
+|align="center"|357
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|FRA}} [[Kylian Mbappé]]
+|{{fbaicon|FRA}} [[Paris Saint-Germain F.C.|Paris Saint-Germain]]
+|align="center"|270
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2024 Ballon d'Or|2024]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ESP}} '''[[Rodri]]'''
+|{{fbaicon|ENG}} '''[[Manchester City F.C.|Manchester City]]'''
+|align="center"|'''1170'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|BRA}} [[Vinícius Júnior]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|1129
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ENG}} [[Jude Bellingham]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|917
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2025 Ballon d'Or|2025]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|FRA}} '''[[Ousmane Dembélé]]'''
+|{{fbaicon|FRA}} '''[[Paris Saint-Germain F.C.|Paris Saint-Germain]]'''
+|align="center"|'''1380'''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|ESP}} [[Lamine Yamal]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|1059
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|POR}} [[Vitinha (footballer, born February 2000)|Vitinha]]
+|{{fbaicon|FRA}} [[Paris Saint-Germain F.C.|Paris Saint-Germain]]
+|align="center"|703
+|-
+!colspan="5"|
+|-
+|align="center" rowspan="3"|'''[[2026 Ballon d'Or|2026]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|ENG}} '''[[Harry Kane]]'''
+|{{fbaicon|GER}} '''[[FC Bayern Munich|Bayern Munich]]'''
+|align="center"|'''1055 '''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|FRA}} [[Kylian Mbappé]]
+|{{fbaicon|ESP}} [[Real Madrid CF|Real Madrid]]
+|align="center"|1027
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|ESP}} [[Lamine Yamal]]
+|{{fbaicon|ESP}} [[FC Barcelona|Barcelona]]
+|align="center"|881
+<!--|-
+|align="center" rowspan="3"|'''[[2027 Ballon d'Or|2027]]'''
+|scope=col style="background-color:gold"|'''1st'''
+|{{flagicon|}} '''[[]]'''
+|{{fbaicon|}} '''[[]]'''
+|align="center"|''''''
+|-
+|scope=col style="background-color:silver"|2nd
+|{{flagicon|}} [[]]
+|{{fbaicon|}} [[]]
+|align="center"|
+|-
+|scope=col style="background-color:#cc9966"|3rd
+|{{flagicon|}} [[]]
+|{{fbaicon|}} [[]]
+|align="center"|
+-->|}
+
+;Notes
+{{notelist}}
+{{reflist|group=note}}
+

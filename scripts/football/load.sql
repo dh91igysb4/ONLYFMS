@@ -18,6 +18,10 @@ create temp table s_external_ids (entity_id text, source text, external_id text)
 create temp table s_spells (player_id text, team_id text, start_date text, end_date text, date_precision text, loan text,
   apps text, goals text, source_ref text) on commit drop;
 create temp table s_caps (player_id text, team_id text, caps text, goals text, first_year text, last_year text) on commit drop;
+create temp table s_honour_catalog (id text, kind text, name_en text, name_ko text, nation_id text, source text, page text, "from" text) on commit drop;
+create temp table s_honours_extra (honour text, season text, team_id text, player_id text) on commit drop;
+create temp table s_managers (id text, name_en text) on commit drop;
+create temp table s_manager_spells (manager_id text, team_id text, from_season text, to_season text, source_url text) on commit drop;
 create temp table s_honours (honour text, season text, team_id text, player_id text) on commit drop;
 
 \copy s_nations from 'nations.csv' with (format csv, header match)
@@ -31,6 +35,10 @@ create temp table s_honours (honour text, season text, team_id text, player_id t
 \copy s_spells from 'spells.csv' with (format csv, header match)
 \copy s_caps from 'caps.csv' with (format csv, header match)
 \copy s_honours from 'honours.csv' with (format csv, header match)
+\copy s_honour_catalog from 'honour_catalog.csv' with (format csv, header match)
+\copy s_honours_extra from 'honours_extra.csv' with (format csv, header match)
+\copy s_managers from 'managers.csv' with (format csv, header match)
+\copy s_manager_spells from 'manager_spells.csv' with (format csv, header match)
 
 -- ---------------------------------------------------------------- 엔터티: upsert 후 사라진 행 폐기
 -- 빈 칸은 null. 필수 열(name_en 등)이 비면 not null 제약으로 실패한다.
@@ -79,6 +87,9 @@ insert into s_retired select 'players', count(*) from r;
 -- ---------------------------------------------------------------- 관계: 통째 교체
 
 delete from public.football_honours;
+delete from public.football_manager_spells;
+delete from public.football_managers;
+delete from public.football_honour_catalog;
 delete from public.football_caps;
 delete from public.football_spells;
 delete from public.football_external_ids;
@@ -105,8 +116,26 @@ select source_ref, player_id, team_id, start_date, nullif(end_date, ''), date_pr
 insert into public.football_caps (player_id, team_id, caps, goals, first_year, last_year)
 select player_id, team_id, nullif(caps, '')::int, nullif(goals, '')::int, nullif(first_year, '')::int, nullif(last_year, '')::int from s_caps;
 
+-- 우승·수상·감독 (설계 2026-11-25-football-honours-design.md §3.4)
+insert into public.football_honour_catalog (id, kind, name_en, name_ko, nation_id, source, page, from_season)
+select id, kind, name_en, name_ko, nullif(nation_id, ''), source, nullif(page, ''), "from"::int from s_honour_catalog;
+
+insert into public.football_managers (id, name_en) select id, name_en from s_managers;
+
+insert into public.football_manager_spells (manager_id, team_id, from_season, to_season, source_url)
+select manager_id, team_id, from_season::int, to_season::int, nullif(source_url, '') from s_manager_spells;
+
+-- 카탈로그에 있는 개인상은 이 수집기(honours_extra)가 기준: 기존 honours.csv의 같은 상 행은 버린다.
+-- 고친 팀 우승(manual/honour_winners.csv → honours_extra의 팀 단위 행)이 있으면 같은 대회·시즌의 honours.csv 팀 우승도 버린다.
 insert into public.football_honours (honour, season, team_id, player_id)
-select honour, season::int, nullif(team_id, ''), nullif(player_id, '') from s_honours;
+select distinct honour, season::int, nullif(team_id, ''), nullif(player_id, '') from (
+  select * from s_honours h
+  where not exists (select 1 from s_honour_catalog c where c.kind = 'award' and h.honour = 'award:' || c.id)
+    and not (coalesce(h.player_id, '') = '' and exists (select 1 from s_honours_extra e
+      where e.honour = h.honour and e.season = h.season and coalesce(e.player_id, '') = ''))
+  union all
+  select * from s_honours_extra
+) x;
 
 -- ---------------------------------------------------------------- 메타
 
@@ -127,6 +156,9 @@ from (
   union all select 'spells', 8, count(*) from public.football_spells
   union all select 'caps', 9, count(*) from public.football_caps
   union all select 'honours', 10, count(*) from public.football_honours
+  union all select 'honour_catalog', 11, count(*) from public.football_honour_catalog
+  union all select 'managers', 12, count(*) from public.football_managers
+  union all select 'manager_spells', 13, count(*) from public.football_manager_spells
 ) c left join s_retired r using (t)
 order by o;
 

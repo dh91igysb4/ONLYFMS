@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { checkDataset, checkHistoryClubs, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
+import { checkDataset, checkHistoryClubs, CORE_FILE_NAMES, FILE_NAMES, FILES, HONOUR_FILE_NAMES, sortRows, type Dataset, type FileName } from './schema.ts'
 import { parseCsv, toCsv, type Row } from './wikidata.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -148,7 +148,7 @@ describe('rules', () => {
 
   test('honour_shape', () => {
     expect(check((d) => { d.files.honours[0].team_id = '' }).some((m) => /^honours:2: /.test(m))).toBe(true)
-    expect(check((d) => { d.files.honours[1].player_id = '' }).some((m) => /^honours:3: /.test(m))).toBe(true)
+    expect(check((d) => { d.files.honours[2].player_id = '' }).some((m) => /^honours:4: /.test(m))).toBe(true) // 개인상 행(픽스처 3번째)
     expect(check((d) => { d.files.honours[0].honour = 'Q1' }).some((m) => /^honours:2: honour Q1/.test(m))).toBe(true)
   })
 
@@ -204,4 +204,29 @@ describe('real data', () => {
     const hcFile = join(REAL, 'manual', 'history_clubs.csv')
     if (existsSync(hcFile)) expect(checkHistoryClubs(parseCsv(readFileSync(hcFile, 'utf8')), new Date().getFullYear())).toEqual([])
   })
+})
+
+describe('honours_extra (설계 2026-11-25-football-honours-design.md §3.4)', () => {
+  test('extra_honour_unknown_catalog', () => {
+    expect(check((d) => { d.files.honours_extra[0].honour = 'award:Q999999' })).toContainEqual(expect.stringMatching(/^honours_extra:2: honour award:Q999999 카탈로그에 없음/))
+  })
+  test('extra_award_needs_player', () => {
+    expect(check((d) => { const r = d.files.honours_extra.find((x) => x.honour.startsWith('award:'))!; r.player_id = '' })).toContainEqual(expect.stringMatching(/^honours_extra:\d+: .*player_id 없음/))
+  })
+  test('manager_spell_order', () => {
+    expect(check((d) => { const r = d.files.manager_spells[0]; r.from_season = '2010'; r.to_season = '2009' })).toContainEqual(expect.stringMatching(/^manager_spells:2: /))
+  })
+  test('manager_must_be_in_catalog', () => {
+    expect(check((d) => { d.files.managers[0].id = 'x-nobody' })).toContainEqual(expect.stringMatching(/^managers:2: id x-nobody 카탈로그 감독이 아님/))
+  })
+  test('catalog_kind', () => {
+    expect(check((d) => { d.files.honour_catalog[0].kind = 'trophy' })).toContainEqual(expect.stringMatching(/^honour_catalog:2: kind trophy 허용 안 됨/))
+  })
+})
+
+test('wikidata_collector_does_not_write_honour_files', () => {
+  // football:fetch가 honours 수집기 출력(honours_extra 등)을 빈 파일로 덮어쓰지 않게, 위키데이터 수집기 파일 목록에서 뺀다
+  expect(CORE_FILE_NAMES).not.toContain('honours_extra')
+  expect(CORE_FILE_NAMES).not.toContain('honour_catalog')
+  expect([...CORE_FILE_NAMES, ...HONOUR_FILE_NAMES].sort()).toEqual([...FILE_NAMES].sort())
 })

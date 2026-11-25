@@ -17,6 +17,9 @@
 | `spells.csv` | 클럽 경력 | 위키데이터 (+ `manual/spells.csv`) |
 | `caps.csv` | 국가대표 경력 | 위키데이터 |
 | `honours.csv` | 리그 우승(대상 리그만), 축구 개인상 | 위키데이터 |
+| `honour_catalog.csv` | 우승·수상·대표팀 대회·감독 수집 목록이자 화면 이름표(한글 이름) | 직접 |
+| `honours_extra.csv` | 리그·컵·대륙 대회 팀 우승(적재 때 `honours.csv`의 같은 대회·시즌 팀 우승을 대신), 선수 단위 우승(리그 포함), 대표팀 엔트리(`squad:`), 개인상(`award:`), 월드컵 결승 득점(`final_goal:`) | 위키데이터 + 위키백과 (`npm run football:honours`) |
+| `managers.csv`, `manager_spells.csv` | 카탈로그 감독과 팀별 재임 시즌 | 위키백과 감독 문서 정보상자 |
 | `season_memberships.csv` | 시즌별 소속 팀(주 소속·머문 날·추정 여부) | `spells.csv`에서 계산(`npm run football:seasons`) |
 | `openfootball/team_competitions.csv` | openfootball 경기 일정에서 뽑아 우리 ID로 이은 참가팀 | openfootball (퍼블릭 도메인) |
 | `openfootball/seasons.csv`, `remap.csv`, `unmatched.csv` | 시즌별 연결 수, 옮길 옛 ID, 못 이은 이름 | 생성 파일 |
@@ -103,8 +106,24 @@ npm run football:seasons -- --as-of 2026-11-05 # 열린 경력을 이 날까지�
 - 개막 이적시장(가을–봄 9/1까지, 단일 연도 3/31까지) 안에서 끝난 경력은 그 시즌 소속이 아니다(출전 전 이적으로 본다). 겨울 이적·임대는 두 팀 모두.
 - 연도만 있는 날짜는 여름 이적으로 본다. 종료일이 빈 경력은 그 뒤 다른 팀 완전 이적 시작일로 닫는다. 원 소속 경력에서 임대 나간 기간은 뺀다. 시즌과 7일 미만 겹치면 치지 않는다.
 - `primary`: 그 시즌 머문 날이 가장 많은 팀(같으면 늦게 온 팀). "그 시즌 스쿼드"는 전체, "그 시즌 그 선수의 팀"은 `primary`.
-- `estimated = true`: 연도 단위 날짜나 열린 경력 닫기로 나온 소속(지금 약 91%).
+- `estimated = true`: 연도 단위 날짜나 열린 경력 닫기로 나온 소속(1987년부터 계산한 지금 약 97%).
 - 한계: 시즌 초 출전 뒤 9/1 전에 떠난 선수는 옛 팀에서 빠진다. 연도 단위 겨울 이적은 한 시즌 어긋난다. 뒤 경력이 원본에 없는 열린 경력(예: 이헤아나초의 맨시티)과 남자 클럽에 붙은 여자 선수는 그대로 남는다. 이런 경우는 `manual/spells.csv`로 고친다.
+
+## 우승·수상·감독 (`npm run football:honours`)
+
+설계 `docs/superpowers/specs/2026-11-25-football-honours-design.md`. 순서: `football:fetch` → `football:seasons` → `football:honours`(시즌 소속을 쓴다).
+
+```bash
+npm run football:honours                              # 전체 (첫 실행 약 25분, 위키백과 호출 간격 5초)
+npm run football:honours -- --only Q166177,Q19317     # 카탈로그 줄 일부만 다시(나머지 줄 행은 그대로)
+npm run football:honours -- --no-cache                # 캐시(.cache/honours/) 무시
+```
+
+- 카탈로그 한 줄 = 수집 단위. `page`는 위키백과 문서 제목이고 `제목#절`이면 그 절만(하위 절 제외) 읽는다. 대표팀 대회는 `{year}` 틀.
+- 리그·컵·대륙 대회 우승팀은 위키데이터 시즌 항목(P3450·P1346), 빠진 시즌만 `page`의 결승·역대 우승 표(리그는 그 대회가 1부였던 시기만). 둘이 다르면 "우승팀 불일치"를 찍으니 맞는 쪽을 `manual/honour_winners.csv`에 적는다.
+- 선수 우승 = 그 시즌 그 팀 소속(시즌 소속 파일). 한 시즌 클럽 소속이 둘 이상인 선수의 그 시즌은 만들지 않는다(시즌 중간 이적·반 시즌 임대).
+- 끝에 카탈로그 줄별 "행 N, 버린 선수·팀 M, 메모"를 찍는다. 버린 수는 우리 DB에 없는 선수(주로 아시아·옛 선수)다.
+- `football:fetch`로 선수 목록이 바뀌면 `football:seasons`·`football:honours`도 다시 돌린다(없어진 선수를 가리키는 행은 CSV 검사에서 걸린다).
 
 ## 직접 입력 (`manual/`)
 
@@ -115,6 +134,8 @@ npm run football:seasons -- --as-of 2026-11-05 # 열린 경력을 이 날까지�
 - `legends.csv` (`player_id,note`): 수집 범위(최근 시즌) 밖이지만 넣을 레전드 선수의 위키데이터 QID와 메모(예: `Q1487,티에리 앙리`). 전체 경력까지 함께 받는다. 축구 선수가 아니거나 QID 형식이 아니면 경고하고 뺀다. 레전드의 옛 시즌 리그 참가 기록은 수집 창 밖이라 생기지 않는다.
 - `ballon_dor_nominees.csv` (`name,nation_ko,years,best_rank,player_id`): 레전드 원본. 발롱도르 후보 2000~2025년 전원 + 1990~1999년 연도별 상위 5위(381명). `npm run football:legends`가 이름을 위키데이터 ID로 바꿔 `legends.csv`에 `[발롱도르]` 줄로 넣고, 판정을 `ballon_dor_resolved.csv`에 쓴다. 확인 필요·못 찾음은 이 파일의 `player_id` 칸에 ID를 적고 다시 돌린다.
 - `ballon_dor_resolved.csv`: 위 도구의 판정 결과(생성 파일, 손으로 고치지 않음).
+- `honour_winners.csv` (`honour,season,team_id,source_url`): 위키데이터 대회 우승팀이 틀리거나 둘 이상일 때 덮어쓴다(예: 유로 2004).
+- `world_cup_final_scorers.csv` (`season,player_id,team_id,source_url`): 1990~2022 월드컵 결승 득점자(자책골·승부차기 제외). 1990 서독은 독일 대표팀 ID.
 - `openfootball_teams.csv` (`competition_id,name,team_id`): openfootball 팀 이름을 우리 ID로 직접 지정. `competition_id`가 비면 모든 리그.
 - `spells.csv` (`action,player_id,team_id,source_ref,start_date,end_date,loan,source_url,note`): 경력 추가·수정·삭제. 설계 2026-11-01 §5.3.
   - `add`: 빠진 이적. `source_ref`는 비운다. `player_id`·`team_id`·`start_date`·`source_url` 필수.
@@ -138,4 +159,5 @@ npm run football:seasons -- --as-of 2026-11-05 # 열린 경력을 이 날까지�
 - 포지션 세부(`position_detail`)는 위키데이터에 있을 때만 채운다. 주발(`foot`)은 대부분 비어 있다.
 - 클럽 색 비율은 같은 비율로 나눈 값이다. 등번호(`shirt_number`)는 비워 두며 API-Football 현재 스쿼드로 채운다.
 - `confederation`은 아직 비어 있다.
+- 우승·수상: 카탈로그 밖 대회·상은 없다. 아시아 선수 상당수가 선수 목록에 없어 아시안컵 엔트리는 일부만 이어진다. 캐나다(2001·2024 코파, 2022·2026 월드컵)·예멘(2019 아시안컵) 대표팀이 `teams.csv`에 없어 그 엔트리는 빠진다.
 - 유스·2군·여자 팀은 이름 규칙(`U21`, `II`, `B`, `Jong`, `women` 등)으로 거른다. 걸러지지 않은 팀이 보이면 `scripts/football/wikidata.ts`의 `isYouthOrReserve`에 추가한다.

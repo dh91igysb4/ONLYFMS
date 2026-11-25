@@ -1,13 +1,13 @@
 // 경력(spells.csv)에서 시즌 소속(season_memberships.csv)을 계산한다. 설계 docs/superpowers/specs/2026-11-01-football-data-layer-design.md §3.6.
 //
-//   npm run football:seasons -- [--as-of 2026-11-05] [--from 2012] [--to 2026] [--dir data/football]
+//   npm run football:seasons -- [--as-of 2026-11-05] [--from 1987] [--to 2026] [--dir data/football]
 //
 // 수집(football:fetch)이나 openfootball 반영 뒤, 또는 manual/spells.csv를 고친 뒤에 돌린다. 네트워크를 쓰지 않는다.
 // 먼저 직접 입력 경력(manual/spells.csv, 설계 §5.3)을 spells.csv에 반영해 다시 쓰고(다시 수집하지 않아도 되게), 그다음 계산한다.
-// --as-of: 열린 경력을 어디까지로 볼지(기본 오늘). --from/--to: 시즌 범위(기본 대상 리그 창의 가장 이른 시작 ~ 현재 시즌).
+// --as-of: 열린 경력을 어디까지로 볼지(기본 오늘). --from/--to: 시즌 범위(기본 HISTORY_FROM(1987) ~ 현재 시즌).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { LEAGUES } from './leagues.ts'
+import { HISTORY_FROM } from './leagues.ts'
 import { applyManualSpells } from './manualSpells.ts'
 import { FILES, sortRows } from './schema.ts'
 import { deriveMemberships, MEMBERSHIP_COLUMNS } from './seasons.ts'
@@ -18,7 +18,7 @@ const get = (k: string) => { const i = a.indexOf(`--${k}`); return i >= 0 ? a[i 
 const today = get('as-of') ?? new Date().toISOString().slice(0, 10)
 if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) throw new Error(`--as-of는 YYYY-MM-DD: ${today}`)
 const to = Number(get('to') ?? currentSeason(new Date(`${today}T00:00:00Z`)))
-const from = Number(get('from') ?? to - Math.max(...LEAGUES.map((l) => l.seasons)) + 1)
+const from = Number(get('from') ?? HISTORY_FROM)
 const dir = get('dir') ?? 'data/football'
 
 const read = (f: string) => parseCsv(readFileSync(join(dir, f), 'utf8'))
