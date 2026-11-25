@@ -11,7 +11,7 @@ import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type IsleLayoutId, type TackleId } from './data.ts'
-import { isleArrival, placeKey, type IsleShape } from './isle.ts'
+import { isleArrival, placeKey, placeName, type IsleShape } from './isle.ts'
 import { canPlace, type FurnId, type Placed } from './home.ts'
 import { BoatPanel, FurnPanel, IsleChoosePanel, WorkbenchPanel } from './IslePanels.tsx'
 import { ISLE_ZONES, type ToolId } from './isleEcon.ts'
@@ -249,6 +249,15 @@ const FISHING_MESSAGES: Record<string, string> = {
   bad_node: '캘 수 없는 곳이에요. 새로고침해 주세요',
   bad_zone: '개간 순서가 바뀌었어요. 새로고침해 주세요',
   bad_tool: '없는 도구예요. 새로고침해 주세요',
+  bad_level: '집 단계가 바뀌었어요. 새로고침해 주세요',
+  need_clear: '개간을 더 해야 지을 수 있어요',
+  no_house: '집을 먼저 지어 주세요',
+  no_furn: '보관함에 그 가구가 없어요',
+  bad_spot: '거기는 놓을 수 없어요',
+  room_full: '방에 더 놓을 수 없어요',
+  no_furn_here: '거기에 가구가 없어요',
+  furn_full: '보관함이 가득 찼어요(종류마다 최대 99)',
+  bad_furn: '없는 가구예요. 새로고침해 주세요',
   fridge_changed: '냉장고가 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
@@ -323,11 +332,19 @@ function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: 
   return interactionAt(map, p.pos, p.facing, opened, dyn)
 }
 /** 큰 지도에 보일 내 자리. 세계 지도 밖 맵(실내·섬)이면 첫 출구(없으면 첫 선착장)가 나가는 자리(마을회관 → 마을 문 앞) */
-function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): { area: AreaId; tx: number; ty: number; facing: Facing } {
-  // 내 섬처럼 출구 없이 배로만 오가는 맵은 첫 선착장이 내리는 자리(섬 → 마을 선착장 앞)
-  const out = map.exits[0] ?? map.docks[0]
-  if (map.onWorldMap || !out) return { area: map.id, ...tileOf(p.pos), facing: p.facing }
-  return { area: out.target, tx: out.entry.tx, ty: out.entry.ty, facing: out.entry.facing }
+function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, resolve: (area: AreaId) => MapDef | null): { area: AreaId; tx: number; ty: number; facing: Facing } {
+  // 세계 지도 밖 맵은 나가는 길을 따라 세계 지도 맵에 닿을 때까지 간다(집 안 → 섬 → 마을 선착장 앞). 선착장을 먼저 본다
+  let m = map
+  let here: { area: AreaId; tx: number; ty: number; facing: Facing } = { area: map.id, ...tileOf(p.pos), facing: p.facing }
+  for (let i = 0; i < 4 && !m.onWorldMap; i++) {
+    const out = m.docks[0] ?? m.exits[0]
+    if (!out) break
+    here = { area: out.target, tx: out.entry.tx, ty: out.entry.ty, facing: out.entry.facing }
+    const next = resolve(out.target)
+    if (!next) break
+    m = next
+  }
+  return here
 }
 /** 고정물 행동(가게·안내판 등). 남의 섬에서는 고정물 행동을 하지 않는다 */
 const isFixtureAct = (i: Interaction): boolean =>
@@ -994,10 +1011,16 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }
+  /** 앞 칸이 막혔을 때 발이 걸치지 않게 서 있는 칸 가운데로 옮긴다(가구·꾸미기를 놓은 뒤) */
+  const snapToTile = () => {
+    const t = tileOf(rt.player.pos)
+    rt.player = { ...rt.player, pos: { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 }, moving: false, walkMs: 0 }
+  }
   const placeFurn = (id: FurnId) => {
     const spot = furnSpotRef.current
     if (!spot) return
     void ownAct({ type: 'place', id, tx: spot.tx, ty: spot.ty }, () => {
+      snapToTile()
       if (menuRef.current === 'furn') closeMenu()
     })
   }
@@ -1051,7 +1074,11 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       if (changed) enteredMap(next)
       rt.player = { pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing, moving: false, walkMs: 0 }
       savePlayer()
-      const name = tr.say ?? AREAS.find((a) => a.id === next.id)?.name
+      // 섬·집 안 이름은 주인으로(내 섬·내 집·{아이디}의 집)
+      const placeLabel = (next.id === 'isle' || next.id === 'home') && go
+        ? go.owner === null ? (next.id === 'isle' ? '내 섬' : '내 집') : placeName(placeKey(next.id, go.owner), { selfId: userIdRef.current, players: islePlayers })
+        : null
+      const name = tr.say ?? placeLabel ?? AREAS.find((a) => a.id === next.id)?.name
       if (name) {
         // 오류 알림이 떠 있으면 덮지 않는다
         setNotice((n) => (n && n.kind !== 'info' ? n : { kind: 'info', text: name }))
@@ -1932,10 +1959,10 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
               )}
               {menu === 'isle' && <IsleChoosePanel busy={busy} onChoose={(l) => void chooseIsle(l)} />}
               {menu === 'furn' && <FurnPanel furniture={view.isle?.furniture ?? {}} busy={busy} onPick={placeFurn} />}
-              {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats) && (
+              {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats && view.isle.furniture && typeof view.isle.house === 'number') && (
                 <p className="muted">게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요</p>
               )}
-              {menu === 'workbench' && view.isle?.tools && view.isle.mats && (
+              {menu === 'workbench' && view.isle?.tools && view.isle.mats && view.isle.furniture && typeof view.isle.house === 'number' && (
                 <WorkbenchPanel
                   isle={view.isle}
                   gold={view.gold}
@@ -1954,7 +1981,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
               {menu === 'map' && (
                 <MapPanel
                   view={view}
-                  here={mapHere(rt.map, rt.player)}
+                  here={mapHere(rt.map, rt.player, (a) => mapFor(a, shapeNow()))}
                   now={serverNow}
                   innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
                   layers={mapLayers}

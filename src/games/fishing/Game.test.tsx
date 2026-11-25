@@ -3783,6 +3783,7 @@ describe('내 섬 C단계: 집 (설계 2026-11-26-my-isle-c §4.5)', () => {
     const a = homeArrival(1)
     expect(tileOf(lastScene().player.pos)).toEqual({ tx: a.tx, ty: a.ty })
     expect(roomGate.joins.at(-1)!.area).toBe('home-u1')
+    expect(screen.getByText('내 집')).toBeInTheDocument()
     key('ArrowDown', true)
     await advance(260)
     key('ArrowDown', false)
@@ -3816,6 +3817,50 @@ describe('내 섬 C단계: 집 (설계 2026-11-26-my-isle-c §4.5)', () => {
     pointer('up', actionButton(), 4)
     await flush()
     expect(calls('pickUp')[0]).toMatchObject({ payload: { type: 'pickUp', tx: 1, ty: 2 } })
+  })
+
+  test('집이 있는 섬·집 안에서 큰 지도를 열면 마을 선착장 자리(죽지 않는다)', async () => {
+    const isle = { ...newIsle('twin'), house: 1 }
+    await mount(makeView({ isle }), { area: 'isle', pos: tileCenter(isleArrival('twin').tx, isleArrival('twin').ty), facing: 'up' })
+    await advance(50)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(screen.getByRole('region', { name: '지도' })).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+    cleanup()
+    await mount(makeView({ isle }), { area: 'home', pos: tileCenter(1, 3), facing: 'up' })
+    await advance(50)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(screen.getByRole('region', { name: '지도' })).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+  })
+
+  test('경계 가까이 서서 앞 칸에 가구를 놓아도 갇히지 않는다(칸 가운데로 옮긴다)', async () => {
+    const isle = { ...newIsle('twin'), house: 1, furniture: { chair: 1 } }
+    const view = makeView({ isle })
+    await mount(view, { area: 'home', pos: { x: 2 * TILE + TILE / 2, y: 4 * TILE + 1 }, facing: 'up' })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    const placed = { ...isle, furniture: {}, placed: [{ id: 'chair' as const, tx: 2, ty: 3 }] }
+    route({ place: () => ok({ ...view, isle: placed }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '가구 놓기' })).getByRole('button', { name: '의자 1개' }))
+    await flush()
+    await advance(50)
+    expect(lastScene().player.pos).toEqual(tileCenter(2, 4))
+    key('ArrowRight', true)
+    await advance(300)
+    key('ArrowRight', false)
+    expect(lastScene().player.pos.x).toBeGreaterThan(tileCenter(2, 4).x)
+  })
+
+  test('옛 서버(v23, 집 값 없음)여도 작업대 창이 죽지 않는다', async () => {
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    const v23 = { ...newIsle('twin'), house: undefined, furniture: undefined, placed: undefined } as unknown as View['isle']
+    await mount(makeView({ isle: v23 }), { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    expect(screen.getByText('게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요')).toBeInTheDocument()
   })
 
   test('작업대 집 탭: 다음 단계 짓기, 가구 탭: 만들기', async () => {
