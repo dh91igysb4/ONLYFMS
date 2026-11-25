@@ -158,3 +158,15 @@ export function tables(text: string): string[][][] {
   }
   return out
 }
+
+/** 제목이 name인 절의 본문(하위 절 포함, 같거나 높은 수준의 다음 제목 전까지). 없으면 null */
+export function sectionText(t: string, name: string): string | null {
+  const lines = t.split('\n')
+  const head = (l: string) => /^(={2,6})\s*(.+?)\s*\1\s*$/.exec(l)
+  const i = lines.findIndex((l) => { const h = head(l); return !!h && plainText(h[2]) === name })
+  if (i < 0) return null
+  const level = head(lines[i])![1].length
+  let j = i + 1
+  for (; j < lines.length; j++) { const h = head(lines[j]); if (h && h[1].length <= level) break }
+  return lines.slice(i + 1, j).join('\n').trim()
+}

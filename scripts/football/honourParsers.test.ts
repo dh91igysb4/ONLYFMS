@@ -7,13 +7,18 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { parseAwardList, parseFinals, parseManagerInfobox, parseSquads } from './honourParsers.ts'
-import { stripComments, tables, templates, wikiLinks } from './wikitext.ts'
+import { sectionText, stripComments, tables, templates, wikiLinks } from './wikitext.ts'
 
 const fx = (name: string) => readFileSync(join(import.meta.dirname, 'fixtures', 'wikitext', `${name}.txt`), 'utf8')
 
 describe('wikitext', () => {
   test('links_normalized', () => {
     expect(wikiLinks('[[AC Milan|Milan]] and [[arsenal_F.C.#History]] [[File:x.jpg|thumb|[[Nope]]]]')).toEqual(['AC Milan', 'Arsenal F.C.'])
+  })
+  test('section_text', () => {
+    const t = '== A ==\na\n=== Golden Ball ===\nball\n==== sub ====\nsub\n=== Golden Boot ===\nboot'
+    expect(sectionText(t, 'Golden Ball')).toBe('ball\n==== sub ====\nsub')
+    expect(sectionText(t, 'Nope')).toBeNull()
   })
   test('comments_stripped', () => {
     expect(stripComments('a<!-- [[X]] -->b')).toBe('ab')
