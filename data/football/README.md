@@ -6,7 +6,8 @@
 
 | 파일 | 내용 | 출처 |
 |---|---|---|
-| `competitions.csv` | 수집 대상 리그 | `scripts/football/leagues.ts` (직접) |
+| `competitions.csv` | 수집 대상 리그와 전신 대회 | `scripts/football/leagues.ts` (직접) |
+| `competition_eras.csv` | 대회의 시기별 나라·단계(풋볼리그 1부처럼 시기마다 단계가 다른 대회) | `scripts/football/leagues.ts` (직접) |
 | `nations.csv` | 국가, 국기 코드 | 위키데이터 |
 | `teams.csv` | 클럽·성인 국가대표팀 (유스·2군·여자 팀 제외) | 위키데이터 |
 | `team_competitions.csv` | 시즌별 리그 참가팀 | 위키데이터 + openfootball + `manual/team_competitions.csv` |
@@ -41,6 +42,35 @@ npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~
 - `User-Agent`는 `WIKIDATA_UA` 환경 변수로 바꿀 수 있다(위키미디어 정책상 연락처 포함 권장).
 - 끝나면 리그·시즌별 참가팀 수 표가 나온다. `--`(없음)나 `!`(리그 정원 `teams` 미만) 칸은 `manual/team_competitions.csv`에 채운다.
 - ONLYFMS 클라우드 개발 환경은 네트워크 정책이 `query.wikidata.org`를 막고 있다. 로컬 PC에서 돌리거나 환경의 허용 도메인에 추가한 뒤 돌린다.
+
+## 1987년부터 받기 (옛 선수·옛 시즌)
+
+설계: [`2026-11-25-football-history-clubs-design.md`](../../docs/superpowers/specs/2026-11-25-football-history-clubs-design.md)
+
+- `football:fetch`는 기본으로 모든 대상 팀의 선수를 1987년부터 받고, 시즌 참가팀도 리그와 전신 대회(`leagues.ts`의 `since`·`eras`)의 1987년부터 받는다. `--history-from 1995`로 바꾸거나 `--history-from off`로 끈다(이전처럼 리그별 최근 시즌만). `--seasons N`만 주면 꺼진다.
+- `manual/history_clubs.csv`(`team_id,from,note`): 참가 기록에 없어 선수 수집 대상에서 빠지는 옛 클럽. `from`이 비면 1987.
+- 전신 대회 찾기: `npm run football:eras` — 리그별 이전 대회(P155·P1365)와 시즌 항목 연도·참가팀 커버리지를 찍는다. 결과로 `leagues.ts`의 `since`·`eras`·시즌별 `teams`(정원 계단)를 채운다.
+- 위키데이터·openfootball에 없는 옛 시즌 참가팀은 영어 위키백과 시즌 문서를 보고 `manual/team_competitions.csv`에 넣고 `source_url` 열에 그 문서 주소를 적는다(시즌 참가팀만 예외적으로 위키백과를 근거로 인정. 경력은 아님). 넣은 뒤 `npm run football:openfootball -- --merge`로 반영한다.
+- 시간: 전체 수집이 몇 시간 걸릴 수 있다. 끊기면 같은 명령을 다시 돌리면 캐시(`.cache/wikidata/`)로 이어진다.
+
+### Windows PowerShell에서 돌리기
+
+위키데이터는 Claude 환경에서 막혀 있어 수집은 사람이 돌린다. Git과 Node 22.18 이상이 필요하다(`git --version`, `node -v`).
+
+```powershell
+git clone https://github.com/dh91igysb4/onlyfms
+cd onlyfms
+npm install
+npm run football:eras                            # 1. 전신 대회 확인 (출력을 Claude에게)
+npm run football:fetch -- --leagues Q9448        # 2. 시험 수집 (.cache/football-trial/에 씀)
+git checkout -b data/history-1987                # 3. 본 수집
+npm run football:fetch
+npm run football:seasons
+npm test
+git add data/football
+git commit -m "chore: 축구 데이터 1987년부터 수집"
+git push -u origin data/history-1987
+```
 
 ## 시즌 참가팀 보완 (openfootball)
 
