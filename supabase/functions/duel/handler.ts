@@ -361,8 +361,9 @@ async function buildView(tx: Tx, m: MatchRow, me: Me, logic: Logic | undefined, 
     action_no: m.action_no,
     turn_deadline: m.turn_deadline ? m.turn_deadline.toISOString() : null,
     server_now: now,
-    // 진행 중에는 내 좌석의 화면, 종료 후·관전은 viewer = null (설계 §3.2)
-    view: usable ? safe('view', () => usable.view(m.state, live ? mySeat : null), null) : null,
+    // 진행 중에는 내 좌석의 화면, 종료 후·관전은 viewer = null (설계 §3.2).
+    // 셋째 인자 ended: 대국이 끝났다(기권·시간 초과 패·무효도). 로직 결과가 진행 중이어도 끝난 화면을 그리게 한다
+    view: usable ? safe('view', () => usable.view(m.state, live ? mySeat : null, !live), null) : null,
     winner: m.winner === 0 || m.winner === 1 ? m.winner : null,
     end_reason: m.end_reason,
     final_scores: m.final_scores && m.final_scores.length === 2 ? [m.final_scores[0], m.final_scores[1]] : null,
@@ -611,7 +612,17 @@ async function join(
   // 판 준비 RPC가 있으면 같은 트랜잭션에서 불러 init에 넘긴다. 실패하면 PrepareFailed → run()이 409(판돈도 롤백)
   const prepare = game.manifest.duel?.prepare
   const prepared = prepare ? await prepareFor(tx, prepare, m.options) : undefined
-  m.state = logic.init(rng, m.options, prepared)
+  if (prepare) {
+    // RPC 결과 모양이 틀려 init이 던지면 판 준비 실패와 같다(트랜잭션 롤백 → 409 prepare_failed)
+    try {
+      m.state = logic.init(rng, m.options, prepared)
+    } catch (e) {
+      console.error('duel: init rejected prepared', m.game_id, e)
+      throw new PrepareFailed()
+    }
+  } else {
+    m.state = logic.init(rng, m.options, prepared)
+  }
   // 상태는 지금 로직으로 만든다
   m.logic_version = logic.version
   m.status = 'active'

@@ -93,6 +93,16 @@ const prepManifest = (id: string, prepare: string): Manifest => ({
 extra.set('coin-prep', { manifest: prepManifest('coin-prep', 'test_prepare'), logic: prepLogic })
 extra.set('coin-prep-null', { manifest: prepManifest('coin-prep-null', 'test_prepare_null'), logic: prepLogic })
 extra.set('coin-prep-throws', { manifest: prepManifest('coin-prep-throws', 'test_prepare_throws'), logic: prepLogic })
+// init이 RPC 결과의 모양을 거절하는(던지는) 게임
+extra.set('coin-prep-badshape', {
+  manifest: prepManifest('coin-prep-badshape', 'test_prepare'),
+  logic: { ...prepLogic, init: () => { throw new Error('invalid_prepared') } },
+})
+// view의 세 번째 인자(ended)를 화면에 그대로 싣는 게임
+extra.set('coin-ended', {
+  manifest: coinManifest('coin-ended', false),
+  logic: { ...base, view: (s: CoinState, viewer: Seat | null, ended?: boolean) => ({ ...s, viewer, ended: ended ?? 'missing' }) },
+})
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -872,6 +882,39 @@ t('prepare_failure_rolls_back', async () => {
     const [w] = await sql`select balance from public.wallets where user_id = ${b}`
     assert.equal(Number(w.balance), 1000)
   }
+})
+
+t('prepare_init_throw_is_prepare_failed', async () => {
+  const a = await user()
+  const b = await user()
+  for (const u of [a, b]) await sql`select public._gold_move(${u}, 1000, 'admin', ${crypto.randomUUID()})`
+  const c = await call(a, { action: 'create', game_id: 'coin-prep-badshape', options: { theme: 'epl' }, rated: false, visibility: 'invite', turn_seconds: 60, stake: 100 }, T0)
+  assert.equal(c.status, 200, JSON.stringify(c.body))
+  const id = c.body.match_id as string
+  const j = await call(b, { action: 'join', match_id: id, stake: 100 }, T0 + SEC)
+  assert.equal(j.status, 409)
+  assert.equal(j.body.error, 'prepare_failed')
+  const m = await row(id)
+  assert.equal(m.status, 'waiting')
+  assert.equal(m.state, null)
+  const [w] = await sql`select balance from public.wallets where user_id = ${b}`
+  assert.equal(Number(w.balance), 1000)
+})
+
+t('view_gets_ended_flag', async () => {
+  const s = await started({ game: 'coin-ended' })
+  const live = s.view.view as Record<string, unknown>
+  assert.equal(live.ended, false)
+  // 기권(첫 수 전이라 무효): 로직 결과는 진행 중이지만 대국은 끝났다
+  const r = await call(s.second, { action: 'resign', match_id: s.id }, T0 + 2 * SEC)
+  assert.equal(r.status, 200)
+  const v = r.body as unknown as View
+  assert.equal(v.status, 'void')
+  const ended = v.view as Record<string, unknown>
+  assert.equal(ended.ended, true)
+  assert.equal(ended.viewer, null)
+  const again = await call(s.first, { action: 'view', match_id: s.id }, T0 + 3 * SEC)
+  assert.equal((again.body.view as Record<string, unknown>).ended, true)
 })
 
 t('yacht_unchanged', async () => {
