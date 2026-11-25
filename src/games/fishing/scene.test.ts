@@ -275,6 +275,23 @@ describe('drawWorld without an offscreen canvas (direct drawing)', () => {
     expect(ctx.sprites.some((c) => c.name.startsWith('tile-'))).toBe(false)
   })
 
+  test('마을회관 명예의 전당: 박제는 fish-<id>를 한 번, 액자는 얼굴이 있으면 캐릭터 합성 그림을 그린다', () => {
+    const size = { w: 320, h: 480 }
+    const p = player({ x: 20 * 16 + 8, y: 3 * 16 + 8 })
+    const fame = [
+      { tx: 16, look: 'mount' as const, species: 'grouper', avatar: null, empty: false },
+      { tx: 18, look: 'frame' as const, species: null, avatar: '{}', empty: false },
+      { tx: 19, look: 'frame' as const, species: null, avatar: null, empty: true },
+    ]
+    const s = { ...scene('idle', p, size), map: HALL, camera: cameraFor(HALL, p.pos, size), bobber: null, fame }
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), s, size)
+    expect(ctx.sprites.filter((c) => c.name === 'fish-grouper')).toHaveLength(1)
+    const noFame = new RecordingCtx()
+    drawWorld(asCtx(noFame), { ...s, fame: [] }, size)
+    expect(ctx.rects.length).toBeGreaterThan(noFame.rects.length)
+  })
+
   test('pose follows phase, facing and walking; left is the side sprite mirrored', () => {
     const size = { w: 195, h: 280 }
     const pick = (phase: Phase, p: Player) => {
