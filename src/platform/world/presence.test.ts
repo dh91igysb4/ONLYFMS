@@ -54,6 +54,12 @@ describe('parseOnlinePeer', () => {
     ]
     for (const b of bad) expect(parseOnlinePeer(b), JSON.stringify(b)).toBeNull()
   })
+  test('장소 값은 48자까지(주인 있는 장소 isle-<32자>)', () => {
+    const key = `isle-${'a'.repeat(32)}`
+    expect(parseOnlinePeer(peer({ area: key }))).toEqual(peer({ area: key }))
+    expect(parseOnlinePeer(peer({ area: 'a'.repeat(48) }))).not.toBeNull()
+    expect(parseOnlinePeer(peer({ area: 'a'.repeat(49) }))).toBeNull()
+  })
 })
 
 describe('shouldTrack', () => {

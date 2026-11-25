@@ -167,6 +167,16 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
+## 내 섬 A단계 배포 (`feat/my-isle-a`, 낚시 `logic.version` 22)
+설계 `docs/superpowers/specs/2026-11-25-my-island-design.md` §5. 마을 선착장 배 창(섬·내 섬·친구 섬), 섬 모양 고르기, 남의 섬 구경(world `visit`), RPC `world_players`.
+
+순서: DB push → `world` 함수 배포 → Vercel.
+
+- [ ] `npx supabase@2 db push --dry-run`으로 `20261125152527_world_players.sql`만 올라가는지 확인한 뒤 `npx supabase@2 db push`
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (`handler.ts`의 `visit`, `src/games/**`의 isle 지역·맵이 바뀌었다. v22를 배포한 뒤에는 v21로 되돌리지 않는다 — 옛 migrate가 고른 섬을 지운다)
+- [ ] 머지·Vercel 배포까지 이어서 한다. 열어 둔 낚시 탭은 새로고침(옛 화면은 마을 선착장에서 바로 낚시 섬으로 간다)
+- [ ] 확인 (두 계정): 마을 선착장 → 배 창, 내 섬 → 섬 고르기 → 도착 알림 "내 섬"·텐트 앞 안내, 다른 계정에서 친구 섬 → "{아이디}의 섬" 도착, 같은 섬에서 서로 보이는지, 섬 선착장 → 마을, 새로고침하면 내 섬은 그 자리·남의 섬은 그 전 자리, 메인 미리보기·큰 지도의 "{아이디}의 섬"
+
 ## 마을회관 2차 배포 (`feat/hall-2`, 낚시 `logic.version` 18)
 냉장고(1인당 15칸), 버리기 부담금(가방 50%·쓰레기통 5%), 회관 이동기. DB 변경 없음.
 

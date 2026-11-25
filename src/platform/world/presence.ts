@@ -8,7 +8,8 @@ export type OnlinePeer = { id: string; handle: string; area: string; act: 'walk'
 /** 움직이는 동안 칸 위치를 다시 올리는 최소 간격(ms) */
 export const PRESENCE_MOVE_MS = 10_000
 
-const AREA_RE = /^[a-z0-9-]{1,32}$/
+/** 장소 값: 지역 id 또는 주인 있는 장소(예: isle-<주인 id 32자>, 내 섬 설계 §5.6) */
+const AREA_RE = /^[a-z0-9-]{1,48}$/
 const isTile = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 10_000
 
 export function parseOnlinePeer(raw: unknown): OnlinePeer | null {

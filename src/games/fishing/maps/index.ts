@@ -1,5 +1,7 @@
 // 지역 → 맵 등록부. 순수 모듈. 모든 지역에 맵이 있다(안 연 지역은 문·선착장이 막는다).
-import type { AreaId } from '../data.ts'
+// 내 섬(isle)만 섬 모양마다 맵이 달라 여기 없고 mapFor가 모양으로 고른다.
+import type { AreaId, IsleLayoutId } from '../data.ts'
+import { isleMap } from '../isle.ts'
 import type { MapDef } from '../map.ts'
 import { CAVE } from './cave.ts'
 import { FOREST } from './forest.ts'
@@ -17,7 +19,8 @@ export const MAPS: Readonly<Partial<Record<AreaId, MapDef>>> = {
   village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP, summit: SUMMIT, wreck: WRECK, hall: HALL,
 }
 
-/** 지역의 맵. 맵이 없는 지역이면 null. */
-export function mapFor(area: AreaId): MapDef | null {
+/** 지역의 맵. 내 섬은 섬 모양(layout)이 있을 때만 그 맵, 다른 지역은 layout을 무시한다. 맵이 없으면 null. */
+export function mapFor(area: AreaId, layout?: IsleLayoutId | null): MapDef | null {
+  if (area === 'isle') return layout ? isleMap(layout) : null
   return MAPS[area] ?? null
 }

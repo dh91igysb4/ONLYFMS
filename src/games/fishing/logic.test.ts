@@ -3,8 +3,8 @@ import { rngFromSeed } from '../../shared/rng.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, ISLE_LAYOUTS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -344,7 +344,7 @@ function migrateW(raw: unknown, from: number): WS {
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
 // v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
 // + v20 신발(옛 세이브는 기본 장화)
-const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[], shoesTier: 1 }
+const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[], shoesTier: 1, isle: null }
 const ok = (r: Played) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
   return r
@@ -361,7 +361,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(21)
+    expect(logic.version).toBe(22)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -1626,7 +1626,7 @@ describe('migrate 버프 (v11)', () => {
   })
   it('v10(옷장) 세이브: 산 옷·업적 옷·입은 옷이 그대로 남고 buffs []', () => {
     const v10 = { ...v9, wardrobe: ['hat:straw', 'top:marine', 'hat:crown'], outfit: { ...DEFAULT_OUTFIT, hat: 'straw', top: 'marine' } }
-    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 }, fridge: [], shoesTier: 1 })
+    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
     // 옷장 행동은 v11에서도 그대로
     const s = migrateW(v10, 10)
     const r = play(s, { type: 'wear', slot: 'hat', id: 'crown' }, { now: T0, rng: fixedRng })
@@ -2018,7 +2018,7 @@ describe('v14 지갑 계약', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
-    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1 })
+    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2226,8 +2226,8 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 21', () => {
-    expect(logic.version).toBe(21)
+  it('version 22', () => {
+    expect(logic.version).toBe(22)
   })
 })
 
@@ -2252,7 +2252,7 @@ describe('신발 (logic.version 20)', () => {
   it('migrate: v19 세이브(신발 없음)는 기본 장화, 저장된 단계는 그대로, 모르는 값은 1', () => {
     const v19 = { ...logic.init() } as Record<string, unknown>
     delete v19.shoesTier
-    expect(logic.migrate(structuredClone(v19), 19)).toEqual({ ...logic.init(), shoesTier: 1 })
+    expect(logic.migrate(structuredClone(v19), 19)).toEqual({ ...logic.init(), shoesTier: 1, isle: null })
     expect(logic.migrate({ ...logic.init(), shoesTier: 3 }, 20).shoesTier).toBe(3)
     for (const bad of [0, 5, '2', 2.5, null]) expect(logic.migrate({ ...logic.init(), shoesTier: bad }, 20).shoesTier).toBe(1)
   })
@@ -2359,5 +2359,43 @@ describe('마을회관 지역 (logic.version 17)', () => {
   })
   it('hall은 돈으로 여는 지역이 아니다', () => {
     expect(err(play(fresh(), { type: 'unlockArea', area: 'hall', price: 0 } as unknown as Action, ctx(T0, 10 ** 9)))).toBeTruthy()
+  })
+})
+
+describe('내 섬 A단계(v22, 내 섬 설계 §5)', () => {
+  it('처음엔 섬이 없고 isleChoose로 고른다', () => {
+    expect(logic.init().isle).toBeNull()
+    expect(ISLE_LAYOUTS.map((l) => l.id)).toEqual(['crescent', 'twin'])
+    const r = ok(play(fresh(), { type: 'isleChoose', layout: 'twin' }, ctx()))
+    expect(r.state.isle).toEqual({ layout: 'twin' })
+    expect(r.gold ?? 0).toBe(0)
+  })
+  it('isleChoose 오류: 낚는 중 busy, 이미 골랐으면 already_chosen, 모르는 값 bad_layout', () => {
+    expect(err(play(withPending(), { type: 'isleChoose', layout: 'twin' }, ctx()))).toBe('busy')
+    expect(err(play(fresh({ isle: { layout: 'crescent' } }), { type: 'isleChoose', layout: 'twin' }, ctx()))).toBe('already_chosen')
+    expect(err(play(fresh(), { type: 'isleChoose', layout: 'zzz' }, ctx()))).toBe('bad_layout')
+    expect(err(play(fresh(), { type: 'isleChoose', layout: 3 }, ctx()))).toBe('bad_layout')
+  })
+  it('previewData: 고르기 전엔 isle 키가 없고, 고른 뒤 섬 모양', () => {
+    expect(PREVIEW_ISLE_KEY).toBe('isle')
+    expect(logic.previewData?.(logic.init())).not.toHaveProperty('isle')
+    expect(logic.previewData?.(fresh({ isle: { layout: 'crescent' } }))?.isle).toBe('crescent')
+  })
+  it('publicView: 섬과 옷차림만, 가방·골드·도감은 없다', () => {
+    const s = fresh({ isle: { layout: 'twin' }, bag: [{ species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
+    const v = logic.publicView!(s) as Record<string, unknown>
+    expect(v).toEqual({ isle: { layout: 'twin' }, outfit: s.outfit })
+    for (const k of ['bag', 'gold', 'dex', 'fridge', 'totalEarned']) expect(v).not.toHaveProperty(k)
+  })
+  it('migrate: 옛 세이브·모르는 값은 null, 저장된 모양은 유지', () => {
+    expect(logic.migrate({ ...logic.init(), isle: undefined }, 21).isle).toBeNull()
+    expect(logic.migrate({ ...logic.init(), isle: { layout: 'twin' } }, 22).isle).toEqual({ layout: 'twin' })
+    expect(logic.migrate({ ...logic.init(), isle: { layout: 'zzz' } }, 22).isle).toBeNull()
+    expect(logic.migrate({ ...logic.init(), isle: 'twin' }, 22).isle).toBeNull()
+  })
+  it('isle은 기본 지역이고 낚시터가 아니다: 던지기 거절', () => {
+    expect(DEFAULT_AREAS).toContain('isle')
+    expect(FISHING_AREAS.map((a) => a.id)).not.toContain('isle')
+    expect(err(play(fresh(), { type: 'cast', area: 'isle', power: 0.5 }, ctx()))).toBeTruthy()
   })
 })

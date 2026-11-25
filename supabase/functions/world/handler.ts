@@ -82,7 +82,8 @@ async function route(req: Request, deps: WorldDeps): Promise<Out> {
     if (h.hidden) return err(404, 'unknown_game')
   }
 
-  if (body.action !== 'load' && body.action !== 'act') return bad('action은 load 또는 act여야 해요')
+  if (body.action === 'visit') return await visit(deps, mod.logic, uid, gameId, body.owner)
+  if (body.action !== 'load' && body.action !== 'act') return bad('action은 load, act 또는 visit이어야 해요')
   const isAct = body.action === 'act'
   if (isAct && (JSON.stringify(body.payload) ?? '').length > MAX_PAYLOAD_CHARS) {
     return bad('행동이 너무 커요')
@@ -96,6 +97,25 @@ async function route(req: Request, deps: WorldDeps): Promise<Out> {
     if (isNotEnoughGold(e)) return err(400, 'not_enough_gold')
     throw e
   }
+}
+
+/**
+ * 다른 사용자의 세이브를 구경한다(내 섬 설계 §5.4). 잠그지도 쓰지도 않고, migrate한 상태의 publicView만 돌려준다.
+ * 주인도 승인 상태여야 한다. 숨김 게임 확인은 route가 이미 했다.
+ */
+async function visit(deps: WorldDeps, logic: Logic, uid: string, gameId: string, owner: unknown): Promise<Out> {
+  if (typeof owner !== 'string' || !UUID_RE.test(owner)) return err(400, 'bad_owner')
+  if (owner.toLowerCase() === uid.toLowerCase()) return err(400, 'self')
+  if (!logic.publicView) return err(400, 'no_public_view')
+  const [o] = await deps.sql<{ handle: string | null }[]>`
+    select handle::text as handle from public.profiles where id = ${owner} and status = 'approved'`
+  if (!o) return err(404, 'no_owner')
+  const [row] = await deps.sql<{ state: unknown; logic_version: number }[]>`
+    select state, logic_version from public.world_saves where user_id = ${owner} and game_id = ${gameId}`
+  if (!row) return err(404, 'no_save')
+  if (row.logic_version > logic.version) return err(409, 'version_newer')
+  const state = row.logic_version === logic.version ? row.state : logic.migrate(row.state, row.logic_version)
+  return out(200, { owner: { id: owner, handle: o.handle ?? '' }, view: logic.publicView(state) })
 }
 
 /** bigint를 text로 받아 숫자로 (잔액은 2^53보다 훨씬 작다) */

@@ -1,7 +1,7 @@
 // 낚시 게임 화면. 규칙·가격·난수는 모두 서버에 있고, 화면은 행동을 보내고 돌아온 view를 그린다.
 // 바 미니게임과 마을 걷기만 브라우저에서 돈다(서버는 검증하지 않는다). 단계 전환은 타이머, 그리기·미니게임·걷기는 rAF 한 개.
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
-import { ApiError, errorMessage, world, type WorldView } from '../../lib/api.ts'
+import { ApiError, errorMessage, world, worldPlayers, worldVisit, type WorldPlayer, type WorldView } from '../../lib/api.ts'
 import { useAuth } from '../../platform/auth/AuthProvider.tsx'
 import type { WorldGameProps } from '../ui.ts'
 import { getWorld } from '../index.ts'
@@ -10,8 +10,10 @@ import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../pl
 import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
-import { sellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
+import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type IsleLayoutId, type TackleId } from './data.ts'
+import { isleArrival, placeKey } from './isle.ts'
+import { BoatPanel, IsleChoosePanel } from './IslePanels.tsx'
+import { PREVIEW_ISLE_KEY, sellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
@@ -95,7 +97,7 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash'
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash' | 'boat' | 'isle'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const outfitMemo = new WeakMap<object, Outfit>()
 /** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
@@ -107,7 +109,7 @@ function outfitOf(view: View | null): Outfit {
   outfitMemo.set(view, o)
   return o
 }
-const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash'])
+const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator', 'fridge', 'trash', 'boat', 'isle'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
 /** 컴퓨터 단축키(e.code → 할 일) */
 const HOTKEYS: Record<string, 'map' | 'bag' | 'dex' | 'challenges' | 'chat' | 'emote'> = {
@@ -162,9 +164,14 @@ type Runtime = {
   map: MapDef
   /**
    * 지역 전환 중(출구·배): 페이드 아웃 → 맵 교체 → 페이드 인. 끝나면 null.
-   * say: 도착 알림을 지역 이름 대신 이 문구로(밀물에 같은 맵 안에서 옮길 때)
+   * say: 도착 알림을 지역 이름 대신 이 문구로(밀물에 같은 맵 안에서 옮길 때, 남의 섬 "{아이디}의 섬")
+   * isle: 내 섬·남의 섬으로 갈 때 섬 모양과 주인(내 섬이면 owner null)
    */
-  trans: { target: AreaId; entry: TileFacing; ms: number; swapped: boolean; say?: string } | null
+  trans: { target: AreaId; entry: TileFacing; ms: number; swapped: boolean; say?: string; isle?: { layout: IsleLayoutId; owner: string | null } } | null
+  /** 남의 섬에 있으면 그 주인 id, 아니면 null(내 섬 설계 §5.6) */
+  owner: string | null
+  /** 남의 섬 구경 값(publicView: 섬 모양·옷차림). 남의 섬이 아니면 null */
+  isleView: { isle: { layout: IsleLayoutId } | null; outfit: unknown } | null
   /** 지역 전환 페이드 알파(0~1) */
   fade: number
   /** 이 방문에 뚫은 얼음 구멍("tx,ty", 오래된 순). 맵을 떠나면 비운다 */
@@ -299,12 +306,16 @@ const coarseQuery = (): MediaQueryList | null =>
 function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
   return interactionAt(map, p.pos, p.facing, opened, dyn)
 }
-/** 큰 지도에 보일 내 자리. 세계 지도 밖 맵(실내)이면 첫 출구가 나가는 자리(마을회관 → 마을 문 앞) */
+/** 큰 지도에 보일 내 자리. 세계 지도 밖 맵(실내·섬)이면 첫 출구(없으면 첫 선착장)가 나가는 자리(마을회관 → 마을 문 앞) */
 function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): { area: AreaId; tx: number; ty: number; facing: Facing } {
-  const out = map.exits[0]
+  // 내 섬처럼 출구 없이 배로만 오가는 맵은 첫 선착장이 내리는 자리(섬 → 마을 선착장 앞)
+  const out = map.exits[0] ?? map.docks[0]
   if (map.onWorldMap || !out) return { area: map.id, ...tileOf(p.pos), facing: p.facing }
   return { area: out.target, tx: out.entry.tx, ty: out.entry.ty, facing: out.entry.facing }
 }
+/** 고정물 행동(가게·안내판 등). 남의 섬에서는 고정물 행동을 하지 않는다 */
+const isFixtureAct = (i: Interaction): boolean =>
+  !!i && i.kind !== 'fish' && i.kind !== 'gate' && i.kind !== 'dock' && i.kind !== 'teleporter' && i.kind !== 'drill'
 function interactionKey(i: Interaction): string {
   if (!i) return ''
   if (i.kind === 'fish') return `fish-${i.spot}`
@@ -333,7 +344,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   userIdRef.current = userId
   // 온라인(같은 지역 친구, 설계 2026-11-24-fishing-online-design.md): 숨김 게임이면 관리자만 방에 들어간다
   const canOnline = !!profile?.id && !!profile?.handle && !(getWorld(gameId)?.manifest.hidden && !profile?.is_admin)
-  const roomRef = useRef<{ area: AreaId; room: WorldRoom } | null>(null)
+  const roomRef = useRef<{ area: string; room: WorldRoom } | null>(null)
   /** 지금 내 자랑·이모트(설계 2026-11-25-fishing-brag-discard). until은 Date.now() 기준 끝 시각 */
   const showRef = useRef<{ code: string; show: Show; until: number } | null>(null)
   const [emoteOpen, setEmoteOpen] = useState(false)
@@ -415,7 +426,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       phase: 'idle', busy: false, held: new Set(), chargeKey: null, openPress: null, chargeStart: 0, gauge: 0, castPower: 0,
       player, stick: STOP, keys: { ...NO_KEYS }, hereKey: interactionKey(interactionFor(map, player, openedOf(null))), castSpot: 'shore', bobber: null,
       offset: 0, hookServerNow: 0, bar: null, params: null, settling: false, caughtSpecies: null, lastFrame: 0, map, trans: null, fade: 0,
-      holes: [], holeSet: new Set(), drill: null, tideWarnKey: null, mythicAt: null,
+      holes: [], holeSet: new Set(), drill: null, tideWarnKey: null, mythicAt: null, owner: null, isleView: null,
     }
   })
   const [here, setHere] = useState<Interaction>(() => interactionFor(rt.map, rt.player, openedOf(null)))
@@ -458,9 +469,15 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   }
   /** 초점을 게임으로 돌려 스페이스(던지기)가 방금 누른 버튼을 다시 누르지 않게 한다 */
   const focusGame = () => rootRef.current?.focus({ preventScroll: true })
+  /** 지금 자리의 상호작용. 남의 섬에서는 고정물(텐트 안내 등) 행동이 없다 */
+  const hereAt = (areas: Opened, dyn: MapDynamic): Interaction => {
+    const at = interactionFor(rt.map, rt.player, areas, dyn)
+    return rt.owner !== null && isFixtureAct(at) ? null : at
+  }
+  /** 위치 저장. 남의 섬 위치는 저장하지 않는다(다음 접속은 그 전 저장 위치에서) */
   const savePlayer = () => {
     const id = userIdRef.current
-    if (id !== null && placed.current) savePosition(id, { area: rt.map.id, pos: rt.player.pos, facing: rt.player.facing })
+    if (id !== null && placed.current && rt.owner === null) savePosition(id, { area: rt.map.id, pos: rt.player.pos, facing: rt.player.facing })
   }
   /**
    * 첫 서버 상태를 받았다: 열린 지역으로 저장 위치를 다시 보고 시작 자리를 잡는다.
@@ -468,11 +485,12 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
    */
   const place = (v: View) => {
     const areas = openedOf(v)
-    const start = startPosition(savedStart.current, areas)
-    rt.map = mapFor(start.area) ?? VILLAGE
+    const layout = v.isle?.layout ?? null
+    const start = startPosition(savedStart.current, areas, layout)
+    rt.map = mapFor(start.area, layout) ?? VILLAGE
     rt.player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
     enteredMap(rt.map)
-    const at = interactionFor(rt.map, rt.player, areas, dynNow())
+    const at = hereAt(areas, dynNow())
     rt.hereKey = interactionKey(at)
     setHere(at)
     placed.current = true
@@ -659,7 +677,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     switch (rt.phase) {
       case 'idle': {
         if (source !== 'action') break
-        const at = interactionFor(rt.map, rt.player, opened, dynNow())
+        const at = hereAt(opened, dynNow())
         if (!at) break
         if (at.kind !== 'fish') {
           // 상점·해금 창과 배는 뗄 때 연다: 누를 때 열면 같은 손가락의 클릭이 방금 뜬 창의 버튼에 떨어진다
@@ -695,7 +713,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       rt.openPress = null
       // 아직 대기 중이고 누를 때와 같은 자리(상점 문·잠긴 문·선착장 앞)일 때만
       if (rt.phase !== 'idle' || rt.busy || rt.trans || rt.drill || menuRef.current) return
-      const at = interactionFor(rt.map, rt.player, opened, dynNow())
+      const at = hereAt(opened, dynNow())
       if (!at || interactionKey(at) !== pressedAt) return
       if (at.kind === 'drill') {
         startDrill()
@@ -705,8 +723,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       } else if (at.kind === 'gate') {
         openUnlock(at.area)
       } else if (at.kind === 'dock') {
-        // 대상 지역이 열렸으면 배를 타고, 아니면 배 구매 창
-        if (opened.has(at.target)) sail(at.target)
+        // 마을 선착장은 목적지 창(섬·내 섬·친구 섬, 내 섬 설계 §5.3). 그 밖은 열렸으면 배를 타고, 아니면 배 구매 창
+        if (rt.map.id === 'village') openBoat()
+        else if (opened.has(at.target)) sail(at.target)
         else openUnlock(at.target)
       } else if (at.kind === 'teleporter') {
         setNotice(null)
@@ -809,12 +828,89 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   }
 
   /** 출구에 닿았거나 배를 탔다: 입력을 잠그고 페이드 아웃을 시작한다. entry는 도착 맵(target)에서 설 칸과 방향 */
-  function startTransition(target: AreaId, entry: TileFacing, say?: string) {
+  function startTransition(target: AreaId, entry: TileFacing, say?: string, isle?: { layout: IsleLayoutId; owner: string | null }) {
     // 조이스틱·방향키는 놓지 않는다: 누른 채 도착하면 페이드 뒤에 이어서 걷는다(걷기는 전환 중 막혀 있다)
     rt.held.clear()
     rt.openPress = null
     rt.player = { ...rt.player, moving: false, walkMs: 0 }
-    rt.trans = { target, entry, ms: 0, swapped: false, ...(say ? { say } : {}) }
+    rt.trans = { target, entry, ms: 0, swapped: false, ...(say ? { say } : {}), ...(isle ? { isle } : {}) }
+  }
+
+  // ------------------------------------------------------------ 내 섬(내 섬 설계 §5.3)
+  const [boatFriends, setBoatFriends] = useState<readonly WorldPlayer[] | null>(null)
+  const [boatNote, setBoatNote] = useState<string | null>(null)
+  /** 섬 이름("{아이디}의 섬")에 쓰는 섬 주인 목록. 접속할 때 한 번, 친구 섬 목록을 열 때 다시 받는다 */
+  const [islePlayers, setIslePlayers] = useState<readonly WorldPlayer[]>([])
+  function openBoat() {
+    setNotice(null)
+    setBoatFriends(null)
+    setBoatNote(null)
+    setMenu('boat')
+  }
+  /** 섬으로 출발: 창을 닫고 페이드 뒤 배에서 내리는 칸에 선다. 남의 섬이면 도착 알림이 "{아이디}의 섬" */
+  function goIsle(layout: IsleLayoutId, owner: string | null, handle?: string) {
+    if (menuRef.current) closeMenu()
+    startTransition('isle', isleArrival(layout), owner && handle ? `${handle}의 섬` : undefined, { layout, owner })
+  }
+  function boatIsland() {
+    if (opened.has('island')) {
+      closeMenu()
+      sail('island')
+    } else openUnlock('island')
+  }
+  function boatMine() {
+    const layout = viewRef.current?.isle?.layout
+    if (layout) goIsle(layout, null)
+    else setMenu('isle')
+  }
+  async function boatFriendList() {
+    setBoatNote(null)
+    try {
+      const list = await worldPlayers(gameId, PREVIEW_ISLE_KEY)
+      if (!alive.current) return
+      setIslePlayers(list)
+      setBoatFriends(list)
+    } catch {
+      if (alive.current) setBoatNote('친구 목록을 불러오지 못했어요')
+    }
+  }
+  async function visitFriend(p: WorldPlayer) {
+    setBoatNote(null)
+    rt.busy = true
+    setBusy(true)
+    try {
+      const res = await worldVisit<{ isle: { layout: IsleLayoutId } | null; outfit: unknown }>(gameId, p.id)
+      if (!alive.current) return
+      const layout = res.view?.isle?.layout
+      if (!layout) {
+        setBoatNote('섬에 갈 수 없어요')
+        return
+      }
+      // 기다리는 동안 창을 닫았거나 다른 곳으로 가는 중이면 출발하지 않는다
+      if (menuRef.current !== 'boat' || rt.trans) return
+      rt.isleView = res.view
+      goIsle(layout, p.id, res.owner?.handle || p.handle)
+    } catch {
+      if (alive.current) setBoatNote('섬에 갈 수 없어요')
+    } finally {
+      rt.busy = false
+      if (alive.current) setBusy(false)
+    }
+  }
+  async function chooseIsle(layout: IsleLayoutId) {
+    setNotice(null)
+    try {
+      const res = await act({ type: 'isleChoose', layout })
+      if (!alive.current) return
+      const got = res.view.isle?.layout
+      // 고른 섬은 저장됐다. 기다리는 동안 창을 닫았거나 다른 곳으로 가는 중이면 출발만 하지 않는다(다음 "내 섬"에서 출발)
+      if (got && menuRef.current === 'isle' && !rt.trans) goIsle(got, null)
+    } catch (e) {
+      if (!alive.current) return
+      const code = codeOf(e)
+      if (code === 'already_chosen') await reload()
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(code) })
+    }
   }
 
   /** 페이드 아웃 → 맵·위치·방향 교체와 저장 → 페이드 인. 끝나는 프레임에는 출구를 다시 보지 않는다. */
@@ -825,7 +921,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     tr.ms += Math.min(dt, TRANSITION_STEP_MAX_MS)
     if (!tr.swapped && tr.ms >= FADE_MS) {
       // 같은 맵 안에서 옮기기(밀물)는 맵을 그대로 두고 얼음 구멍도 남긴다
-      const next = tr.target === rt.map.id && tr.say ? rt.map : mapFor(tr.target)
+      const next = tr.target === rt.map.id && tr.say && !tr.isle ? rt.map : mapFor(tr.target, tr.isle?.layout ?? null)
       if (!next) {
         // 맵이 없는 지역으로 가는 출구는 만들지 않지만, 있다면 전환을 접는다
         rt.trans = null
@@ -834,7 +930,10 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       }
       tr.swapped = true
       const { tx, ty, facing } = tr.entry
-      const changed = next !== rt.map
+      const owner = tr.isle?.owner ?? null
+      const changed = next !== rt.map || owner !== rt.owner
+      rt.owner = owner
+      if (owner === null) rt.isleView = null
       if (changed) {
         setHoles([])
         rt.drill = null
@@ -860,7 +959,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
 
   /** 서 있는 자리의 상호작용이 바뀌었을 때만 화면 상태를 고친다. */
   function syncHere(dyn: MapDynamic) {
-    const at = interactionFor(rt.map, rt.player, opened, dyn)
+    const at = hereAt(opened, dyn)
     const k = interactionKey(at)
     if (k === rt.hereKey) return
     rt.hereKey = k
@@ -942,7 +1041,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
    * 실시간 값은 그리기에만 쓴다. 시계는 Date.now()(방이 받은 시각과 같은 시계).
    */
   function stepOnline(camera: Vec): ScenePeer[] {
-    const want = canOnline && viewRef.current && !rt.trans ? rt.map.id : null
+    // 장소 키: 지역 id, 섬이면 isle-<주인 id>(내 섬이면 내 id: 손님과 같은 방)
+    const place = placeKey(rt.map.id, rt.map.id === 'isle' ? rt.owner ?? profile?.id ?? null : null)
+    const want = canOnline && viewRef.current && !rt.trans ? place : null
     const cur = roomRef.current
     if (cur && cur.area !== want) {
       cur.room.leave()
@@ -975,7 +1076,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const t = Date.now()
       const p = rt.player
       const act = rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' ? 'fish' : 'walk'
-      presenceRef.current?.update({ id: profile.id, handle: profile.handle, area: rt.map.id, act, ...tileOf(p.pos) }, t)
+      presenceRef.current?.update({ id: profile.id, handle: profile.handle, area: place, act, ...tileOf(p.pos) }, t)
       room.tick(t, {
         id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
         outfit: JSON.stringify(outfitOf(viewRef.current)),
@@ -1024,6 +1125,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   useEffect(() => {
     alive.current = true
     void load()
+    // 섬 이름용 섬 주인 목록(실패하면 "누군가의 섬")
+    worldPlayers(gameId, PREVIEW_ISLE_KEY).then((list) => { if (alive.current) setIslePlayers(list) }, () => {})
     const pending = timers.current
     return () => {
       alive.current = false
@@ -1578,7 +1681,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1704,6 +1807,18 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 />
               )}
               {menu === 'elevator' && <ElevatorPanel />}
+              {menu === 'boat' && (
+                <BoatPanel
+                  busy={busy}
+                  friends={boatFriends}
+                  note={boatNote}
+                  onIsland={boatIsland}
+                  onMine={boatMine}
+                  onFriends={() => void boatFriendList()}
+                  onFriend={(p) => void visitFriend(p)}
+                />
+              )}
+              {menu === 'isle' && <IsleChoosePanel busy={busy} onChoose={(l) => void chooseIsle(l)} />}
               {menu === 'unlock' && unlockTarget && (
                 <UnlockPanel view={view} area={unlockTarget} busy={busy} onUnlock={() => void unlock(unlockTarget)} />
               )}
@@ -1718,6 +1833,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   layers={mapLayers}
                   onLayers={setMapLayers}
                   online={onlinePeers}
+                  names={{ selfId: userId, players: islePlayers }}
                 />
               )}
               {menu === 'teleport' && (

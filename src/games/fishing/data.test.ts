@@ -120,9 +120,10 @@ describe('fishing data', () => {
     expect(byId('anchovy').behavior).toBe('dart')
   })
   it('areas and defaults', () => {
-    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck', 'hall'])
+    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck', 'hall', 'isle'])
     expect(FISHING_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
-    expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest', 'hall'])
+    expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest', 'hall', 'isle'])
+    expect(AREAS.find((a) => a.id === 'isle')).toEqual({ id: 'isle', name: '내 섬', spots: [] })
     expect(AREAS.find((a) => a.id === 'hall')).toEqual({ id: 'hall', name: '마을회관', spots: [] })
   })
   it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/132000, 산정·난파선 264000/330000(v15)(난파선은 백골 이상)', () => {

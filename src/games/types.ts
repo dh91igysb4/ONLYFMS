@@ -164,6 +164,11 @@ export interface WorldLogic<State, Action, View> {
    * DB `_free_bonus_pct`가 그 행들을 합쳐(상한 `FREE_BONUS_MAX_PCT`) 자유 플레이 지급 트리거가 판당 골드와 게임별 하루 상한에 곱한다.
    */
   freeBonus?(state: State): number
+  /**
+   * 남에게 보여도 되는 값만(내 섬 설계 §5.4). 있으면 world 함수의 `visit` 요청이 다른 사용자의 세이브를 읽어
+   * migrate만 하고(쓰지 않는다) 이 값을 돌려준다. 가방·지갑 같은 개인 값은 넣지 않는다.
+   */
+  publicView?(state: State): unknown
 }
 
 /** 자유 플레이 골드 보너스가 저장되는 game_records 키. manifest `records`의 key로 쓰지 않는다 */

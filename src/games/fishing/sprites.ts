@@ -2665,6 +2665,62 @@ const BOAT = sprite(BOAT_PALETTE, [
 // 순간이동기(teleporter, 32×48): 둥근 돌 받침 위에 선 흰·붉은 줄무늬 등대 신호기. 철제 등롱과 회랑, 붉은 지붕과 금빛 꼭지.
 // 아래 32줄이 구조물 2×2 칸, 위 16줄은 한 칸 위로 솟는다. 꺼진 상태는 유리가 어둡고,
 // 켜지면 teleporter-glow-0/1(32×16, 위 16줄에 겹침)이 등롱에 불을 밝히고 빛살이 번갈아 뻗는다.
+// 내 섬 텐트(내 섬 설계 §5.2): 48×40, 건물 3×2칸 왼쪽 아래에 맞춰 그린다. 가운데 열린 문이 문 칸(D) 위에 온다
+const TENT_PALETTE: Record<string, string> = {
+  o: '#5a3a22', // 테두리
+  c: '#d9b77a', // 햇빛 받는 천
+  C: '#b8935a', // 그늘진 천
+  d: '#a07b45', // 천 이음 줄
+  s: '#7a5530', // 용마루 솔기
+  f: '#6b4a2b', // 문 덮개 가장자리
+  k: '#2a1d14', // 열린 문 안
+  p: '#4a3020', // 기둥·말뚝
+  r: '#d2483c', // 깃발
+  g: '#00000033', // 땅 그림자
+}
+const TENT = sprite(TENT_PALETTE, [
+  '.......................pprr.....................',
+  '.......................pprr.....................',
+  '.......................ppr......................',
+  '.......................pp.......................',
+  '.......................pp.......................',
+  '......................oooo......................',
+  '......................osso......................',
+  '.....................ocssCo.....................',
+  '....................oocssCoo....................',
+  '....................occssCCo....................',
+  '...................odddssdddo...................',
+  '...................occcssCCCo...................',
+  '..................occccssCCCCo..................',
+  '.................occcccssCCCCCo.................',
+  '.................occcccssCCCCCo.................',
+  '................occccccssCCCCCCo................',
+  '...............ooddddddssddddddoo...............',
+  '...............occcccccssCCCCCCCo...............',
+  '..............occccccccffCCCCCCCCo..............',
+  '.............ooccccccccffCCCCCCCCoo.............',
+  '.............occccccccfkkfCCCCCCCCo.............',
+  '............occcccccccfkkfCCCCCCCCCo............',
+  '............odddddddddfkkfdddddddddo............',
+  '...........occcccccccfkkkkfCCCCCCCCCo...........',
+  '..........occccccccccfkkkkfCCCCCCCCCCo..........',
+  '..........occcccccccfkkkkkkfCCCCCCCCCo..........',
+  '.........occccccccccfkkkkkkfCCCCCCCCCCo.........',
+  '........ooccccccccccfkkkkkkfCCCCCCCCCCoo........',
+  '........oddddddddddfkkkkkkkkfddddddddddo........',
+  '.......occcccccccccfkkkkkkkkfCCCCCCCCCCCo.......',
+  '......oocccccccccccfkkkkkkkkfCCCCCCCCCCCoo......',
+  '......occcccccccccfkkkkkkkkkkfCCCCCCCCCCCo......',
+  '.....occccccccccccfkkkkkkkkkkfCCCCCCCCCCCCo.....',
+  '.....occcccccccccfkkkkkkkkkkkkfCCCCCCCCCCCo.....',
+  '....oddddddddddddfkkkkkkkkkkkkfddddddddddddo....',
+  '...occcccccccccccfkkkkkkkkkkkkfCCCCCCCCCCCCCo...',
+  '...occccccccccccfkkkkkkkkkkkkkkfCCCCCCCCCCCCo...',
+  '..occcccccccccccfkkkkkkkkkkkkkkfCCCCCCCCCCCCCo..',
+  '.pggggggggggggggggggggggggggggggggggggggggggggp.',
+  '.p............................................p.',
+])
+
 const TELEPORTER_PALETTE: Record<string, string> = {
   k: '#2a2135', // 외곽선
   x: '#1f2a1c55', // 바닥 그림자
@@ -5288,6 +5344,7 @@ export const SPRITES: Record<string, Sprite> = {
   'tile-fence-v': TILE_FENCE_V,
   'tile-tree': TILE_TREE,
   'hall-exterior': HALL_EXTERIOR,
+  tent: TENT,
   'hall-interior': HALL_INTERIOR,
   'map-you': MAP_YOU,
   'map-spot': MAP_SPOT,

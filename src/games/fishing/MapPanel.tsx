@@ -11,6 +11,8 @@ import {
 } from './atlas.ts'
 import type { Facing } from './map.ts'
 import { mapFor } from './maps/index.ts'
+import { placeName } from './isle.ts'
+import type { PlaceNames } from './preview.ts'
 import { MINIMAP_PX, minimapScale, minimapUrl, spotHighlightUrl } from './minimap.ts'
 import { buffLine, conditionLabel, dexItemClass, RarityBadge, SPOT_NAMES } from './Menus.tsx'
 import { spriteDataUrl } from './sprites.ts'
@@ -74,15 +76,18 @@ type MapPanelProps = {
   onLayers(next: MapLayers): void
   /** 다른 지역까지 포함한 접속 중 친구(나 제외, 온라인 2단계-1). 탭 인원 수와 지도 위 점 */
   online?: OnlinePeer[]
+  /** 섬에 있는 친구의 장소 이름("{아이디}의 섬")에 쓰는 섬 주인 목록 */
+  names?: PlaceNames
 }
 
 /** 머리줄·목록 갱신 단위: 시계 표시(10분) 또는 날짜·계절·날씨가 바뀔 때만 새 값 */
 /** 큰 지도 탭: 세계 지도에 그리는 맵이 있는 지역(실내 마을회관 제외) */
-const MAP_AREAS = AREAS.filter((a) => mapFor(a.id)?.onWorldMap !== false)
+// 세계 지도에 그리는 지역만(마을회관 실내·모양별 맵인 내 섬 제외)
+const MAP_AREAS = AREAS.filter((a) => mapFor(a.id)?.onWorldMap === true)
 
 const condKey = (c: Conditions) => `${c.gameDay}|${formatClock(c.gameMinute)}|${c.season}|${c.weather}`
 
-export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online = [] }: MapPanelProps) {
+export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online = [], names }: MapPanelProps) {
   const [tab, setTab] = useState<AreaId>(here.area)
   const [pick, setPick] = useState<Pick | null>(null)
   /** 지금 지역 탭에서 가는 길을 강조할 마지막으로 본 다른 지역 */
@@ -151,6 +156,13 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online
           )
         })}
       </div>
+      {(() => {
+        // 지도 탭에 없는 장소(섬)에 있는 친구
+        const away = online.filter((p) => !MAP_AREAS.some((a) => a.id === p.area))
+        if (away.length === 0) return null
+        const label = away.map((p) => `${p.handle} ${placeName(p.area, names ?? { selfId: null, players: [] }) ?? ''}`.trim()).join(', ')
+        return <p className="muted" data-testid="fish-map-away">{`다른 곳: ${label}`}</p>
+      })()}
       <div className="fish-map-chips" role="group" aria-label="보기">
         <span className="fish-map-chip-label">보기</span>
         <Chip on={layers.paths} onClick={() => toggle('paths')}>길</Chip>

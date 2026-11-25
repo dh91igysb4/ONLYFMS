@@ -2,8 +2,9 @@
 // 위치는 브라우저 저장값, 옷차림·열린 지역은 user_records의 기록 행(avatar, areas)에서 읽는다. 서버 world 함수는 부르지 않는다.
 import { AVATAR_RECORD_KEY } from '../types.ts'
 import type { Conditions } from './clock.ts'
-import { AREAS, DEFAULT_AREAS, type AreaId } from './data.ts'
-import { PREVIEW_AREAS_KEY } from './logic.ts'
+import { AREAS, DEFAULT_AREAS, ISLE_LAYOUTS, type AreaId, type IsleLayoutId } from './data.ts'
+import { placeName } from './isle.ts'
+import { PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY } from './logic.ts'
 import type { Opened } from './map.ts'
 import { decodeOutfit } from './outfit.ts'
 import { startPosition, type SavedPosition } from './position.ts'
@@ -13,7 +14,7 @@ import type { Outfit } from './wardrobe.ts'
 import type { OnlinePeer } from '../../platform/world/presence.ts'
 
 export type PreviewRecord = { key: string; detail: string | null }
-export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit }
+export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit; isle: IsleLayoutId | null }
 
 /** 비·눈이 오는 동안 다시 그리는 간격(ms) */
 export const PREVIEW_RAIN_FRAME_MS = 100
@@ -32,8 +33,10 @@ export function previewState(saved: SavedPosition | null, records: PreviewRecord
   const detailOf = (key: string) => records.find((r) => r.key === key)?.detail
   const opened = openedFrom(detailOf(PREVIEW_AREAS_KEY))
   const outfit = decodeOutfit(detailOf(AVATAR_RECORD_KEY) ?? '')
-  const start = startPosition(saved, opened)
-  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit }
+  // 내 섬 모양(기록 isle, 고른 뒤에만 있다). 모르는 값이면 섬이 없는 것으로 본다
+  const isle = ISLE_LAYOUTS.find((l) => l.id === detailOf(PREVIEW_ISLE_KEY))?.id ?? null
+  const start = startPosition(saved, opened, isle)
+  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit, isle }
 }
 
 /** 정사각형 한 변(CSS px)에 맞는 정수 배율 1~4. 논리 장면 한 변은 floor(size / scale) */
@@ -48,11 +51,14 @@ export function redrawDelayMs(cond: Conditions, nowMs: number): number {
   return CLOCK_STEP_MS - (((nowMs % CLOCK_STEP_MS) + CLOCK_STEP_MS) % CLOCK_STEP_MS)
 }
 
-/** 메인 미리보기 모서리 요약(온라인 2단계-1). 최대 2명, 넘으면 '외 n명'. 0명이면 null */
-export function onlineSummary(peers: readonly OnlinePeer[]): string | null {
+export type PlaceNames = { selfId: string | null; players: readonly { id: string; handle: string }[] }
+const NO_NAMES: PlaceNames = { selfId: null, players: [] }
+
+/** 메인 미리보기 모서리 요약(온라인 2단계-1). 최대 2명, 넘으면 '외 n명'. 0명이면 null. 섬 이름은 names(섬 주인 목록)로 정한다 */
+export function onlineSummary(peers: readonly OnlinePeer[], names: PlaceNames = NO_NAMES): string | null {
   if (peers.length === 0) return null
   const one = (p: OnlinePeer) => {
-    const area = AREAS.find((a) => a.id === p.area)?.name
+    const area = placeName(p.area, names)
     if (!area) return p.handle
     return p.act === 'fish' ? `${p.handle} ${area}에서 낚시 중` : `${p.handle} ${area}`
   }
