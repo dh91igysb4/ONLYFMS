@@ -74,10 +74,10 @@ function arrivalTiles(map: MapDef, opened: Opened): { tx: number; ty: number }[]
  * 첫 서버 상태(열린 지역)를 받은 뒤 시작할 자리.
  * 저장 위치가 없거나, 그 지역이 아직 안 열렸거나, 발이 열린 지역 기준으로 못 걷는 칸(아직 잠긴 문 등)에 걸치거나,
  * 열린 지역 기준으로 그 맵의 도착 칸들에서 걸어 닿지 못하는 칸(잠긴 문 너머 등)이면 마을 시작 위치.
- * 내 섬(area 'isle')은 섬 모양(isleLayout)이 있어야 그 맵으로 보고, 없으면 마을 시작 위치.
+ * 내 섬(area 'isle')은 섬 모양(isleLayout)이 있어야 그 맵(치운 구역 isleCleared까지)으로 보고, 없으면 마을 시작 위치.
  */
-export function startPosition(saved: SavedPosition | null, opened: Opened, isleLayout: IsleLayoutId | null = null): SavedPosition {
-  const map = saved && opened.has(saved.area) ? mapFor(saved.area, isleLayout) : null
+export function startPosition(saved: SavedPosition | null, opened: Opened, isleLayout: IsleLayoutId | null = null, isleCleared = 0): SavedPosition {
+  const map = saved && opened.has(saved.area) ? mapFor(saved.area, isleLayout, isleCleared) : null
   if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
     const { tx, ty } = tileOf(saved.pos)
     // 내 섬은 배로만 온다: 배에서 내리는 칸이 도착 칸

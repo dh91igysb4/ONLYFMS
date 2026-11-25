@@ -4,6 +4,7 @@ import { AVATAR_RECORD_KEY } from '../types.ts'
 import type { Conditions } from './clock.ts'
 import { AREAS, DEFAULT_AREAS, ISLE_LAYOUTS, type AreaId, type IsleLayoutId } from './data.ts'
 import { placeName } from './isle.ts'
+import { ISLE_ZONES } from './isleEcon.ts'
 import { PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY } from './logic.ts'
 import type { Opened } from './map.ts'
 import { decodeOutfit } from './outfit.ts'
@@ -14,7 +15,7 @@ import type { Outfit } from './wardrobe.ts'
 import type { OnlinePeer } from '../../platform/world/presence.ts'
 
 export type PreviewRecord = { key: string; detail: string | null }
-export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit; isle: IsleLayoutId | null }
+export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit; isle: IsleLayoutId | null; isleCleared: number }
 
 /** 비·눈이 오는 동안 다시 그리는 간격(ms) */
 export const PREVIEW_RAIN_FRAME_MS = 100
@@ -34,9 +35,13 @@ export function previewState(saved: SavedPosition | null, records: PreviewRecord
   const opened = openedFrom(detailOf(PREVIEW_AREAS_KEY))
   const outfit = decodeOutfit(detailOf(AVATAR_RECORD_KEY) ?? '')
   // 내 섬 모양(기록 isle, 고른 뒤에만 있다). 모르는 값이면 섬이 없는 것으로 본다
-  const isle = ISLE_LAYOUTS.find((l) => l.id === detailOf(PREVIEW_ISLE_KEY))?.id ?? null
-  const start = startPosition(saved, opened, isle)
-  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit, isle }
+  // 값은 "모양:치운 구역 수"(v23). 옛 값은 모양만이라 0
+  const [shape, done] = (detailOf(PREVIEW_ISLE_KEY) ?? '').split(':')
+  const isle = ISLE_LAYOUTS.find((l) => l.id === shape)?.id ?? null
+  const n = Number(done)
+  const isleCleared = Number.isFinite(n) ? Math.max(0, Math.min(ISLE_ZONES, Math.floor(n))) : 0
+  const start = startPosition(saved, opened, isle, isleCleared)
+  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit, isle, isleCleared }
 }
 
 /** 정사각형 한 변(CSS px)에 맞는 정수 배율 1~4. 논리 장면 한 변은 floor(size / scale) */

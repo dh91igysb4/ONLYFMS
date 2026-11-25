@@ -19,8 +19,8 @@ export const MAPS: Readonly<Partial<Record<AreaId, MapDef>>> = {
   village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP, summit: SUMMIT, wreck: WRECK, hall: HALL,
 }
 
-/** 지역의 맵. 내 섬은 섬 모양(layout)이 있을 때만 그 맵, 다른 지역은 layout을 무시한다. 맵이 없으면 null. */
-export function mapFor(area: AreaId, layout?: IsleLayoutId | null): MapDef | null {
-  if (area === 'isle') return layout ? isleMap(layout) : null
+/** 지역의 맵. 내 섬은 섬 모양(layout)이 있을 때만 그 모양·치운 구역 수(cleared)의 맵, 다른 지역은 둘 다 무시한다. 맵이 없으면 null. */
+export function mapFor(area: AreaId, layout?: IsleLayoutId | null, cleared = 0): MapDef | null {
+  if (area === 'isle') return layout ? isleMap(layout, cleared) : null
   return MAPS[area] ?? null
 }

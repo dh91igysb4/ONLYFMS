@@ -66,6 +66,7 @@ describe('내 섬 맵(내 섬 설계 §5.2)', () => {
     expect(mapFor('isle', null)).toBeNull()
     expect(mapFor('isle', 'twin')).toBe(isleMap('twin'))
     expect(mapFor('village', 'twin')).toBe(mapFor('village'))
+    expect(mapFor('isle', 'twin', 4)).toBe(isleMap('twin', 4))
   })
 })
 
