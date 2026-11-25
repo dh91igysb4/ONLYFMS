@@ -45,7 +45,10 @@ console.error(`직접 입력 경력: 추가 ${manual.added}, 수정 ${manual.fix
 // 2. 시즌 소속
 // 생일: 40세가 넘은 선수의 열린 경력을 닫는 데 쓴다(설계 2026-11-25 §3.4)
 const birth = new Map(read('players.csv').filter((p) => p.birth_date).map((p) => [p.id, p.birth_date]))
-const rows = deriveMemberships(manual.spells, nations, { from, to, today, birth })
+// 40세가 넘었어도 현역인 선수(manual/active_players.csv: player_id,note)는 열린 경력을 닫지 않는다
+const activeFile = join(dir, 'manual', 'active_players.csv')
+const active = new Set(existsSync(activeFile) ? parseCsv(readFileSync(activeFile, 'utf8')).map((r) => r.player_id) : [])
+const rows = deriveMemberships(manual.spells, nations, { from, to, today, birth, active })
 writeFileSync(join(dir, 'season_memberships.csv'), toCsv(MEMBERSHIP_COLUMNS, rows))
 
 const est = rows.filter((r) => r.estimated === 'true').length

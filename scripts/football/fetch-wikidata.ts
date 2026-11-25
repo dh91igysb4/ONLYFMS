@@ -17,7 +17,7 @@ import { HISTORY_FROM, LEAGUES, type League } from './leagues.ts'
 import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
-  competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
+  competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, leaguesFor, seasonChunks, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
   qPlayersAtTeams, qSeasons, qSpells, qTeams, teamStarts, toCsv, type Row, type Team, type TeamCompetition, type Window,
 } from './wikidata.ts'
 import { batched, log, query } from './wdqs.ts'
@@ -35,15 +35,17 @@ function args() {
   const override = seasons === undefined ? undefined : Number(seasons)
   if (override !== undefined && !(Number.isInteger(override) && override >= 1)) throw new Error(`--seasons는 1 이상의 정수: ${seasons}`)
   const only = get('leagues')?.split(',')
-  const leagues = only ? LEAGUES.filter((l) => only.includes(l.id)) : LEAGUES
-  if (only && leagues.length !== only.length) throw new Error(`모르는 리그: ${only.filter((q) => !LEAGUES.some((l) => l.id === q)).join(', ')} (scripts/football/leagues.ts)`)
+  const picked = only ? LEAGUES.filter((l) => only.includes(l.id)) : LEAGUES
+  if (only && picked.length !== only.length) throw new Error(`모르는 리그: ${only.filter((q) => !LEAGUES.some((l) => l.id === q)).join(', ')} (scripts/football/leagues.ts)`)
   // --seasons N(시험용)만 주면 이전처럼 최근 N시즌만 받는다
   const hf = get('history-from') ?? (override !== undefined ? 'off' : String(HISTORY_FROM))
   const historyFrom = hf === 'off' ? null : Number(hf)
+  const leagues = leaguesFor(picked, historyFrom)
   if (historyFrom !== null && !(Number.isInteger(historyFrom) && historyFrom >= 1950 && historyFrom <= to)) throw new Error(`--history-from는 1950~${to}의 연도 또는 off: ${hf}`)
   const limit = get('limit-teams')
   // 일부만 받는 시험 실행(--leagues·--limit-teams·--seasons)은 본 데이터를 덮어쓰지 않게 따로 쓴다(--out으로 바꿀 수 있음)
-  const trial = only !== undefined || limit !== undefined || override !== undefined
+  // --history-from를 직접 주는 것도 비교용 시험 실행으로 본다
+  const trial = only !== undefined || limit !== undefined || override !== undefined || get('history-from') !== undefined
   return {
     windows: competitionWindows(leagues, to, { override, historyFrom }), leagues, historyFrom,
     limitTeams: limit ? Number(limit) : Infinity,
@@ -79,7 +81,10 @@ async function main() {
   log(`리그 ${o.leagues.length}개, 시즌 ${o.leagues.map((l) => `${l.name_ko} ${o.windows.get(l.id)!.from}~`).join(', ')} ~${to}`)
 
   // 1. 시즌별 참가팀·우승 (리그마다 자기 창)
-  const seasons = buildSeasons(await query(qSeasons(o.windows), o.cache))
+  // 대회별·10년 단위로 나눠 질의한다(창이 넓어 한 번에 보내면 시간 초과)
+  const seasonRows = []
+  for (const w of seasonChunks(o.windows, 10)) seasonRows.push(...await query(qSeasons(w), o.cache))
+  const seasons = buildSeasons(seasonRows)
   const leagueIds = new Set(competitionList(o.leagues).map((c) => c.id))
   // 위키데이터 + openfootball 경기 일정(npm run football:openfootball, 설계 §3.5) + 직접 입력.
   // openfootball 명단이 다 이어진 시즌은 openfootball이 기준, 우승 기록의 옛 ID는 remap.csv로 옮긴다

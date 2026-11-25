@@ -614,6 +614,18 @@ export function competitionWindows(leagues: readonly League[], to: number, opts:
   return m
 }
 
+/** 시즌 질의를 대회별·maxYears년 단위로 나눈 창 목록. 창이 1987년까지 넓어져 한 질의가 시간 초과로 죽지 않게 한다 */
+export function seasonChunks(windows: ReadonlyMap<string, Window>, maxYears: number): Map<string, Window>[] {
+  const out: Map<string, Window>[] = []
+  for (const [id, w] of windows) for (let f = w.from; f <= w.to; f += maxYears) out.push(new Map([[id, { from: f, to: Math.min(w.to, f + maxYears - 1) }]]))
+  return out
+}
+
+/** --history-from off면 전신 대회(eras)를 뺀 리그 목록(이전 동작), 아니면 그대로 */
+export function leaguesFor(leagues: readonly League[], historyFrom: number | null): League[] {
+  return historyFrom === null ? leagues.map(({ eras: _eras, ...l }) => l) : [...leagues]
+}
+
 /** competitions.csv 행: 리그와 전신 대회. 같은 QID는 한 줄이고 단계(tier)는 가장 최근 시기의 값 */
 export function competitionList(leagues: readonly League[]): { id: string; name_ko: string; name_en: string; kind: 'league'; nation_id: string; tier: number }[] {
   const m = new Map<string, { row: { id: string; name_ko: string; name_en: string; kind: 'league'; nation_id: string; tier: number }; to: number }>()

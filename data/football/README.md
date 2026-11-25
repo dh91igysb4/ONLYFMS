@@ -48,6 +48,7 @@ npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~
 설계: [`2026-11-25-football-history-clubs-design.md`](../../docs/superpowers/specs/2026-11-25-football-history-clubs-design.md)
 
 - `football:fetch`는 기본으로 모든 대상 팀의 선수를 1987년부터 받고, 시즌 참가팀도 리그와 전신 대회(`leagues.ts`의 `since`·`eras`)의 1987년부터 받는다. `--history-from 1995`로 바꾸거나 `--history-from off`로 끈다(이전처럼 리그별 최근 시즌만). `--seasons N`만 주면 꺼진다.
+- `manual/active_players.csv`(`player_id,note`): 40세가 넘었어도 현역인 선수. `football:seasons`가 이 선수의 열린 경력은 닫지 않는다(설계 §3.4).
 - `manual/history_clubs.csv`(`team_id,from,note`): 참가 기록에 없어 선수 수집 대상에서 빠지는 옛 클럽. `from`이 비면 1987.
 - 전신 대회 찾기: `npm run football:eras` — 리그별 이전 대회(P155·P1365)와 시즌 항목 연도·참가팀 커버리지를 찍는다. 결과로 `leagues.ts`의 `since`·`eras`·시즌별 `teams`(정원 계단)를 채운다.
 - 위키데이터·openfootball에 없는 옛 시즌 참가팀은 영어 위키백과 시즌 문서를 보고 `manual/team_competitions.csv`에 넣고 `source_url` 열에 그 문서 주소를 적는다(시즌 참가팀만 예외적으로 위키백과를 근거로 인정. 경력은 아님). 넣은 뒤 `npm run football:openfootball -- --merge`로 반영한다.
@@ -62,8 +63,10 @@ git clone https://github.com/dh91igysb4/onlyfms
 cd onlyfms
 npm install
 npm run football:eras                            # 1. 전신 대회 확인 (출력을 Claude에게)
+# → Claude가 leagues.ts의 since·eras·정원을 채운 PR을 머지한 뒤에 다음으로
+git checkout main; git pull
 npm run football:fetch -- --leagues Q9448        # 2. 시험 수집 (.cache/football-trial/에 씀)
-git checkout -b data/history-1987                # 3. 본 수집
+git checkout -b data/history-1987                # 3. 본 수집 (eras가 비어 있으면 옛 시즌 참가팀이 비니 1·2를 먼저)
 npm run football:fetch
 npm run football:seasons
 npm test

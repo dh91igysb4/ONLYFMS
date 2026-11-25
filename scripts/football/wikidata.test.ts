@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
+  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, seasonChunks, leaguesFor, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -445,4 +445,15 @@ test('applyLeagueNations_uses_era_competitions_too', () => {
 test('mergeTeamComps_ignores_extra_manual_columns', () => {
   const m = mergeTeamComps([], [{ team_id: 'Q1', competition_id: 'Q9448', season: '1995', source_url: 'https://en.wikipedia.org/wiki/1995%E2%80%9396_FA_Premier_League' }])
   expect(m).toEqual([{ team_id: 'Q1', competition_id: 'Q9448', season: '1995' }])
+})
+
+test('seasonChunks_split_each_competition_window', () => {
+  const chunks = seasonChunks(new Map([['A', { from: 1987, to: 2026 }], ['B', { from: 2017, to: 2026 }]]), 15)
+  expect(chunks.map((c) => [...c].map(([id, w]) => `${id}:${w.from}-${w.to}`).join())).toEqual(['A:1987-2001', 'A:2002-2016', 'A:2017-2026', 'B:2017-2026'])
+})
+
+test('leaguesFor_off_drops_eras', () => {
+  expect(leaguesFor([L92], null)[0].eras).toBeUndefined()
+  expect(leaguesFor([L92], 1987)[0].eras).toHaveLength(1)
+  expect(competitionList(leaguesFor([L92], null)).map((c) => c.id)).toEqual(['L92'])
 })

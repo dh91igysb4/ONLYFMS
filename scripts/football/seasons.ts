@@ -128,7 +128,7 @@ export function playerIntervals(spells: readonly SpellInput[], calOf: (teamId: s
 export function deriveMemberships(
   spells: readonly SpellInput[],
   teamNation: ReadonlyMap<string, string>,
-  opts: { from: number; to: number; today: string; birth?: ReadonlyMap<string, string> },
+  opts: { from: number; to: number; today: string; birth?: ReadonlyMap<string, string>; active?: ReadonlySet<string> },
 ): Membership[] {
   const calOf = (t: string) => calendarOf(teamNation.get(t))
   const byPlayer = new Map<string, SpellInput[]>()
@@ -140,7 +140,7 @@ export function deriveMemberships(
   for (const [player, list] of byPlayer) {
     type Acc = { team: string; days: number; estimated: boolean; arrived: string }
     const seasons = new Map<number, Map<string, Acc>>()
-    for (const { team_id, intervals } of playerIntervals(list, calOf, opts.today, opts.birth?.get(player))) {
+    for (const { team_id, intervals } of playerIntervals(list, calOf, opts.today, opts.active?.has(player) ? undefined : opts.birth?.get(player))) {
       const cal = calOf(team_id)
       for (const iv of intervals) {
         const first = Math.max(opts.from, Number(iv.from.slice(0, 4)) - 1)

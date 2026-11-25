@@ -137,6 +137,11 @@ describe('옛 선수의 열린 경력', () => {
     expect(teamsIn(r, 2026)).toEqual(['ENG1'])
   })
 
+  it('노이어형: manual/active_players.csv의 현역은 닫지 않는다', () => {
+    const r = deriveMemberships([sp('ENG1', '2011-07-01')], NATIONS, { from: 1990, to: 2026, today: NOW, birth: new Map([['P', '1986-03-27']]), active: new Set(['P']) })
+    expect(teamsIn(r, 2026)).toEqual(['ENG1'])
+  })
+
   it('38세 이후 시작: 시작 + 1년에서 닫는다', () => {
     const r = old([sp('ENG1', '2000-07-01')], '1960')
     expect(teamsIn(r, 2000)).toEqual(['ENG1'])
