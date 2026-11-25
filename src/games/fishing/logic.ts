@@ -5,8 +5,7 @@ import {
   AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, FRIDGE_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
   LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
   TIDE_GRACE_MIN, UNLOCKS,
-  type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId,
-} from './data.ts'
+  type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId, SHOES, type ShoeTier } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 
@@ -208,6 +207,8 @@ export type State = {
   totalEarned: number
   rodTier: RodTier
   bagTier: BagTier
+  /** 신발 단계(v20). 걷기 속도는 화면이 shoeSpeed로 곱한다 */
+  shoesTier: ShoeTier
   areas: AreaId[]
   bag: Fish[]
   dex: Record<string, { count: number; maxCm: number }>
@@ -247,6 +248,7 @@ export type Action =
   // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
   | { type: 'buyRod'; tier: number; price: number }
   | { type: 'buyBag'; tier: number; price: number }
+  | { type: 'buyShoes'; tier: number; price: number }
   | { type: 'buyTackle'; id: string }
   | { type: 'equip'; ids: string[] }
   | { type: 'unlockArea'; area: string; price: number }
@@ -257,7 +259,8 @@ export type Action =
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
 // sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; gold: number }
+// shoesTier는 v20 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 기본 장화(1)로 본다.
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -280,6 +283,7 @@ const init = (): State => ({
   totalEarned: 0,
   rodTier: 1,
   bagTier: 1,
+  shoesTier: 1,
   areas: [...DEFAULT_AREAS],
   bag: [],
   dex: {},
@@ -519,6 +523,15 @@ function buyBag(state: State, a: Record<string, unknown>, gold: number): Out {
   return { state: { ...state, bagTier: bag.tier }, gold: -bag.price }
 }
 
+function buyShoes(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!Number.isInteger(a.tier) || a.tier !== state.shoesTier + 1) return { error: 'bad_tier' }
+  const shoes = SHOES.find((s) => s.tier === a.tier)
+  if (!shoes) return { error: 'bad_tier' }
+  if (a.price !== shoes.price) return { error: 'price_changed' }
+  if (gold < shoes.price) return { error: 'not_enough_gold' }
+  return { state: { ...state, shoesTier: shoes.tier }, gold: -shoes.price }
+}
+
 function buyTackle(state: State, a: Record<string, unknown>, gold: number): Out {
   const t = TACKLES.find((x) => x.id === a.id)
   if (!t) return { error: 'bad_tackle' }
@@ -685,6 +698,7 @@ function migrate(raw: unknown, fromVersion: number): State {
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
     rodTier,
     bagTier,
+    shoesTier: SHOES.some((x) => x.tier === raw.shoesTier) ? (raw.shoesTier as ShoeTier) : base.shoesTier,
     areas,
     bag: bag.slice(0, bagSize(bagTier)),
     dex,
@@ -769,7 +783,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
   // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
   // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
-  version: 19,
+  // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
+  version: 20,
   wallet: true,
   init,
   migrate,
@@ -816,6 +831,8 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return buyRod(state, action, ctx.gold)
     case 'buyBag':
       return buyBag(state, action, ctx.gold)
+    case 'buyShoes':
+      return buyShoes(state, action, ctx.gold)
     case 'buyTackle':
       return buyTackle(state, action, ctx.gold)
     case 'equip':

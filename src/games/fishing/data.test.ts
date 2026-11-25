@@ -4,7 +4,7 @@ import { SPRITES } from './sprites.ts'
 import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 import {
   AREAS, FISHING_AREAS, areaHasSpecies, areaMinRod, rodAtLeast, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
-  speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, type Species,
+  speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, SHOES, shoeSpeed, type Species,
 } from './data.ts'
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter']
@@ -453,5 +453,17 @@ describe('신화·전설 동시 후보 없음', () => {
       const spotless = SPECIES.map((s) => (s.id === 'tmp-legend' ? { ...s, spots: undefined } : s))
       expect(shadowingLegends(spotless)).toEqual(['tmp-mythic2 must need tmp-legend'])
     })
+  })
+})
+
+describe('신발 (2026-11-26)', () => {
+  it('4단계: 기본 장화 무료 ×1, 운동화 1,000 ×1.25, 러닝화 6,000 ×1.5, 재원이의 군화 30,000 ×1.75', () => {
+    expect(SHOES.map((s) => [s.tier, s.name, s.price, s.speed])).toEqual([
+      [1, '기본 장화', 0, 1], [2, '운동화', 1000, 1.25], [3, '러닝화', 6000, 1.5], [4, '재원이의 군화', 30000, 1.75],
+    ])
+  })
+  it('shoeSpeed: 단계별 배율, 모르는 단계는 1', () => {
+    expect([1, 2, 3, 4].map(shoeSpeed)).toEqual([1, 1.25, 1.5, 1.75])
+    for (const t of [0, 5, NaN, 2.5]) expect(shoeSpeed(t)).toBe(1)
   })
 })

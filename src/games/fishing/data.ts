@@ -368,6 +368,19 @@ export const BAGS: readonly { tier: BagTier; size: number; price: number }[] = [
   { tier: 4, size: 50, price: 80000 },
   { tier: 5, size: 60, price: 160000 },
 ]
+// ---------------------------------------------------------------- 신발(2026-11-26): 걷기 속도 배율. 위치는 서버가 판정하지 않아 화면이 곱한다
+export type ShoeTier = 1 | 2 | 3 | 4
+export const SHOES: readonly { tier: ShoeTier; name: string; price: number; speed: number }[] = [
+  { tier: 1, name: '기본 장화', price: 0, speed: 1 },
+  { tier: 2, name: '운동화', price: 1000, speed: 1.25 },
+  { tier: 3, name: '러닝화', price: 6000, speed: 1.5 },
+  { tier: 4, name: '재원이의 군화', price: 30000, speed: 1.75 },
+]
+/** 걷기 속도 배율. 모르는 단계(옛 서버 응답 등)는 1 */
+export function shoeSpeed(tier: number): number {
+  return SHOES.find((s) => s.tier === tier)?.speed ?? 1
+}
+
 /** 모르는 tier는 기본 가방(20칸) */
 export function bagSize(tier: number): number {
   return BAGS.find((b) => b.tier === tier)?.size ?? BAGS[0].size
