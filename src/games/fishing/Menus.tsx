@@ -26,7 +26,7 @@ const fishPrice = (f: { species: string; sizeCm: number; perfect: boolean }, buf
   knownSpecies(f.species) ? sellPrice(f, buffs) : null
 /**
  * 전부 팔기 예상(서버 sell과 같은 규칙, 판매 마릿수 감쇠 v15): 오늘 before마리 판 뒤 가방 순서대로 한 마리씩 배율.
- * 모르는 어종은 금액에서 빼되 마릿수에는 센다(서버는 팔 때 센다)
+ * 모르는 어종(화면이 서버보다 옛 데이터일 때)은 금액에서 빼고 순서 자리는 그대로 센다
  */
 const saleEstimate = (fish: readonly { species: string; sizeCm: number; perfect: boolean }[], buffs: readonly BuffId[], before: number): number =>
   fish.reduce((sum, f, i) => {

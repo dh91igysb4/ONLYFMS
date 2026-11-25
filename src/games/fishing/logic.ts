@@ -230,11 +230,12 @@ export type Action =
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
   | { type: 'lock'; index: number; locked: boolean }
-  | { type: 'buyRod'; tier: number }
-  | { type: 'buyBag'; tier: number }
+  // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
+  | { type: 'buyRod'; tier: number; price: number }
+  | { type: 'buyBag'; tier: number; price: number }
   | { type: 'buyTackle'; id: string }
   | { type: 'equip'; ids: string[] }
-  | { type: 'unlockArea'; area: string }
+  | { type: 'unlockArea'; area: string; price: number }
   | { type: 'teleport'; from: string; to: string }
   | { type: 'buyWear'; slot: string; id: string }
   | { type: 'wear'; slot: string; id: string }
@@ -443,6 +444,7 @@ function buyRod(state: State, a: Record<string, unknown>, gold: number): Out {
   if (!Number.isInteger(a.tier) || a.tier !== state.rodTier + 1) return { error: 'bad_tier' }
   const rod = RODS.find((r) => r.tier === a.tier)
   if (!rod) return { error: 'bad_tier' }
+  if (a.price !== rod.price) return { error: 'price_changed' }
   if (gold < rod.price) return { error: 'not_enough_gold' }
   return { state: { ...state, rodTier: rod.tier }, gold: -rod.price }
 }
@@ -451,6 +453,7 @@ function buyBag(state: State, a: Record<string, unknown>, gold: number): Out {
   if (!Number.isInteger(a.tier) || a.tier !== state.bagTier + 1) return { error: 'bad_tier' }
   const bag = BAGS.find((b) => b.tier === a.tier)
   if (!bag) return { error: 'bad_tier' }
+  if (a.price !== bag.price) return { error: 'price_changed' }
   if (gold < bag.price) return { error: 'not_enough_gold' }
   return { state: { ...state, bagTier: bag.tier }, gold: -bag.price }
 }
@@ -472,6 +475,7 @@ function unlockArea(state: State, a: Record<string, unknown>, gold: number): Out
   if (state.pending) return { error: 'busy' }
   if (state.areas.includes(area)) return { error: 'already_open' }
   if (u.minRod !== undefined && state.rodTier < u.minRod) return { error: 'need_rod' }
+  if (a.price !== u.price) return { error: 'price_changed' }
   if (gold < u.price) return { error: 'not_enough_gold' }
   return { state: { ...state, areas: [...state.areas, area] }, gold: -u.price }
 }
