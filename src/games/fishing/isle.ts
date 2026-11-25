@@ -1,11 +1,12 @@
 // 내 섬(내 섬 설계 docs/superpowers/specs/2026-11-25-my-island-design.md §5). 순수 모듈.
 // 섬 모양별 맵, 배에서 내리는 칸, 주인 있는 장소 키(접속 방·위치 표시용)와 그 이름.
 import { AREAS, type AreaId, type IsleLayoutId } from './data.ts'
-import { defineMap, type MapDef, type MapNode, type MapOpts, type NodeKind, type TileFacing } from './map.ts'
+import { ALL_AREAS_OPEN, defineMap, isWalkable, tileAt, type MapDef, type MapNode, type MapOpts, type NodeKind, type TileFacing } from './map.ts'
 import { ISLE_CRESCENT, ISLE_CRESCENT_OPTS, ISLE_CRESCENT_ROWS } from './maps/isle-crescent.ts'
 import { ISLE_TWIN, ISLE_TWIN_OPTS, ISLE_TWIN_ROWS } from './maps/isle-twin.ts'
 import { HOUSE_MAX, ISLE_ZONES } from './isleEcon.ts'
 import { homeArrival, type Placed } from './home.ts'
+import { decoWalkable, type DecoId, type DecoPlaced } from './deco.ts'
 
 const ISLE_BASE: Readonly<Record<IsleLayoutId, { map: MapDef; rows: readonly string[]; opts: MapOpts }>> = {
   crescent: { map: ISLE_CRESCENT, rows: ISLE_CRESCENT_ROWS, opts: ISLE_CRESCENT_OPTS },
@@ -143,7 +144,7 @@ export function isleZoneTiles(layout: IsleLayoutId): ReadonlyMap<string, number>
 }
 
 /** 섬·집 맵을 정하는 값(주인의 섬 상태 중 그림에 쓰는 것) */
-export type IsleShape = { layout: IsleLayoutId; cleared?: number; house?: number; placed?: readonly Placed[] }
+export type IsleShape = { layout: IsleLayoutId; cleared?: number; house?: number; placed?: readonly Placed[]; deco?: readonly DecoPlaced[] }
 
 /** 집 단계별 섬 건물 그림 */
 export const HOUSE_SPRITES = ['tent', 'hut', 'cottage', 'house', 'manor'] as const
@@ -153,28 +154,76 @@ const MAPS = new Map<string, MapDef>()
  * 섬 모양·치운 구역 수·집 단계의 맵(치운 칸은 풀밭, 드러난 자원 칸만 nodes). 같은 값이면 같은 객체.
  * 집 1단계부터 건물 그림이 바뀌고 문이 집 안(home)으로 가는 출구가 된다(텐트 안내는 빠진다).
  */
-export function isleMap(layout: IsleLayoutId, cleared = 0, house = 0): MapDef {
+export function isleMap(layout: IsleLayoutId, cleared = 0, house = 0, deco: readonly DecoPlaced[] = []): MapDef {
   const c = Math.max(0, Math.min(ISLE_ZONES, Math.floor(cleared)))
   const h = Math.max(0, Math.min(HOUSE_MAX, Math.floor(house)))
-  const k = `${layout}:${c}:${h}`
+  const k = `${layout}:${c}:${h}:${deco.map((d) => `${d.id}@${d.tx},${d.ty}`).join(';')}`
   const hit = MAPS.get(k)
   if (hit) return hit
   const base = ISLE_BASE[layout]
   const { zones, nodes } = plan(layout)
-  const rows = c === 0 ? base.rows : base.rows.map((row, y) =>
-    [...row].map((ch, x) => ((zones.get(key(x, y)) ?? Infinity) <= c ? ',' : ch)).join(''))
+  // 바깥 꾸미기(D): 길 '=', 꽃밭 'f', 막는 것 'x'(그림은 props)
+  const decoAt = new Map(deco.map((d) => [key(d.tx, d.ty), d.id] as const))
+  const decoChar = (id: DecoId) => (id === 'path' ? '=' : id === 'flowers' ? 'f' : 'x')
+  const rows = c === 0 && deco.length === 0 ? base.rows : base.rows.map((row, y) =>
+    [...row].map((ch, x) => {
+      const d = decoAt.get(key(x, y))
+      if (d) return decoChar(d)
+      return (zones.get(key(x, y)) ?? Infinity) <= c ? ',' : ch
+    }).join(''))
+  const props = deco.filter((d) => !decoWalkable(d.id)).map((d) => ({ tx: d.tx, ty: d.ty, sprite: `deco-${d.id}` }))
   const shown = nodes.filter((n) => n.zone <= c).map(({ id, tx, ty, kind }) => ({ id, tx, ty, kind }))
   const door = base.map.building!
-  const opts: MapOpts = h === 0 ? { ...base.opts, nodes: shown } : {
+  const opts: MapOpts = h === 0 ? { ...base.opts, nodes: shown, props } : {
     ...base.opts,
     nodes: shown,
+    props,
     buildingSprite: HOUSE_SPRITES[h],
     fixtures: (base.opts.fixtures ?? []).filter((f) => f.act.kind !== 'notice'),
     exits: [...(base.opts.exits ?? []), { at: { tx: door.doorTx, ty: door.ty + door.h - 1, w: 1, h: 1 }, target: 'home', entry: homeArrival(h) }],
   }
   const map = defineMap('isle', rows, opts)
+  if (MAPS.size > 256) MAPS.clear()
   MAPS.set(k, map)
   return map
+}
+
+const DECO_GROUND = new Set(['sand', 'grass', 'path', 'flower'])
+/**
+ * 바깥 꾸미기를 놓을 수 있는가(설계 D §4.3, 서버·화면 같은 규칙): 걸을 수 있는 땅(모래·풀·길·꽃), 비어 있음,
+ * 배에서 내리는 칸·고정물 앞·선착장 앞·집 문 앞 아님. 막는 것이면 놓은 뒤에도 지금 닿는 땅이 모두 닿고,
+ * 드러난 자원 칸마다 옆에 닿는 칸이 남아야 한다.
+ */
+export function canDecorate(shape: IsleShape, tx: number, ty: number, id: DecoId): boolean {
+  const deco = shape.deco ?? []
+  const m = isleMap(shape.layout, shape.cleared ?? 0, shape.house ?? 0, deco)
+  const kind = tileAt(m, tx, ty)
+  if (!kind || !DECO_GROUND.has(kind) || !isWalkable(m, tx, ty, ALL_AREAS_OPEN)) return false
+  if (deco.some((d) => d.tx === tx && d.ty === ty)) return false
+  const a = isleArrival(shape.layout)
+  const b = m.building
+  const fronts = [a, ...m.fixtures.map((f) => f.front), ...m.docks.map((d) => d.front), ...(b ? [{ tx: b.doorTx, ty: b.ty + b.h }] : [])]
+  if (fronts.some((f) => f.tx === tx && f.ty === ty)) return false
+  if (decoWalkable(id)) return true
+  const flood = (blocked: string | null) => {
+    const seen = new Set([key(a.tx, a.ty)])
+    const q: [number, number][] = [[a.tx, a.ty]]
+    for (let i = 0; i < q.length; i++) {
+      const [x, y] = q[i]
+      for (const [dx, dy] of D4) {
+        const k2 = key(x + dx, y + dy)
+        if (!seen.has(k2) && k2 !== blocked && isWalkable(m, x + dx, y + dy, ALL_AREAS_OPEN)) {
+          seen.add(k2)
+          q.push([x + dx, y + dy])
+        }
+      }
+    }
+    return seen
+  }
+  const before = flood(null)
+  const after = flood(key(tx, ty))
+  if (after.size !== before.size - (before.has(key(tx, ty)) ? 1 : 0)) return false
+  return m.nodes.every((n) => !D4.some(([dx, dy]) => before.has(key(n.tx + dx, n.ty + dy))) || D4.some(([dx, dy]) => after.has(key(n.tx + dx, n.ty + dy))))
 }
 
 /** 마을에서 배로 섬에 닿았을 때 서는 칸: 선착장 뿌리의 모래, 섬 쪽을 본다(두 모양 모두 같은 칸) */

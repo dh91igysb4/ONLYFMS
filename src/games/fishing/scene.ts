@@ -518,6 +518,10 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     // 내 섬 철광: 바위 위에 철 무늬
     if (g.map.nodes.some((n) => n.kind === 'iron' && n.tx === tx && n.ty === ty)) drawSprite(ctx, 'iron-ore', x, y, 1)
   } else if (kind === 'bench') drawSprite(ctx, 'workbench', x, y, 1)
+  else if (kind === 'deco') {
+    const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)
+    if (prop) drawSprite(ctx, prop.sprite, x, y, 1)
+  }
   else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)

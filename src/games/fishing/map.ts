@@ -20,6 +20,8 @@ export type TileKind = 'water' | 'sand' | 'grass' | 'path' | 'pier' | 'tree' | '
   | 'floor' | 'wall'
   // 내 섬 B: 작업대(못 걷는 칸, 풀밭 위에 그림)
   | 'bench'
+  // 내 섬 D: 막는 바깥 꾸미기(못 걷는 칸, 풀밭 위에 물건 그림)
+  | 'deco'
 export type Facing = 'up' | 'down' | 'left' | 'right'
 export type Vec = { x: number; y: number } // 월드 픽셀. 캐릭터 pos는 발 중앙
 
@@ -69,6 +71,7 @@ export const TILE_CHARS: Readonly<Record<string, TileKind>> = {
   F: 'floor', // 실내 바닥
   Y: 'wall', // 실내 벽·가구
   j: 'bench', // 내 섬 작업대
+  x: 'deco', // 내 섬 바깥 꾸미기(막는 것)
 }
 
 const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock', 'boardwalk', 'snow', 'deck', 'floor', 'door'])
@@ -474,6 +477,9 @@ export type Interaction =
   | { kind: 'node'; id: string; res: NodeKind }
   | { kind: 'furn'; tx: number; ty: number; id: string }
   | { kind: 'furnSpot'; tx: number; ty: number }
+  // 내 섬 꾸미기 모드(화면이 만든다, interactionAt은 돌려주지 않는다)
+  | { kind: 'decoSpot'; tx: number; ty: number }
+  | { kind: 'decoHere'; tx: number; ty: number }
   | null
 
 /** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'(선착장 dock은 부두가 아니라 그 물의 자리 그대로). */

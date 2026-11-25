@@ -22,7 +22,7 @@ export const MAPS: Readonly<Partial<Record<AreaId, MapDef>>> = {
 
 /** 지역의 맵. 내 섬·집 안은 섬 상태(shape)가 있을 때만 그 맵(집 0단계면 집 안 없음), 다른 지역은 shape를 무시한다. 맵이 없으면 null. */
 export function mapFor(area: AreaId, shape?: IsleShape | null): MapDef | null {
-  if (area === 'isle') return shape ? isleMap(shape.layout, shape.cleared, shape.house) : null
+  if (area === 'isle') return shape ? isleMap(shape.layout, shape.cleared, shape.house, shape.deco) : null
   if (area === 'home') return shape ? homeMap(shape.layout, shape.house ?? 0, shape.placed) : null
   return MAPS[area] ?? null
 }
