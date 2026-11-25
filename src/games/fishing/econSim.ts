@@ -31,7 +31,7 @@ export const SIM = {
   recastSec: 3,
 } as const
 /** 가방이 찼을 때 상점(마을)까지 다녀오는 시간(초). 마을 물가 30초는 REF 계산과 같다. 먼 곳은 걷거나 배·순간이동 */
-export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75, tideflat: 45, swamp: 90, summit: 90, wreck: 120, hall: 0 }
+export const TRIP_SEC: Record<AreaId, number> = { village: 30, river: 45, forest: 60, lake: 60, cave: 90, island: 75, tideflat: 45, swamp: 90, summit: 90, wreck: 120, hall: 0, isle: 0 }
 
 const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
 type NormalRarity = keyof Rod['weights']

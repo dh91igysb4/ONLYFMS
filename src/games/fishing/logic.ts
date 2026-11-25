@@ -2,7 +2,7 @@
 import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
-  AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, FRIDGE_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
+  AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, FRIDGE_SIZE, ISLE_LAYOUTS, type IsleLayoutId, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
   LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
   TIDE_GRACE_MIN, UNLOCKS,
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId, SHOES, type ShoeTier } from './data.ts'
@@ -230,6 +230,8 @@ export type State = {
   sold: Sold
   /** 마을회관 냉장고(보관만, FRIDGE_SIZE칸, v18). 잠금 표시는 그대로 둔다 */
   fridge: Fish[]
+  /** 내 섬(v22): 고른 섬 모양. 처음 배를 타기 전엔 null */
+  isle: { layout: IsleLayoutId } | null
   pending: Pending | null
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
@@ -257,12 +259,14 @@ export type Action =
   | { type: 'teleport'; from: string; to: string }
   | { type: 'buyWear'; slot: string; id: string }
   | { type: 'wear'; slot: string; id: string }
+  // 내 섬(v22): 섬 모양 고르기(한 번만, 무료)
+  | { type: 'isleChoose'; layout: string }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
 // sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
-// shoesTier는 v20 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 기본 장화(1)로 본다.
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; gold: number }
+// shoesTier는 v20, isle은 v22 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 기본 장화(1)·섬 없음(null)으로 본다.
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -298,6 +302,7 @@ const init = (): State => ({
   buffs: [],
   sold: { day: '', n: 0 },
   fridge: [],
+  isle: null,
   pending: null,
 })
 
@@ -736,6 +741,10 @@ function migrate(raw: unknown, fromVersion: number): State {
     buffs,
     sold: parseSold(raw.sold),
     fridge,
+    // v21 이하에는 섬이 없다. 모르는 모양도 null(다시 고른다)
+    isle: isObj(raw.isle) && ISLE_LAYOUTS.some((l) => l.id === (raw.isle as Record<string, unknown>).layout)
+      ? { layout: (raw.isle as Record<string, unknown>).layout as IsleLayoutId }
+      : null,
     pending: migratePending(raw.pending, fromVersion),
   }
 }
@@ -796,6 +805,8 @@ function records(state: State): WorldRecord[] {
 
 /** 메인 미리보기용 열린 지역 기록의 키(game_records, detail = 쉼표로 이은 지역 id). 메인 미리보기 설계 §6 */
 export const PREVIEW_AREAS_KEY = 'areas'
+/** 섬이 있는 사람 기록의 키(game_records, detail = 섬 모양). 고른 뒤에만 쓴다. 친구 섬 목록(world_players)이 읽는다. 내 섬 설계 §5.4 */
+export const PREVIEW_ISLE_KEY = 'isle'
 
 export const logic: WorldLogic<State, Action, View> = {
   // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
@@ -810,7 +821,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
-  version: 21,
+  // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
+  version: 22,
   wallet: true,
   init,
   migrate,
@@ -825,13 +837,26 @@ export const logic: WorldLogic<State, Action, View> = {
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),
-  previewData: (state) => ({ [PREVIEW_AREAS_KEY]: state.areas.join(',') }),
+  previewData: (state) => ({
+    [PREVIEW_AREAS_KEY]: state.areas.join(','),
+    ...(state.isle ? { [PREVIEW_ISLE_KEY]: state.isle.layout } : {}),
+  }),
+  // 남의 섬 구경(world visit): 섬 모양과 옷차림만
+  publicView: (state) => ({ isle: state.isle, outfit: state.outfit }),
   freeBonus,
 }
 
 /** 깬 도전과제의 미니게임 골드 보너스 합(%, 지갑 설계 §7.5). 열 개 다 깨면 400 */
 export function freeBonus(state: Pick<State, 'challenges'>): number {
   return CHALLENGES.reduce((sum, c) => sum + (state.challenges[c.id]?.done === true ? c.freeBonusPct : 0), 0)
+}
+
+function isleChoose(state: State, a: Record<string, unknown>): Out {
+  if (state.pending) return { error: 'busy' }
+  if (state.isle) return { error: 'already_chosen' }
+  const layout = ISLE_LAYOUTS.find((l) => l.id === a.layout)
+  if (!layout) return { error: 'bad_layout' }
+  return { state: { ...state, isle: { layout: layout.id } } }
 }
 
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
@@ -873,6 +898,8 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return buyWear(state, action, ctx.gold)
     case 'wear':
       return wear(state, action)
+    case 'isleChoose':
+      return isleChoose(state, action)
     default:
       return { error: 'bad_action' }
   }
