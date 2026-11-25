@@ -3,15 +3,17 @@ import { Link, useParams } from 'react-router-dom'
 import { getDuel } from '../../games/index.ts'
 import { getDuelComponent } from '../../games/ui.ts'
 import type { DuelResult } from '../../games/types.ts'
-import { rpc } from '../../lib/api.ts'
+import { duelActionMessage, rpc } from '../../lib/api.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useGameScreen } from '../games/useGameScreen.ts'
+import { defaultOptions, OptionSelects } from './OptionSelects.tsx'
 
 const NAMES: [string, string] = ['플레이어 1', '플레이어 2']
 
 /**
  * 같은 화면 대전 (설계 §8·§9): 한 기기에서 두 사람이 번갈아. 대국 기록 없음, 턴 시간 제한 없음.
  * manifest `duel.prepare`가 있으면 판마다 그 RPC를 먼저 불러 결과를 init에 넘긴다(티키타카토 설계 §5.3).
+ * manifest `options`가 있으면 먼저 설정을 고르고, 고른 설정으로 판을 만든다(다시 하기도 같은 설정).
  */
 export function DuelLocalPage({ rng }: { rng?: () => number }) {
   const { game = '' } = useParams()
@@ -26,11 +28,12 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   const mod = found && (!found.manifest.hidden || !!profile?.is_admin) ? found : undefined
   const Board = getDuelComponent(game)
   const random = useRef(rng ?? Math.random)
-  const defaults = () => Object.fromEntries((mod?.manifest.options ?? []).map((o) => [o.key, o.default]))
   const prepare = mod?.manifest.duel?.prepare
-  const [state, setState] = useState<unknown>(() => (mod && !prepare ? mod.logic.init(random.current, defaults()) : null))
-  // 판 준비: prepare가 없으면 늘 ready
-  const [phase, setPhase] = useState<'loading' | 'failed' | 'ready'>(prepare ? 'loading' : 'ready')
+  const hasOptions = !!mod && mod.manifest.options.length > 0
+  const [options, setOptions] = useState<Record<string, string>>(() => (mod ? defaultOptions(mod.manifest) : {}))
+  const [state, setState] = useState<unknown>(() => (mod && !prepare && !hasOptions ? mod.logic.init(random.current, options) : null))
+  // setup: 설정 고르기(옵션이 있을 때), loading/failed: 판 준비 RPC, ready: 대국
+  const [phase, setPhase] = useState<'setup' | 'loading' | 'failed' | 'ready'>(hasOptions ? 'setup' : prepare ? 'loading' : 'ready')
   const [passed, setPassed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [round, setRound] = useState(0)
@@ -40,37 +43,68 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
   const attempt = useRef(0)
   useEffect(() => () => { attempt.current++ }, [])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts: Record<string, string>) => {
     if (!mod || !prepare) return
     const n = ++attempt.current
     setPhase('loading')
-    const options = Object.fromEntries(mod.manifest.options.map((o) => [o.key, o.default]))
-    let data: unknown = null
+    let next: unknown = null
     try {
-      data = await rpc<unknown>(prepare, { p_options: options })
+      const data = await rpc<unknown>(prepare, { p_options: opts })
+      // 결과 모양이 틀려 init이 던져도 실패로 본다
+      if (data !== null && data !== undefined) next = mod.logic.init(random.current, opts, data)
     } catch {
-      data = null
+      next = null
     }
     if (n !== attempt.current) return
-    if (data === null || data === undefined) {
+    if (next === null) {
       setPhase('failed')
       return
     }
-    setState(mod.logic.init(random.current, options, data))
+    setState(next)
     setPassed(false)
     setError(null)
     setPhase('ready')
   }, [mod, prepare])
 
+  // 옵션이 없는 준비 게임은 바로 판을 불러온다
   useEffect(() => {
-    if (playable && prepare) void load()
-  }, [playable, prepare, load])
+    if (playable && prepare && !hasOptions) void load(options)
+  }, [playable, prepare, hasOptions, load, options])
+
+  /** 고른 설정으로 새 판 */
+  function start(opts: Record<string, string>) {
+    if (!mod) return
+    setRound((n) => n + 1)
+    if (prepare) {
+      void load(opts)
+      return
+    }
+    setState(mod.logic.init(random.current, opts))
+    setPassed(false)
+    setError(null)
+    setPhase('ready')
+  }
 
   if (!mod || !Board || !playable) {
     return (
       <div className="stack">
         <p className="muted">없는 게임이에요</p>
         <Link to="/duel">대전으로</Link>
+      </div>
+    )
+  }
+
+  if (phase === 'setup') {
+    return (
+      <div className="stack">
+        <h2 className="page-title">{mod.manifest.name} · 같은 화면</h2>
+        <form className="card" aria-label="설정" onSubmit={(e) => { e.preventDefault(); start(options) }}>
+          <OptionSelects manifest={mod.manifest} value={options} onChange={setOptions} />
+          <div className="card-actions">
+            <button type="submit" className="btn btn-primary">시작</button>
+            <Link className="btn btn-ghost" to="/duel">대전으로</Link>
+          </div>
+        </form>
       </div>
     )
   }
@@ -85,7 +119,8 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
           <section className="card">
             <p className="card-title" role="alert">판을 불러오지 못했어요</p>
             <div className="card-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void load()}>다시 시도</button>
+              <button type="button" className="btn btn-primary" onClick={() => void load(options)}>다시 시도</button>
+              {hasOptions && <button type="button" className="btn btn-ghost" onClick={() => setPhase('setup')}>설정 바꾸기</button>}
               <Link className="btn btn-ghost" to="/duel">대전으로</Link>
             </div>
           </section>
@@ -103,7 +138,7 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
     const before = logic.turnNo(state)
     const r = logic.apply(state, seat, action, random.current)
     if ('error' in r) {
-      setError('지금은 할 수 없는 행동이에요')
+      setError(duelActionMessage(r.error))
       return
     }
     setError(null)
@@ -111,23 +146,13 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
     setPassed(logic.turnNo(r.state) !== before && !logic.result(r.state).over)
   }
 
-  function restart() {
-    setRound((n) => n + 1)
-    if (prepare) {
-      void load()
-      return
-    }
-    setState(logic.init(random.current, defaults()))
-    setPassed(false)
-    setError(null)
-  }
 
   return (
     <div className="stack">
       <h2 className="page-title">{mod.manifest.name} · 같은 화면</h2>
       <Board
         key={round}
-        view={logic.view(state, seat)}
+        view={logic.view(state, seat, over)}
         mySeat={seat}
         toMove={seat}
         finished={over}
@@ -144,7 +169,8 @@ function LocalGame({ game, rng }: { game: string; rng?: () => number }) {
               <p className="card-status">{NAMES[0]} {result.scores[0]} : {result.scores[1]} {NAMES[1]}</p>
             )}
             <div className="card-actions">
-              <button type="button" className="btn btn-primary" onClick={restart}>다시 하기</button>
+              <button type="button" className="btn btn-primary" onClick={() => start(options)}>다시 하기</button>
+              {hasOptions && <button type="button" className="btn btn-ghost" onClick={() => setPhase('setup')}>설정 바꾸기</button>}
               <Link className="btn btn-ghost" to="/duel">대전으로</Link>
             </div>
           </section>

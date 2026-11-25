@@ -10,7 +10,7 @@ vi.mock('./supabase.ts', () => ({
   supabaseKey: 'pub',
 }))
 
-import { ApiError, duel, duelErrorMessage, errorMessage, play, rpc } from './api.ts'
+import { ApiError, duel, duelActionMessage, duelErrorMessage, errorMessage, play, rpc } from './api.ts'
 
 beforeEach(() => { rpcMock.mockReset() })
 afterEach(() => vi.unstubAllGlobals())
@@ -105,4 +105,15 @@ test('duel messages', () => {
   expect(duelErrorMessage('not_due')).toBe('')
   expect(duelErrorMessage('version_changed')).toBe('규칙이 바뀌어 이 대국은 무효가 됐어요')
   expect(errorMessage('stale')).toBe('다른 화면에서 진행된 내용으로 갱신했어요') // 대회 문구는 그대로
+  expect(duelErrorMessage('prepare_failed')).toBe('판을 준비하지 못했어요. 잠시 뒤 다시 해 주세요')
+})
+
+test('duel action messages: logic sentences shown, codes hidden', () => {
+  expect(duelActionMessage('이미 쓴 선수예요')).toBe('이미 쓴 선수예요')
+  expect(duelActionMessage('bad_pick')).toBe('할 수 없는 행동이에요')
+  expect(duelActionMessage('no_rolls_left2')).toBe('할 수 없는 행동이에요')
+  expect(duelActionMessage(undefined)).toBe('할 수 없는 행동이에요')
+  expect(duelActionMessage('')).toBe('할 수 없는 행동이에요')
+  expect(duelActionMessage(42)).toBe('할 수 없는 행동이에요')
+  expect(duelActionMessage('x'.repeat(201))).toBe('할 수 없는 행동이에요')
 })
