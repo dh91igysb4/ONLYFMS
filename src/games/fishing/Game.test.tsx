@@ -2708,6 +2708,36 @@ describe('큰 지도', () => {
     expect(screen.getByRole('heading', { name: '가방' })).toBeInTheDocument()
   })
 
+  test('단축키: E 가방·Q 도감·G 과제(다시 누르면 닫힘, 한글 입력 상태 무관), 다른 창이 열려 있으면 무시', async () => {
+    await mount(makeView(), SAND)
+    const key = (code: string, k: string) => fireEvent.keyDown(window, { code, key: k })
+    key('KeyE', 'ㄷ')
+    expect(screen.getByRole('heading', { name: '가방' })).toBeInTheDocument()
+    key('KeyQ', 'ㅂ')
+    expect(screen.queryByRole('heading', { name: '도감' })).not.toBeInTheDocument()
+    key('KeyE', 'e')
+    expect(screen.queryByRole('heading', { name: '가방' })).not.toBeInTheDocument()
+    key('KeyQ', 'q')
+    expect(screen.getByRole('region', { name: '도감' })).toBeInTheDocument()
+    key('KeyQ', 'q')
+    key('KeyG', 'ㅎ')
+    expect(screen.getByText('깬 과제 0/10')).toBeInTheDocument()
+  })
+
+  test('단축키: T는 말 입력칸을 열고 초점을 주며(글자는 안 들어감), 입력칸에서 친 Q·E는 창을 열지 않는다. Y는 이모트', async () => {
+    await mount(makeView(), SAND)
+    const t = fireEvent.keyDown(window, { code: 'KeyT', key: 't' })
+    expect(t).toBe(false)
+    const input = screen.getByRole('textbox', { name: '할 말' })
+    expect(input).toHaveFocus()
+    fireEvent.keyDown(input, { code: 'KeyE', key: 'e' })
+    expect(screen.queryByRole('heading', { name: '가방' })).not.toBeInTheDocument()
+    fireEvent.keyDown(window, { code: 'KeyY', key: 'y' })
+    expect(screen.getByRole('group', { name: '이모트' })).toBeInTheDocument()
+    fireEvent.keyDown(window, { code: 'KeyY', key: 'y' })
+    expect(screen.queryByRole('group', { name: '이모트' })).not.toBeInTheDocument()
+  })
+
   test('레이어를 끄고 닫았다 다시 열면 꺼진 그대로', async () => {
     await mount(makeView(), SAND)
     fireEvent.click(screen.getByRole('button', { name: '지도' }))

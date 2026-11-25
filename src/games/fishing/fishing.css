@@ -81,7 +81,8 @@
 .fish-panel-body { display: flex; flex-direction: column; gap: 8px; }
 .fish-panel-body img { image-rendering: pixelated; flex-shrink: 0; }
 
-.fish-bag { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+/* 칸 최소 76px: 폰(약 330px)은 4칸, 넓은 화면은 칸 수를 늘려 한 칸이 80px 안팎에 머문다(전체화면 PC에서 한 칸이 수백 px가 되던 문제) */
+.fish-bag { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .fish-cell-slot { display: flex; min-width: 0; }
 .fish-cell {
   position: relative;
