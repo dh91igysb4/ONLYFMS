@@ -102,6 +102,8 @@ const worlds = new Map<string, WorldModule>([
   ['test-world-badbonus', { manifest: manifest('test-world-badbonus', false), logic: { ...base, freeBonus: () => -1 } }],
   ['test-world-preview', { manifest: manifest('test-world-preview', false), logic: { ...base, previewData: (state: S) => ({ p1: `t-${state.n}`, p2: 'fixed' }) } }],
   ['test-world-avatar-fixed', { manifest: { ...manifest('test-world-avatar-fixed', false), avatar: { label: '캐릭터' } }, logic: { ...base, version: 2, avatar: () => 'same' } }],
+  ['test-world-public', { manifest: manifest('test-world-public', false), logic: { ...v2, publicView: (state: { n: number }) => ({ shown: state.n }) } }],
+  ['test-world-public-hidden', { manifest: manifest('test-world-public-hidden', true), logic: { ...base, publicView: (state: S) => ({ shown: state.n }) } }],
 ])
 const registry = { getWorld: (id: string) => worlds.get(id) }
 
@@ -153,7 +155,7 @@ async function save(uid: string, game = 'test-world') {
   return rows
 }
 
-await sql`insert into public.hidden_games (game_id) values ('test-world-hidden') on conflict do nothing`
+await sql`insert into public.hidden_games (game_id) values ('test-world-hidden'), ('test-world-public-hidden') on conflict do nothing`
 
 // ---------------------------------------------------------------- tests
 t('load creates a save with init state', async () => {
@@ -811,7 +813,51 @@ t('previewData: no rows for a world without previewData()', async () => {
   assert.equal(rows.length, 0)
 })
 
+// ---------------------------------------------------------------- visit (내 섬 설계 §5.4)
+const visit = (uid: string | null, owner: unknown, game = 'test-world-public') => call(uid, { game, action: 'visit', owner })
+
+t('visit: 주인의 publicView만, 세이브는 migrate해도 쓰지 않는다', async () => {
+  const me = await user()
+  const owner = await user()
+  await sql`update public.profiles set handle = ${`own${seq}`} where id = ${owner}`
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${owner}, 'test-world-public', ${sql.json({ n: 7 })}, 1)`
+  const before = (await sql`select updated_at from public.world_saves where user_id = ${owner} and game_id = 'test-world-public'`)[0].updated_at
+  const r = await visit(me, owner)
+  assert.equal(r.status, 200)
+  assert.deepEqual(r.body, { owner: { id: owner, handle: `own${seq}` }, view: { shown: 7 } })
+  const after = await sql`select state, logic_version, updated_at from public.world_saves where user_id = ${owner} and game_id = 'test-world-public'`
+  assert.equal(after[0].logic_version, 1)
+  assert.deepEqual(after[0].state, { n: 7 })
+  assert.equal(String(after[0].updated_at), String(before))
+  assert.equal((await save(me, 'test-world-public')).length, 0)
+})
+
+t('visit 오류: bad_owner·self·no_owner(없음·대기)·no_save·no_public_view·version_newer·숨김 비관리자 404', async () => {
+  const me = await user()
+  const pending = await user('pending')
+  const nosave = await user()
+  assert.equal((await visit(me, 'x')).body.error, 'bad_owner')
+  assert.equal((await visit(me, 3)).body.error, 'bad_owner')
+  assert.equal((await visit(me, me)).body.error, 'self')
+  assert.equal((await visit(me, '00000000-0000-0000-0000-00000000dead')).status, 404)
+  assert.equal((await visit(me, pending)).body.error, 'no_owner')
+  const r = await visit(me, nosave)
+  assert.equal(r.status, 404)
+  assert.equal(r.body.error, 'no_save')
+  const plain = await user()
+  await load(plain)
+  assert.equal((await visit(me, plain, 'test-world')).body.error, 'no_public_view')
+  const newer = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${newer}, 'test-world-public', ${sql.json({ n: 1 })}, 9)`
+  assert.equal((await visit(me, newer)).status, 409)
+  const hiddenOwner = await user()
+  await sql`insert into public.world_saves (user_id, game_id, state, logic_version) values (${hiddenOwner}, 'test-world-public-hidden', ${sql.json({ n: 1 })}, 1)`
+  assert.equal((await visit(me, hiddenOwner, 'test-world-public-hidden')).status, 404)
+  const admin = await user('approved', true)
+  assert.equal((await visit(admin, hiddenOwner, 'test-world-public-hidden')).status, 200)
+})
+
 t('teardown', async () => {
-  await sql`delete from public.hidden_games where game_id = 'test-world-hidden'`
+  await sql`delete from public.hidden_games where game_id in ('test-world-hidden', 'test-world-public-hidden')`
   await sql.end()
 })

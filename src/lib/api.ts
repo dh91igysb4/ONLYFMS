@@ -219,6 +219,11 @@ export type WorldView<V = unknown, R = unknown> = {
   gold_capped?: { asked: number; got: number }
 }
 
+/** 다른 사용자의 지속형 게임 세이브 구경(내 섬 설계 §5.4): 게임이 정한 공개 값(publicView)만 받는다. 세이브는 바뀌지 않는다 */
+export async function worldVisit<V = unknown>(game: string, owner: string): Promise<{ owner: { id: string; handle: string }; view: V }> {
+  return (await callFunction('world', { game, action: 'visit', owner })) as { owner: { id: string; handle: string }; view: V }
+}
+
 /** 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act). */
 export async function world<V = unknown, R = unknown>(
   body: { game: string; action: 'load' } | { game: string; action: 'act'; payload: unknown },
