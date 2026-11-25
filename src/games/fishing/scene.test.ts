@@ -1485,6 +1485,13 @@ describe('친구 캐릭터(others)', () => {
     expect(bad.sprites.filter((x) => x.name.startsWith('fish-'))).toHaveLength(0)
   })
 
+  test('잡은 직후 자랑으로 다른 물고기를 들면 잡은 물고기는 그리지 않는다', () => {
+    const c = new RecordingCtx()
+    dataCalls(c)
+    drawWorld(asCtx(c), scene('caught', me, size, { holding: 'grouper' }), size)
+    expect(c.sprites.filter((x) => x.name.startsWith('fish-')).map((x) => x.name)).toEqual(['fish-grouper'])
+  })
+
   test('others가 없으면 친구를 그리지 않는다', () => {
     const ctx = new RecordingCtx()
     const calls = dataCalls(ctx)

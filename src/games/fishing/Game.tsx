@@ -211,7 +211,8 @@ const NEED_ROD = `${rodAtLeast(NEED_ROD_TIER)}이 있어야 해요`
 const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
   not_enough_gold: '골드가 부족해요',
-  price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 사 주세요',
+  price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 해 주세요',
+  bag_changed: '가방이 바뀌었어요. 다시 골라 주세요',
   locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
   too_early: RETRY,
@@ -833,7 +834,8 @@ export function Game({ gameId }: WorldGameProps) {
     const camera = cameraFor(rt.map, { x: Math.round(pos.x), y: Math.round(pos.y) }, size)
     // 자랑·이모트 끝내기: 시간이 지나면, 자랑은 걷거나 낚시를 시작하면 바로
     const sh = showRef.current
-    if (sh && (Date.now() >= sh.until || (sh.show.kind === 'brag' && (rt.player.moving || rt.phase !== 'idle' || rt.trans)))) showRef.current = null
+    const castingNow = rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting'
+    if (sh && (Date.now() >= sh.until || (sh.show.kind === 'brag' && (rt.player.moving || castingNow || rt.trans || rt.drill)))) showRef.current = null
     const others = stepOnline(camera)
     drawWorld(ctx, {
       map: rt.map,
@@ -1199,8 +1201,10 @@ export function Game({ gameId }: WorldGameProps) {
 
   async function discard(index: number, fee: number) {
     setNotice(null)
+    const f = viewRef.current?.bag[index]
+    if (!f) return
     try {
-      const res = await act<{ fee: number }>({ type: 'discard', index, fee })
+      const res = await act<{ fee: number }>({ type: 'discard', index, fee, species: f.species, sizeCm: f.sizeCm })
       if (alive.current && res.result) setNotice({ kind: 'info', text: `버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })

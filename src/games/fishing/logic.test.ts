@@ -2121,7 +2121,7 @@ describe('버리기', () => {
   it('discard: 그 칸만 빠지고 골드에서 부담금, 판 마릿수·totalEarned 그대로', () => {
     const fee = discardFee(mack(), [])
     const s = fresh({ gold: 100, bag: [mack(30), mack(), mack(35)], sold: { day: '2026-11-25', n: 3 }, totalEarned: 7 })
-    const r = ok(play(s, { type: 'discard', index: 1, fee }, ctx()))
+    const r = ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx()))
     expect(r.state.bag).toEqual([mack(30), mack(35)])
     expect(r.state.gold).toBe(100 - fee)
     expect(r.state.sold).toEqual({ day: '2026-11-25', n: 3 })
@@ -2131,11 +2131,18 @@ describe('버리기', () => {
   it('discard 거절: 잠김 locked, 골드 부족 not_enough_gold, 부담금 다름·없음 price_changed, 칸 잘못 bad_action', () => {
     const fee = discardFee(mack(), [])
     const s = fresh({ gold: 100, bag: [mack(), { ...mack(), locked: true }] })
-    expect(err(play(s, { type: 'discard', index: 1, fee }, ctx()))).toBe('locked')
-    expect(err(play(fresh({ gold: fee - 1, bag: [mack()] }), { type: 'discard', index: 0, fee }, ctx()))).toBe('not_enough_gold')
-    expect(err(play(s, { type: 'discard', index: 0, fee: fee + 1 }, ctx()))).toBe('price_changed')
-    expect(err(play(s, { type: 'discard', index: 0 }, ctx()))).toBe('price_changed')
+    expect(err(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('locked')
+    expect(err(play(fresh({ gold: fee - 1, bag: [mack()] }), { type: 'discard', index: 0, fee, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(s, { type: 'discard', index: 0, fee: fee + 1, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('price_changed')
+    expect(err(play(s, { type: 'discard', index: 0, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('price_changed')
     for (const index of [-1, 2, 0.5, '0', undefined]) expect(err(play(s, { type: 'discard', index, fee }, ctx())), String(index)).toBe('bad_action')
+  })
+  it('discard: 보낸 어종·크기가 그 칸과 다르면 bag_changed(옛 화면이 다른 물고기를 버리지 않게)', () => {
+    const fee = discardFee(mack(), [])
+    const s = fresh({ gold: 100, bag: [mack(30), mack()] })
+    expect(err(play(s, { type: 'discard', index: 0, fee: discardFee(mack(30), []), species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('bag_changed')
+    expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
+    expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
   it('version 16', () => {
     expect(logic.version).toBe(16)

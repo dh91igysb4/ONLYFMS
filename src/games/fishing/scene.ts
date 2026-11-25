@@ -884,7 +884,8 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
 function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, cx: number, top: number, w: number): void {
   const t = s.tMs
   const inX = (x: number, sw: number) => Math.max(0, Math.min(w - sw, x))
-  if (s.phase === 'caught' && s.caughtSpecies && SPRITES[`fish-${s.caughtSpecies}`]) {
+  // 자랑으로 다른 물고기를 들었으면 그 물고기만 보인다(같은 자리에 겹치지 않게)
+  if (s.phase === 'caught' && !s.holding && s.caughtSpecies && SPRITES[`fish-${s.caughtSpecies}`]) {
     const fish = SPRITES[`fish-${s.caughtSpecies}`]
     const fx = inX(cx - fish.w, fish.w * 2)
     const fy = Math.max(0, top - fish.h * 2 - 2 - (Math.floor(t / 400) % 2))

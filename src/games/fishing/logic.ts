@@ -230,8 +230,8 @@ export type Action =
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
   | { type: 'lock'; index: number; locked: boolean }
-  // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed
-  | { type: 'discard'; index: number; fee: number }
+  // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed. species·sizeCm이 그 칸과 다르면 bag_changed
+  | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number }
   // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
   | { type: 'buyRod'; tier: number; price: number }
   | { type: 'buyBag'; tier: number; price: number }
@@ -442,6 +442,8 @@ function discard(state: State, a: Record<string, unknown>, gold: number): Out {
   const i = a.index
   if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= state.bag.length) return { error: 'bad_action' }
   const f = state.bag[i]
+  // 화면이 본 물고기와 다르면(다른 탭·응답 유실로 칸이 밀림) 버리지 않는다
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
   if (f.locked) return { error: 'locked' }
   const fee = discardFee(f, state.buffs ?? [])
   if (a.fee !== fee) return { error: 'price_changed' }

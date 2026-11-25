@@ -3013,6 +3013,31 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     expect(calls('lock')).toHaveLength(0)
   })
 
+  test('잡은 직후 결과가 떠 있을 때 자랑해도 들고 있는다(결과가 끝나도 이어서)', async () => {
+    const view = makeView({ rodTier: 3 })
+    await castAndWait(view, 3000)
+    const fish = { species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
+    route({
+      hook: () => ok(view, { species: 'grouper', sizeCm: 100 }),
+      resolve: () => ok({ ...view, bag: [mack, fish], dex: { grouper: { count: 1, maxCm: 100 } }, legends: ['grouper'] }, { caught: fish }),
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(200 + MIN_FIGHT_MS)
+    expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '자랑하기' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
+    await advance(50)
+    expect(lastScene().holding).toBe('mackerel')
+    await advance(2600)
+    expect(screen.queryByText('전설의 물고기!')).not.toBeInTheDocument()
+    expect(lastScene().holding).toBe('mackerel')
+  })
+
   test('자랑 중에 걸으면 바로 끝난다', async () => {
     await mount(makeView({ bag: [mack] }), SAND)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
@@ -3061,7 +3086,7 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     expect(within(bagRegion()).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
     fireEvent.click(within(bagRegion()).getByRole('button', { name: '버리기 확인' }))
     await flush()
-    expect(calls('discard')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discard', index: 0, fee } }])
+    expect(calls('discard')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discard', index: 0, fee, species: 'mackerel', sizeCm: 40 } }])
     expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
   })
 })
