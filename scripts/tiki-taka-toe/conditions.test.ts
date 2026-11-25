@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { parseCsv, type Row } from '../football/wikidata.ts'
-import { buildConditions, clubLabel, CONTINENTS, mergeHonours, type FootballData } from './conditions.ts'
+import { buildConditions, clubLabel, CONTINENTS, mergeHonours, readFootballData, type FootballData } from './conditions.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const REAL = join(ROOT, 'data', 'football')
@@ -48,7 +48,8 @@ function data(over: Partial<FootballData> = {}): FootballData {
       'Q9448,league,Premier League,프리미어리그,Q21,wikidata,x,1987',
       'Q754839,league,Football League First Division,풋볼리그 1부,Q21,wikidata,x,1987',
       'Q15804,league,Serie A,세리에 A,Q38,wikidata,x,1987',
-      'Q47576,manager,Arsène Wenger,아르센 벵거,,wikipedia,x,1987'),
+      'Q47576,manager,Arsène Wenger,아르센 벵거,,wikipedia,x,1987',
+      'Q11151,cup,FA Cup,FA컵,Q21,wikidata,x,1987'),
     manager_spells: rows('manager_id,team_id,from_season,to_season'),
     nation_continents: rows('nation_id,continent', 'Q21,europe', 'Q38,europe', 'Q155,south_america', 'Q34,europe'),
     ...over,
@@ -101,6 +102,20 @@ describe('buildConditions', () => {
     const r = buildConditions(d)
     expect([...r.players.get('teammate:P1')!].sort()).toEqual(['P2', 'P5'])
     expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('즐라탄 이브라히모비치와 뛴 선수')
+  })
+
+  test('teammate_anchors_popularity_then_club_seasons', () => {
+    const d = data({
+      players: rows('id,name_ko,name_en,nation_id,popularity',
+        'P1,즐라탄 이브라히모비치,Zlatan Ibrahimović,Q34,88',
+        'P2,선수 둘,Player Two,Q155,79',
+        'P3,선수 셋,Player Three,Q38,88',
+        'P4,선수 넷,Player Four,Q21,50'),
+      season_memberships: ms('P1,2000,CA', 'P1,2001,CA', 'P2,2000,CA', 'P2,2001,CA', 'P2,2002,CA', 'P3,2000,CA', 'P3,2010,NB', 'P3,2011,NB', 'P3,2012,NB', 'P4,2000,CA'),
+    })
+    // 인지도 80 이상만, 같은 인지도면 클럽 시즌 수가 많은 쪽(P3의 대표팀 시즌은 안 셈)
+    expect(buildConditions(d).conditions.filter((c) => c.kind === 'teammate').map((c) => c.ref).sort()).toEqual(['P1', 'P3'])
+    expect(buildConditions(d, { teammateAnchors: 1 }).conditions.filter((c) => c.kind === 'teammate').map((c) => c.ref)).toEqual(['P1'])
   })
 
   test('manager_club_and_national', () => {
@@ -161,7 +176,10 @@ describe('buildConditions', () => {
   })
 
   test('club_themes', () => {
-    const d = data({ season_memberships: ms('P2,1995,CJ', 'P3,1995,CA', 'P4,1995,CX'), honours: hs('award:Q794775,1995,,P3', 'award:Q166177,1995,,P3') })
+    const d = data({
+      season_memberships: ms('P2,1995,CJ', 'P3,1995,CA', 'P4,1995,CX'),
+      honours: hs('award:Q794775,1995,,P3', 'award:Q166177,1995,,P3', 'Q11151,1995,CA,P3', 'Q18756,1995,CA,P3'),
+    })
     const r = buildConditions(d)
     const themes = (id: string) => r.conditions.find((c) => c.id === id)?.themes
     expect(themes('club:CJ')).toEqual(['ita', 'eur'])
@@ -170,6 +188,8 @@ describe('buildConditions', () => {
     expect(themes('league:Q15804')).toEqual(['ita', 'eur'])
     expect(themes('award:Q794775')).toEqual(['eng', 'eur'])
     expect(themes('award:Q166177')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur'])
+    expect(themes('title:Q11151:1')).toEqual(['eng', 'eur']) // 국내 컵은 그 나라 리그 테마 + eur
+    expect(themes('title:Q18756:1')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur']) // 대륙 대회는 모든 테마
     expect(themes('nation:Q155')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur'])
   })
 
@@ -222,6 +242,12 @@ describe('mergeHonours', () => {
 })
 
 describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
+  test('zlatan_is_teammate_anchor', () => {
+    const r = buildConditions(readFootballData(REAL))
+    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('즐라탄 이브라히모비치와 뛴 선수')
+    expect(r.conditions.filter((c) => c.kind === 'teammate')).toHaveLength(150)
+  }, 60_000)
+
   test('continent_table_complete', () => {
     const nations = parseCsv(readFileSync(join(REAL, 'nations.csv'), 'utf8'))
     const table = parseCsv(readFileSync(join(REAL, 'manual', 'nation_continents.csv'), 'utf8'))

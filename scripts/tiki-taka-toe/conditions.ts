@@ -4,12 +4,13 @@
 // 판정 규칙(설계 §4, 2026-11-26 결정):
 // - 모든 집합은 1987년 이후 기록만 쓴다(FROM).
 // - 클럽·리그 경력은 "한 시즌이라도 소속"(그 시즌 클럽이 둘이어도 둘 다 센다).
+// - 팀 동료 기준 선수는 인지도 80 이상 중 인지도 높은 순 → 클럽 시즌 수 많은 순 150명.
 // - 팀 동료·감독(클럽)은 우승과 같은 규칙: 그 시즌 클럽 소속이 둘 이상인 선수의 그 시즌은 세지 않는다(대표팀은 클럽 수에 넣지 않는다).
 // - "PL" 우승·득점왕은 프리미어리그(Q9448, 1992~)만. "잉글랜드 1부"는 잉글랜드 대회 중 1부였던 시기
 //   (competition_eras.csv: 풋볼리그 1부 Q754839 1987~1991 + PL)를 합친다.
 // - 국적은 players.nation_id 하나(이중 국적 없음). 대륙은 manual/nation_continents.csv.
 // - 테마(§3.4): 클럽은 대상 유럽 9개 리그 1부(team_competitions × 1부 시기)에 1987년 이후 한 시즌이라도 있던 클럽만,
-//   그 리그 테마 + eur. 리그·리그 우승·리그 득점왕은 그 리그 테마 + eur. 나머지는 모든 테마.
+//   그 리그 테마 + eur. 리그·리그 우승·리그 득점왕·국내 컵 우승은 그 리그 테마 + eur. 나머지는 모든 테마.
 //   K리그(대상 유럽 리그 밖 나라의 리그·컵·득점왕)는 어느 테마에도 넣지 않아 조건을 만들지 않는다.
 // - 개인상은 honour_catalog의 award만(한글 이름이 있는 것). honours.csv의 카탈로그 밖 상은 쓰지 않는다.
 //
@@ -44,8 +45,8 @@ const CONTINENT_LABEL: Record<string, [string, string]> = {
 
 /** 이 해부터의 기록만 쓴다 (season_memberships.csv가 1987년부터) */
 export const FROM = 1987
-/** 팀 동료 기준 선수: 인지도 이 값인 선수 중 시즌 소속 시즌 수가 많은 순 */
-export const TEAMMATE_POPULARITY = 100
+/** 팀 동료 기준 선수: 인지도 이 값 이상인 선수를 인지도 높은 순, 같으면 클럽 시즌 수가 많은 순으로 TEAMMATE_ANCHORS명 */
+export const TEAMMATE_MIN_POPULARITY = 80
 export const TEAMMATE_ANCHORS = 150
 
 /** 대상 유럽 9개 리그 나라 → 테마. eur만 있는 나라는 [] */
@@ -150,7 +151,7 @@ function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
 }
 const sortThemes = (t: Iterable<Theme>) => THEMES.filter((x) => new Set(t).has(x))
 
-export function buildConditions(d: FootballData): { conditions: Condition[]; players: Map<string, Set<string>> } {
+export function buildConditions(d: FootballData, opts: { teammateAnchors?: number } = {}): { conditions: Condition[]; players: Map<string, Set<string>> } {
   const conditions: Condition[] = []
   const players = new Map<string, Set<string>>()
   const known = new Set(d.players.map((p) => p.id))
@@ -237,12 +238,12 @@ export function buildConditions(d: FootballData): { conditions: Condition[]; pla
   emit({ id: 'league:eng-top', kind: 'league', label_ko: '잉글랜드 1부', label_en: 'English top flight', ref: 'eng-top', themes: themesOfNation(ENGLAND) }, leaguePlayers('eng-top'))
 
   // ---- 팀 동료
-  const seasonsOf = new Map<string, Set<string>>()
-  for (const m of mems) add(seasonsOf, m.player_id, m.season)
+  const clubSeasons = new Map<string, number>()
+  for (const k of clubsOf.keys()) { const p = k.split('|')[0]; clubSeasons.set(p, (clubSeasons.get(p) ?? 0) + 1) }
   const anchors = d.players
-    .filter((p) => Number(p.popularity) === TEAMMATE_POPULARITY && seasonsOf.has(p.id))
-    .sort((a, b) => seasonsOf.get(b.id)!.size - seasonsOf.get(a.id)!.size || cmp(a.id, b.id))
-    .slice(0, TEAMMATE_ANCHORS)
+    .filter((p) => Number(p.popularity) >= TEAMMATE_MIN_POPULARITY && clubSeasons.has(p.id))
+    .sort((a, b) => Number(b.popularity) - Number(a.popularity) || clubSeasons.get(b.id)! - clubSeasons.get(a.id)! || cmp(a.id, b.id))
+    .slice(0, opts.teammateAnchors ?? TEAMMATE_ANCHORS)
   for (const a of anchors.sort((x, y) => cmp(x.id, y.id))) {
     const mates = new Set<string>()
     for (const { season, team } of singleSeasons.get(a.id) ?? []) for (const p of singleAt.get(`${team}|${season}`) ?? []) if (p !== a.id) mates.add(p)
@@ -288,13 +289,13 @@ export function buildConditions(d: FootballData): { conditions: Condition[]; pla
     const [lk, le] = titleLabel('잉글랜드 1부', 'English top flight', n)
     emit({ id: `title:eng-top:${n}`, kind: 'title', label_ko: lk, label_en: le, ref: 'eng-top', themes: themesOfNation(ENGLAND) }, atLeast(engTop, n))
   }
-  // 컵·대륙·대표팀 대회 우승 (1회), 대상 유럽 리그 밖 나라의 컵은 뺀다
+  // 컵·대륙·대표팀 대회 우승 (1회). 국내 컵은 그 나라 리그 테마 + eur(대상 유럽 리그 밖 나라의 컵은 빠진다), 대륙·대표팀 대회는 모든 테마
   for (const c of [...d.honour_catalog].sort((a, b) => cmp(a.id, b.id))) {
     if (!['cup', 'continental', 'international'].includes(c.kind)) continue
-    if (c.nation_id && !(c.nation_id in TARGET_NATIONS)) continue
     const [ko, en] = short(c.id)
     const [lk, le] = titleLabel(ko, en, 1)
-    emit({ id: `title:${c.id}:1`, kind: 'title', label_ko: lk, label_en: le, ref: c.id, themes: ALL }, atLeast(titleSeasons.get(c.id), 1))
+    const themes = c.kind === 'cup' && c.nation_id ? themesOfNation(c.nation_id) : ALL
+    emit({ id: `title:${c.id}:1`, kind: 'title', label_ko: lk, label_en: le, ref: c.id, themes }, atLeast(titleSeasons.get(c.id), 1))
     if (c.kind === 'international') {
       emit({ id: `squad:${c.id}`, kind: 'squad', label_ko: `${ko} 출전`, label_en: `${en} squad`, ref: c.id, themes: ALL }, rowsOf.get(`squad:${c.id}`) ?? [])
     }
