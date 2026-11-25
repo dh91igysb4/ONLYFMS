@@ -14,10 +14,12 @@ export type Tag = {
   card?: { text: string; tone: Rarity }
   /** 이모트 글자 */
   emote?: string
+  /** 말풍선(맨 위) */
+  say?: string
 }
 
-/** 자식 하나를 있으면 맞추고 없으면 지운다 */
-function part(host: HTMLElement, cls: string, text: string | undefined, before: boolean): HTMLElement | null {
+/** 자식 하나를 있으면 맞추고 없으면 지운다. 새로 만들 때는 before 앞(없으면 맨 끝)에 넣는다 */
+function part(host: HTMLElement, cls: string, text: string | undefined, before: Element | null): HTMLElement | null {
   let el = host.querySelector<HTMLElement>(`:scope > .${cls}`)
   if (text === undefined) {
     el?.remove()
@@ -26,8 +28,7 @@ function part(host: HTMLElement, cls: string, text: string | undefined, before: 
   if (!el) {
     el = document.createElement('span')
     el.className = cls
-    if (before) host.prepend(el)
-    else host.append(el)
+    host.insertBefore(el, before)
   }
   if (el.textContent !== text) el.textContent = text
   return el
@@ -46,9 +47,11 @@ export function syncTags(container: HTMLElement, tags: Tag[]): void {
       el.dataset.id = t.id
       container.appendChild(el)
     }
-    part(el, 'fish-peer-name', t.handle, false)
-    part(el, 'fish-peer-emote', t.emote, true)
-    const card = part(el, 'fish-peer-card', t.card?.text, false)
+    // 위에서 아래로: 말풍선 · 이모트 · 이름 · 자랑 카드
+    const name = part(el, 'fish-peer-name', t.handle, null)!
+    const emote = part(el, 'fish-peer-emote', t.emote, name)
+    part(el, 'fish-peer-say', t.say, emote ?? name)
+    const card = part(el, 'fish-peer-card', t.card?.text, null)
     if (card && t.card && card.dataset.tone !== t.card.tone) card.dataset.tone = t.card.tone
     el.style.transform = `translate(${Math.round(t.x)}px, ${Math.round(t.y)}px)`
     el.hidden = !t.visible

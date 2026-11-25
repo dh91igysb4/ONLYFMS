@@ -560,6 +560,9 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 말풍선 채팅 (`feat/fishing-chat`)
+서버·DB·함수 변경 없음. Vercel 배포만. 두 계정으로 같은 지역에서 "말" → 입력 → 보내기 → 상대 화면 이름 위에 5초, 3초 안에 다시 보내면 "잠시 뒤에…".
+
 ## 물고기 자랑·이모트·버리기 (`feat/fishing-brag`, 낚시 logic.version 16)
 DB 변경 없음.
 1. PR 머지 뒤 `npx supabase@2 functions deploy world --no-verify-jwt`(버리기 `discard` 행동). 이것 전에는 버리기가 `bad_action`으로 거절된다.

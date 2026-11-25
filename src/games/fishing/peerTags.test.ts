@@ -57,3 +57,19 @@ describe('자랑 카드·이모트 (설계 2026-11-25-fishing-brag-discard)', ()
     expect(s.querySelector('.fish-peer-name')?.textContent).toBe('kane')
   })
 })
+
+describe('말풍선', () => {
+  test('say는 맨 위 말풍선, 빠지면 지운다', () => {
+    const c = document.createElement('div')
+    syncTags(c, [{ ...tag('a', 'kane'), say: '안녕', emote: '👍' }])
+    const s = spans(c)[0]
+    expect([...s.children].map((x) => x.className)).toEqual(['fish-peer-say', 'fish-peer-emote', 'fish-peer-name'])
+    expect(s.querySelector('.fish-peer-say')?.textContent).toBe('안녕')
+    syncTags(c, [tag('a', 'kane')])
+    expect(s.querySelector('.fish-peer-say')).toBeNull()
+    // 말풍선이 먼저 있고 이모트가 나중에 생겨도 순서는 같다
+    syncTags(c, [{ ...tag('a', 'kane'), say: '안녕' }])
+    syncTags(c, [{ ...tag('a', 'kane'), say: '안녕', emote: '😂' }])
+    expect([...s.children].map((x) => x.className)).toEqual(['fish-peer-say', 'fish-peer-emote', 'fish-peer-name'])
+  })
+})

@@ -20,15 +20,36 @@ export type EmoteId = (typeof EMOTES)[number]['id']
 
 export type Brag = { kind: 'brag'; species: string; sizeCm: number; perfect: boolean }
 export type Emote = { kind: 'emote'; id: EmoteId; char: string }
-export type Show = Brag | Emote
+export type Chat = { kind: 'chat'; text: string }
+export type Show = Brag | Emote | Chat
 
 export const encodeBrag = (f: { species: string; sizeCm: number; perfect: boolean }) => `b:${f.species}:${f.sizeCm}:${f.perfect ? 1 : 0}`
 export const encodeEmote = (id: EmoteId) => `e:${id}`
+
+/** 말풍선(설계 2026-11-25-fishing-chat): 5초, 40자(코드포인트), 3초에 한 번 */
+export const CHAT_MS = 5000
+export const CHAT_MAX = 40
+export const CHAT_GAP_MS = 3000
+
+/** 제어·방향 제어 문자를 빼고 공백을 한 칸으로, 앞뒤를 다듬어 40자로 자른다. 비면 null. 보내는 쪽·받는 쪽이 같이 쓴다 */
+export function cleanChat(raw: string): string | null {
+  const text = [...raw.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, (c) => (/\s/.test(c) ? ' ' : '')).replace(/\s+/g, ' ').trim()]
+    .slice(0, CHAT_MAX)
+    .join('')
+    .trim()
+  return text.length > 0 ? text : null
+}
+export const encodeChat = (text: string) => `c:${text}`
 
 const INT_RE = /^\d{1,4}$/
 
 export function parseShow(s: string | undefined): Show | null {
   if (typeof s !== 'string') return null
+  // 말은 콜론을 담을 수 있어 앞 두 글자로만 가른다
+  if (s.startsWith('c:')) {
+    const text = cleanChat(s.slice(2))
+    return text ? { kind: 'chat', text } : null
+  }
   const parts = s.split(':')
   if (parts[0] === 'e' && parts.length === 2) {
     const e = EMOTES.find((x) => x.id === parts[1])
