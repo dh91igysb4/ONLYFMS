@@ -1317,13 +1317,18 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     setChatHint(null)
   }
 
-  async function discard(index: number, fee: number, at: DiscardAt) {
+  /** 여러 마리 버리기(v21): 요청 한 번 */
+  async function discard(indices: number[], fee: number, at: DiscardAt) {
     setNotice(null)
-    const f = viewRef.current?.bag[index]
-    if (!f) return
+    const bag = viewRef.current?.bag ?? []
+    const items = indices.flatMap((index) => (bag[index] ? [{ index, species: bag[index].species, sizeCm: bag[index].sizeCm }] : []))
+    if (items.length === 0 || items.length !== indices.length) return
     try {
-      const res = await act<{ fee: number }>({ type: 'discard', index, fee, species: f.species, sizeCm: f.sizeCm, at })
-      if (alive.current && res.result) setNotice({ kind: 'info', text: `버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
+      const res = await act<{ fee: number; n?: number }>({ type: 'discardMany', items, fee, at })
+      if (alive.current && res.result) {
+        const n = res.result.n ?? items.length
+        setNotice({ kind: 'info', text: `${n > 1 ? `${n}마리 ` : ''}버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
+      }
     } catch (e) {
       await failMove(codeOf(e))
     }
@@ -1668,10 +1673,10 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 </button>
               </div>
               {menu === 'bag' && (
-                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} onBrag={brag} onDiscard={(i, fee, at) => void discard(i, fee, at)} />
+                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} onBrag={brag} onDiscard={(is, fee, at) => void discard(is, fee, at)} />
               )}
               {menu === 'trash' && (
-                <BagPanel view={view} atShop={false} busy={busy} discardAt="trash" onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onDiscard={(i, fee, at) => void discard(i, fee, at)} />
+                <BagPanel view={view} atShop={false} busy={busy} discardAt="trash" onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onDiscard={(is, fee, at) => void discard(is, fee, at)} />
               )}
               {menu === 'fridge' && (
                 <FridgePanel view={view} busy={busy} onStore={(i) => void moveFish('store', i)} onTakeOut={(i) => void moveFish('takeOut', i)} />
