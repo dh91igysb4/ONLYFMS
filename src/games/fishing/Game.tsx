@@ -212,6 +212,7 @@ const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
   not_enough_gold: '골드가 부족해요',
   price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 사 주세요',
+  locked: '잠긴 물고기는 버릴 수 없어요',
   bad_tier: '이전 단계를 먼저 사야 해요',
   too_early: RETRY,
   too_late: RETRY,

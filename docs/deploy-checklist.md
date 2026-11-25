@@ -560,6 +560,12 @@ npx supabase@2 functions deploy world --no-verify-jwt
   - v14 세이브에 gold 없음: `select count(*) from world_saves where game_id = 'fishing' and logic_version >= 14 and state ? 'gold';`(0)
 - 경제 목표(낚시 시뮬레이션 `src/games/fishing/econSim.ts`가 실제 2단 상한으로 잼, `gold.test.ts`·`economyPace.test.ts`): 하루 1시간 약 37일(목표 34일 ±20% 안), 3시간 약 30일, 5시간 약 26일. 일주일 뒤 사람별 하루 들어옴: `select user_id, (created_at at time zone 'Asia/Seoul')::date d, sum(delta) filter (where reason in ('world','free','daily_prize') and delta > 0) earned, sum(coalesce(raw_delta, delta)) filter (where reason in ('world','free') and delta > 0) asked from gold_ledger group by 1, 2 order by 2 desc, 3 desc;` → 하루 1시간쯤 하는 사람의 `earned` 중앙값이 `REF × 1.2~1.5`(24,600~30,750)에서 크게 벗어나면 설계 §4.1 목표를 다시 본다
 
+## 물고기 자랑·이모트·버리기 (`feat/fishing-brag`, 낚시 logic.version 16)
+DB 변경 없음.
+1. PR 머지 뒤 `npx supabase@2 functions deploy world --no-verify-jwt`(버리기 `discard` 행동). 이것 전에는 버리기가 `bad_action`으로 거절된다.
+2. Vercel 배포 확인. 두 계정으로 같은 지역에서: 가방 → 자랑하기 → 물고기 → 상대 화면에 머리 위 물고기와 "고등어 40cm · … G · 흔함" 카드, 6초 뒤 사라짐.
+   이모트 → 👍 → 3초. 가방 → 버리기 → 물고기 → "환경부담금 n G" 확인 → 버리기, 지갑에서 n G가 빠진다. 잠긴 물고기는 버리기 버튼이 꺼져 있다.
+
 ## 낚시 판매 마릿수 감쇠·후반 가격 (`feat/fishing-sell-decay`, 낚시 logic.version 15)
 1. PR 머지 뒤 main을 pull하고 `npx -y supabase@2 db push`로 `20261125040000_fishing_out_of_soft_cap.sql`을 적용한다(낚시 수입을 사이트 하루 상한에서 뺀다).
 2. `npx supabase@2 functions deploy world --no-verify-jwt` — 함수가 낚시 로직·가격을 번들한다. 이것 전에는 서버가 옛 가격·감쇠 없는 판매로 판정한다.
