@@ -19,7 +19,7 @@
 // 소련·독립국가연합·이스라엘·아제르바이잔·아르메니아 → 유럽(UEFA), 오스트레일리아 → 아시아(AFC). P30이 없는 지역
 // (코르시카·아스투리아스·아라곤·안달루시아·파다니아·올란드·건지섬·서아르메니아) → 유럽, nations.csv에 잘못 들어간
 // "캄페오나투 브라질레이루 세리에 C"(Q2037826) → 남미. 수리남·가이아나·프랑스령 기아나는 지리대로 남미다.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cmp, parseCsv, type Row } from '../football/wikidata.ts'
 
@@ -35,6 +35,8 @@ export type FootballData = {
   /** honours.csv + honours_extra.csv를 load.sql 규칙으로 합친 것(mergeHonours) */
   honours: Row[]
   honour_catalog: Row[]; manager_spells: Row[]; nation_continents: Row[]
+  /** data/tiki-taka-toe/manual/short_names.csv (player_id,short_ko): 팀 동료·감독 머리칸 이름. 성 규칙보다 먼저 쓴다 */
+  short_names?: Row[]
 }
 
 export const CONTINENTS = ['europe', 'south_america', 'north_america', 'africa', 'asia', 'oceania'] as const
@@ -133,7 +135,8 @@ function readCsv(file: string): Row[] {
   return parseCsv(readFileSync(file, 'utf8'))
 }
 
-export function readFootballData(dir: string): FootballData {
+/** dir: 축구 CSV 폴더. shortNames: 머리칸 짧은 이름 표(기본 dir/../tiki-taka-toe/manual/short_names.csv, 없으면 빈 표) */
+export function readFootballData(dir: string, shortNames = join(dir, '..', 'tiki-taka-toe', 'manual', 'short_names.csv')): FootballData {
   const f = (name: string) => readCsv(join(dir, `${name}.csv`))
   const honour_catalog = f('honour_catalog')
   return {
@@ -141,6 +144,7 @@ export function readFootballData(dir: string): FootballData {
     competition_eras: f('competition_eras'), team_competitions: f('team_competitions'), season_memberships: f('season_memberships'),
     honours: mergeHonours(f('honours'), f('honours_extra'), honour_catalog), honour_catalog,
     manager_spells: f('manager_spells'), nation_continents: readCsv(join(dir, 'manual', 'nation_continents.csv')),
+    short_names: existsSync(shortNames) ? readCsv(shortNames) : [],
   }
 }
 
@@ -168,6 +172,7 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
   const clubIds = new Set(d.teams.filter((t) => t.kind === 'club').map((t) => t.id))
   const catalog = new Map(d.honour_catalog.map((c) => [c.id, c]))
   const ALL = [...THEMES]
+  const shortKo = new Map((d.short_names ?? []).map((r) => [r.player_id, r.short_ko]))
   const themesOfNation = (n: string): Theme[] => (n in TARGET_NATIONS ? sortThemes([...TARGET_NATIONS[n], 'eur']) : [])
 
   // ---- 1부 시기: 대회 → [from, to, nation] (대상 나라만)
@@ -247,7 +252,7 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
     .filter((p) => Number(p.popularity) >= TEAMMATE_MIN_POPULARITY && clubSeasons.has(p.id))
     .sort((a, b) => Number(b.popularity) - Number(a.popularity) || clubSeasons.get(b.id)! - clubSeasons.get(a.id)! || cmp(a.id, b.id))
     .slice(0, opts.teammateAnchors ?? TEAMMATE_ANCHORS)
-  // 감독 머리칸과 같은 성 규칙("즐라탄 이브라히모비치" → "이브라히모비치", 한 단어 이름은 그대로).
+  // 짧은 이름 표(short_names.csv)가 먼저, 없으면 감독 머리칸과 같은 성 규칙("즐라탄 이브라히모비치" → "이브라히모비치", 한 단어 이름은 그대로).
   // 성이 앞인 나라는 첫 토큰. 기준 선수끼리 짧은 이름이 겹치면(다비드 실바·치아구 실바) 전체 이름.
   const sorted = anchors.sort((x, y) => cmp(x.id, y.id))
   const shortName = (full: string, nation: string) => {
@@ -262,7 +267,7 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
   for (const { a, ko, en, sko, sen } of names) {
     const mates = new Set<string>()
     for (const { season, team } of singleSeasons.get(a.id) ?? []) for (const p of singleAt.get(`${team}|${season}`) ?? []) if (p !== a.id) mates.add(p)
-    const lko = count('sko', sko) > 1 ? ko : sko
+    const lko = shortKo.get(a.id) ?? (count('sko', sko) > 1 ? ko : sko)
     const len = count('sen', sen) > 1 ? en : sen
     emit({ id: `teammate:${a.id}`, kind: 'teammate', label_ko: `${withParticle(lko)} 뛴 선수`, label_en: `Played with ${len}`, ref: a.id, themes: ALL }, mates)
   }
@@ -339,7 +344,7 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
       }
     }
     const ko = c.name_ko || c.name_en
-    emit({ id: `manager:${c.id}`, kind: 'manager', label_ko: `${surname(ko)} 감독`, label_en: `Played under ${surname(c.name_en)}`, ref: c.id, themes: ALL }, set)
+    emit({ id: `manager:${c.id}`, kind: 'manager', label_ko: `${shortKo.get(c.id) ?? surname(ko)} 감독`, label_en: `Played under ${surname(c.name_en)}`, ref: c.id, themes: ALL }, set)
   }
 
   // ---- 월드컵 결승 득점

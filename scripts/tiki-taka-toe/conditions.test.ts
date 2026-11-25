@@ -147,6 +147,18 @@ describe('buildConditions', () => {
     expect(buildConditions(d, { teammateAnchors: 1 }).conditions.filter((c) => c.kind === 'teammate').map((c) => c.ref)).toEqual(['P1'])
   })
 
+  test('short_name_override', () => {
+    const d = data({
+      players: rows('id,name_ko,name_en,nation_id,popularity', 'P1,라울 곤살레스,Raúl,Q29,100', 'P2,선수 둘,Player Two,Q155,50'),
+      season_memberships: ms('P1,1996,CA', 'P2,1996,CA'),
+      manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1996'),
+      short_names: rows('player_id,short_ko', 'P1,라울', 'Q47576,아르센'),
+    })
+    const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
+    expect(label('teammate:P1')).toBe('라울과 뛴 선수')
+    expect(label('manager:Q47576')).toBe('아르센 감독')
+  })
+
   test('manager_club_and_national', () => {
     const d = data({
       manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1997', 'Q47576,NB,2002,2002'),
@@ -273,7 +285,14 @@ describe('mergeHonours', () => {
 describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
   test('zlatan_is_teammate_anchor', () => {
     const r = buildConditions(readFootballData(REAL))
-    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('이브라히모비치와 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('즐라탄과 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q11576')?.label_ko).toBe('라울과 뛴 선수')
+    // 짧은 이름 표의 id는 모두 팀 동료 기준 선수나 감독이고, 라벨은 겹치지 않는다
+    const refs = new Set(r.conditions.filter((c) => c.kind === 'teammate' || c.kind === 'manager').map((c) => c.ref))
+    const table = parseCsv(readFileSync(join(ROOT, 'data', 'tiki-taka-toe', 'manual', 'short_names.csv'), 'utf8'))
+    for (const t of table) expect(refs, t.player_id).toContain(t.player_id)
+    const labels = r.conditions.map((c) => c.label_ko)
+    expect(new Set(labels).size).toBe(labels.length)
     expect(r.conditions.filter((c) => c.kind === 'teammate')).toHaveLength(150)
   }, 60_000)
 
