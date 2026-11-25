@@ -243,6 +243,91 @@ export const SPECIES: Species[] = [
   { id: 'giant-squid', name: '대왕오징어', rarity: 'rare', basePrice: 1500, minCm: 200, maxCm: 600, difficulty: 0.92, minRod: 5, behavior: 'mixed', area: 'wreck', spots: ['abyss'], hours: [20, 5] },
   { id: 'oarfish', name: '산갈치', rarity: 'legend', basePrice: 9000, minCm: 300, maxCm: 800, difficulty: 0.96, minRod: 5, behavior: 'smooth', area: 'wreck', spots: ['abyss'], hours: [22, 2], legend: { power: 0.95 } },
   { id: 'dragon-king', name: '용왕', rarity: 'mythic', basePrice: 30000, minCm: 400, maxCm: 900, difficulty: 1, minRod: 6, behavior: 'surge', area: 'wreck', spots: ['abyss'], weather: 'rain', legend: { power: 0.98, needs: ['grouper', 'rainbow-marlin', 'oarfish'], buff: 'dragon-pearl' } },
+  // 확장(2026-11-25): 바닷가 마을. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'greenling', name: '노래미', rarity: 'common', basePrice: 40, minCm: 20, maxCm: 45, difficulty: 0.25, minRod: 1, behavior: 'sinker', area: 'village' },
+  { id: 'halfbeak', name: '학꽁치', rarity: 'common', basePrice: 35, minCm: 20, maxCm: 40, difficulty: 0.2, minRod: 1, behavior: 'dart', area: 'village' },
+  { id: 'olive-flounder', name: '넙치', rarity: 'uncommon', basePrice: 140, minCm: 30, maxCm: 80, difficulty: 0.5, minRod: 1, behavior: 'sinker', area: 'village' },
+  // 확장(2026-11-25): 마을 강. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'dace', name: '황어', rarity: 'common', basePrice: 30, minCm: 20, maxCm: 45, difficulty: 0.25, minRod: 1, behavior: 'dart', area: 'river' },
+  { id: 'sand-gudgeon', name: '모래무지', rarity: 'common', basePrice: 35, minCm: 10, maxCm: 25, difficulty: 0.25, minRod: 1, behavior: 'sinker', area: 'river' },
+  { id: 'korean-piscivorous-chub', name: '끄리', rarity: 'uncommon', basePrice: 110, minCm: 25, maxCm: 40, difficulty: 0.5, minRod: 1, behavior: 'dart', area: 'river' },
+  // 확장(2026-11-25): 숲. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'medaka', name: '송사리', rarity: 'common', basePrice: 15, minCm: 2, maxCm: 4, difficulty: 0.15, minRod: 1, behavior: 'dart', area: 'forest', spots: ['pond'] },
+  { id: 'frog', name: '개구리', rarity: 'common', basePrice: 20, minCm: 4, maxCm: 10, difficulty: 0.2, minRod: 1, behavior: 'floater', area: 'forest', spots: ['pond'] },
+  { id: 'crawfish', name: '가재', rarity: 'uncommon', basePrice: 70, minCm: 8, maxCm: 15, difficulty: 0.4, minRod: 1, behavior: 'sinker', area: 'forest', spots: ['pond'] },
+  { id: 'koi', name: '비단잉어', rarity: 'uncommon', basePrice: 150, minCm: 40, maxCm: 80, difficulty: 0.5, minRod: 1, behavior: 'smooth', area: 'forest', spots: ['pond'] },
+  { id: 'snapping-turtle', name: '늑대거북', rarity: 'rare', basePrice: 360, minCm: 25, maxCm: 45, difficulty: 0.7, minRod: 2, behavior: 'sinker', area: 'forest', spots: ['pond'] },
+  { id: 'korean-shiner', name: '쉬리', rarity: 'common', basePrice: 25, minCm: 8, maxCm: 14, difficulty: 0.25, minRod: 1, behavior: 'dart', area: 'forest', spots: ['waterfall'] },
+  { id: 'spined-loach', name: '참종개', rarity: 'common', basePrice: 20, minCm: 6, maxCm: 12, difficulty: 0.25, minRod: 1, behavior: 'sinker', area: 'forest', spots: ['waterfall'] },
+  { id: 'torrent-catfish', name: '퉁가리', rarity: 'common', basePrice: 25, minCm: 7, maxCm: 13, difficulty: 0.3, minRod: 1, behavior: 'sinker', area: 'forest', spots: ['waterfall'] },
+  { id: 'slender-catfish', name: '미유기', rarity: 'uncommon', basePrice: 90, minCm: 15, maxCm: 30, difficulty: 0.45, minRod: 1, behavior: 'smooth', area: 'forest', spots: ['waterfall'] },
+  { id: 'sculpin', name: '둑중개', rarity: 'uncommon', basePrice: 100, minCm: 8, maxCm: 15, difficulty: 0.5, minRod: 1, behavior: 'sinker', area: 'forest', spots: ['waterfall'] },
+  { id: 'golden-trout', name: '금송어', rarity: 'rare', basePrice: 380, minCm: 25, maxCm: 50, difficulty: 0.72, minRod: 2, behavior: 'dart', area: 'forest', spots: ['waterfall'] },
+  // 확장(2026-11-25): 산 호수. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'yellow-perch', name: '옐로우퍼치', rarity: 'common', basePrice: 55, minCm: 15, maxCm: 30, difficulty: 0.35, minRod: 1, behavior: 'mixed', area: 'lake' },
+  { id: 'topmouth-gudgeon', name: '참붕어', rarity: 'common', basePrice: 40, minCm: 6, maxCm: 10, difficulty: 0.3, minRod: 1, behavior: 'dart', area: 'lake' },
+  { id: 'pike', name: '강꼬치고기', rarity: 'uncommon', basePrice: 170, minCm: 40, maxCm: 100, difficulty: 0.6, minRod: 1, behavior: 'dart', area: 'lake' },
+  { id: 'silver-carp', name: '백련어', rarity: 'uncommon', basePrice: 150, minCm: 50, maxCm: 100, difficulty: 0.55, minRod: 1, behavior: 'smooth', area: 'lake' },
+  { id: 'gar', name: '가아', rarity: 'rare', basePrice: 650, minCm: 60, maxCm: 140, difficulty: 0.82, minRod: 2, behavior: 'smooth', area: 'lake' },
+  // 확장(2026-11-25): 동굴. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'cave-shrimp', name: '동굴새우', rarity: 'common', basePrice: 70, minCm: 4, maxCm: 8, difficulty: 0.3, minRod: 1, behavior: 'dart', area: 'cave', spots: ['cave1', 'cave2', 'cave3'] },
+  { id: 'stalactite-fish', name: '석순고기', rarity: 'common', basePrice: 80, minCm: 10, maxCm: 22, difficulty: 0.35, minRod: 1, behavior: 'sinker', area: 'cave', spots: ['cave1', 'cave2', 'cave3'] },
+  { id: 'glowmoss-fish', name: '빛이끼고기', rarity: 'common', basePrice: 90, minCm: 6, maxCm: 14, difficulty: 0.4, minRod: 1, behavior: 'floater', area: 'cave', spots: ['cave2'] },
+  { id: 'ember-goby', name: '숯망둑', rarity: 'common', basePrice: 140, minCm: 10, maxCm: 22, difficulty: 0.55, minRod: 1, behavior: 'mixed', area: 'cave', spots: ['cave3'] },
+  { id: 'cave-lantern', name: '등불고기', rarity: 'uncommon', basePrice: 220, minCm: 15, maxCm: 35, difficulty: 0.6, minRod: 1, behavior: 'mixed', area: 'cave', spots: ['cave1', 'cave2', 'cave3'] },
+  { id: 'olm', name: '동굴도롱뇽', rarity: 'uncommon', basePrice: 200, minCm: 20, maxCm: 30, difficulty: 0.55, minRod: 1, behavior: 'smooth', area: 'cave', spots: ['cave1'] },
+  { id: 'lava-crab', name: '용암게', rarity: 'uncommon', basePrice: 300, minCm: 10, maxCm: 20, difficulty: 0.65, minRod: 1, behavior: 'sinker', area: 'cave', spots: ['cave3'] },
+  { id: 'white-cave-eel', name: '흰동굴장어', rarity: 'rare', basePrice: 700, minCm: 50, maxCm: 100, difficulty: 0.82, minRod: 2, behavior: 'smooth', area: 'cave', spots: ['cave1'] },
+  { id: 'amethyst-carp', name: '자수정잉어', rarity: 'rare', basePrice: 800, minCm: 30, maxCm: 60, difficulty: 0.85, minRod: 2, behavior: 'mixed', area: 'cave', spots: ['cave2'] },
+  // 확장(2026-11-25): 갯벌. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'horseshoe-crab', name: '투구게', rarity: 'rare', basePrice: 950, minCm: 30, maxCm: 60, difficulty: 0.82, minRod: 2, behavior: 'sinker', area: 'tideflat' },
+  { id: 'gizzard-shad', name: '전어', rarity: 'common', basePrice: 100, minCm: 15, maxCm: 30, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['estuary'] },
+  { id: 'big-eyed-herring', name: '밴댕이', rarity: 'common', basePrice: 95, minCm: 10, maxCm: 18, difficulty: 0.3, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['estuary'] },
+  { id: 'kuruma-prawn', name: '보리새우', rarity: 'common', basePrice: 110, minCm: 10, maxCm: 25, difficulty: 0.4, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['estuary'] },
+  { id: 'chum-salmon', name: '연어', rarity: 'uncommon', basePrice: 270, minCm: 50, maxCm: 90, difficulty: 0.55, minRod: 1, behavior: 'smooth', area: 'tideflat', spots: ['estuary'] },
+  { id: 'mantis-shrimp', name: '갯가재', rarity: 'uncommon', basePrice: 250, minCm: 10, maxCm: 20, difficulty: 0.5, minRod: 1, behavior: 'sinker', area: 'tideflat' },
+  { id: 'razor-clam', name: '맛조개', rarity: 'uncommon', basePrice: 230, minCm: 8, maxCm: 15, difficulty: 0.45, minRod: 1, behavior: 'sinker', area: 'tideflat', spots: ['creek'] },
+  { id: 'ghost-crab', name: '칠게', rarity: 'common', basePrice: 100, minCm: 3, maxCm: 6, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'tideflat', spots: ['creek'] },
+  { id: 'surf-clam', name: '동죽', rarity: 'common', basePrice: 90, minCm: 3, maxCm: 6, difficulty: 0.3, minRod: 1, behavior: 'sinker', area: 'tideflat', spots: ['creek'] },
+  // 확장(2026-11-25): 섬. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'blue-tang', name: '블루탱', rarity: 'common', basePrice: 90, minCm: 15, maxCm: 30, difficulty: 0.35, minRod: 1, behavior: 'mixed', area: 'island', spots: ['lagoon'] },
+  { id: 'seahorse', name: '해마', rarity: 'common', basePrice: 85, minCm: 5, maxCm: 12, difficulty: 0.35, minRod: 1, behavior: 'floater', area: 'island', spots: ['lagoon'] },
+  { id: 'ribbon-eel', name: '리본장어', rarity: 'uncommon', basePrice: 250, minCm: 50, maxCm: 100, difficulty: 0.6, minRod: 1, behavior: 'smooth', area: 'island', spots: ['lagoon'] },
+  { id: 'porcupinefish', name: '가시복', rarity: 'uncommon', basePrice: 240, minCm: 20, maxCm: 40, difficulty: 0.6, minRod: 1, behavior: 'floater', area: 'island', spots: ['lagoon'] },
+  { id: 'parrotfish', name: '파랑비늘돔', rarity: 'common', basePrice: 90, minCm: 25, maxCm: 50, difficulty: 0.35, minRod: 1, behavior: 'mixed', area: 'island', spots: ['sea'] },
+  { id: 'needlefish', name: '동갈치', rarity: 'common', basePrice: 80, minCm: 40, maxCm: 90, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'island', spots: ['sea'] },
+  { id: 'remora', name: '빨판상어', rarity: 'common', basePrice: 95, minCm: 30, maxCm: 70, difficulty: 0.4, minRod: 1, behavior: 'smooth', area: 'island', spots: ['sea'] },
+  { id: 'napoleonfish', name: '나폴레옹피시', rarity: 'uncommon', basePrice: 300, minCm: 60, maxCm: 150, difficulty: 0.65, minRod: 1, behavior: 'smooth', area: 'island', spots: ['sea'] },
+  { id: 'giant-trevally', name: '무명갈전갱이', rarity: 'uncommon', basePrice: 280, minCm: 50, maxCm: 120, difficulty: 0.65, minRod: 1, behavior: 'dart', area: 'island', spots: ['sea'] },
+  { id: 'hammerhead', name: '귀상어', rarity: 'rare', basePrice: 700, minCm: 150, maxCm: 300, difficulty: 0.85, minRod: 2, behavior: 'smooth', area: 'island', spots: ['sea'] },
+  // 확장(2026-11-25): 늪지. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'tadpole', name: '올챙이', rarity: 'common', basePrice: 120, minCm: 2, maxCm: 6, difficulty: 0.3, minRod: 1, behavior: 'dart', area: 'swamp' },
+  { id: 'chinese-minnow', name: '왜몰개', rarity: 'common', basePrice: 130, minCm: 4, maxCm: 8, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'swamp' },
+  { id: 'marsh-shrimp', name: '늪새우', rarity: 'common', basePrice: 140, minCm: 3, maxCm: 6, difficulty: 0.4, minRod: 1, behavior: 'dart', area: 'swamp', spots: ['bog'] },
+  { id: 'bichir', name: '엔드리케리', rarity: 'uncommon', basePrice: 360, minCm: 30, maxCm: 60, difficulty: 0.6, minRod: 1, behavior: 'smooth', area: 'swamp' },
+  { id: 'stickleback', name: '가시고기', rarity: 'uncommon', basePrice: 320, minCm: 5, maxCm: 9, difficulty: 0.6, minRod: 1, behavior: 'dart', area: 'swamp' },
+  { id: 'arapaima', name: '피라루쿠', rarity: 'rare', basePrice: 1250, minCm: 150, maxCm: 300, difficulty: 0.85, minRod: 3, behavior: 'smooth', area: 'swamp' },
+  // 확장(2026-11-25): 산정 호수. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'frost-minnow', name: '서리모치', rarity: 'common', basePrice: 100, minCm: 6, maxCm: 12, difficulty: 0.4, minRod: 1, behavior: 'dart', area: 'summit', spots: ['ice'] },
+  { id: 'ice-krill', name: '얼음새우', rarity: 'common', basePrice: 95, minCm: 2, maxCm: 5, difficulty: 0.4, minRod: 1, behavior: 'floater', area: 'summit', spots: ['ice'] },
+  { id: 'glacier-trout', name: '빙하송어', rarity: 'uncommon', basePrice: 320, minCm: 30, maxCm: 60, difficulty: 0.62, minRod: 1, behavior: 'dart', area: 'summit', spots: ['ice'] },
+  { id: 'ice-catfish', name: '얼음메기', rarity: 'uncommon', basePrice: 300, minCm: 30, maxCm: 70, difficulty: 0.6, minRod: 1, behavior: 'sinker', area: 'summit', spots: ['ice'] },
+  { id: 'guppy', name: '구피', rarity: 'common', basePrice: 110, minCm: 3, maxCm: 6, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'summit', spots: ['hotspring'] },
+  { id: 'neon-tetra', name: '네온테트라', rarity: 'common', basePrice: 115, minCm: 2, maxCm: 4, difficulty: 0.35, minRod: 1, behavior: 'dart', area: 'summit', spots: ['hotspring'] },
+  { id: 'rainbowfish', name: '레인보우피시', rarity: 'common', basePrice: 120, minCm: 6, maxCm: 12, difficulty: 0.4, minRod: 1, behavior: 'mixed', area: 'summit', spots: ['hotspring'] },
+  { id: 'doctor-fish', name: '닥터피시', rarity: 'uncommon', basePrice: 280, minCm: 6, maxCm: 12, difficulty: 0.55, minRod: 1, behavior: 'mixed', area: 'summit', spots: ['hotspring'] },
+  { id: 'arowana', name: '아로와나', rarity: 'rare', basePrice: 1100, minCm: 60, maxCm: 100, difficulty: 0.85, minRod: 3, behavior: 'smooth', area: 'summit', spots: ['hotspring'] },
+  // 확장(2026-11-25): 난파선 앞바다. 조건 없는 상시 어종(자리마다 흔함4·드묾2·희귀1)
+  { id: 'scorpionfish', name: '쏨뱅이', rarity: 'common', basePrice: 190, minCm: 15, maxCm: 30, difficulty: 0.45, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['wreck'] },
+  { id: 'black-porgy', name: '감성돔', rarity: 'common', basePrice: 220, minCm: 25, maxCm: 50, difficulty: 0.5, minRod: 5, behavior: 'mixed', area: 'wreck', spots: ['wreck'] },
+  { id: 'rock-bream', name: '돌돔', rarity: 'uncommon', basePrice: 520, minCm: 30, maxCm: 60, difficulty: 0.65, minRod: 5, behavior: 'mixed', area: 'wreck', spots: ['wreck'] },
+  { id: 'spider-crab', name: '키다리게', rarity: 'uncommon', basePrice: 540, minCm: 40, maxCm: 120, difficulty: 0.7, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['wreck'] },
+  { id: 'sawshark', name: '톱상어', rarity: 'rare', basePrice: 1350, minCm: 100, maxCm: 150, difficulty: 0.88, minRod: 5, behavior: 'smooth', area: 'wreck', spots: ['wreck'] },
+  { id: 'firefly-squid', name: '반딧불오징어', rarity: 'common', basePrice: 190, minCm: 5, maxCm: 8, difficulty: 0.45, minRod: 5, behavior: 'floater', area: 'wreck', spots: ['abyss'] },
+  { id: 'vampire-squid', name: '흡혈오징어', rarity: 'common', basePrice: 210, minCm: 10, maxCm: 25, difficulty: 0.5, minRod: 5, behavior: 'floater', area: 'wreck', spots: ['abyss'] },
+  { id: 'lanternfish', name: '샛비늘치', rarity: 'common', basePrice: 180, minCm: 5, maxCm: 12, difficulty: 0.45, minRod: 5, behavior: 'dart', area: 'wreck', spots: ['abyss'] },
+  { id: 'footballfish', name: '초롱아귀', rarity: 'uncommon', basePrice: 560, minCm: 20, maxCm: 60, difficulty: 0.7, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['abyss'] },
+  { id: 'giant-isopod', name: '자이언트이소포드', rarity: 'uncommon', basePrice: 540, minCm: 20, maxCm: 40, difficulty: 0.68, minRod: 5, behavior: 'sinker', area: 'wreck', spots: ['abyss'] },
 ]
 
 export const RODS: Rod[] = [
@@ -312,7 +397,7 @@ export const TACKLE_FX = { corkBar: 1.2, trapDrain: 0.75, spinnerBite: 0.7, curi
 
 /**
  * 판매 마릿수 감쇠(설계 2026-11-25-fishing-sell-decay-design.md): KST 하루에 판 n번째 물고기의 판매가 배율(%).
- * [이 마릿수까지, 배율] 차례. 후반 가격(장비 ×1.6, 지역 ×2.2, 갯벌 제외)과 함께 하루 1시간 약 30일에 맞췄다(econSim)
+ * [이 마릿수까지, 배율] 차례. 후반 가격(장비 ×1.6, 지역 ×2.2, 갯벌 제외)과 함께 하루 1시간 약 30일에 맞췄다(econSim). 어종 확장(v19)으로 약 25일이 됐고 그대로 받아들였다(2026-11-25-fishing-species-expansion-design.md)
  */
 export const SELL_DECAY: readonly (readonly [upTo: number, pct: number])[] = [
   [150, 100],

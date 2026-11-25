@@ -16,9 +16,9 @@ const daily = simulate(BUY_ORDER, { hoursPerDay: 1 })
 const at = (ms: typeof plain, label: string) => ms.find((m) => m.label === label)!
 
 describe('REF (지갑 설계 §4)', () => {
-  it('2단계 낚싯대·마을 물가·20칸 기대 수입이 REF ±25% (계산값 20,515)', () => {
+  it('2단계 낚싯대·마을 물가·20칸 기대 수입이 REF ±25% (계산값 21,494, 어종 확장 v19)', () => {
     const v = hourlyIncome('village', 'shore', { rodTier: 2, bagTier: 1, equipped: [] })
-    expect(Math.abs(v - 20_515) / 20_515).toBeLessThan(0.01)
+    expect(Math.abs(v - 21_494) / 21_494).toBeLessThan(0.01)
     expect(Math.abs(v - REF) / REF).toBeLessThan(0.25)
   })
 })
@@ -69,14 +69,14 @@ describe('진행 시뮬레이션 (감쇠 없음)', () => {
   it('기존 장비·해금은 지금 속도 그대로(4시간 안에 다 산다)', () => {
     expect(at(plain, '가시 바늘').atHours).toBeLessThan(4)
   })
-  it('감쇠가 없으면 전부 다 사기까지 약 26.8시간(±20%, 몰아서 하는 경우의 참고값)', () => {
+  it('감쇠가 없으면 전부 다 사기까지 약 22.1시간(±20%, 몰아서 하는 경우의 참고값, 어종 확장 v19)', () => {
     const h = plain[plain.length - 1].atHours
-    expect(h).toBeGreaterThan(26.8 * 0.8)
-    expect(h).toBeLessThan(26.8 * 1.2)
+    expect(h).toBeGreaterThan(22.1 * 0.8)
+    expect(h).toBeLessThan(22.1 * 1.2)
   })
-  it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각(감쇠 없음은 낚시 5부 전과 같다, 하루 1시간 감쇠는 기록 값)', () => {
-    expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.36, 1.46, 1.55, 2.2, 2.86, 2.88, 2.9, 2.92])
-    expect(daily.slice(0, 13).map((m) => +m.atDay.toFixed(2))).toEqual([0.14, 0.18, 0.4, 0.76, 0.82, 1.45, 1.55, 1.64, 2.4, 3.15, 3.17, 3.19, 3.21])
+  it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각(기록 값, 어종 확장 v19에서 다시 잼)', () => {
+    expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.05, 1.14, 1.23, 1.85, 2.48, 2.49, 2.51, 2.54])
+    expect(daily.slice(0, 13).map((m) => +m.atDay.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.14, 1.23, 1.31, 2.02, 2.65, 2.66, 2.68, 2.71])
     expect(plain[12].label).toBe('가시 바늘')
     expect(plain.slice(13, 15).map((m) => m.label)).toEqual(['갯벌 해금', '늪지 해금'])
   })
@@ -90,10 +90,10 @@ describe('진행 시뮬레이션 (감쇠 없음)', () => {
 })
 
 describe('하루 1시간 + 판매 마릿수 감쇠', () => {
-  it('전부 다 사기까지 약 30일(27~41일 안)', () => {
+  it('전부 다 사기까지 약 25일(21~31일 안, 어종 확장 v19 목표)', () => {
     const d = daily[daily.length - 1].atDay
-    expect(d).toBeGreaterThan(27)
-    expect(d).toBeLessThan(41)
+    expect(d).toBeGreaterThan(21)
+    expect(d).toBeLessThan(31)
   })
   it('3주 안에 다 사지 못한다, 기존 장비는 일주일 안', () => {
     expect(daily[daily.length - 1].atDay).toBeGreaterThan(21)
@@ -108,17 +108,17 @@ describe('하루 여러 시간 + 판매 마릿수 감쇠 (기록, ±5%)', () => 
     return memo.get(h)!
   }
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want, `${v} vs ${want}`).toBeLessThan(0.05)
-  it('하루 1·2·3·5·10시간 = 30.4 / 21.4 / 20.1 / 18.2 / 15.7일', () => {
-    near(daysFor(1), 30.35)
-    near(daysFor(2), 21.38)
-    near(daysFor(3), 20.05)
-    near(daysFor(5), 18.25)
-    near(daysFor(10), 15.75)
+  it('하루 1·2·3·5·10시간 = 25.1 / 17.7 / 16.3 / 15.1 / 13.0일', () => {
+    near(daysFor(1), 25.05)
+    near(daysFor(2), 17.65)
+    near(daysFor(3), 16.28)
+    near(daysFor(5), 15.12)
+    near(daysFor(10), 13.02)
   })
-  it('오래 할수록 빠르지만 하루 10시간도 2주 넘게 걸린다', () => {
+  it('오래 할수록 빠르지만 하루 10시간도 12일 넘게 걸린다(어종 확장 v19 전에는 2주)', () => {
     expect(daysFor(1)).toBeGreaterThan(daysFor(3))
     expect(daysFor(3)).toBeGreaterThan(daysFor(10))
-    expect(daysFor(10)).toBeGreaterThan(14)
+    expect(daysFor(10)).toBeGreaterThan(12)
   })
 })
 
@@ -180,15 +180,17 @@ describe('시뮬레이션 확장 (합성 지역)', () => {
 // ---------------------------------------------------------------- 낚시 5부 M2: 갯벌·늪지
 describe('갯벌·늪지 수입 (40칸, 회전+호기심, 얻을 수 있는 신화 버프 포함)', () => {
   const gear = (rodTier: 4 | 5 | 6) => ({ rodTier, bagTier: 3 as const, equipped: ['spinner', 'curious'] as TackleId[], buffs: buffsAt(['cave', 'tideflat', 'swamp'], rodTier) })
-  it.each([4, 5, 6] as const)('낚싯대 %i: 갯벌 갯골(물때 섞음) < 동굴 용암, 늪지 수렁 ≤ 동굴 용암', (rod) => {
+  // 어종 확장(v19)부터 해금 비용 순서(동굴 15,000 < 갯벌 30,000 < 늪지 132,000)와 같다. 그 전에는 갯골 < 용암, 수렁 ≤ 용암이었다
+  it.each([4, 5, 6] as const)('낚싯대 %i: 동굴 용암 < 갯벌 갯골(물때 섞음) < 늪지 수렁', (rod) => {
     const lava = hourlyIncome('cave', 'cave3', gear(rod))
-    expect(hourlyIncome('tideflat', 'creek', gear(rod))).toBeLessThan(lava)
-    expect(hourlyIncome('swamp', 'bog', gear(rod))).toBeLessThanOrEqual(lava)
+    const creek = hourlyIncome('tideflat', 'creek', gear(rod))
+    expect(lava).toBeLessThan(creek)
+    expect(creek).toBeLessThan(hourlyIncome('swamp', 'bog', gear(rod)))
   })
-  it('시험 계산과 같은 크기(±5%): 낚싯대 4에서 갯골 61,400 · 수렁 73,700', () => {
+  it('기록 값(±5%): 낚싯대 4에서 갯골 87,600 · 수렁 107,800(어종 확장 v19)', () => {
     const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.05)
-    near(hourlyIncome('tideflat', 'creek', gear(4)), 61_400)
-    near(hourlyIncome('swamp', 'bog', gear(4)), 73_700)
+    near(hourlyIncome('tideflat', 'creek', gear(4)), 87_600)
+    near(hourlyIncome('swamp', 'bog', gear(4)), 107_800)
   })
   it('이무기의 비늘은 늪지와 백골 낚싯대가 있어야 얻었다고 본다', () => {
     expect(buffsAt(['swamp'], 4)).toEqual([])
@@ -230,15 +232,15 @@ describe('산정 호수·난파선 수입과 최종 진행 (40칸, 회전+호기
 // 사용자 초안(마을·강·숲 20, 호수·동굴 40, 섬·갯벌·늪지 40, 산정·난파선 70)은 최대 차이 0.18(산 호수에서 앞섬)이라
 // 호수 20 / 동굴 60, 산정 60 / 난파선 80으로 옮겨 0.12로 맞췄다(합 400 그대로).
 describe('도전과제 보너스 = 낚시 수입 곡선 (로그 정규화)', () => {
-  // 처음(대나무·20칸·기본 지역)의 가장 좋은 자리 수입. simulate는 구매 뒤 값만 주므로 따로 잰다(약 11,500)
+  // 처음(대나무·20칸·기본 지역)의 가장 좋은 자리 수입. simulate는 구매 뒤 값만 주므로 따로 잰다(약 12,600)
   const start = Math.max(...DEFAULT_AREAS.flatMap((a) => AREAS.find((x) => x.id === a)!.spots.map((spot) => hourlyIncome(a, spot, { rodTier: 1, bagTier: 1, equipped: [] }))))
   const final = plain[plain.length - 1].incomeAfter
   const pctOf = (area: AreaId) => CHALLENGES.find((c) => c.area === area)?.freeBonusPct ?? 0
   const unlocks = plain.filter((m) => m.label.endsWith(' 해금'))
   const areaOfLabel = (label: string) => (Object.entries(UNLOCKS) as [AreaId, { name: string }][]).find(([id]) => label === `${AREAS.find((a) => a.id === id)!.name} 해금`)?.[0]
 
-  it('해금 지점 일곱 곳을 모두 찾는다(지역 이름 = 라벨), 처음 수입 약 11,500', () => {
-    expect(Math.abs(start - 11_499) / 11_499).toBeLessThan(0.01)
+  it('해금 지점 일곱 곳을 모두 찾는다(지역 이름 = 라벨), 처음 수입 약 12,600(어종 확장 v19)', () => {
+    expect(Math.abs(start - 12_586) / 12_586).toBeLessThan(0.01)
     expect(unlocks.map((m) => areaOfLabel(m.label))).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
   })
   it('해금 지점마다 |ln(배율)/ln 5 − ln(낚시 비율)/ln(최종 비율)| ≤ 0.15, 다 깨면 ×5', () => {

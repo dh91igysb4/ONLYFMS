@@ -119,4 +119,15 @@ describe('ownership', () => {
     expect(unlockMet({ ...empty, challenges: all }, { kind: 'allChallenges' }, grown)).toBe(false)
     expect(ownsWear({ ...empty, challenges: all, wardrobe: ['rodSkin:rainbow'] }, 'rodSkin', 'rainbow')).toBe(true)
   })
+
+  test('지역 도감 옷: 어종 확장(2026-11-25)으로 조건이 거짓이 돼도 wardrobe에 있으면 가진다', () => {
+    const fishHat = WEAR.find((w) => w.unlock?.kind === 'areaDex')!
+    const key = `${fishHat.slot}:${fishHat.id}`
+    const oldForest = Object.fromEntries(SPECIES.slice(0, 94).filter((s) => s.area === 'forest').map((s) => [s.id, { count: 1 }]))
+    expect(Object.keys(oldForest)).toHaveLength(8)
+    const f: OwnFacts = { ...empty, dex: oldForest, wardrobe: [key] }
+    expect(unlockMet(f, { kind: 'areaDex' })).toBe(false)
+    expect(ownsWear(f, fishHat.slot, fishHat.id)).toBe(true)
+    expect(newlyEarned(f)).not.toContain(key)
+  })
 })

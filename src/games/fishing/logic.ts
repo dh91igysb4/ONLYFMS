@@ -697,7 +697,35 @@ function migrate(raw: unknown, fromVersion: number): State {
     buffs,
     sold: parseSold(raw.sold),
     fridge,
-    pending: null,
+    pending: migratePending(raw.pending, fromVersion),
+  }
+}
+
+/** pending 형식이 지금과 같아진 버전(v18). 그 전 세이브의 진행 중 낚시는 버린다 */
+const PENDING_FORMAT_SINCE = 18
+const SEASON_IDS: readonly string[] = ['spring', 'summer', 'autumn', 'winter']
+const WEATHER_IDS: readonly string[] = ['sun', 'rain']
+/**
+ * 진행 중 낚시를 버전이 바뀌어도 이어 준다(어종 확장 v19, 배포 순간 낚던 물고기를 잃지 않게).
+ * 형식이 같은 버전(PENDING_FORMAT_SINCE 이상)이고 어종·지역·자리를 알고 값이 모두 온전할 때만, 아니면 null
+ */
+function migratePending(raw: unknown, fromVersion: number): Pending | null {
+  if (fromVersion < PENDING_FORMAT_SINCE || !isObj(raw)) return null
+  const { species, sizeCm, biteDelayMs, startedAt, hookedAt, area, spot, cond, power } = raw
+  const a = AREAS.find((x) => x.id === area)
+  if (!knownSpecies(species) || !a || typeof spot !== 'string' || !a.spots.includes(spot)) return null
+  if (![sizeCm, biteDelayMs, startedAt, power].every(isNum) || !(hookedAt === null || isNum(hookedAt))) return null
+  if (!isObj(cond) || !isNum(cond.gameMinute) || !isNum(cond.gameDay) || !SEASON_IDS.includes(cond.season as string) || !WEATHER_IDS.includes(cond.weather as string)) return null
+  return {
+    species,
+    sizeCm: sizeCm as number,
+    biteDelayMs: biteDelayMs as number,
+    startedAt: startedAt as number,
+    hookedAt: hookedAt as number | null,
+    area: a.id,
+    spot,
+    cond: { gameMinute: cond.gameMinute, gameDay: cond.gameDay, season: cond.season as Conditions['season'], weather: cond.weather as Conditions['weather'] },
+    power: power as number,
   }
 }
 
@@ -740,7 +768,8 @@ export const logic: WorldLogic<State, Action, View> = {
   //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
   // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
   // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
-  version: 18,
+  // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
+  version: 19,
   wallet: true,
   init,
   migrate,
