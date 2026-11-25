@@ -241,7 +241,8 @@ export type Action =
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
-export type View = Omit<State, 'pending' | 'buffs'> & { pending: PendingView | null; buffs?: BuffId[]; gold: number }
+// sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
+export type View = Omit<State, 'pending' | 'buffs' | 'sold'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
