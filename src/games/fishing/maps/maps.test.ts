@@ -114,7 +114,7 @@ describe('맵 등록부', () => {
     expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'hall', 'island', 'lake', 'river', 'summit', 'swamp', 'tideflat', 'village', 'wreck'])
     // 내 섬(isle)은 섬 모양마다 맵이 달라 등록부에 없다(isle.test.ts)
     for (const { id } of AREAS) {
-      if (id === 'isle') continue
+      if (id === 'isle' || id === 'home') continue
       expect(mapFor(id)).toBe(MAPS[id])
       expect(mapFor(id)!.id).toBe(id)
     }

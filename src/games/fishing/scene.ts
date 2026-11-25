@@ -469,6 +469,18 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     drawIceRim(ctx, g, tx, ty)
     return
   }
+  // 집 안(배경 그림이 없는 실내): 나무 바닥·벽
+  if ((kind === 'floor' || kind === 'wall') && !g.map.backdrop) {
+    drawSprite(ctx, kind === 'floor' ? 'home-floor' : 'home-wall', x, y, 1)
+    if (kind === 'wall') {
+      const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)
+      if (prop) {
+        drawSprite(ctx, 'home-floor', x, y, 1)
+        drawSprite(ctx, prop.sprite, x, y, 1)
+      }
+    }
+    return
+  }
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
   else if (kind === 'cliff') drawSprite(ctx, 'tile-cliff', x, y, 1)

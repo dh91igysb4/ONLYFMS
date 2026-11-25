@@ -37,3 +37,20 @@ export function toolCost(tier: number): Cost | null {
 export const B_GOLD_TOTAL: number =
   Array.from({ length: ISLE_ZONES }, (_, i) => clearCost(i + 1).gold).reduce((a, b) => a + b, 0) +
   TOOL_IDS.length * (toolCost(2)!.gold + toolCost(3)!.gold)
+
+// ---------------------------------------------------------------- 집(C단계, 설계 2026-11-26-my-isle-c §4.2)
+/** 집 최고 단계(0 텐트, 1 오두막, 2 작은 집, 3 집, 4 큰 집) */
+export const HOUSE_MAX = 4
+
+/** 집을 n(1..4) 단계로 올리는 값: 골드 floor10(REF × 1.7 × n^1.8), 나무 30n, 돌 20n, 철 10(n−1) */
+export function houseCost(n: number): Cost {
+  return { gold: floor10(REF * 1.7 * n ** 1.8), wood: 30 * n, stone: 20 * n, iron: 10 * (n - 1) }
+}
+
+/** 집 n단계에 필요한 개간 구역 수 */
+export function houseNeedsCleared(n: number): number {
+  return n >= 4 ? ISLE_ZONES : n >= 3 ? 4 : 0
+}
+
+/** 집 골드 총액(1~4단계) */
+export const HOUSE_GOLD_TOTAL: number = Array.from({ length: HOUSE_MAX }, (_, i) => houseCost(i + 1).gold).reduce((a, b) => a + b, 0)

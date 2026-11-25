@@ -31,3 +31,16 @@ describe('내 섬 B 가격 (설계 2026-11-26-my-isle-b §5.4)', () => {
     expect(sum).toBeLessThanOrEqual(REF * 30 * 1.15)
   })
 })
+
+describe('집 단계 가격 (설계 2026-11-26-my-isle-c §4.2)', () => {
+  it('단계 n 골드 floor10(REF×1.7×n^1.8), 나무 30n·돌 20n·철 10(n−1), 개간 조건', async () => {
+    const { HOUSE_MAX, houseCost, houseNeedsCleared, HOUSE_GOLD_TOTAL } = await import('./isleEcon.ts')
+    expect(HOUSE_MAX).toBe(4)
+    expect([1, 2, 3, 4].map((n) => houseCost(n).gold)).toEqual([34850, 121350, 251770, 422580])
+    expect(houseCost(2)).toEqual({ gold: 121350, wood: 60, stone: 40, iron: 10 })
+    expect([1, 2, 3, 4].map(houseNeedsCleared)).toEqual([0, 0, 4, 8])
+    expect(HOUSE_GOLD_TOTAL).toBe(830550)
+    expect(HOUSE_GOLD_TOTAL).toBeGreaterThanOrEqual(REF * 40 * 0.85)
+    expect(HOUSE_GOLD_TOTAL).toBeLessThanOrEqual(REF * 40 * 1.15)
+  })
+})

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { WorldPlayer } from '../../lib/api.ts'
 import { ISLE_LAYOUTS, type IsleLayoutId } from './data.ts'
 import { isleMap } from './isle.ts'
-import { ISLE_ZONES, TOOL_IDS, TOOL_MAX, clearCost, toolCost, zoneNeeds, type Cost, type Mats, type ToolId } from './isleEcon.ts'
+import { HOUSE_MAX, ISLE_ZONES, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Cost, type Mats, type ToolId } from './isleEcon.ts'
+import { FURNITURE, type FurnId } from './home.ts'
 import type { IsleState } from './logic.ts'
 
 type BoatProps = {
@@ -94,18 +95,24 @@ type WorkbenchProps = {
   busy: boolean
   onCraft: (tool: ToolId, tier: number, price: number) => void
   onClear: (zone: number, price: number) => void
+  onBuild: (level: number, price: number) => void
+  onMake: (id: FurnId, price: number) => void
 }
+const HOUSE_NAMES = ['텐트', '오두막', '작은 집', '집', '큰 집'] as const
+type BenchTab = 'tools' | 'clear' | 'house' | 'furn'
+const BENCH_TABS: readonly [BenchTab, string][] = [['tools', '도구'], ['clear', '개간'], ['house', '집'], ['furn', '가구']]
 
 /** 작업대(내 섬 B 설계 §5.5): 도구 올리기·다음 구역 개간. 가진 재료를 맨 위에 */
-export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear }: WorkbenchProps) {
-  const [tab, setTab] = useState<'tools' | 'clear'>('tools')
+export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear, onBuild, onMake }: WorkbenchProps) {
+  const [tab, setTab] = useState<BenchTab>('tools')
   const next = isle.cleared + 1
   return (
     <section className="fish-panel-body fish-workbench" aria-label="작업대">
       <p className="muted">{matLine(isle.mats)}</p>
       <div className="fish-dex-tabs" role="tablist" aria-label="작업대">
-        <button type="button" role="tab" aria-selected={tab === 'tools'} className={`fish-dex-tab${tab === 'tools' ? ' fish-dex-tab-on' : ''}`} onClick={() => setTab('tools')}>도구</button>
-        <button type="button" role="tab" aria-selected={tab === 'clear'} className={`fish-dex-tab${tab === 'clear' ? ' fish-dex-tab-on' : ''}`} onClick={() => setTab('clear')}>개간</button>
+        {BENCH_TABS.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`fish-dex-tab${tab === id ? ' fish-dex-tab-on' : ''}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
       </div>
       {tab === 'tools' && (
         <ul className="fish-workbench-list">
@@ -143,6 +150,55 @@ export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear }: Workbench
           </div>
         )
       })())}
+      {tab === 'house' && (isle.house >= HOUSE_MAX ? (
+        <p className="muted">{`${HOUSE_NAMES[isle.house]} — 최고 단계예요`}</p>
+      ) : (() => {
+        const n = isle.house + 1
+        const cost = houseCost(n)
+        const needClear = houseNeedsCleared(n)
+        const short = isle.cleared < needClear
+        return (
+          <div className="fish-rod">
+            <div className="fish-rod-info">
+              <strong>{`${HOUSE_NAMES[isle.house]} → ${HOUSE_NAMES[n]}`}</strong>
+              <span className="muted">{costLine(cost)}</span>
+              {short && <span className="fish-shop-note">{`개간 ${needClear}구역이 있어야 해요`}</span>}
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy || short || !enough(isle.mats, gold, cost)} onClick={() => onBuild(n, cost.gold)}>짓기</button>
+          </div>
+        )
+      })())}
+      {tab === 'furn' && (
+        <ul className="fish-workbench-list">
+          {FURNITURE.map((f) => (
+            <li key={f.id} className="fish-rod">
+              <div className="fish-rod-info">
+                <strong>{`${f.name} · 가진 것 ${isle.furniture[f.id] ?? 0}`}</strong>
+                <span className="muted">{costLine(f.cost)}</span>
+              </div>
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy || !enough(isle.mats, gold, f.cost)} onClick={() => onMake(f.id, f.cost.gold)}>만들기</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/** 집 안 가구 놓기 창: 보관함의 가구를 골라 앞 칸에 놓는다 */
+export function FurnPanel({ furniture, busy, onPick }: { furniture: Partial<Record<FurnId, number>>; busy: boolean; onPick: (id: FurnId) => void }) {
+  const have = FURNITURE.filter((f) => (furniture[f.id] ?? 0) > 0)
+  return (
+    <section className="fish-panel-body fish-furn" aria-label="가구 놓기">
+      {have.length === 0 ? (
+        <p className="muted">보관함이 비었어요. 섬 작업대에서 가구를 만들어 주세요</p>
+      ) : (
+        <div className="fish-furn-list">
+          {have.map((f) => (
+            <button key={f.id} type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onPick(f.id)}>{`${f.name} ${furniture[f.id]}개`}</button>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

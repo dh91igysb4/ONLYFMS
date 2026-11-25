@@ -139,6 +139,8 @@ export type FameSlot = { group: 'record'; key: string } | { group: 'site'; index
 /** 내 섬 자원 칸: 나무(도끼 → 나무), 바위(곡괭이 → 돌), 철광(곡괭이 → 철) */
 export type NodeKind = 'tree' | 'rock' | 'iron'
 export type MapNode = { id: string; tx: number; ty: number; kind: NodeKind }
+/** 칸 위 물건 그림. id는 상호작용에 돌려줄 값(가구 id) */
+export type MapProp = { tx: number; ty: number; sprite: string; id?: string }
 /** 고정물(자판기·행거·노트북 등) 앞에서 할 수 있는 일 */
 export type FixtureAct =
   | { kind: 'shop' }
@@ -203,6 +205,10 @@ export type MapDef = {
   backdrop: string | null
   /** 자원 칸(내 섬 B): 그 칸을 보면 { kind: 'node' }. 드러난 칸만 */
   nodes: readonly MapNode[]
+  /** 칸 위에 그리는 물건(집 안 가구). 그 칸은 rows에서 이미 못 걷는 칸이다 */
+  props: readonly MapProp[]
+  /** 가구를 놓는 맵(집 안): 빈 바닥을 보면 { kind: 'furnSpot' } */
+  placeable: boolean
   /** 건물 외관 스프라이트(건물 사각형 왼쪽 아래에 맞춰 그린다). 기본 마을회관 'hall-exterior', 내 섬은 'tent' */
   buildingSprite: string
 }
@@ -297,7 +303,7 @@ export type MapOpts = {
   spots?: MapDef['spots']; exits?: Exit[]; gates?: Gate[]; docks?: Dock[]; indoor?: boolean
   world?: MapDef['world']; teleporter?: Teleporter
   tidal?: boolean; fog?: boolean; snowy?: boolean
-  walls?: WallSpec; fixtures?: Fixture[]; onWorldMap?: boolean; backdrop?: string; buildingSprite?: string; nodes?: MapNode[]
+  walls?: WallSpec; fixtures?: Fixture[]; onWorldMap?: boolean; backdrop?: string; buildingSprite?: string; nodes?: MapNode[]; props?: MapProp[]; placeable?: boolean
 }
 
 const rectInside = (map: MapDef, r: Rect): boolean =>
@@ -352,6 +358,8 @@ export function defineMap(id: AreaId, rows: readonly string[], opts: MapOpts = {
     walls: wallKeys(opts.walls), fixtures: opts.fixtures ?? [], onWorldMap: opts.onWorldMap ?? true, backdrop: opts.backdrop ?? null,
     buildingSprite: opts.buildingSprite ?? 'hall-exterior',
     nodes: opts.nodes ?? [],
+    props: opts.props ?? [],
+    placeable: opts.placeable ?? false,
   }
   checkPlaces(map)
   map.building = computeBuilding(map)
@@ -464,6 +472,8 @@ export type Interaction =
   | { kind: 'teleporter' }
   | { kind: 'drill' }
   | { kind: 'node'; id: string; res: NodeKind }
+  | { kind: 'furn'; tx: number; ty: number; id: string }
+  | { kind: 'furnSpot'; tx: number; ty: number }
   | null
 
 /** 낚시 자리 id. 앞이 물 종류가 아니거나 맵에 그 물의 자리가 없으면 null. 부두 위에서 바다를 보면 'pier'(선착장 dock은 부두가 아니라 그 물의 자리 그대로). */
@@ -494,6 +504,9 @@ export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Ope
   if (map.teleporter && inRect(map.teleporter.tiles, here.tx + dx, here.ty + dy)) return { kind: 'teleporter' }
   const node = map.nodes.find((n) => n.tx === here.tx + dx && n.ty === here.ty + dy)
   if (node) return { kind: 'node', id: node.id, res: node.kind }
+  const prop = map.props.find((p) => p.tx === here.tx + dx && p.ty === here.ty + dy)
+  if (prop?.id) return { kind: 'furn', tx: prop.tx, ty: prop.ty, id: prop.id }
+  if (map.placeable && tileAt(map, here.tx + dx, here.ty + dy) === 'floor') return { kind: 'furnSpot', tx: here.tx + dx, ty: here.ty + dy }
   const fx = here.tx + dx
   const fy = here.ty + dy
   const front = tileAt(map, fx, fy)

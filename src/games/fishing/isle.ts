@@ -4,7 +4,8 @@ import { AREAS, type AreaId, type IsleLayoutId } from './data.ts'
 import { defineMap, type MapDef, type MapNode, type MapOpts, type NodeKind, type TileFacing } from './map.ts'
 import { ISLE_CRESCENT, ISLE_CRESCENT_OPTS, ISLE_CRESCENT_ROWS } from './maps/isle-crescent.ts'
 import { ISLE_TWIN, ISLE_TWIN_OPTS, ISLE_TWIN_ROWS } from './maps/isle-twin.ts'
-import { ISLE_ZONES } from './isleEcon.ts'
+import { HOUSE_MAX, ISLE_ZONES } from './isleEcon.ts'
+import { homeArrival, type Placed } from './home.ts'
 
 const ISLE_BASE: Readonly<Record<IsleLayoutId, { map: MapDef; rows: readonly string[]; opts: MapOpts }>> = {
   crescent: { map: ISLE_CRESCENT, rows: ISLE_CRESCENT_ROWS, opts: ISLE_CRESCENT_OPTS },
@@ -141,11 +142,21 @@ export function isleZoneTiles(layout: IsleLayoutId): ReadonlyMap<string, number>
   return plan(layout).zones
 }
 
+/** 섬·집 맵을 정하는 값(주인의 섬 상태 중 그림에 쓰는 것) */
+export type IsleShape = { layout: IsleLayoutId; cleared?: number; house?: number; placed?: readonly Placed[] }
+
+/** 집 단계별 섬 건물 그림 */
+export const HOUSE_SPRITES = ['tent', 'hut', 'cottage', 'house', 'manor'] as const
+
 const MAPS = new Map<string, MapDef>()
-/** 섬 모양과 치운 구역 수의 맵(치운 칸은 풀밭, 드러난 자원 칸만 nodes). 같은 값이면 같은 객체 */
-export function isleMap(layout: IsleLayoutId, cleared = 0): MapDef {
+/**
+ * 섬 모양·치운 구역 수·집 단계의 맵(치운 칸은 풀밭, 드러난 자원 칸만 nodes). 같은 값이면 같은 객체.
+ * 집 1단계부터 건물 그림이 바뀌고 문이 집 안(home)으로 가는 출구가 된다(텐트 안내는 빠진다).
+ */
+export function isleMap(layout: IsleLayoutId, cleared = 0, house = 0): MapDef {
   const c = Math.max(0, Math.min(ISLE_ZONES, Math.floor(cleared)))
-  const k = `${layout}:${c}`
+  const h = Math.max(0, Math.min(HOUSE_MAX, Math.floor(house)))
+  const k = `${layout}:${c}:${h}`
   const hit = MAPS.get(k)
   if (hit) return hit
   const base = ISLE_BASE[layout]
@@ -153,7 +164,15 @@ export function isleMap(layout: IsleLayoutId, cleared = 0): MapDef {
   const rows = c === 0 ? base.rows : base.rows.map((row, y) =>
     [...row].map((ch, x) => ((zones.get(key(x, y)) ?? Infinity) <= c ? ',' : ch)).join(''))
   const shown = nodes.filter((n) => n.zone <= c).map(({ id, tx, ty, kind }) => ({ id, tx, ty, kind }))
-  const map = c === 0 && shown.length === 0 ? base.map : defineMap('isle', rows, { ...base.opts, nodes: shown })
+  const door = base.map.building!
+  const opts: MapOpts = h === 0 ? { ...base.opts, nodes: shown } : {
+    ...base.opts,
+    nodes: shown,
+    buildingSprite: HOUSE_SPRITES[h],
+    fixtures: (base.opts.fixtures ?? []).filter((f) => f.act.kind !== 'notice'),
+    exits: [...(base.opts.exits ?? []), { at: { tx: door.doorTx, ty: door.ty + door.h - 1, w: 1, h: 1 }, target: 'home', entry: homeArrival(h) }],
+  }
+  const map = defineMap('isle', rows, opts)
   MAPS.set(k, map)
   return map
 }
@@ -163,12 +182,12 @@ export function isleArrival(_layout: IsleLayoutId): TileFacing {
   return { tx: 24, ty: 30, facing: 'up' }
 }
 
-const OWNER_RE = /^isle-([0-9a-f]{32})$/
+const OWNER_RE = /^(?:isle|home)-([0-9a-f]{32})$/
 const compactId = (id: string): string => id.toLowerCase().replace(/-/g, '')
 
-/** 접속 방·위치의 장소 키: 주인 있는 섬은 `isle-<주인 id 32자>`, 그 외엔 지역 id */
+/** 접속 방·위치의 장소 키: 주인 있는 장소(섬·집)는 `isle-<주인 id 32자>`·`home-<…>`, 그 외엔 지역 id */
 export function placeKey(area: AreaId, owner: string | null): string {
-  return owner ? `isle-${compactId(owner)}` : area
+  return owner && (area === 'isle' || area === 'home') ? `${area}-${compactId(owner)}` : area
 }
 
 /** 장소 키의 섬 주인(하이픈 없는 32자). 섬 키가 아니면 null */
@@ -180,9 +199,10 @@ export function ownerOfPlaceKey(key: string): string | null {
 export function placeName(key: string, opts: { selfId: string | null; players: readonly { id: string; handle: string }[] }): string | null {
   const owner = ownerOfPlaceKey(key)
   if (owner) {
-    if (opts.selfId && compactId(opts.selfId) === owner) return '내 섬'
+    const what = key.startsWith('home-') ? '집' : '섬'
+    if (opts.selfId && compactId(opts.selfId) === owner) return `내 ${what}`
     const p = opts.players.find((x) => compactId(x.id) === owner)
-    return p ? `${p.handle}의 섬` : '누군가의 섬'
+    return p ? `${p.handle}의 ${what}` : `누군가의 ${what}`
   }
   return AREAS.find((a) => a.id === key)?.name ?? null
 }

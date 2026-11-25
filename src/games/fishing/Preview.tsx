@@ -38,7 +38,7 @@ export function Preview({ userId, records, size, onFail, online }: WorldPreviewP
       return
     }
     ctx.imageSmoothingEnabled = false
-    const map = mapFor(st.area, st.isle, st.isleCleared) ?? VILLAGE
+    const map = (st.isle ? mapFor(st.area, { layout: st.isle, cleared: st.isleCleared, house: st.house }) : mapFor(st.area)) ?? VILLAGE
     const view = { w: side, h: side }
     let timer: ReturnType<typeof setTimeout> | null = null
     let onScreen = true

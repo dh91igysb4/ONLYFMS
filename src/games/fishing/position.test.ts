@@ -222,7 +222,7 @@ describe('내 섬 위치(내 섬 설계 §5.5)', () => {
     expect(loadPosition('u1')).toEqual(onIsle)
   })
   test('섬 모양이 있으면 걷는 칸 그대로, 없으면 마을 시작', () => {
-    expect(startPosition(onIsle, opened, 'twin')).toEqual(onIsle)
+    expect(startPosition(onIsle, opened, { layout: 'twin' })).toEqual(onIsle)
     expect(startPosition(onIsle, opened)).toEqual(AT_SPAWN)
     expect(startPosition(onIsle, opened, null)).toEqual(AT_SPAWN)
   })
@@ -230,10 +230,10 @@ describe('내 섬 위치(내 섬 설계 §5.5)', () => {
     const [k] = [...isleZoneTiles('twin')].find(([, z]) => z === 1)!
     const [x, y] = k.split(',').map(Number)
     const cleared = { area: 'isle' as const, pos: center(x, y), facing: 'up' as const }
-    expect(startPosition(cleared, opened, 'twin', 1)).toEqual(cleared)
-    expect(startPosition(cleared, opened, 'twin')).toEqual(AT_SPAWN)
+    expect(startPosition(cleared, opened, { layout: 'twin', cleared: 1 })).toEqual(cleared)
+    expect(startPosition(cleared, opened, { layout: 'twin' })).toEqual(AT_SPAWN)
   })
   test('섬의 막힌 칸(바다)·닿지 못하는 칸은 마을 시작', () => {
-    expect(startPosition({ ...onIsle, pos: center(0, 0) }, opened, 'twin')).toEqual(AT_SPAWN)
+    expect(startPosition({ ...onIsle, pos: center(0, 0) }, opened, { layout: 'twin' })).toEqual(AT_SPAWN)
   })
 })

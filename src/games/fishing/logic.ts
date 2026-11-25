@@ -9,7 +9,10 @@ import {
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 import { isleNodes } from './isle.ts'
-import { ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
+import { HOUSE_MAX, ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
+import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } from './home.ts'
+/** 가구 종류마다 보관함 최대 개수 */
+const FURN_CAP = 99
 import type { NodeKind } from './map.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
@@ -268,6 +271,11 @@ export type Action =
   | { type: 'gather'; id: string }
   | { type: 'craft'; tool: string; tier: number; price: number }
   | { type: 'clear'; zone: number; price: number }
+  // 내 섬 C(v24): 집 짓기, 가구 만들기·놓기·치우기
+  | { type: 'build'; level: number; price: number }
+  | { type: 'makeFurn'; id: string; price: number }
+  | { type: 'place'; id: string; tx: number; ty: number }
+  | { type: 'pickUp'; tx: number; ty: number }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
@@ -284,9 +292,16 @@ export type IsleState = {
   mats: Mats
   /** 오늘(KST) 캔 자원 칸 id */
   gathered: { day: string; ids: string[] }
+  /** 집 단계 0..HOUSE_MAX(v24, 0 텐트) */
+  house: number
+  /** 만들고 놓지 않은 가구 개수(0 없는 키는 지운다) */
+  furniture: Partial<Record<FurnId, number>>
+  /** 집 안 놓인 가구 */
+  placed: Placed[]
 }
 export const newIsle = (layout: IsleLayoutId): IsleState => ({
   layout, cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] },
+  house: 0, furniture: {}, placed: [],
 })
 export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
 
@@ -778,6 +793,22 @@ function migrateIsle(raw: unknown): IsleState | null {
   const m = isObj(raw.mats) ? raw.mats : {}
   const g = isObj(raw.gathered) ? raw.gathered : {}
   const known = new Set(isleNodes(base.layout).map((n) => n.id))
+  // 집(v24): 단계, 보관함(0~99, 모르는 가구 버림), 놓인 가구(방 안·겹침 없이 canPlace 순서대로, 안 되는 것은 보관함으로)
+  const house = int(raw.house, 0, HOUSE_MAX, 0)
+  const furniture: Partial<Record<FurnId, number>> = {}
+  const addFurn = (id: FurnId, n: number) => {
+    const v = Math.min(FURN_CAP, (furniture[id] ?? 0) + n)
+    if (v > 0) furniture[id] = v
+  }
+  if (isObj(raw.furniture)) for (const [id, n] of Object.entries(raw.furniture)) if (isFurnId(id)) addFurn(id, int(n, 0, FURN_CAP, 0))
+  const placed: Placed[] = []
+  if (Array.isArray(raw.placed)) {
+    for (const p of raw.placed) {
+      if (!isObj(p) || !isFurnId(p.id)) continue
+      if (placed.length < ROOM_MAX && isNum(p.tx) && isNum(p.ty) && canPlace(house, placed, p.tx, p.ty)) placed.push({ id: p.id, tx: p.tx, ty: p.ty })
+      else addFurn(p.id, 1)
+    }
+  }
   return {
     layout: base.layout,
     cleared: int(raw.cleared, 0, ISLE_ZONES, 0),
@@ -787,6 +818,9 @@ function migrateIsle(raw: unknown): IsleState | null {
       day: typeof g.day === 'string' && DAY_RE.test(g.day) ? g.day : '',
       ids: Array.isArray(g.ids) ? [...new Set(g.ids.filter((id): id is string => typeof id === 'string' && known.has(id)))] : [],
     },
+    house,
+    furniture,
+    placed,
   }
 }
 
@@ -842,6 +876,7 @@ function records(state: State): WorldRecord[] {
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
     { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
     // 0구역은 기록하지 않는다(섬만 고른 사람이 명예의 전당 0구역 줄에 몰리지 않게)
+    ...(state.isle && state.isle.house > 0 ? [{ key: 'house', value: state.isle.house, detail: `${state.isle.house}/${HOUSE_MAX}` }] : []),
     ...(state.isle && state.isle.cleared > 0 ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
   ]
 }
@@ -865,8 +900,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
   // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
+  // 24: 내 섬 C단계(집: build·makeFurn·place·pickUp, isle에 house·furniture·placed, 지역 home). v23 섬은 집 0(설계 2026-11-26-my-isle-c-design.md)
   // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
-  version: 23,
+  version: 24,
   wallet: true,
   init,
   migrate,
@@ -884,11 +920,14 @@ export const logic: WorldLogic<State, Action, View> = {
   previewData: (state) => ({
     [PREVIEW_AREAS_KEY]: state.areas.join(','),
     // 섬 모양:치운 구역 수(v23). 옛 값은 모양만이고 화면은 0으로 읽는다
-    ...(state.isle ? { [PREVIEW_ISLE_KEY]: `${state.isle.layout}:${state.isle.cleared}` } : {}),
+    ...(state.isle ? { [PREVIEW_ISLE_KEY]: `${state.isle.layout}:${state.isle.cleared}:${state.isle.house}` } : {}),
   }),
   // 남의 섬 구경(world visit): 섬 모양과 옷차림만
   // 재료·도구·오늘 캔 칸은 남에게 보이지 않는다
-  publicView: (state) => ({ isle: state.isle && { layout: state.isle.layout, cleared: state.isle.cleared }, outfit: state.outfit }),
+  publicView: (state) => ({
+    isle: state.isle && { layout: state.isle.layout, cleared: state.isle.cleared, house: state.isle.house, placed: state.isle.placed },
+    outfit: state.outfit,
+  }),
   freeBonus,
 }
 
@@ -961,6 +1000,64 @@ function clearZone(state: State, a: Record<string, unknown>, gold: number): Out 
   return { state: { ...state, isle: { ...isle, cleared: k, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold, result: { cleared: k } }
 }
 
+/** 집을 한 단계 올린다 */
+function build(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!Number.isInteger(a.level) || a.level !== isle.house + 1 || isle.house >= HOUSE_MAX) return { error: 'bad_level' }
+  const n = a.level as number
+  if (isle.cleared < houseNeedsCleared(n)) return { error: 'need_clear' }
+  const cost = houseCost(n)
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, isle: { ...isle, house: n, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold, result: { house: n } }
+}
+
+/** 가구 하나를 만들어 보관함에 */
+function makeFurn(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const f = FURNITURE.find((x) => x.id === a.id)
+  if (!f) return { error: 'bad_furn' }
+  if ((isle.furniture[f.id] ?? 0) >= FURN_CAP) return { error: 'furn_full' }
+  if (a.price !== f.cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, f.cost)) return { error: 'not_enough_mats' }
+  if (gold < f.cost.gold) return { error: 'not_enough_gold' }
+  return {
+    state: { ...state, isle: { ...isle, mats: minusMats(isle.mats, f.cost), furniture: { ...isle.furniture, [f.id]: (isle.furniture[f.id] ?? 0) + 1 } } },
+    gold: -f.cost.gold,
+  }
+}
+
+/** 보관함 가구를 집 안 칸에 놓는다 */
+function placeFurn(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (isle.house < 1) return { error: 'no_house' }
+  if (!isFurnId(a.id)) return { error: 'bad_furn' }
+  const id = a.id
+  if ((isle.furniture[id] ?? 0) < 1) return { error: 'no_furn' }
+  if (isle.placed.length >= ROOM_MAX) return { error: 'room_full' }
+  if (!Number.isInteger(a.tx) || !Number.isInteger(a.ty) || !canPlace(isle.house, isle.placed, a.tx as number, a.ty as number)) return { error: 'bad_spot' }
+  const furniture = { ...isle.furniture, [id]: (isle.furniture[id] ?? 0) - 1 }
+  if (furniture[id] === 0) delete furniture[id]
+  return { state: { ...state, isle: { ...isle, furniture, placed: [...isle.placed, { id, tx: a.tx as number, ty: a.ty as number }] } } }
+}
+
+/** 집 안 칸의 가구를 보관함으로 */
+function pickUp(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const i = isle.placed.findIndex((p) => p.tx === a.tx && p.ty === a.ty)
+  if (i < 0) return { error: 'no_furn_here' }
+  const id = isle.placed[i].id
+  if ((isle.furniture[id] ?? 0) >= FURN_CAP) return { error: 'furn_full' }
+  return { state: { ...state, isle: { ...isle, placed: isle.placed.filter((_, j) => j !== i), furniture: { ...isle.furniture, [id]: (isle.furniture[id] ?? 0) + 1 } } } }
+}
+
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
   if (!isObj(action)) return { error: 'bad_action' }
   switch (action.type) {
@@ -1008,6 +1105,14 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return craft(state, action, ctx.gold)
     case 'clear':
       return clearZone(state, action, ctx.gold)
+    case 'build':
+      return build(state, action, ctx.gold)
+    case 'makeFurn':
+      return makeFurn(state, action, ctx.gold)
+    case 'place':
+      return placeFurn(state, action)
+    case 'pickUp':
+      return pickUp(state, action)
     default:
       return { error: 'bad_action' }
   }

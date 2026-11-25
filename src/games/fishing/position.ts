@@ -2,8 +2,9 @@
 // 저장소가 막혀 있거나 값이 깨졌거나 지역·맵이 바뀌어 못 쓰는 자리면 null(마을 시작 위치에서 시작).
 // 1단계 형식({pos, facing}, area 없음)은 마을로 읽는다.
 // 열린 지역으로 거르는 일은 첫 서버 상태를 받은 뒤 startPosition이 한다.
-import { AREAS, type AreaId, type IsleLayoutId } from './data.ts'
-import { isleArrival } from './isle.ts'
+import { AREAS, type AreaId } from './data.ts'
+import { isleArrival, type IsleShape } from './isle.ts'
+import { homeArrival } from './home.ts'
 import { ALL_AREAS_OPEN, nearestDryTile, reachableTiles, TILE, tileOf, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -26,7 +27,7 @@ function parse(raw: string | null): SavedPosition | null {
   if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!FACINGS.includes(facing as Facing)) return null
   // 내 섬은 섬 모양을 알아야 맵이 정해진다: 여기서는 값만 보고, 맵 판정은 startPosition이 한다
-  if (area === 'isle') return { area: 'isle', pos: { x, y }, facing: facing as Facing }
+  if (area === 'isle' || area === 'home') return { area, pos: { x, y }, facing: facing as Facing }
   const map: MapDef | null = AREAS.some((a) => a.id === area) ? mapFor(area as AreaId) : null
   if (map === null) return null
   // 발이 걸을 수 없는 타일에 걸친 채로 시작하면 영영 움직일 수 없다.
@@ -74,14 +75,16 @@ function arrivalTiles(map: MapDef, opened: Opened): { tx: number; ty: number }[]
  * 첫 서버 상태(열린 지역)를 받은 뒤 시작할 자리.
  * 저장 위치가 없거나, 그 지역이 아직 안 열렸거나, 발이 열린 지역 기준으로 못 걷는 칸(아직 잠긴 문 등)에 걸치거나,
  * 열린 지역 기준으로 그 맵의 도착 칸들에서 걸어 닿지 못하는 칸(잠긴 문 너머 등)이면 마을 시작 위치.
- * 내 섬(area 'isle')은 섬 모양(isleLayout)이 있어야 그 맵(치운 구역 isleCleared까지)으로 보고, 없으면 마을 시작 위치.
+ * 내 섬·집 안(area 'isle'·'home')은 섬 상태(shape)가 있어야 그 맵으로 보고, 없으면(집 0단계 포함) 마을 시작 위치.
  */
-export function startPosition(saved: SavedPosition | null, opened: Opened, isleLayout: IsleLayoutId | null = null, isleCleared = 0): SavedPosition {
-  const map = saved && opened.has(saved.area) ? mapFor(saved.area, isleLayout, isleCleared) : null
+export function startPosition(saved: SavedPosition | null, opened: Opened, shape: IsleShape | null = null): SavedPosition {
+  const map = saved && opened.has(saved.area) ? mapFor(saved.area, shape) : null
   if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
     const { tx, ty } = tileOf(saved.pos)
     // 내 섬은 배로만 온다: 배에서 내리는 칸이 도착 칸
-    const arrivals = saved.area === 'isle' && isleLayout ? [isleArrival(isleLayout)] : arrivalTiles(map, opened)
+    const arrivals = saved.area === 'isle' && shape ? [isleArrival(shape.layout)]
+      : saved.area === 'home' && shape ? [homeArrival(shape.house ?? 0)]
+        : arrivalTiles(map, opened)
     if (reachableTiles(map, arrivals, opened).has(`${tx},${ty}`)) return saved
   }
   return { area: VILLAGE.id, pos: { ...VILLAGE.spawn.pos }, facing: VILLAGE.spawn.facing }

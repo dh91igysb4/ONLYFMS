@@ -484,3 +484,5 @@
 /* 내 섬 B: 작업대 창 */
 .fish-workbench { display: flex; flex-direction: column; gap: 8px; }
 .fish-workbench-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* 내 섬 C: 가구 놓기 창 */
+.fish-furn-list { display: flex; flex-wrap: wrap; gap: 6px; }

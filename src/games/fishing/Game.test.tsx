@@ -13,6 +13,7 @@ import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
+import { homeArrival, homeMap } from './home.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
 import { CAVE } from './maps/cave.ts'
@@ -83,7 +84,7 @@ vi.mock('../../platform/world/hallOfFame.ts', () => ({
 const mapGate = vi.hoisted(() => ({ hideRiver: false }))
 vi.mock('./maps/index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./maps/index.ts')>()
-  return { ...orig, mapFor: (area: AreaId, layout?: 'crescent' | 'twin' | null, cleared?: number) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area, layout, cleared)) }
+  return { ...orig, mapFor: (area: AreaId, shape?: Parameters<typeof orig.mapFor>[1]) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area, shape)) }
 })
 vi.mock('./minimap.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./minimap.ts')>()
@@ -1863,7 +1864,7 @@ describe('fishing Game: 지역 전환', () => {
   test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
     await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
     await advance(50)
-    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'isle', 'lake', 'river', 'village'])
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'home', 'isle', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
@@ -3750,5 +3751,122 @@ describe('내 섬 B단계: 캐기·작업대·개간 (설계 2026-11-26-my-isle-
     await flush()
     await advance(400)
     expect(lastScene().map).toBe(isleMap('twin', 5))
+  })
+})
+
+describe('내 섬 C단계: 집 (설계 2026-11-26-my-isle-c §4.5)', () => {
+  async function interact() {
+    press()
+    release()
+    await advance(300)
+  }
+  const walkUp = async (ms: number) => {
+    key('ArrowUp', true)
+    await advance(ms)
+    key('ArrowUp', false)
+    await advance(50)
+  }
+  beforeEach(() => {
+    roomGate.joins = []
+    vi.mocked(worldPlayers).mockReset().mockResolvedValue([])
+  })
+
+  test('집 1단계: 문으로 들어가면 집 안 도착 칸, 방 키 home-<내 id>, 아래 문으로 나가면 섬 문 앞', async () => {
+    const isle = { ...newIsle('twin'), house: 1 }
+    const m = isleMap('twin', 0, 1)
+    const b = m.building!
+    await mount(makeView({ isle }), { area: 'isle', pos: tileCenter(b.doorTx, b.ty + b.h), facing: 'up' })
+    await advance(50)
+    await walkUp(260)
+    await advance(800)
+    expect(lastScene().map).toBe(homeMap('twin', 1))
+    const a = homeArrival(1)
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: a.tx, ty: a.ty })
+    expect(roomGate.joins.at(-1)!.area).toBe('home-u1')
+    key('ArrowDown', true)
+    await advance(260)
+    key('ArrowDown', false)
+    await advance(800)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 1))
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: b.doorTx, ty: b.ty + b.h })
+  })
+
+  test('집 안 빈 바닥 앞 "놓기" → 가구 고르기 창 → place 요청, 놓은 가구 앞 "치우기" → pickUp', async () => {
+    stubTouch()
+    const isle = { ...newIsle('twin'), house: 1, furniture: { chair: 1 } }
+    const view = makeView({ isle })
+    await mount(view, { area: 'home', pos: tileCenter(1, 3), facing: 'up' })
+    await advance(50)
+    expect(lastScene().map).toBe(homeMap('twin', 1))
+    expect(actionButton()).toHaveTextContent('놓기')
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await advance(300)
+    const panel = screen.getByRole('region', { name: '가구 놓기' })
+    const placed = { ...isle, furniture: {}, placed: [{ id: 'chair' as const, tx: 1, ty: 2 }] }
+    route({ place: () => ok({ ...view, isle: placed }) })
+    fireEvent.click(within(panel).getByRole('button', { name: '의자 1개' }))
+    await flush()
+    expect(calls('place')[0]).toMatchObject({ payload: { type: 'place', id: 'chair', tx: 1, ty: 2 } })
+    await advance(50)
+    expect(lastScene().map).toBe(homeMap('twin', 1, placed.placed))
+    expect(actionButton()).toHaveTextContent('치우기')
+    route({ pickUp: () => ok({ ...view, isle }) })
+    pointer('down', actionButton(), 4)
+    pointer('up', actionButton(), 4)
+    await flush()
+    expect(calls('pickUp')[0]).toMatchObject({ payload: { type: 'pickUp', tx: 1, ty: 2 } })
+  })
+
+  test('작업대 집 탭: 다음 단계 짓기, 가구 탭: 만들기', async () => {
+    const isle = { ...newIsle('twin'), mats: { wood: 500, stone: 500, iron: 500 } }
+    const view = makeView({ gold: 1e6, isle })
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(view, { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    await interact()
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '집' }))
+    route({ build: () => ok({ ...view, isle: { ...isle, house: 1 } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('button', { name: '짓기' }))
+    await flush()
+    expect(calls('build')[0]).toMatchObject({ payload: { type: 'build', level: 1, price: 34850 } })
+    await advance(50)
+    expect(lastScene().map.buildingSprite).toBe('hut')
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '가구' }))
+    route({ makeFurn: () => ok({ ...view, isle: { ...isle, house: 1, furniture: { bed: 1 } } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getAllByRole('button', { name: '만들기' })[0])
+    await flush()
+    expect(calls('makeFurn')[0]).toMatchObject({ payload: { type: 'makeFurn', id: 'bed', price: 3000 } })
+  })
+
+  test('친구 집: 들어가 구경, 가구가 보이고 놓기·치우기 없음', async () => {
+    stubTouch()
+    vi.mocked(worldPlayers).mockResolvedValue([{ id: 'f1', handle: 'mj', avatar: null }])
+    const placed = [{ id: 'bed', tx: 1, ty: 2 }]
+    vi.mocked(worldVisit).mockResolvedValue({ owner: { id: 'f1', handle: 'mj' }, view: { isle: { layout: 'twin', cleared: 0, house: 1, placed }, outfit: DEFAULT_OUTFIT } })
+    const dock = VILLAGE.docks[0].front
+    await mount(makeView(), { area: 'village', pos: tileCenter(dock.tx, dock.ty), facing: dock.facing })
+    await advance(50)
+    await interact()
+    fireEvent.click(within(screen.getByRole('region', { name: '배' })).getByRole('button', { name: '친구 섬' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('region', { name: '배' })).getByRole('button', { name: 'mj의 섬' }))
+    await flush()
+    await advance(400)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 1))
+    // 섬 도착(24,30) → 위 1 → 왼쪽 4 → 위 11칸이면 집 문 앞(20,18), 한 칸 더 위가 문
+    const walk = async (code: string, tiles: number) => {
+      key(code, true)
+      await advance(Math.round((tiles * TILE * 1000) / WALK_SPEED))
+      key(code, false)
+      await advance(50)
+    }
+    await walk('ArrowUp', 1)
+    await walk('ArrowLeft', 4)
+    await walk('ArrowUp', 13)
+    await advance(800)
+    expect(lastScene().map).toBe(homeMap('twin', 1, placed as never))
+    expect(roomGate.joins.at(-1)!.area).toBe('home-f1')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
   })
 })

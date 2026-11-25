@@ -4,6 +4,7 @@ import { ALL_AREAS_OPEN, TILE, interactionAt, reachableTiles, tileAt, type Facin
 import { isleArrival, isleMap, isleNodes, isleZoneTiles, ownerOfPlaceKey, placeKey, placeName } from './isle.ts'
 import { ISLE_ZONES } from './isleEcon.ts'
 import { mapFor } from './maps/index.ts'
+import { homeMap } from './home.ts'
 import { placeMarkers } from './atlas.ts'
 import { SPRITES } from './sprites.ts'
 
@@ -64,9 +65,11 @@ describe('내 섬 맵(내 섬 설계 §5.2)', () => {
   it('mapFor: isle은 모양이 있을 때만, 다른 지역은 모양을 무시한다', () => {
     expect(mapFor('isle')).toBeNull()
     expect(mapFor('isle', null)).toBeNull()
-    expect(mapFor('isle', 'twin')).toBe(isleMap('twin'))
-    expect(mapFor('village', 'twin')).toBe(mapFor('village'))
-    expect(mapFor('isle', 'twin', 4)).toBe(isleMap('twin', 4))
+    expect(mapFor('isle', { layout: 'twin' })).toBe(isleMap('twin'))
+    expect(mapFor('village', { layout: 'twin' })).toBe(mapFor('village'))
+    expect(mapFor('isle', { layout: 'twin', cleared: 4 })).toBe(isleMap('twin', 4))
+    expect(mapFor('home', { layout: 'twin', house: 2 })).toBe(homeMap('twin', 2))
+    expect(mapFor('home', { layout: 'twin', house: 0 })).toBeNull()
   })
 })
 
@@ -86,6 +89,15 @@ describe('장소 키(내 섬 설계 §5.6)', () => {
     expect(ownerOfPlaceKey(placeKey('isle', ID))).toBe('abcdef0123456789abcdef0123456789')
     expect(ownerOfPlaceKey('village')).toBeNull()
     expect(ownerOfPlaceKey('isle-xyz')).toBeNull()
+  })
+  it('집 장소 키 home-<32자>, 이름 내 집·{아이디}의 집·누군가의 집', () => {
+    const k = placeKey('home', ID)
+    expect(k).toBe('home-abcdef0123456789abcdef0123456789')
+    expect(ownerOfPlaceKey(k)).toBe('abcdef0123456789abcdef0123456789')
+    const players = [{ id: '11111111-2222-3333-4444-555555555555', handle: 'mj' }]
+    expect(placeName(k, { selfId: ID, players })).toBe('내 집')
+    expect(placeName(placeKey('home', players[0].id), { selfId: ID, players })).toBe('mj의 집')
+    expect(placeName(placeKey('home', '99999999-2222-3333-4444-555555555555'), { selfId: ID, players })).toBe('누군가의 집')
   })
   it('placeName: 지역 이름·내 섬·아이디의 섬·누군가의 섬·모르면 null', () => {
     const players = [{ id: '11111111-2222-3333-4444-555555555555', handle: 'mj' }]
