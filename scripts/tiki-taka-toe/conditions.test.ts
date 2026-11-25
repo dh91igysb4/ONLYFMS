@@ -1,0 +1,232 @@
+// 티키타카토 조건별 선수 집합 (설계 2026-11-26-tiki-taka-toe-design.md §3.4·§4)
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, test } from 'vitest'
+import { parseCsv, type Row } from '../football/wikidata.ts'
+import { buildConditions, clubLabel, CONTINENTS, mergeHonours, type FootballData } from './conditions.ts'
+
+const ROOT = join(import.meta.dirname, '..', '..')
+const REAL = join(ROOT, 'data', 'football')
+
+const rows = (header: string, ...lines: string[]): Row[] => parseCsv([header, ...lines].join('\n'))
+
+// 작은 인메모리 데이터: 잉글랜드(Q21)·이탈리아(Q38)·브라질(Q155)
+function data(over: Partial<FootballData> = {}): FootballData {
+  return {
+    players: rows('id,name_ko,name_en,nation_id,popularity',
+      'P1,즐라탄 이브라히모비치,Zlatan Ibrahimović,Q34,100',
+      'P2,선수 둘,Player Two,Q155,50',
+      'P3,선수 셋,Player Three,Q38,50',
+      'P4,선수 넷,Player Four,Q21,50',
+      'P5,선수 다섯,Player Five,Q21,50'),
+    teams: rows('id,kind,name_ko,name_en,short_name,nation_id',
+      'CA,club,아스널,Arsenal FC,Arsenal,Q21',
+      'CJ,club,유벤투스,Juventus FC,Juventus,Q38',
+      'CC,club,첼시,Chelsea FC,Chelsea,Q21',
+      'CX,club,,Nowhere FC,,Q999',
+      'NB,national,브라질 축구 국가대표팀,Brazil national football team,,Q155'),
+    nations: rows('id,name_ko,name_en',
+      'Q21,잉글랜드,England', 'Q38,이탈리아,Italy', 'Q155,브라질,Brazil', 'Q34,스웨덴,Sweden'),
+    competitions: rows('id,name_ko,name_en,kind,nation_id,tier',
+      'Q9448,프리미어리그,Premier League,league,Q21,1',
+      'Q754839,풋볼리그 1부,Football League First Division,league,Q21,2',
+      'Q15804,세리에 A,Serie A,league,Q38,1'),
+    competition_eras: rows('competition_id,from_season,to_season,nation_id,tier',
+      'Q9448,1992,,Q21,1',
+      'Q754839,1888,1991,Q21,1',
+      'Q754839,1992,2003,Q21,2',
+      'Q15804,1987,,Q38,1'),
+    team_competitions: rows('team_id,competition_id,season',
+      'CA,Q9448,1995', 'CC,Q9448,1995', 'CJ,Q15804,1995', 'CA,Q754839,1990', 'CC,Q754839,1995'),
+    season_memberships: rows('player_id,season,team_id,primary,days,estimated'),
+    honours: rows('honour,season,team_id,player_id'),
+    honour_catalog: rows('id,kind,name_en,name_ko,nation_id,source,page,from',
+      'Q166177,award,Ballon d\'Or,발롱도르,,wikipedia,x,1987',
+      'Q794775,award,Premier League Golden Boot,프리미어리그 득점왕,Q21,wikipedia,x,1987',
+      'Q18756,continental,UEFA Champions League,UEFA 챔피언스리그,,wikidata,x,1987',
+      'Q19317,international,FIFA World Cup,FIFA 월드컵,,wikipedia,x,1990',
+      'Q9448,league,Premier League,프리미어리그,Q21,wikidata,x,1987',
+      'Q754839,league,Football League First Division,풋볼리그 1부,Q21,wikidata,x,1987',
+      'Q15804,league,Serie A,세리에 A,Q38,wikidata,x,1987',
+      'Q47576,manager,Arsène Wenger,아르센 벵거,,wikipedia,x,1987'),
+    manager_spells: rows('manager_id,team_id,from_season,to_season'),
+    nation_continents: rows('nation_id,continent', 'Q21,europe', 'Q38,europe', 'Q155,south_america', 'Q34,europe'),
+    ...over,
+  }
+}
+
+const ms = (...l: string[]) => rows('player_id,season,team_id,primary,days,estimated', ...l.map((x) => `${x},true,365,true`))
+const hs = (...l: string[]) => rows('honour,season,team_id,player_id', ...l)
+
+function setOf(d: FootballData, id: string): Set<string> {
+  return buildConditions(d).players.get(id) ?? new Set()
+}
+
+describe('buildConditions', () => {
+  test('club_any_season', () => {
+    const d = data({ season_memberships: ms('P2,1987,CA', 'P3,1986,CA', 'P3,1987,CJ') })
+    const s = setOf(d, 'club:CA')
+    expect(s.has('P2')).toBe(true)
+    expect(s.has('P3')).toBe(false)
+    const c = buildConditions(d).conditions.find((x) => x.id === 'club:CA')!
+    expect(c).toMatchObject({ kind: 'club', label_ko: '아스널', ref: 'CA' })
+  })
+
+  test('league_via_team_competitions', () => {
+    // CA 1995 PL 참가, 1996은 참가 기록 없음. CC는 1995 풋볼리그 1부(이 시기 2부)
+    const d = data({ season_memberships: ms('P2,1995,CA', 'P3,1996,CA', 'P4,1995,CC', 'P5,1995,CJ') })
+    const r = buildConditions(d)
+    expect([...r.players.get('league:Q9448')!].sort()).toEqual(['P2', 'P4'])
+    expect([...r.players.get('league:Q15804')!]).toEqual(['P5'])
+    expect(r.conditions.find((c) => c.id === 'league:Q15804')!.label_ko).toBe('세리에 A')
+  })
+
+  test('league_eng_top_combines_eras', () => {
+    const d = data({ season_memberships: ms('P2,1990,CA', 'P4,1995,CC', 'P5,1995,CJ') })
+    const r = buildConditions(d)
+    expect([...r.players.get('league:eng-top')!].sort()).toEqual(['P2', 'P4'])
+    expect(r.conditions.find((c) => c.id === 'league:eng-top')!.label_ko).toBe('잉글랜드 1부')
+  })
+
+  test('teammate_same_season_single_club', () => {
+    const d = data({
+      season_memberships: ms(
+        'P1,2000,CA', 'P1,2001,CJ', 'P1,2001,CC', // 2001에는 즐라탄이 두 클럽 → 그 시즌 안 셈
+        'P2,2000,CA', // 같은 시즌 같은 클럽
+        'P3,2000,CA', 'P3,2000,CC', // P3는 그 시즌 클럽 둘 → 제외
+        'P4,2001,CJ', // 즐라탄이 클럽 둘인 시즌 → 제외
+        'P5,2000,NB', 'P5,2000,CA', // 대표팀은 클럽 수에 안 셈 → 포함
+      ),
+    })
+    const r = buildConditions(d)
+    expect([...r.players.get('teammate:P1')!].sort()).toEqual(['P2', 'P5'])
+    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('즐라탄 이브라히모비치와 뛴 선수')
+  })
+
+  test('manager_club_and_national', () => {
+    const d = data({
+      manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1997', 'Q47576,NB,2002,2002'),
+      season_memberships: ms('P2,1996,CA', 'P3,1998,CA', 'P4,1997,CA', 'P4,1997,CC'),
+      honours: hs('squad:Q19317,2002,NB,P5', 'squad:Q19317,2006,NB,P1'),
+    })
+    const r = buildConditions(d)
+    expect([...r.players.get('manager:Q47576')!].sort()).toEqual(['P2', 'P5'])
+    expect(r.conditions.find((c) => c.id === 'manager:Q47576')!.label_ko).toBe('벵거 감독')
+  })
+
+  test('title_threshold', () => {
+    const d = data({
+      honours: hs('Q9448,1995,CA,P2', 'Q9448,1996,CA,P2', 'Q9448,1997,CA,P2', 'Q9448,1995,CA,P3', 'Q9448,1996,CA,P3', 'Q9448,1995,CA,'),
+    })
+    const r = buildConditions(d)
+    expect([...r.players.get('title:Q9448:3')!]).toEqual(['P2'])
+    expect([...r.players.get('title:Q9448:1')!].sort()).toEqual(['P2', 'P3'])
+    expect(r.conditions.find((c) => c.id === 'title:Q9448:3')!.label_ko).toBe('PL 3회 이상 우승')
+  })
+
+  test('eng_top_combines_eras', () => {
+    const d = data({ honours: hs('Q754839,1990,CA,P2', 'Q9448,1995,CA,P2', 'Q9448,1996,CA,P2') })
+    const r = buildConditions(d)
+    expect(r.players.get('title:eng-top:3')?.has('P2')).toBe(true)
+    expect(r.players.get('title:Q9448:3')?.has('P2') ?? false).toBe(false)
+  })
+
+  test('cup_titles_squads_awards_final_goal', () => {
+    const d = data({
+      honours: hs('Q18756,1999,CA,P2', 'Q18756,1999,CA,', 'Q19317,2002,NB,P2', 'squad:Q19317,2002,NB,P3',
+        'award:Q166177,2005,,P4', 'award:Q311830,2005,,P4', 'final_goal:Q19317,2002,NB,P5'),
+    })
+    const r = buildConditions(d)
+    const label = (id: string) => r.conditions.find((c) => c.id === id)?.label_ko
+    expect([...r.players.get('title:Q18756:1')!]).toEqual(['P2'])
+    expect(label('title:Q18756:1')).toBe('UCL 우승')
+    expect(r.players.has('title:Q18756:3')).toBe(false)
+    expect(label('title:Q19317:1')).toBe('월드컵 우승')
+    expect([...r.players.get('squad:Q19317')!]).toEqual(['P3'])
+    expect(label('squad:Q19317')).toBe('월드컵 출전')
+    expect([...r.players.get('award:Q166177')!]).toEqual(['P4'])
+    expect(label('award:Q166177')).toBe('발롱도르')
+    expect(r.players.has('award:Q311830')).toBe(false) // 카탈로그 밖 상은 이름이 없어 뺀다
+    expect([...r.players.get('final_goal:Q19317')!]).toEqual(['P5'])
+    expect(label('final_goal:Q19317')).toBe('월드컵 결승 득점')
+  })
+
+  test('continent_from_table', () => {
+    const r = buildConditions(data())
+    expect(r.players.get('continent:south_america')?.has('P2')).toBe(true)
+    expect(r.players.get('continent:europe')?.has('P2') ?? false).toBe(false)
+    expect(r.conditions.find((c) => c.id === 'continent:south_america')!.label_ko).toBe('남미')
+    expect(r.players.get('nation:Q155')?.has('P2')).toBe(true)
+    expect(r.conditions.find((c) => c.id === 'nation:Q155')!.label_ko).toBe('브라질')
+  })
+
+  test('club_themes', () => {
+    const d = data({ season_memberships: ms('P2,1995,CJ', 'P3,1995,CA', 'P4,1995,CX'), honours: hs('award:Q794775,1995,,P3', 'award:Q166177,1995,,P3') })
+    const r = buildConditions(d)
+    const themes = (id: string) => r.conditions.find((c) => c.id === id)?.themes
+    expect(themes('club:CJ')).toEqual(['ita', 'eur'])
+    expect(themes('club:CA')).toEqual(['eng', 'eur'])
+    expect(themes('club:CX')).toBeUndefined() // 대상 리그 1부에 없던 클럽은 조건이 아니다
+    expect(themes('league:Q15804')).toEqual(['ita', 'eur'])
+    expect(themes('award:Q794775')).toEqual(['eng', 'eur'])
+    expect(themes('award:Q166177')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur'])
+    expect(themes('nation:Q155')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur'])
+  })
+
+  test('empty_sets_are_dropped_and_ids_unique', () => {
+    const r = buildConditions(data())
+    const ids = r.conditions.map((c) => c.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const c of r.conditions) expect(r.players.get(c.id)?.size ?? 0).toBeGreaterThan(0)
+    expect(r.players.has('club:CA')).toBe(false)
+  })
+})
+
+describe('clubLabel', () => {
+  test('약칭·창단 연도 토큰을 뗀다', () => {
+    expect(clubLabel('아스널 FC')).toBe('아스널')
+    expect(clubLabel('1. FC 하이덴하임 1846')).toBe('하이덴하임')
+    expect(clubLabel('헤르타 BSC 베를린')).toBe('헤르타 베를린')
+    expect(clubLabel('FC 샬케 04')).toBe('샬케 04')
+    expect(clubLabel('하노버 96')).toBe('하노버 96')
+    expect(clubLabel('Arsenal F.C.')).toBe('Arsenal')
+    expect(clubLabel('SPAL')).toBe('SPAL') // 다 떼면 원래 이름
+    expect(clubLabel('TSV 1860 뮌헨')).toBe('1860 뮌헨') // 가운데 연도는 이름
+    expect(clubLabel('AVS Futebol SAD')).toBe('AVS Futebol SAD') // 영문은 끝의 FC류만
+  })
+
+  test('떼면 다른 클럽 이름의 앞부분이 되는 이름은 그대로', () => {
+    const d = data({
+      teams: rows('id,kind,name_ko,name_en,short_name,nation_id', 'CP,club,파리 FC,Paris FC,,Q142', 'CG,club,파리 생제르맹 FC,Paris Saint-Germain F.C.,,Q142'),
+      competitions: rows('id,name_ko,name_en,kind,nation_id,tier', 'Q13394,리그 1,Ligue 1,league,Q142,1'),
+      competition_eras: rows('competition_id,from_season,to_season,nation_id,tier', 'Q13394,1987,,Q142,1'),
+      team_competitions: rows('team_id,competition_id,season', 'CP,Q13394,1990', 'CG,Q13394,1990'),
+      season_memberships: ms('P2,1990,CP', 'P3,1990,CG'),
+    })
+    const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
+    expect(label('club:CP')).toBe('파리 FC')
+    expect(label('club:CG')).toBe('파리 생제르맹')
+  })
+})
+
+describe('mergeHonours', () => {
+  test('load.sql 규칙', () => {
+    const catalog = rows('id,kind,name_en,name_ko,nation_id,source,page,from', 'Q166177,award,B,발롱도르,,w,x,1987')
+    const base = hs('award:Q166177,1990,,P1', 'award:Q999,1990,,P1', 'Q9448,1995,CA,', 'Q9448,1996,CA,', 'Q9448,1995,CA,P1')
+    const extra = hs('Q9448,1995,CC,', 'award:Q166177,1991,,P2', 'Q9448,1996,CA,')
+    const key = (r: Row) => `${r.honour}|${r.season}|${r.team_id}|${r.player_id}`
+    expect(mergeHonours(base, extra, catalog).map(key).sort()).toEqual([
+      'Q9448|1995|CA|P1', 'Q9448|1995|CC|', 'Q9448|1996|CA|', 'award:Q166177|1991||P2', 'award:Q999|1990||P1',
+    ])
+  })
+})
+
+describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
+  test('continent_table_complete', () => {
+    const nations = parseCsv(readFileSync(join(REAL, 'nations.csv'), 'utf8'))
+    const table = parseCsv(readFileSync(join(REAL, 'manual', 'nation_continents.csv'), 'utf8'))
+    const m = new Map(table.map((r) => [r.nation_id, r.continent]))
+    expect(m.size).toBe(table.length)
+    for (const n of nations) expect(CONTINENTS, n.id).toContain(m.get(n.id))
+  })
+})
