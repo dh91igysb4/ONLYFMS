@@ -697,7 +697,35 @@ function migrate(raw: unknown, fromVersion: number): State {
     buffs,
     sold: parseSold(raw.sold),
     fridge,
-    pending: null,
+    pending: migratePending(raw.pending, fromVersion),
+  }
+}
+
+/** pending 형식이 지금과 같아진 버전(v18). 그 전 세이브의 진행 중 낚시는 버린다 */
+const PENDING_FORMAT_SINCE = 18
+const SEASON_IDS: readonly string[] = ['spring', 'summer', 'autumn', 'winter']
+const WEATHER_IDS: readonly string[] = ['sun', 'rain']
+/**
+ * 진행 중 낚시를 버전이 바뀌어도 이어 준다(어종 확장 v19, 배포 순간 낚던 물고기를 잃지 않게).
+ * 형식이 같은 버전(PENDING_FORMAT_SINCE 이상)이고 어종·지역·자리를 알고 값이 모두 온전할 때만, 아니면 null
+ */
+function migratePending(raw: unknown, fromVersion: number): Pending | null {
+  if (fromVersion < PENDING_FORMAT_SINCE || !isObj(raw)) return null
+  const { species, sizeCm, biteDelayMs, startedAt, hookedAt, area, spot, cond, power } = raw
+  const a = AREAS.find((x) => x.id === area)
+  if (!knownSpecies(species) || !a || typeof spot !== 'string' || !a.spots.includes(spot)) return null
+  if (![sizeCm, biteDelayMs, startedAt, power].every(isNum) || !(hookedAt === null || isNum(hookedAt))) return null
+  if (!isObj(cond) || !isNum(cond.gameMinute) || !isNum(cond.gameDay) || !SEASON_IDS.includes(cond.season as string) || !WEATHER_IDS.includes(cond.weather as string)) return null
+  return {
+    species,
+    sizeCm: sizeCm as number,
+    biteDelayMs: biteDelayMs as number,
+    startedAt: startedAt as number,
+    hookedAt: hookedAt as number | null,
+    area: a.id,
+    spot,
+    cond: { gameMinute: cond.gameMinute, gameDay: cond.gameDay, season: cond.season as Conditions['season'], weather: cond.weather as Conditions['weather'] },
+    power: power as number,
   }
 }
 

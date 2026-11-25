@@ -2196,12 +2196,25 @@ describe('버리기', () => {
 describe('어종 확장 (logic.version 19)', () => {
   const hookedOn = (species: string, sizeCm: number, area: AreaId, spot: string): WS =>
     fresh({ pending: { species, sizeCm, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area, spot, cond: cond('spring', 12), power: 0.5 } })
-  it('migrate: v18 세이브는 진행 중 낚시(pending)만 비우고(버전이 바뀌면 늘 그렇다) 나머지는 그대로, 바로 다시 던질 수 있다', () => {
-    const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ species: 'koi', sizeCm: 50, perfect: false }], dex: { mackerel: { count: 1, maxCm: 40 } } } as WS
+  it('migrate: v18 세이브의 진행 중 낚시(pending)는 그대로 남아 v19에서 끝까지 낚인다', () => {
+    const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ species: 'koi', sizeCm: 50, perfect: false }] } as WS
     const m = logic.migrate(structuredClone(v18), 18)
-    expect(m).toEqual({ ...v18, pending: null })
-    const again = ok(play({ ...m, gold: 0 } as WS, { type: 'cast', area: 'village', power: 0.5, spot: 'shore' }, ctx()))
-    expect(again.state.pending).not.toBeNull()
+    expect(m).toEqual(v18)
+    const r = ok(play({ ...m, gold: 0 } as WS, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(r.state.bag).toEqual([{ species: 'koi', sizeCm: 50, perfect: false }, { species: 'mackerel', sizeCm: 40, perfect: false }])
+  })
+  it('migrate: pending은 v18 이상 형식이고 모르는 어종·지역·깨진 값이 없을 때만 남긴다', () => {
+    const good = hookedOn('mackerel', 40, 'village', 'shore')
+    expect(logic.migrate(structuredClone(good), 17).pending).toBeNull()
+    const bad = (p: Record<string, unknown>) => logic.migrate({ ...structuredClone(good), pending: { ...good.pending!, ...p } }, 18).pending
+    expect(bad({ species: 'zzz' })).toBeNull()
+    expect(bad({ area: 'nowhere' })).toBeNull()
+    expect(bad({ spot: 'river' })).toBeNull()
+    expect(bad({ sizeCm: 'big' })).toBeNull()
+    expect(bad({ hookedAt: 'x' })).toBeNull()
+    expect(bad({ cond: { gameMinute: 1, gameDay: 1, season: 'monsoon', weather: 'sun' } })).toBeNull()
+    expect(bad({ hookedAt: null })).toEqual({ ...good.pending!, hookedAt: null })
+    expect(logic.migrate({ ...structuredClone(good), pending: 'x' }, 18).pending).toBeNull()
   })
   it('새 어종을 잡으면 dex·가방에 들어가고 판매가가 0보다 크다', () => {
     const r = ok(play(hookedOn('koi', 60, 'forest', 'pond'), { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
