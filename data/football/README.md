@@ -161,5 +161,4 @@ npm run football:honours -- --no-cache                # 캐시(.cache/honours/) 
 - `confederation`은 아직 비어 있다.
 - 우승·수상: 카탈로그 밖 대회·상은 없다. 아시아 선수 상당수가 선수 목록에 없어 아시안컵 엔트리는 일부만 이어진다. 캐나다(2001·2024 코파, 2022·2026 월드컵)·예멘(2019 아시안컵) 대표팀이 `teams.csv`에 없어 그 엔트리는 빠진다.
 - 유스·2군·여자 팀은 이름 규칙(`U21`, `II`, `B`, `Jong`, `women` 등)으로 거른다. 걸러지지 않은 팀이 보이면 `scripts/football/wikidata.ts`의 `isYouthOrReserve`에 추가한다.
-
 - 티키타카토(`data/tiki-taka-toe/`)는 이 데이터에서 생성한다. 갱신 순서는 `CLAUDE.md`의 "티키타카토 데이터 갱신"을 따른다.

@@ -78,7 +78,7 @@
 | 우승 `title` | PL 3회 이상 우승 / UCL 우승 / 월드컵 우승 | `football_honours` 선수 단위 우승 행 수 ≥ N (리그는 1 또는 3, 그 밖은 1) |
 | 대표팀 대회 출전 `squad` | 월드컵 출전 | `squad:<대회>` 행 |
 | 개인상 `award` | 발롱도르 / PL 득점왕 | `award:<id>` 행 |
-| 감독 `manager` | 벵거 감독 | 클럽: 감독 재임 시즌 ∩ 선수 시즌 소속(같은 클럽). 대표팀: 재임 중 대회 엔트리 |
+| 감독 `manager` | 벵거 감독 | 클럽: 감독 재임 시즌 ∩ 선수 시즌 소속(같은 클럽). 대표팀: 재임 중 대회 엔트리(부임한 해의 대회는 빼고 `시작 < 대회 연도 ≤ 끝` — 대회 직후 부임이 보통이라 그 대회는 전임 감독 것) |
 | 월드컵 결승 득점 `final_goal` | 월드컵 결승 득점 | `final_goal:Q19317` 행 |
 
 - **같은 시즌 판정의 정밀도 (내 결정):** 경력 기록 대부분이 연 단위라, 팀 동료·감독 조건은 우승과 같은 규칙을 쓴다. 그 시즌 클럽 소속이 둘 이상인 선수(시즌 중간 이적·반 시즌 임대)는 그 시즌을 세지 않는다. 클럽·리그 경력 조건은 "한 시즌이라도 소속"이라 이 제외를 하지 않는다.
@@ -105,14 +105,15 @@
 
 ### 5.2 DB
 새 마이그레이션: `ttt_conditions`, `ttt_condition_players`(인덱스 `(condition_id, player_id)`), `ttt_puzzles`. 클라이언트에서 직접 읽지 않는다(RLS로 막음).
-적재는 축구 적재와 같은 방식의 스크립트(`scripts/tiki-taka-toe/load.sh` + `load.sql`, 한 트랜잭션 통째 교체). 축구 데이터를 다시 적재하면 생성 → 적재를 다시 한다(선수가 사라지면 FK로 실패해 알 수 있게 `player_id references football_players`).
+적재는 축구 적재와 같은 방식의 스크립트(`scripts/tiki-taka-toe/load.sh` + `load.sql`, 한 트랜잭션 통째 교체). 축구 데이터를 다시 적재하면 생성(`npm run ttt:generate`) → 적재를 다시 한다. `player_id references football_players`이지만 축구 적재는 CSV에서 빠진 선수를 지우지 않고 `retired`로 표시하므로 FK로 실패하지 않는다. 다시 생성하기 전까지 그 선수는 계속 정답으로 남는다.
 
-RPC `ttt_pick_puzzle(p_options jsonb) returns jsonb` (security definer, 승인 사용자): `theme`에 맞는 판 하나를 무작위로 골라 `{ puzzle_id, rows: [{id,kind,label}], cols: [...], answers: [[player_id…] × 9] }`를 돌려준다(칸 순서 행 우선). 정답은 판 고를 때 `ttt_condition_players` 교집합으로 만든다. 각 칸 정답의 인지도 순 상위 5명 이름도 함께(끝난 뒤 공개용).
+RPC `ttt_pick_puzzle(p_options jsonb) returns jsonb` (security definer, 승인 사용자): `theme`에 맞는 판 하나를 무작위로 골라 `{ puzzle_id, theme, rows: [{id,kind,label}], cols: [...], answers: [[player_id…] × 9] }`를 돌려준다(칸 순서 행 우선). 정답은 판 고를 때 `ttt_condition_players` 교집합으로 만든다. 각 칸 정답의 인지도 순 상위 5명 이름도 함께(끝난 뒤 공개용).
 
 ### 5.3 대전 플랫폼 일반 기능 "판 준비 RPC"
 - manifest `duel.prepare?: string`(RPC 이름). 있으면 `duel` Edge Function이 대국을 시작할 때(지금 `logic.init`을 부르는 곳) 같은 트랜잭션에서 `select public.<prepare>(options)`를 불러 결과를 `init`에 넘긴다.
 - 계약 변경: `DuelLogic.init(rng, options, prepared?: unknown)`. 기존 게임은 세 번째 인자를 무시한다.
-- 한 화면 대전(`DuelLocalPage`)은 브라우저에서 `init`을 부르므로, `prepare`가 있으면 먼저 `supabase.rpc(prepare, { p_options })`를 불러 넘긴다.
+- 한 화면 대전(`DuelLocalPage`)은 브라우저에서 `init`을 부르므로, `prepare`가 있으면 먼저 `supabase.rpc(prepare, { p_options })`를 불러 넘긴다. manifest `options`가 있으면 시작 전에 고르고(대국 만들기와 같은 선택 칸), 그 설정으로 준비·`init`·"다시 하기"를 한다.
+- RPC가 실패하거나 null을 돌려주거나, 결과 모양이 틀려 `init`이 던지면 409 `prepare_failed`(같은 트랜잭션 롤백).
 - RPC 이름은 manifest의 값이라 게임별 분기 코드가 아니다. 이름은 `^[a-z_]+$`만 허용한다.
 - 정답이 담긴 결과는 대국 상태(`duel_matches.state`)에만 있고, `view`는 끝나기 전 정답을 내보내지 않는다. 한 화면 대전이나 RPC를 직접 부르면 정답을 볼 수 있지만, 폰으로 검색하면 되는 게임이라 막지 않는다(내 판단).
 
@@ -123,7 +124,8 @@ RPC `ttt_pick_puzzle(p_options jsonb) returns jsonb` (security definer, 승인 �
 - apply: 잘못된 행동(범위 밖 칸, 이미 쓴 선수, 스틸 0인데 상대 칸, 내 칸 재선택)은 `error`. 맞음/틀림은 정상 행동이고 차례가 넘어간다.
 - timeoutAction: `{ type: 'pass' }`. turnNo: 수 번호.
 - result: 줄 완성 → 그 좌석 승. 9칸이 다 찼고 줄 없음 → 무승부. 무승부 제안 수락 → 무승부. 막힌 판(§3.3) → 칸 많은 쪽 승, 같으면 무승부.
-- view: 정답 집합은 끝나기 전 빼고, 끝나면 칸별 정답 예시(최대 5명 이름)를 넣는다.
+- view: 정답 집합은 끝나기 전 빼고, 끝나면 칸별 정답 예시(최대 5명 이름)를 넣는다. "끝남"은 `result.over`이거나 플랫폼이 넘기는 `view(state, viewer, ended)`의 `ended`(대국 status가 active가 아님 — 기권·두 번 시간 초과 패·무효 포함)다. 진행 중 관전자(viewer null, ended false)에게는 보이지 않는다. 문제 테마(`theme`)도 넣는다.
+- 거절 이유(`error`)는 화면에 그대로 뜨는 한국어 문장이다(이미 쓴 선수예요, 스틸을 다 썼어요, 이번 차례엔 무승부를 다시 제안할 수 없어요, 이 칸은 고를 수 없어요 등). 플랫폼은 영문 코드가 아닌 거절 이유만 그대로 보인다.
 - `logic.version` 1. 판정·문제 선택이 바뀌면 올린다(CLAUDE.md 로직 버전 규칙).
 
 ## 7. 화면 (`Game.tsx`, 모바일 우선, theme.css 토큰만)

@@ -46,7 +46,7 @@
 - 마이그레이션에 `game_modes` (false, false, false) 행과 숨김이면 `hidden_games` 행.
 - 판돈(`duel_matches.stake`, 0~41,000, 숨김 게임 0만, 지갑 게임이 없으면 함수가 0만 받음)은 `duel` 함수가 `create`·`join`에서 `duel_stake`로 맡기고, 지급·환불은 트리거 `_duel_settle_stakes` 한 곳(`status`가 `finished`/`void`로 바뀔 때, 장부 기준). 대국을 끝내거나 무효로 만드는 새 길을 더해도 `status` update만 하면 된다. 참가는 화면이 본 `stake`를 보내고 다르면 409 `stake_mismatch`.
 - `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
-- `duel.prepare`(선택)는 대국 시작 때 DB에서 판 같은 준비 값을 받는 RPC 이름이다(`^[a-z_]+$`, 인자 `p_options jsonb`, `authenticated`에 실행 권한). `duel` 함수가 시작 트랜잭션에서 `select public.<prepare>(options)`를 불러 그 결과를 `DuelLogic.init(rng, options, prepared?)`의 세 번째 인자로 넘기고, 한 화면 대전 페이지는 `supabase.rpc(prepare, { p_options })`로 같은 값을 받는다. 호출이 실패하면 409 `prepare_failed`. 준비 값이 필요 없는 게임은 두지 않는다(티키타카토: `ttt_pick_puzzle`)
+- `duel.prepare`(선택)는 대국 시작 때 DB에서 판 같은 준비 값을 받는 RPC 이름이다(`^[a-z_]+$`, 인자 `p_options jsonb`, `authenticated`에 실행 권한). `duel` 함수가 시작 트랜잭션에서 `select public.<prepare>(options)`를 불러 그 결과를 `DuelLogic.init(rng, options, prepared?)`의 세 번째 인자로 넘기고, 한 화면 대전 페이지는 `supabase.rpc(prepare, { p_options })`로 같은 값을 받는다. 호출이 실패하거나 null을 돌려주거나 결과 모양이 틀려 `init`이 던지면 409 `prepare_failed`(같은 트랜잭션 롤백). 한 화면 대전은 manifest `options`를 먼저 고르게 하고(`src/platform/duel/OptionSelects.tsx`, 대국 만들기와 공용) 그 설정으로 준비·`init`한다. `DuelLogic.view(state, viewer, ended?)`의 `ended`는 대국이 끝났는지(status가 active가 아님, 같은 화면은 `result.over`)이고, 거절 이유 `error`가 영문 코드(`^[a-z0-9_]+$`)가 아니면 화면에 그대로 뜬다. 준비 값이 필요 없는 게임은 두지 않는다(티키타카토: `ttt_pick_puzzle`)
 
 지속형(world) 게임은 대전과 비슷하게 추가한다:
 - manifest에 `category: 'world'`, `modes`는 모두 false, 필요하면 `records: [{ key, label, unit? }]`(프로필 "기록" 탭이 이 선언과 RPC `user_records`만으로 그린다). 로직은 `WorldLogic`.
@@ -83,7 +83,7 @@
 3. `npm test`의 대비·목록 테스트가 통과해야 한다.
 
 ## 티키타카토 데이터 갱신 (`tiki-taka-toe`)
-1. 축구 데이터가 바뀌면 `npm run football:seasons` → `npm run football:honours` → `npm run ttt:generate` 순서로 돌려 `data/tiki-taka-toe/*.csv`를 다시 만들고 커밋한다.
+1. 축구 데이터가 바뀌면 `npm run football:seasons` → `npm run football:honours` → `npm run ttt:generate` 순서로 돌려 `data/tiki-taka-toe/*.csv`를 다시 만들고 커밋한다. 축구 적재는 빠진 선수를 지우지 않고 `retired`로 표시하므로 FK로 실패하지 않는다 — 다시 생성하기 전까지 그 선수는 계속 정답으로 남으니, 축구 데이터를 갱신하면 꼭 다시 생성한다.
 2. 머지 뒤 운영 DB에 마이그레이션을 적용하고 `DATABASE_URL='…' npm run ttt:load`로 통째 교체 적재한다 (축구 적재가 먼저). 로컬 확인은 `scripts/db-up.sh`의 `TEST_DB_URL`로 `football:load` → `ttt:load`.
 3. 판정 규칙(logic)이 바뀔 때만 `logic.version`을 올린다. 데이터만 바뀌면 올리지 않는다.
 
