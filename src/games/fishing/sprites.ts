@@ -4,6 +4,7 @@
 // 마을 타일은 16×16(나무 16×32). 땅 타일은 칸을 꽉 채우고, 돌·울타리·나무는 배경이 투명해 땅 위에 얹는다.
 // 마을회관 외관·실내 배경은 생성 파일 hallArt.ts(scripts/build-hall-art.py)에서 온다.
 
+import { FISH_ART } from './fishArt.ts'
 import { HALL_EXTERIOR, HALL_INTERIOR } from './hallArt.ts'
 
 export type Sprite = { w: number; h: number; rows: string[]; palette: Record<string, string> }
@@ -5295,6 +5296,8 @@ export const SPRITES: Record<string, Sprite> = {
   'map-dock': MAP_DOCK,
   'map-shop': MAP_SHOP,
   'map-teleporter': MAP_TELEPORTER,
+  // 어종 확장(2026-11-25) 75종
+  ...FISH_ART,
 }
 
 /** 안 잡은 물고기 실루엣 색(모양만). 중간 밝기라 모든 팔레트의 어두운·밝은 패널에서 대비 3:1 이상(sprites.test) */

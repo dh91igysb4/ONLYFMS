@@ -3,6 +3,7 @@ import { RODS, SPECIES } from './data.ts'
 import { TILE } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { SILHOUETTE, SPRITES, drawSprite } from './sprites.ts'
+import { FISH_ART, FISH_ART_IDS } from './fishArt.ts'
 import { PALETTES, PALETTE_IDS } from '../../app/palettes.ts'
 
 const PLAYER_POSES = [
@@ -172,6 +173,25 @@ describe('SPRITES', () => {
     expectBodyUnbroken('conger')
     const eyes = SPRITES['fish-octopus'].rows.find((r) => r.includes('e'))!
     expect(eyes).toBe([...eyes].reverse().join(''))
+  })
+
+  it('확장 75종 그림: 16×16, 팔레트 글자 모두 정의, 서로 다르고 기존 어종 그림과도 다르다', () => {
+    expect(FISH_ART_IDS).toHaveLength(75)
+    const old = new Set(SPECIES.slice(0, 94).map((s) => SPRITES[`fish-${s.id}`].rows.join('\n')))
+    const seen = new Set<string>()
+    for (const id of FISH_ART_IDS) {
+      const sp = SPRITES[`fish-${id}`]
+      expect(sp, id).toBe(FISH_ART[`fish-${id}`])
+      expect([sp.w, sp.h, sp.rows.length], id).toEqual([16, 16, 16])
+      for (const r of sp.rows) {
+        expect(r).toHaveLength(16)
+        for (const ch of r) if (ch !== '.') expect(sp.palette[ch], `${id} ${ch}`).toBeDefined()
+      }
+      const d = sp.rows.join('\n')
+      expect(old.has(d), id).toBe(false)
+      expect(seen.has(d), id).toBe(false)
+      seen.add(d)
+    }
   })
 
   it('all fish are drawn differently', () => {
