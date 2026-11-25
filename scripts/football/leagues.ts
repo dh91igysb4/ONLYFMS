@@ -7,6 +7,12 @@
 /** 옛 선수·옛 시즌 참가팀 수집 시작 연도(시즌 시작 연도). 설계 2026-11-25-football-history-clubs-design.md */
 export const HISTORY_FROM = 1987
 
+/** 정규 시즌 참가팀 수. 숫자 하나, 또는 [그 시즌부터, 팀 수] 계단(오래된 순) */
+export type TeamCount = number | readonly (readonly [fromSeason: number, n: number])[]
+
+/** 리그의 전신 대회 한 시기. id는 그 시기 위키데이터 대회 QID(다른 리그의 전신과 같은 QID일 수 있다) */
+export type Era = { id: string; name_ko: string; name_en: string; from: number; to: number; tier: number; teams: TeamCount }
+
 export type League = {
   id: string
   name_ko: string
@@ -17,7 +23,11 @@ export type League = {
   /** 수집할 최근 시즌 수 (현재 시즌 포함) */
   seasons: number
   /** 정규 시즌 참가팀 수. 커버리지 표에서 이보다 적은 시즌을 경고한다 */
-  teams: number
+  teams: TeamCount
+  /** 이 QID의 첫 시즌. 그 전은 eras(전신 대회)가 맡는다. 없으면 제한 없음 */
+  since?: number
+  /** 전신 대회 시기, 오래된 순. 1987 이후로 since까지 빈 해 없이 이어져야 한다(leagues.test.ts) */
+  eras?: readonly Era[]
 }
 
 export const LEAGUES: League[] = [

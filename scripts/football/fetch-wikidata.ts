@@ -57,9 +57,9 @@ function readManual(dir: string, name: string): Row[] {
 
 function printCoverage(tc: ReturnType<typeof mergeTeamComps>, leagues: readonly League[], windows: ReadonlyMap<string, Window>) {
   log(`\n시즌별 참가팀 수 (openfootball 포함. 빈칸 --·정원 미만 !는 data/football/manual/team_competitions.csv로 채운다)`)
-  for (const { league, from, counts, warn } of coverage(tc, leagues, windows)) {
+  for (const { id, name_ko, from, counts, warn } of coverage(tc, leagues, windows)) {
     const cells = counts.map((n, i) => (n === 0 ? ' --' : String(n).padStart(3)) + (n > 0 && warn[i] ? '!' : ' ')).join('')
-    log(`  ${league.name_ko.padEnd(10)} ${from}~${from + counts.length - 1} (정원 ${league.teams}) ${cells}`)
+    log(`  ${name_ko.padEnd(10)} ${id.padEnd(9)} ${from}~${from + counts.length - 1} ${cells}`)
   }
 }
 

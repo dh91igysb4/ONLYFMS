@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
+  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -362,4 +362,57 @@ test('footballer_condition_sees_all_ranks', () => {
     expect(q).toContain('ps:P106 wd:Q937857')
     expect(q).toContain('wikibase:DeprecatedRank')
   }
+})
+
+// ---------------------------------------------------------------- 1987년 확장 (설계 2026-11-25 §3.7)
+
+const OLD = { id: 'E1', name_ko: '옛 1부', name_en: 'Old First Division', from: 1888, to: 1991, tier: 1, teams: 22 }
+const L92 = { ...PL, id: 'L92', since: 1992, eras: [OLD] }
+
+test('competitionWindows_off_equals_seasonWindows', () => {
+  expect(competitionWindows(LEAGUES, 2026, { historyFrom: null })).toEqual(seasonWindows(LEAGUES, 2026))
+  expect(competitionWindows(LEAGUES, 2026, { historyFrom: null, override: 3 })).toEqual(seasonWindows(LEAGUES, 2026, 3))
+})
+
+test('competitionWindows_history_clips_to_since_and_eras', () => {
+  const w = competitionWindows([L92, LL], 2026, { historyFrom: 1987 })
+  expect(w.get('L92')).toEqual({ from: 1992, to: 2026 })
+  expect(w.get('E1')).toEqual({ from: 1987, to: 1991 })
+  expect(w.get(LL.id)).toEqual({ from: 1987, to: 2026 })
+  const late = competitionWindows([{ ...L92, eras: [{ ...OLD, to: 1980 }] }], 2026, { historyFrom: 1987 })
+  expect(late.has('E1')).toBe(false) // 1987 전에 끝난 시기는 빠진다
+})
+
+test('teamsAt_number_or_steps', () => {
+  expect(teamsAt([[1987, 16], [1988, 18], [2004, 20]], 1990)).toBe(18)
+  expect(teamsAt([[1987, 16], [1988, 18], [2004, 20]], 2010)).toBe(20)
+  expect(teamsAt(20, 1990)).toBe(20)
+})
+
+test('competitionList_and_eras_same_qid_two_tiers', () => {
+  const second = { ...CH, id: 'L04', since: 2004, eras: [{ ...OLD, id: 'E2', name_en: 'Old Second', from: 1892, to: 1991, tier: 2, teams: 24 }, { ...OLD, from: 1992, to: 2003, tier: 2, teams: 24 }] }
+  const leagues = [L92, second]
+  const list = competitionList(leagues)
+  expect(list.filter((c) => c.id === 'E1')).toHaveLength(1)
+  expect(list.find((c) => c.id === 'E1')!.tier).toBe(2) // 가장 최근 시기의 단계
+  expect(list.find((c) => c.id === 'L92')).toMatchObject({ kind: 'league', tier: 1, nation_id: PL.nation_id })
+  const eras = competitionEras(leagues, competitionWindows(leagues, 2026, { historyFrom: 1987 }))
+  expect(eras.filter((e) => e.competition_id === 'E1').map((e) => [e.from_season, e.to_season, e.tier])).toEqual([[1888, 1991, 1], [1992, 2003, 2]])
+  expect(eras.find((e) => e.competition_id === 'L92')).toEqual({ competition_id: 'L92', from_season: 1992, to_season: '', nation_id: PL.nation_id, tier: 1 })
+  const plain = competitionEras([LL], competitionWindows([LL], 2026, { historyFrom: 1987 }))
+  expect(plain).toEqual([{ competition_id: LL.id, from_season: 1987, to_season: '', nation_id: LL.nation_id, tier: 1 }])
+})
+
+test('coverage_includes_eras_with_season_team_counts', () => {
+  const steps = { ...L92, teams: [[1992, 22], [1995, 20]] as const }
+  const tc = [
+    ...Array.from({ length: 22 }, (_, i) => ({ team_id: `Qx${i}`, competition_id: 'E1', season: '1990' })),
+    ...Array.from({ length: 20 }, (_, i) => ({ team_id: `Qy${i}`, competition_id: 'L92', season: '1993' })),
+  ]
+  const cov = coverage(tc, [steps], competitionWindows([steps], 1995, { historyFrom: 1987 }))
+  const era = cov.find((c) => c.id === 'E1')!, lg = cov.find((c) => c.id === 'L92')!
+  expect(era).toMatchObject({ from: 1987, name_ko: '옛 1부' })
+  expect(era.counts).toEqual([0, 0, 0, 22, 0])
+  expect(lg.counts).toEqual([0, 20, 0, 0])
+  expect(lg.warn).toEqual([true, true, true, true]) // 1993은 정원 22에 못 미침, 1995 정원 20
 })
