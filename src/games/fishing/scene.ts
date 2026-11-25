@@ -690,6 +690,11 @@ function drawPierExtras(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty
 /** 움직이지 않는 맵(물 k번 장)을 타일 범위 [tx0..tx1]×[ty0..ty1]만큼 월드 좌표로 그린다. */
 function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
   const { map } = g
+  // 실내 배경 맵(마을회관): 칸 그림 대신 큰 그림 한 장
+  if (map.backdrop) {
+    drawSprite(ctx, map.backdrop, 0, 0, 1)
+    return
+  }
   const x0 = Math.max(0, tx0)
   const y0 = Math.max(0, ty0)
   const x1 = Math.min(map.w - 1, tx1)
@@ -701,12 +706,13 @@ function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: nu
       if (tileAt(map, tx, ty) === 'pier') drawPierExtras(ctx, g, tx, ty)
     }
   }
-  const shop = map.building
-  if (shop) {
-    const shopRight = shop.tx + shop.w - 1
-    const shopBottom = shop.ty + shop.h - 1
-    if (shop.tx <= x1 && shopRight >= x0 && shop.ty <= y1 && shopBottom >= y0) {
-      drawSprite(ctx, 'shop', shop.tx * TILE, shop.ty * TILE, 1)
+  // 마을회관 외관: 건물 사각형 왼쪽 아래에 맞춰(위로는 사각형을 넘을 수 있다)
+  const b = map.building
+  if (b) {
+    const right = b.tx + b.w - 1
+    const bottom = b.ty + b.h - 1
+    if (b.tx <= x1 && right >= x0 && b.ty <= y1 && bottom >= y0) {
+      drawSprite(ctx, 'hall-exterior', b.tx * TILE, (b.ty + b.h) * TILE - SPRITES['hall-exterior'].h, 1)
     }
   }
 }

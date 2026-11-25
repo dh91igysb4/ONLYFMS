@@ -1,7 +1,10 @@
 // 낚시 픽셀 스프라이트. 전부 자체 디자인이며 글자 하나가 픽셀 하나다('.' = 투명).
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)라 여기서 직접 정한다.
 // 물고기는 머리가 왼쪽, 16×16 칸 가운데. 캐릭터는 16×24, 아래·위·옆(오른쪽) 세 방향이고 왼쪽은 flipX로 그린다.
-// 마을 타일은 16×16(나무 16×32, 상점 80×64). 땅 타일은 칸을 꽉 채우고, 돌·울타리·나무·상점은 배경이 투명해 땅 위에 얹는다.
+// 마을 타일은 16×16(나무 16×32). 땅 타일은 칸을 꽉 채우고, 돌·울타리·나무는 배경이 투명해 땅 위에 얹는다.
+// 마을회관 외관·실내 배경은 생성 파일 hallArt.ts(scripts/build-hall-art.py)에서 온다.
+
+import { HALL_EXTERIOR, HALL_INTERIOR } from './hallArt.ts'
 
 export type Sprite = { w: number; h: number; rows: string[]; palette: Record<string, string> }
 
@@ -2141,39 +2144,6 @@ const TREE: Record<string, string> = {
   x: GROUND_SHADOW,
 }
 
-// 상점: 5×4칸(80×64). 맨 아래 줄 세 번째 칸(x 32~47)이 문. 산호색 기와 지붕, 하늘색 판자 벽, 물고기 간판
-const SHOP_PALETTE: Record<string, string> = {
-  k: '#2a2135', // 외곽선
-  R: '#d9654b', // 기와
-  r: '#b04a3a', // 기와 그늘
-  Q: '#ef8f6c', // 기와 밝은 쪽
-  C: '#8f3a33', // 용마루
-  n: '#4a3a4a', // 처마 그늘
-  B: '#9fcbd8', // 벽 판자
-  b: '#7db0c2', // 판자 이음
-  w: '#f6f1e4', // 흰 테두리
-  W: '#d9d0bc', // 흰 테두리 그늘
-  G: '#bfe6f2', // 유리
-  g: '#8cc8de', // 유리 아래
-  i: '#e9f8fc', // 유리 반짝임
-  d: '#a0673d', // 문
-  D: '#7c4b2a', // 문 홈
-  e: '#c28452', // 문 밝은 쪽
-  y: '#f4c542', // 문손잡이
-  s: '#a9b3b9', // 기단 돌
-  S: '#7f8b93', // 돌 이음
-  a: '#f27d5e', // 차양 산호색 줄, 간판 물고기 꼬리
-  A: '#fbf1d6', // 차양 흰 줄, 간판 물고기
-  o: '#c8925a', // 화분 윗면
-  O: '#8a5a34', // 화분, 간판 줄, 선반
-  f: '#3f7fa8', // 간판 아래 테
-  F: '#2f6b7c', // 간판
-  p: '#f28fae', // 분홍 꽃
-  P: '#ffd76a', // 노란 꽃
-  t: '#4e8a3e', // 잎
-  c: '#9aa3a8', // 굴뚝
-  x: '#6e7880', // 굴뚝 이음
-}
 
 const TILE_GRASS = sprite(GRASS, [
   'gggggggggggggggg',
@@ -2362,72 +2332,6 @@ const TILE_TREE = sprite(TREE, [
   '................',
 ])
 
-const SHOP = sprite(SHOP_PALETTE, [
-  '........................................................kkkkkkkkk...............',
-  '........................................................kxxxxxxxk...............',
-  '........................................................kxxxxxxxk...............',
-  '........................................................kcccxccck...............',
-  '........kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk........',
-  '........CQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQC........',
-  '........CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCkccccccckCCCCCCC........',
-  '.......kCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCkcxcccxckCCCCCCCk.......',
-  '.......kQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRkcxcccxckRRRQQRRk.......',
-  '.......kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRkxxxxxxxkRrRRRRRk.......',
-  '......kRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRkccccccckRrRRRRRRk......',
-  '......kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrkccccccckrrrrrrrRk......',
-  '......kRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQkkkkkkkkkkkQRRRRQQk......',
-  '.....kRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRrrrrrrrrrrrRRRrRRRRk.....',
-  '.....kRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRk.....',
-  '.....kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk.....',
-  '....kRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQk....',
-  '....kRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRk....',
-  '....kRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRk....',
-  '...kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk...',
-  '...kRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRk...',
-  '...kRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrk...',
-  '..kRRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRk..',
-  '..kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk..',
-  '..kQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRk..',
-  '.kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRk.',
-  '.kRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRrRRRRRk.',
-  '.kRrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrRk.',
-  'kRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQRRRRQQk',
-  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
-  'knnnnnnnnnnnnnnnnnnnnnnnnnnnnnOnnnnnnnnnnnnnnnnnnOnnnnnnnnnnnnnnnnnnnnnnnnnnnnnk',
-  'knnnnnnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkkkkkkkkkkkkkknnnnnnnnnnnnnnnnnnnnnnnnnnnk',
-  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBkFFFFFFFFAAAFFFFFFFFFFFkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWbkkkkkkkkkkkkkkkkkkkkkkbkFFFFFFAAAAAAAFaaFFFFFFkbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
-  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkFFFFFAkAAAAAAaaFFFFFFFkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkFFFFFFAAAAAAAFaaFFFFFFkBBOOOOOOOOOOOOOOOOOOOOBBwwWk',
-  'kwwWBkaaaAAAaaaAAAaaaAAAaakBkffffffffWWWfffffffffffkBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWbbaakAAkaakAAkaakAAkaakbkkkkkkkkkkkkkkkkkkkkkkkkbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
-  'kwwWBBBkkkkkkkkkkkkkkkkkkBBBBBBBkwwwwwwwwwwwwwwkBBBBBBBkkkkkkkkkkkkkkkkkkBBBwwWk',
-  'kwwWBBBkwwwwwwwwwwwwwwwwkBBBBBBBkwwwwwwwwwwwwwwkBBBBBBBkwwwwwwwwwwwwwwwwkBBBwwWk',
-  'kwwWBBBkwGGGGGGwwGGGGGGwkBBBBBBBkwwDDDDDDDDDDwwkBBBBBBBkwGGGGGGwwGGGGGGwkBBBwwWk',
-  'kwwWbbbkwGiiGGGwwGiiGGGwkbbbbbbbkwwdeDddddDddwwkbbbbbbbkwGiiGGGwwGiiGGGwkbbbwwWk',
-  'kwwWBBBkwGiGGGGwwGiGGGGwkBBBBBBBkwwdeDddddDddwwkBBBBBBBkwGiGGGGwwGiGGGGwkBBBwwWk',
-  'kwwWBBBkwGGGGGGwwGGGGGGwkBBBBBBBkwwdeDkkkkDddwwkBBBBBBBkwGGGGGGwwGGGGGGwkBBBwwWk',
-  'kwwWBBBkwwwwwwwwwwwwwwwwkBBBBBBBkwwdekiiGGkddwwkBBBBBBBkwwwwwwwwwwwwwwwwkBBBwwWk',
-  'kwwWbbbkwggggggwwggggggwkbbbbbbbkwwdekGGGGkddwwkbbbbbbbkwggggggwwggggggwkbbbwwWk',
-  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdekGGGGkddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
-  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdeDkkkkDddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
-  'kwwWBBBkwggggggwwggggggwkBBBBBBBkwwdeDddddDddwwkBBBBBBBkwggggggwwggggggwkBBBwwWk',
-  'kwwWbbbkAggPggpwwAggpggPkbbbbbbbkwwdeDddddDddwwkbbbbbbbkwggggggwwggggggwkbbbwwWk',
-  'kwwWBBBkppWPPWppWPPWppWPPBBBBBBBkwwdeDddddDddwwkBBBBBBBkWWWWWWWWWWWWWWWWkBBBwwWk',
-  'kwwWBBBkttkttkttkttkttkttBBBBBBBkwwdeDddddDddwwkBBBBBBBkkkkkkkkkkkkkkkkkkBBBwwWk',
-  'kwwWBBkkktkktkktkktkktkktkBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWbbkooooooooooooooooookbbbbbbkwwdeDddddDydwwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
-  'kwwWBBkOOOOOOOOOOOOOOOOOOkBBBBBBkwwdeDddddDDdwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWBBkkkkkkkkkkkkkkkkkkkkBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwwdeDddddDddwwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbwwWk',
-  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kwwWBBBBBBBBBBBBBBBBBBBBBBBBBBBBkwwdeDddddDddwwkBBBBBBBBBBBBBBBBBBBBBBBBBBBBwwWk',
-  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwwdeDddddDddwwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
-  'ksssSssssssSssssssSssssssSssssskSSSSSSSSSSSSSSSSkssssSssssssSssssssSssssssSssssk',
-  'ksssSssssssSssssssSssssssSsssssksssssssssssssssskssssSssssssSssssssSssssssSssssk',
-  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
-])
 
 // ── 강·연못·웅덩이·폭포·다리·절벽(2단계 지역 타일). 16×16, 0/1 쌍은 물결이 다르다 ──
 const RIVER: Record<string, string> = {
@@ -5382,7 +5286,8 @@ export const SPRITES: Record<string, Sprite> = {
   'tile-fence': TILE_FENCE,
   'tile-fence-v': TILE_FENCE_V,
   'tile-tree': TILE_TREE,
-  shop: SHOP,
+  'hall-exterior': HALL_EXTERIOR,
+  'hall-interior': HALL_INTERIOR,
   'map-you': MAP_YOU,
   'map-spot': MAP_SPOT,
   'map-exit': MAP_EXIT,
