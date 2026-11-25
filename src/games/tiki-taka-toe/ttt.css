@@ -1,0 +1,122 @@
+/* 티키타카토 화면. 색은 theme.css·palettes.ts 토큰만 쓴다.
+   좌석 0은 채운 칸(--lime / --on-accent), 좌석 1은 테두리 칸(--warn-text). */
+.ttt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ttt-head { margin-bottom: -2px; }
+.ttt-foot { margin-top: -2px; }
+
+.ttt-board {
+  display: grid;
+  grid-template-columns: minmax(56px, 0.8fr) repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  max-width: 520px;
+  align-self: center;
+}
+.ttt-row-wrap { display: contents; }
+.ttt-label {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  display: flex;
+  align-items: center;
+}
+.ttt-col { justify-content: center; text-align: center; padding-bottom: 2px; align-items: flex-end; }
+.ttt-row { justify-content: flex-start; padding-right: 2px; }
+
+.ttt-cell {
+  font: inherit;
+  aspect-ratio: 1;
+  min-height: 64px;
+  border-radius: 10px;
+  border: 1px dashed var(--muted);
+  background: transparent;
+  color: var(--ink);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: center;
+}
+.ttt-cell:disabled { cursor: default; }
+.ttt-cell:not(:disabled):hover, .ttt-cell:focus-visible { border-color: var(--accent-strong); outline: none; box-shadow: 0 0 0 2px var(--accent-strong); }
+.ttt-cell.ttt-seat0 { background: var(--lime); color: var(--on-accent); border: 2px solid var(--accent-edge); }
+.ttt-cell.ttt-seat1 { background: var(--panel); color: var(--warn-text); border: 2px solid var(--warn-text); }
+.ttt-cell.ttt-last { box-shadow: 0 0 0 3px var(--sky); }
+.ttt-name { font-weight: 800; font-size: 13px; line-height: 1.2; overflow-wrap: anywhere; word-break: keep-all; }
+.ttt-steal { font-size: 11px; font-weight: 600; opacity: 0.9; }
+.ttt-ex { display: flex; flex-direction: column; font-size: 10px; line-height: 1.2; opacity: 0.85; max-height: 100%; overflow: hidden; }
+
+.ttt-info { display: flex; flex-direction: column; gap: 4px; }
+.ttt-steals { margin: 0; display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+.ttt-who { display: inline-flex; align-items: center; gap: 6px; }
+.ttt-chip { width: 12px; height: 12px; border-radius: 3px; display: inline-block; box-sizing: border-box; }
+.ttt-chip.ttt-seat0 { background: var(--lime); border: 1px solid var(--accent-edge); }
+.ttt-chip.ttt-seat1 { background: var(--panel); border: 2px solid var(--warn-text); }
+.ttt-lastline { margin: 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+
+.ttt-controls { display: flex; flex-direction: column; gap: 8px; }
+.ttt-row-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.ttt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; min-height: 36px; cursor: pointer; }
+.ttt-check-off { color: var(--muted); cursor: default; }
+.ttt-offer { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--accent-strong); }
+.ttt-offer p { margin: 0; font-size: 14px; }
+.ttt-note { margin: 0; font-size: 13px; }
+
+.ttt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.ttt-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+.ttt-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ttt-sheet-title { margin: 0; font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+.ttt-hits { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 0; }
+.ttt-hit {
+  font: inherit;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ttt-hit:hover, .ttt-hit:focus-visible { border-color: var(--accent-strong); outline: none; }
+.ttt-hit:disabled { opacity: 0.5; cursor: default; }
+.ttt-hit-name { font-weight: 700; overflow-wrap: anywhere; }
+.ttt-hit-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+@media (min-width: 900px) {
+  .ttt-label { font-size: 13px; }
+  .ttt-name { font-size: 15px; }
+  .ttt-ex { font-size: 11px; }
+}

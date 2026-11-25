@@ -75,7 +75,7 @@ test('home_create_form', async () => {
   await flush()
   const game = screen.getByLabelText('게임') as HTMLSelectElement
   // 대전 게임만 (솔로 게임은 없다). 관리자라 숨김 대전도 보인다
-  expect(Array.from(game.options).map((o) => o.textContent)).toEqual(['요트 다이스', '숨김 대전'])
+  expect(Array.from(game.options).map((o) => o.textContent)).toEqual(['요트 다이스', '티키타카토', '숨김 대전'])
   const turn = screen.getByLabelText('턴 시간') as HTMLSelectElement
   expect(Array.from(turn.options).map((o) => o.value)).toEqual(['30', '60', '90'])
   expect(turn.value).toBe('60')

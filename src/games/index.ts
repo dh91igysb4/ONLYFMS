@@ -5,6 +5,8 @@ import { manifest as toothbrushManifest } from './toothbrush/manifest.ts'
 import { logic as toothbrushLogic } from './toothbrush/logic.ts'
 import { manifest as yachtManifest } from './yacht/manifest.ts'
 import { logic as yachtLogic } from './yacht/logic.ts'
+import { manifest as tttManifest } from './tiki-taka-toe/manifest.ts'
+import { logic as tttLogic } from './tiki-taka-toe/logic.ts'
 import { manifest as ballRunManifest } from './ball-run/manifest.ts'
 import { logic as ballRunLogic } from './ball-run/logic.ts'
 import { manifest as sneakExamManifest } from './sneak-exam/manifest.ts'
@@ -28,7 +30,10 @@ export function getGame(id: string): GameModule | undefined {
 }
 
 /** 대전 게임 등록부. 솔로 `games`와 분리한다 (play Edge Function은 games만 본다). */
-export const duels: DuelModule[] = [{ manifest: yachtManifest, logic: yachtLogic }]
+export const duels: DuelModule[] = [
+  { manifest: yachtManifest, logic: yachtLogic },
+  { manifest: tttManifest, logic: tttLogic },
+]
 
 export function getDuel(id: string): DuelModule | undefined {
   return duels.find((d) => d.manifest.id === id)

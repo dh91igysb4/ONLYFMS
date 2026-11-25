@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
 import { Game as ToothbrushGame } from './toothbrush/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
+import { Game as TikiTakaToeGame } from './tiki-taka-toe/Game.tsx'
 import { Game as BallRunGame } from './ball-run/Game.tsx'
 import { Game as SneakExamGame } from './sneak-exam/Game.tsx'
 import { Game as FishingGame } from './fishing/Game.tsx'
@@ -59,6 +60,7 @@ export type DuelGameProps = {
 /** 대전 게임 화면 등록부. 새 대전 게임 화면을 여기에 한 줄씩 등록한다. */
 const duelComponents: Record<string, ComponentType<DuelGameProps>> = {
   yacht: YachtGame,
+  'tiki-taka-toe': TikiTakaToeGame,
 }
 
 export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
