@@ -8,7 +8,7 @@
 // 선수 단위 우승(리그 포함)은 매번 팀 우승 전체와 시즌 소속으로 다시 계산한다(§3.1).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles } from './honours.ts'
+import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles, topTierSeason, winnerMismatches } from './honours.ts'
 import { parseAwardList, parseFinals, parseManagerInfobox, parseSquads, type Hit } from './honourParsers.ts'
 import { FILES, sortRows } from './schema.ts'
 import { calendarOf, type Membership } from './seasons.ts'
@@ -34,6 +34,7 @@ const players = new Set(read('players.csv').map((p) => p.id))
 const clubIds = new Set(teams.filter((t) => t.kind === 'club').map((t) => t.id))
 const nationalIds = new Set(teams.filter((t) => t.kind === 'national').map((t) => t.id))
 const nationalByHeading = nationalTeamFinder(teams as unknown as { id: string; kind: string; name_en: string }[])
+const topTier = topTierSeason(read('competition_eras.csv') as unknown as { competition_id: string; from_season: string; to_season: string; tier: string }[])
 // 직접 고친 우승팀 (위키데이터가 틀리거나 비었을 때)
 const winnerFixes = read('manual/honour_winners.csv') as unknown as { honour: string; season: string; team_id: string }[]
 
@@ -112,22 +113,26 @@ async function editions(comp: Row): Promise<{ season: number; winner: string | n
 
 async function collectCup(c: Row): Promise<Honour[]> {
   const eds = await editions(c)
-  const out: Honour[] = applyWinnerFixes(eds.filter((e) => e.winner).map((e) => ({ honour: c.id, season: String(e.season), team_id: e.winner!, player_id: '' })), winnerFixes, c.id)
-  const have = new Set(out.map((h) => h.season))
-  if (c.page) {
-    const p = await page(c.page)
-    if (!p) rep(c.id).note.push(`문서 없음: ${c.page}`)
-    else {
-      const hits = parseFinals(p.text, { from: Number(c.from), seasonCol: calendarOf(c.nation_id || undefined) === 'year' ? 'year' : 'start' })
-        .filter((h) => !have.has(String(h.season)) && h.season <= current)
-      const q = await resolve(hits.map((h) => h.link))
-      for (const h of hits) {
-        const t = q.get(h.link)
-        if (t && teamById.has(t)) { out.push({ honour: c.id, season: String(h.season), team_id: t, player_id: '' }); have.add(String(h.season)) }
-        else rep(c.id).note.push(`${h.season} 우승팀 ${h.link} 우리 DB에 없음`)
-      }
-    }
+  const fromWikidata = eds.filter((e) => e.winner).map((e) => ({ honour: c.id, season: String(e.season), team_id: e.winner!, player_id: '' }))
+  const out: Honour[] = applyWinnerFixes(fromWikidata, winnerFixes, c.id)
+  if (!c.page) return out
+  const p = await page(c.page)
+  if (!p) { rep(c.id).note.push(`문서 없음: ${c.page}`); return out }
+  const hits = parseFinals(p.text, { from: Number(c.from), seasonCol: calendarOf(c.nation_id || undefined) === 'year' ? 'year' : 'start' }).filter((h) => h.season <= current)
+  const q = await resolve(hits.map((h) => h.link))
+  const fromPage: Honour[] = []
+  for (const h of hits) {
+    const t = q.get(h.link)
+    // 리그는 그 시즌 1부였던 시기만(역대 우승 표는 1부 우승팀 목록이다)
+    if (c.kind === 'league' && !topTier(c.id, h.season)) continue
+    if (t && teamById.has(t)) fromPage.push({ honour: c.id, season: String(h.season), team_id: t, player_id: '' })
   }
+  // 위키데이터와 결승 표가 다르면 알린다(고친 시즌은 빼고). 위키데이터가 없는 시즌만 결승 표로 채운다
+  const fixed = new Set(winnerFixes.filter((f) => f.honour === c.id).map((f) => f.season))
+  for (const m of winnerMismatches(fromWikidata, fromPage)) if (!fixed.has(m.season))
+    rep(c.id).note.push(`${m.season} 우승팀 불일치: 위키데이터 ${teamById.get(m.wikidata)?.name_en} / 문서 ${teamById.get(m.page)?.name_en}`)
+  const have = new Set(out.map((h) => h.season))
+  for (const h of fromPage) if (!have.has(h.season)) { out.push(h); have.add(h.season) }
   return out
 }
 
@@ -211,7 +216,7 @@ for (const c of catalog) {
   if (c.source === 'existing') continue
   log(`${c.kind} ${c.name_en} …`)
   try {
-    const rows = c.kind === 'cup' || c.kind === 'continental' ? await collectCup(c)
+    const rows = c.kind === 'league' || c.kind === 'cup' || c.kind === 'continental' ? await collectCup(c)
       : c.kind === 'international' ? await collectInternational(c)
       : c.kind === 'award' ? await collectAward(c) : []
     if (c.kind === 'manager') { const s = await collectManager(c); spells.push(...s); rep(c.id).rows += s.length }
@@ -225,11 +230,13 @@ for (const c of catalog) {
 for (const r of read('manual/world_cup_final_scorers.csv')) extra.push({ honour: 'final_goal:Q19317', season: r.season, team_id: r.team_id, player_id: r.player_id })
 
 // 선수 단위 우승: 리그(기존 honours.csv) + 컵·대륙 팀 우승 × 시즌 소속, 대표팀 대회 우승팀 엔트리
-const leagueIds = new Set(catalog.filter((c) => c.kind === 'league').map((c) => c.id))
-const cupIds = new Set(catalog.filter((c) => c.kind === 'cup' || c.kind === 'continental').map((c) => c.id))
+// 팀 우승: 이 수집기 행이 있는 대회·시즌은 그것만, 없으면 기존 honours.csv 리그 우승 (load.sql과 같은 규칙)
+const clubCompIds = new Set(catalog.filter((c) => c.kind === 'league' || c.kind === 'cup' || c.kind === 'continental').map((c) => c.id))
+const extraWins = extra.filter((h) => clubCompIds.has(h.honour) && h.player_id === '')
+const overridden = new Set(extraWins.map((h) => `${h.honour}|${h.season}`))
 const teamWins = [
-  ...(read('honours.csv') as unknown as Honour[]).filter((h) => leagueIds.has(h.honour) && h.player_id === ''),
-  ...extra.filter((h) => cupIds.has(h.honour) && h.player_id === ''),
+  ...(read('honours.csv') as unknown as Honour[]).filter((h) => clubCompIds.has(h.honour) && h.player_id === '' && !overridden.has(`${h.honour}|${h.season}`)),
+  ...extraWins,
 ]
 const memberships = read('season_memberships.csv') as unknown as Membership[]
 extra.push(...playerTitles(teamWins, memberships, clubIds))

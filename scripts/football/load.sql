@@ -125,11 +125,14 @@ insert into public.football_managers (id, name_en) select id, name_en from s_man
 insert into public.football_manager_spells (manager_id, team_id, from_season, to_season, source_url)
 select manager_id, team_id, from_season::int, to_season::int, nullif(source_url, '') from s_manager_spells;
 
--- 카탈로그에 있는 개인상은 이 수집기(honours_extra)가 기준: 기존 honours.csv의 같은 상 행은 버린다
+-- 카탈로그에 있는 개인상은 이 수집기(honours_extra)가 기준: 기존 honours.csv의 같은 상 행은 버린다.
+-- 고친 팀 우승(manual/honour_winners.csv → honours_extra의 팀 단위 행)이 있으면 같은 대회·시즌의 honours.csv 팀 우승도 버린다.
 insert into public.football_honours (honour, season, team_id, player_id)
 select distinct honour, season::int, nullif(team_id, ''), nullif(player_id, '') from (
   select * from s_honours h
   where not exists (select 1 from s_honour_catalog c where c.kind = 'award' and h.honour = 'award:' || c.id)
+    and not (coalesce(h.player_id, '') = '' and exists (select 1 from s_honours_extra e
+      where e.honour = h.honour and e.season = h.season and coalesce(e.player_id, '') = ''))
   union all
   select * from s_honours_extra
 ) x;

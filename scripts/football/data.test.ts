@@ -148,7 +148,7 @@ describe('rules', () => {
 
   test('honour_shape', () => {
     expect(check((d) => { d.files.honours[0].team_id = '' }).some((m) => /^honours:2: /.test(m))).toBe(true)
-    expect(check((d) => { d.files.honours[1].player_id = '' }).some((m) => /^honours:3: /.test(m))).toBe(true)
+    expect(check((d) => { d.files.honours[2].player_id = '' }).some((m) => /^honours:4: /.test(m))).toBe(true) // 개인상 행(픽스처 3번째)
     expect(check((d) => { d.files.honours[0].honour = 'Q1' }).some((m) => /^honours:2: honour Q1/.test(m))).toBe(true)
   })
 

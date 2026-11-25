@@ -1,5 +1,6 @@
 id,kind,name_en,name_ko,nation_id,source,page,from
 Q166177,award,Ballon d'Or,발롱도르,,wikipedia,Ballon d'Or#Winners,1987
+Q17355204,award,FIFA World Cup Golden Ball,월드컵 골든볼,,wikipedia,FIFA World Cup awards#Official winners (1982–present),1987
 Q182529,award,FIFA World Player of the Year,FIFA 올해의 선수,,wikipedia,FIFA World Player of the Year#FIFA World Player of the Year,1987
 Q233454,award,European Golden Shoe,유러피언 골든슈,,wikipedia,European Golden Shoe#Winners,1987
 Q28156245,award,The Best FIFA Men's Player,더 베스트 FIFA 남자 선수상,,wikipedia,The Best FIFA Men's Player#Winners,1987
@@ -9,11 +10,11 @@ Q729513,award,Pichichi Trophy,라리가 득점왕(피치치),Q29,wikipedia,Pichi
 Q794775,award,Premier League Golden Boot,프리미어리그 득점왕,Q21,wikipedia,Premier League Golden Boot#Winners,1987
 x-belgian-top-scorer,award,Belgian Pro League top scorer,벨기에 프로리그 득점왕,Q31,wikipedia,Belgian Pro League top scorers#List of top scorers,1987
 x-bundesliga-top-scorer,award,Bundesliga top scorer,분데스리가 득점왕,Q183,wikipedia,List of Bundesliga top scorers by season,1987
+x-england-top-flight-top-scorer,award,English top-flight top scorer,잉글랜드 1부 득점왕,Q21,wikipedia,List of English football first tier top scorers,1987
 x-eredivisie-top-scorer,award,Eredivisie top scorer,에레디비시 득점왕,Q55,wikipedia,Eredivisie#Top scorers,1987
 x-kleague-top-scorer,award,K League 1 top scorer,K리그1 득점왕,Q884,wikipedia,K League Top Scorer Award#K League 1 award,1987
 x-ligue1-top-scorer,award,Ligue 1 top scorer,리그 1 득점왕,Q142,wikipedia,List of Ligue 1 top scorers#Top scorers by season,1987
 x-super-lig-top-scorer,award,Süper Lig top scorer,쉬페르리그 득점왕,Q43,wikipedia,List of Süper Lig top scorers#Top scorers by season,1987
-x-wc-golden-ball,award,FIFA World Cup Golden Ball,월드컵 골든볼,,wikipedia,FIFA World Cup awards#Official winners (1982–present),1987
 x-wc-golden-boot,award,FIFA World Cup Golden Boot,월드컵 골든부트,,wikipedia,FIFA World Cup awards#Golden Boot,1987
 Q18756,continental,UEFA Champions League,UEFA 챔피언스리그,,wikidata,List of European Cup and UEFA Champions League finals,1987
 Q18760,continental,UEFA Europa League,UEFA 유로파리그,,wikidata,List of UEFA Cup and Europa League finals,1987
@@ -33,19 +34,19 @@ Q157894,international,AFC Asian Cup,AFC 아시안컵,,wikipedia,{year} AFC Asian
 Q178750,international,Copa América,코파 아메리카,,wikipedia,{year} Copa América squads,1987
 Q19317,international,FIFA World Cup,FIFA 월드컵,,wikipedia,{year} FIFA World Cup squads,1990
 Q260858,international,UEFA European Championship,UEFA 유로,,wikipedia,UEFA Euro {year} squads,1988
-Q13394,league,Ligue 1,리그 1,Q142,existing,,1987
-Q15804,league,Serie A,세리에 A,Q38,existing,,1987
-Q167541,league,Eredivisie,에레디비시,Q55,existing,,1987
-Q182994,league,Primeira Liga,프리메이라리가,Q45,existing,,1987
-Q19510,league,EFL Championship,EFL 챔피언십,Q21,existing,,1987
-Q216022,league,Belgian Pro League,벨기에 프로리그,Q31,existing,,1987
-Q2386334,league,K League 1,K리그1,Q884,existing,,1987
-Q324867,league,LaLiga,라리가,Q29,existing,,1987
-Q485568,league,Süper Lig,쉬페르리그,Q43,existing,,1987
-Q754839,league,Football League First Division,풋볼리그 1부,Q21,existing,,1987
-Q769744,league,Football League Second Division,풋볼리그 2부,Q21,existing,,1987
-Q82595,league,Bundesliga,분데스리가,Q183,existing,,1987
-Q9448,league,Premier League,프리미어리그,Q21,existing,,1987
+Q13394,league,Ligue 1,리그 1,Q142,wikidata,List of French football champions,1987
+Q15804,league,Serie A,세리에 A,Q38,wikidata,List of Italian football champions,1987
+Q167541,league,Eredivisie,에레디비시,Q55,wikidata,List of Dutch football champions,1987
+Q182994,league,Primeira Liga,프리메이라리가,Q45,wikidata,List of Portuguese football champions,1987
+Q19510,league,EFL Championship,EFL 챔피언십,Q21,wikidata,,1987
+Q216022,league,Belgian Pro League,벨기에 프로리그,Q31,wikidata,List of Belgian football champions,1987
+Q2386334,league,K League 1,K리그1,Q884,wikidata,List of South Korean football champions,1987
+Q324867,league,LaLiga,라리가,Q29,wikidata,List of Spanish football champions,1987
+Q485568,league,Süper Lig,쉬페르리그,Q43,wikidata,List of Turkish football champions,1987
+Q754839,league,Football League First Division,풋볼리그 1부,Q21,wikidata,List of English football champions,1987
+Q769744,league,Football League Second Division,풋볼리그 2부,Q21,wikidata,,1987
+Q82595,league,Bundesliga,분데스리가,Q183,wikidata,List of German football champions,1987
+Q9448,league,Premier League,프리미어리그,Q21,wikidata,List of English football champions,1987
 Q144048,manager,Rafael Benítez,라파엘 베니테스,,wikipedia,Rafael Benítez,1987
 Q152107,manager,Jupp Heynckes,유프 하인케스,,wikipedia,Jupp Heynckes,1987
 Q164038,manager,Pep Guardiola,펩 과르디올라,,wikipedia,Pep Guardiola,1987

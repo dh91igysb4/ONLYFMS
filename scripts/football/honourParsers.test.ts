@@ -63,6 +63,11 @@ describe('awards', () => {
     const t = '{|\n|-\n| {{nowrap|[[1999–2000 La Liga|1999–2000]]}} || {{flagicon|Spain}} {{sortname||Salva|Salva Ballesta}} || [[Racing de Santander|Racing]]\n|}'
     expect(parseAwardList(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 1999, link: 'Salva Ballesta' }])
   })
+  test('award_ties_in_one_cell', () => {
+    // 카포칸노니에레 1995–96: 공동 득점왕이 한 칸에 <hr/>로 나뉨
+    const t = '{|\n|-\n| [[1995–96 Serie A|1995–96]] || [[Igor Protti]]<hr/>[[Giuseppe Signori]] (3) || [[A.S. Bari|Bari]]<hr/>[[S.S. Lazio|Lazio]] || 24\n|}'
+    expect(parseAwardList(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 1995, link: 'Igor Protti' }, { season: 1995, link: 'Giuseppe Signori' }])
+  })
   test('award_ties', () => {
     const h = parseAwardList(fx('pl_golden_boot'), { from: 1992, seasonCol: 'start' }).filter((x) => x.season === 2018)
     expect(h.map((x) => x.link).sort()).toEqual(['Mohamed Salah', 'Pierre-Emerick Aubameyang', 'Sadio Mané'])
@@ -80,6 +85,11 @@ describe('finals', () => {
 })
 
 describe('finals_more', () => {
+  test('finals_two_legged_bold_winner', () => {
+    // 튀르키예 컵 1988–89: 홈·원정 순서 표, 우승팀은 굵게
+    const t = "{|\n|-\n| [[1988–89 Turkish Cup|1988–89]] || [[Fenerbahçe S.K. (football)|Fenerbahçe]] || 0–1 || '''[[Beşiktaş J.K.|Beşiktaş]]''' || [[Şükrü Saracoğlu Stadium]]\n|-\n| [[1988–89 Turkish Cup|1988–89]] || '''[[Beşiktaş J.K.|Beşiktaş]]''' || 2–1 || [[Fenerbahçe S.K. (football)|Fenerbahçe]] || [[BJK İnönü Stadium]]\n|}"
+    expect(parseFinals(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 1988, link: 'Beşiktaş J.K.' }])
+  })
   test('finals_season_in_sort', () => {
     // List of Belgian Cup finals: 회차 칸 다음 {{sort|키|[[시즌]]}}
     const t = '{|\n|-\n| 68th || {{sort|2022–23 Belgian Cup (68)|[[2022–23 Belgian Cup|2022–23]]}} || [[Royal Antwerp FC|Antwerp]] || [[2023 Belgian Cup final|2–0]] || [[KV Mechelen|Mechelen]]\n|}'
@@ -103,6 +113,10 @@ describe('managers', () => {
     const r = parseManagerInfobox(fx('wenger'))
     expect(r).toContainEqual({ club: 'Arsenal F.C.', from: 1996, to: 2018, caretaker: false })
     expect(r).toHaveLength(4)
+  })
+  test('infobox_skips_assistant_youth', () => {
+    const t = '{{Infobox football biography\n| manageryears1 = 1992–1995\n| managerclubs1 = [[Italy national football team|Italy]] (assistant)\n| manageryears2 = 1992–1993\n| managerclubs2 = [[FC Winterthur]] (youth)\n| manageryears3 = 1995\n| managerclubs3 = [[VfB Stuttgart]] (assistant coach)\n| manageryears4 = 1995–1996\n| managerclubs4 = [[Reggiana]]\n}}'
+    expect(parseManagerInfobox(t).map((x) => x.club)).toEqual(['Reggiana'])
   })
   test('infobox_present_and_caretaker', () => {
     const t = '{{Infobox football biography\n| manageryears1 = 2019-\n| managerclubs1 = [[Arsenal F.C.|Arsenal]]\n| manageryears2 = 2019\n| managerclubs2 = [[Arsenal F.C.]] (caretaker)\n}}'

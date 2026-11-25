@@ -1,6 +1,6 @@
 -- 우승·수상·감독 테이블과 적재 (설계 2026-11-25-football-honours-design.md §3.4). db-test.sh가 픽스처를 먼저 적재해 둔다.
 begin;
-select plan(11);
+select plan(12);
 
 \set AP '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}'
 \set PE '{"sub":"00000000-0000-0000-0000-0000000000f2","role":"authenticated"}'
@@ -19,7 +19,10 @@ select is((select count(*)::int from public.football_manager_spells), 1, 'manage
 -- 카탈로그 상은 새 수집 행만: honours.csv의 2021 행은 버리고 honours_extra.csv의 2022 행만
 select is((select array_agg(season order by season) from public.football_honours where honour = 'award:x-pl-golden-boot'), array[2022], 'catalog award replaced by extra rows');
 select is((select count(*)::int from public.football_honours where honour = 'squad:x-wc'), 1, 'squad rows loaded');
-select is((select count(*)::int from public.football_honours where honour = 'Q324867'), 2, 'team and player league titles both present');
+select is((select count(*)::int from public.football_honours where honour = 'Q324867' and season = 2023), 2, 'team and player league titles both present');
+
+-- 고친 팀 우승(honours_extra의 팀 단위 행)이 있으면 같은 대회·시즌의 honours.csv 팀 우승은 버린다
+select is((select array_agg(team_id) from public.football_honours where honour = 'Q324867' and season = 2022 and player_id is null), array['Q18741'], 'fixed team winner replaces old one');
 
 select throws_ok($$insert into public.football_manager_spells (manager_id, team_id, from_season, to_season) values ('x-wenger', 'Q18741', 2019, 2018)$$,
   '23514', null, 'from_season <= to_season');

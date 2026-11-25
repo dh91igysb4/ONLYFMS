@@ -1,6 +1,6 @@
 // 선수 우승·대표팀 우승·감독 시즌 계산 (설계 2026-11-25-football-honours-design.md §3.1·§3.5)
 import { expect, test } from 'vitest'
-import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles } from './honours.ts'
+import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles, topTierSeason, winnerMismatches } from './honours.ts'
 
 const m = (player_id: string, season: string, team_id: string) => ({ player_id, season, team_id, primary: 'true', days: '300', estimated: 'true' })
 const win = (honour: string, season: string, team_id: string) => ({ honour, season, team_id, player_id: '' })
@@ -30,7 +30,7 @@ test('manager_seasons', () => {
   expect(managerSeasons(1996, 2018, 'split', 2026)).toEqual({ from_season: 1996, to_season: 2017 })
   expect(managerSeasons(1986, 2013, 'split', 2026)).toEqual({ from_season: 1986, to_season: 2012 })
   expect(managerSeasons(2005, 2010, 'year', 2026)).toEqual({ from_season: 2005, to_season: 2010 })
-  expect(managerSeasons(2019, 2019, 'split', 2026)).toEqual({ from_season: 2019, to_season: 2019 })
+  expect(managerSeasons(2019, 2019, 'split', 2026)).toEqual({ from_season: 2018, to_season: 2018 }) // 같은 해 짧은 대행은 봄(직전 시즌)
   expect(managerSeasons(2019, null, 'split', 2026)).toEqual({ from_season: 2019, to_season: 2026 })
 })
 
@@ -56,4 +56,24 @@ test('national_team_by_heading', () => {
   expect(find('Germany')).toBe('Qger')
   expect(find('Republic of Ireland')).toBe('Qirl')
   expect(find('Narnia')).toBeUndefined()
+})
+
+test('winner_mismatches', () => {
+  const wd = [win('C', '1993', 'Tcol'), win('C', '1995', 'Turu')]
+  const pg = [win('C', '1993', 'Targ'), win('C', '1995', 'Turu'), win('C', '1997', 'Tbra')]
+  expect(winnerMismatches(wd, pg)).toEqual([{ season: '1993', wikidata: 'Tcol', page: 'Targ' }])
+})
+
+test('top_tier_seasons_from_eras', () => {
+  const eras = [
+    { competition_id: 'Q754839', from_season: '1888', to_season: '1991', tier: '1' },
+    { competition_id: 'Q754839', from_season: '1992', to_season: '2003', tier: '2' },
+    { competition_id: 'Q9448', from_season: '1992', to_season: '', tier: '1' },
+  ]
+  const top = topTierSeason(eras)
+  expect(top('Q754839', 1991)).toBe(true)
+  expect(top('Q754839', 1992)).toBe(false)
+  expect(top('Q9448', 2025)).toBe(true)
+  expect(top('Q9448', 1991)).toBe(false)
+  expect(top('Qnone', 2000)).toBe(false)
 })

@@ -53,16 +53,22 @@ function seasonTable(t: string, opts: SeasonOpts, preferSortname = false): Hit[]
       const rest = row.slice(si + 1)
       if (rest.some((c) => /not awarded|no award|cancelled|abandoned/i.test(plainText(c)))) continue
       if (rest.some((c) => RANK_BELOW_FIRST.test(plainText(c)))) continue
-      let link: string | null = null
-      // 수상자 표: {{sortname}} 칸이 있으면 그 칸이 선수다(클럽 칸이 앞에 오는 표 대비)
+      // 수상자 표: {{sortname}} 칸이 있으면 그 칸이 선수다(클럽 칸이 앞에 오는 표 대비). 없으면 링크가 있는 첫 칸
       const sortCell = preferSortname ? rest.find((c) => /\{\{\s*sortname\s*\|/i.test(c)) : undefined
-      if (sortCell) link = firstLink(sortCell)
-      else for (const c of rest) { link = firstLink(c); if (link) break }
-      if (!link) continue
-      const k = `${season}|${link}`
-      if (seen.has(k)) continue
-      seen.add(k)
-      out.push({ season, link })
+      // 결승 표: 굵게 표시한 팀이 있으면 그 팀이 우승팀(두 경기 결승 표는 홈·원정 순서라 첫 링크가 우승팀이 아니다)
+      const boldCell = preferSortname ? undefined : rest.find((c) => /'''\s*\[\[/.test(c))
+      const cell = sortCell ?? boldCell ?? rest.find((c) => firstLink(c) !== null)
+      if (!cell) continue
+      // 공동 수상자가 한 칸에 <hr/>·<br/>로 나뉘어 있으면 모두 (수상자 표만)
+      const parts = preferSortname ? cell.split(/<hr\s*\/?>|<br\s*\/?>/i) : [cell]
+      for (const part of parts) {
+        const link = firstLink(part)
+        if (!link) continue
+        const k = `${season}|${link}`
+        if (seen.has(k)) continue
+        seen.add(k)
+        out.push({ season, link })
+      }
     }
   }
   return out
@@ -119,6 +125,8 @@ export function parseManagerInfobox(t: string): { club: string; from: number; to
     const club = wikiLinks(clubRaw)[0]
     const ys = [...yr.matchAll(/\d{4}/g)].map((x) => Number(x[0]))
     if (!club || !ys.length) continue
+    // 코치·유스·2군 경력은 감독 재임이 아니다(예: 안첼로티 이탈리아 1992–95 수석코치, 뢰브 독일 2004–06 코치)
+    if (/assistant|youth|reserves?\b|\bU-?\d{2}\b|under-\d{2}/i.test(plainText(clubRaw).replace(club, ''))) continue
     const open = /[–\-—]\s*$|present/i.test(yr)
     out.push({ club: normalizeTitle(club), from: ys[0], to: ys.length > 1 ? ys[1] : open ? null : ys[0], caretaker: /caretaker|interim/i.test(clubRaw) })
   }

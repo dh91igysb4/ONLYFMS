@@ -44,11 +44,13 @@ export function nationalTitles(squads: readonly Honour[], winners: readonly Hono
 
 /**
  * 정보상자 감독 기간(연도) → 시즌 범위(§3.5). 가을–봄은 Y1~Y2−1, 한 해 달력은 Y1~Y2.
- * 같은 해 시작·끝은 그 해 한 시즌, 진행 중(null)은 현재 시즌까지.
+ * 가을–봄의 같은 해 시작·끝은 직전 시즌 하나(봄 대행), 한 해 달력은 그 해. 진행 중(null)은 현재 시즌까지.
  */
 export function managerSeasons(from: number, to: number | null, cal: Calendar, current: number): { from_season: number; to_season: number } {
   if (to === null) return { from_season: from, to_season: Math.max(from, current) }
-  if (cal === 'year' || to <= from) return { from_season: from, to_season: Math.max(from, to) }
+  if (cal === 'year') return { from_season: from, to_season: Math.max(from, to) }
+  // 가을–봄 클럽의 같은 해 짧은 재임(대행)은 대개 봄이라 직전 시즌으로 본다(히딩크 첼시 2009 → 2008–09)
+  if (to <= from) return { from_season: from - 1, to_season: from - 1 }
   return { from_season: from, to_season: to - 1 }
 }
 
@@ -76,4 +78,18 @@ export function nationalTeamFinder(teams: readonly { id: string; kind: string; n
     if (country !== t.name_en && !m.has(key(country))) m.set(key(country), t.id)
   }
   return (heading) => m.get(key(heading))
+}
+
+/** 같은 시즌 위키데이터 우승팀과 위키백과 결승 표 우승팀이 다른 시즌 (수집 출력에 알려 manual/honour_winners.csv로 고치게) */
+export function winnerMismatches(wikidata: readonly Honour[], page: readonly Honour[]): { season: string; wikidata: string; page: string }[] {
+  const pg = new Map(page.map((h) => [h.season, h.team_id]))
+  return wikidata.filter((w) => pg.has(w.season) && pg.get(w.season) !== w.team_id).map((w) => ({ season: w.season, wikidata: w.team_id, page: pg.get(w.season)! }))
+}
+
+/**
+ * 대회 시기표(competition_eras.csv)로 "그 시즌 그 대회가 1부였나". 리그 우승을 위키백과 역대 우승 표로 채울 때,
+ * 2부로 내려간 시기(풋볼리그 1부 1992~2003)에 1부(PL) 우승팀이 들어가지 않게 한다.
+ */
+export function topTierSeason(eras: readonly { competition_id: string; from_season: string; to_season: string; tier: string }[]): (comp: string, season: number) => boolean {
+  return (comp, season) => eras.some((e) => e.competition_id === comp && e.tier === '1' && Number(e.from_season) <= season && (e.to_season === '' || season <= Number(e.to_season)))
 }
