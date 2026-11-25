@@ -15,9 +15,11 @@ import { dirname, join } from 'node:path'
 import { LEAGUES } from './leagues.ts'
 import { buildIndex, combineTeamComps, completeSeasons, matchTeam, OF_SOURCES, parseJsonTeams, parseTxtTeams, readOverrides, sourceUrls, type SeasonInfo } from './openfootball.ts'
 import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset } from './schema.ts'
-import { cmp, currentSeason, mergeTeamComps, parseCsv, seasonWindows, toCsv, type Row, type TeamCompetition } from './wikidata.ts'
+import { cmp, competitionWindows, currentSeason, leaguesFor, mergeTeamComps, parseCsv, toCsv, type Row, type TeamCompetition } from './wikidata.ts'
 
 const log = (...m: unknown[]) => console.error(...m)
+/** football.json의 첫 시즌(2010-11). 1987년 확장 뒤로 이 해부터 받는다(설계 2026-11-25 §3.7) */
+const OF_FIRST_SEASON = 2010
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 function args() {
@@ -32,7 +34,8 @@ function args() {
   const leagues = only ? supported.filter((l) => only.includes(l.id)) : supported
   if (only && leagues.length !== only.length) throw new Error(`openfootball에 없는 리그: ${only.filter((q) => !supported.some((l) => l.id === q)).join(', ')} (scripts/football/openfootball.ts OF_SOURCES)`)
   return {
-    leagues, windows: seasonWindows(leagues, to, override),
+    // 기본은 openfootball football.json이 있는 첫 시즌(2010-11)부터. --seasons N이면 리그별 최근 N시즌만(이전 동작)
+    leagues, windows: competitionWindows(leaguesFor(leagues, null), to, { override, historyFrom: override !== undefined ? null : OF_FIRST_SEASON }),
     dir: get('out') ?? 'data/football',
     // --no-cache: 캐시를 읽지 않고 새로 받아 캐시를 갱신한다
     cacheDir: get('cache') ?? '.cache/openfootball', refresh: a.includes('--no-cache'),
