@@ -50,7 +50,7 @@
 - 뺏긴 칸을 다시 뺏는 것도 스틸 횟수가 남아 있으면 된다.
 - 9칸이 다 찼는데 줄이 없으면 무승부. 스틸이 남아 있어도 끝난다.
 - 끝나면 칸마다 가능했던 정답 예시를 보여 준다(인지도 순 최대 5명).
-- 선공은 무작위(서버 난수). 턴 시간 선택지 15·30·60초, 기본 30초.
+- 선공은 무작위(서버 난수). 턴 시간 선택지 15·30·60·120·180초(2분·3분은 2026-11-26 사용자 추가), 기본 30초.
 - 스틸 횟수가 0이면 상대 칸은 고를 수 없다(화면에서 막고 로직도 거절).
 
 ### 3.3 턴 넘기기·무승부 제안·막힌 판 (2026-11-26 사용자 결정)
@@ -144,7 +144,7 @@ RPC `ttt_pick_puzzle(p_options jsonb) returns jsonb` (security definer, 승인 �
 
 ## 8. 등록과 배포
 - `src/games/tiki-taka-toe/{manifest,logic,logic.test,Game}.tsx?`, `index.ts` `duels`에 추가, `ui.ts` `getDuelComponent`.
-- manifest: `category: 'duel'`, `modes` 모두 false, `options: [theme]`, `duel: { turnSeconds: { choices: [15, 30, 60], default: 30 }, sameScreen: true, prepare: 'ttt_pick_puzzle' }`.
+- manifest: `category: 'duel'`, `modes` 모두 false, `options: [theme]`, `duel: { turnSeconds: { choices: [15, 30, 60, 120, 180], default: 30 }, sameScreen: true, prepare: 'ttt_pick_puzzle' }`.
 - 마이그레이션: `game_modes` (false,false,false) 행, `hidden_games` 행(처음엔 숨김), `ttt_*` 테이블, `ttt_pick_puzzle`.
 - 숨김으로 머지 → 운영에서 관리자 확인 → 공개.
 
