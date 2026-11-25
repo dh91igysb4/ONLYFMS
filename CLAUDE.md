@@ -52,6 +52,8 @@
 - 등록은 `src/games/index.ts`의 `worlds`, 화면은 `src/games/ui.ts`의 `getWorldComponent`.
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
 - 골드는 세이브에 두지 않는다. 지갑을 쓰는 게임은 logic에 `wallet: true`를 두고 `ctx.gold`(잔액)를 읽어 지출을 검사한 뒤 `apply`의 `gold`(정수 증감)로 돌려준다. 옛 세이브의 골드는 `legacyGold`가 한 번 지갑으로 옮긴다(reason `migrate`). 사이트 하루 상한은 게임이 몰라도 된다(핸들러가 `gold_capped`를 응답에 넣고 `WorldPage`가 알린다).
+- 남에게 보여 줄 값이 있으면 `WorldLogic.publicView`를 둔다. `world` 함수의 `{ game, action: 'visit', owner }`가 주인 세이브를 잠그지도 쓰지도 않고 migrate만 해서 이 값만 돌려준다(가방·지갑 같은 개인 값은 넣지 않는다). 그 게임 기록 키가 있는 사람 목록은 RPC `world_players(p_game, p_key)`.
+- 접속 방·프레즌스의 장소 값은 지역 id 또는 주인 있는 장소 `isle-<주인 id 하이픈 없는 32자>`(48자 이하, `src/platform/world/presence.ts`의 규칙). 낚시는 `src/games/fishing/isle.ts`의 `placeKey`·`placeName`.
 
 ## 마을회관 그림 (`fishing`)
 - 회관 외관·1층 실내 배경은 `python3 scripts/build-hall-art.py`가 `scripts/hall-art/{exterior,interior}.py`로 그려 `src/games/fishing/hallArt.ts`를 만든다(생성 파일, 직접 고치지 않는다). 그림을 바꾸면 이 명령을 다시 돌린다.
