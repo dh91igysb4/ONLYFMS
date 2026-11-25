@@ -5,7 +5,7 @@
 import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId, type Rarity, type Species } from './data.ts'
 import { inHours, type Conditions } from './clock.ts'
 import {
-  ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, shopSpot, tileAt,
+  ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, doorSpot, tileAt,
   type Facing, type MapDef, type MapDynamic, type Opened, type Rect,
 } from './map.ts'
 import { MAPS, mapFor } from './maps/index.ts'
@@ -53,13 +53,17 @@ const teleporterCell = (map: MapDef): Cell | null => (map.teleporter ? rectMid(m
 export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
   const out: PlaceMarker[] = []
   const coveredBy = (area: AreaId) => map.gates.some((g) => g.area === area) || map.docks.some((d) => d.target === area)
+  const b = map.building
+  const atDoor = (e: MapDef['exits'][number]) => !!b && 'at' in e && e.at.tx <= b.doorTx && b.doorTx < e.at.tx + e.at.w && e.at.ty <= b.ty + b.h - 1 && b.ty + b.h - 1 < e.at.ty + e.at.h
   for (const e of map.exits) {
     if (!opened.has(e.target) && coveredBy(e.target)) continue
+    // 건물 문 출구는 '상점' 표시가 대신한다
+    if (atDoor(e)) continue
     out.push({ kind: 'exit', ...exitCell(map, e), target: e.target, dir: 'at' in e ? 'in' : e.edge })
   }
   for (const g of map.gates) if (!opened.has(g.area)) out.push({ kind: 'gate', ...rectMid(g.tiles), area: g.area })
   for (const d of map.docks) out.push({ kind: 'dock', tx: d.front.tx, ty: d.front.ty, target: d.target })
-  const shop = shopSpot(map)
+  const shop = doorSpot(map)
   if (shop) out.push({ kind: 'shop', ...shop })
   const tp = teleporterCell(map)
   if (tp) out.push({ kind: 'teleporter', ...tp })
@@ -70,7 +74,7 @@ export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
 export function fixedCells(map: MapDef): Cell[] {
   const out: Cell[] = map.exits.map((e) => exitCell(map, e))
   for (const d of map.docks) out.push({ tx: d.front.tx, ty: d.front.ty })
-  const shop = shopSpot(map)
+  const shop = doorSpot(map)
   if (shop) out.push(shop)
   const tp = teleporterCell(map)
   if (tp) out.push(tp)

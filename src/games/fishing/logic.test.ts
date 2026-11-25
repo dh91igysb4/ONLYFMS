@@ -3,7 +3,7 @@ import { rngFromSeed } from '../../shared/rng.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
-import { AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
+import { AREAS, FISHING_AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
@@ -341,7 +341,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(16)
+    expect(logic.version).toBe(17)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -817,7 +817,7 @@ describe('fishing WorldLogic', () => {
     const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
     const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
     const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
-    expect(migrateW(v3, 3)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
+    expect(migrateW(v3, 3)).toEqual({ ...v3, areas: [...DEFAULT_AREAS, 'lake'], tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
     const v2 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }
     expect(migrateW(v2, 2)).toEqual({ ...v3, tackles: [], equipped: [], challenges: {}, areas: [...DEFAULT_AREAS], ...W0, buffs: [], wardrobe: ['hat:crown'] })
   })
@@ -945,7 +945,7 @@ describe('fishing WorldLogic', () => {
       const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
       const dex = { grouper: { count: 1, maxCm: 100 } }
       const v4 = { gold: 300, totalEarned: 900, rodTier: 4, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper'], pending: null }
-      expect(migrateW(v4, 4)).toEqual({ ...v4, tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
+      expect(migrateW(v4, 4)).toEqual({ ...v4, areas: [...DEFAULT_AREAS, 'lake'], tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
     })
     it('migrate v5: 모르는 id·중복 제거, 미보유 장착 제거, 칸 초과분은 뒤에서 자른다', () => {
       const m = (raw: Record<string, unknown>) => migrateW(raw, 5)
@@ -1997,7 +1997,7 @@ describe('v14 지갑 계약', () => {
 describe('freeBonus: 깬 도전과제의 미니게임 골드 보너스', () => {
   const done = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, { progress: 9, done: true }]))
   it('지역마다 하나, 10 단위, 합 400(×5)', () => {
-    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    expect(CHALLENGES.map((c) => c.area)).toEqual(FISHING_AREAS.map((a) => a.id))
     for (const c of CHALLENGES) {
       expect(c.freeBonusPct % 10, c.id).toBe(0)
       expect(c.freeBonusPct, c.id).toBeGreaterThan(0)
@@ -2145,6 +2145,21 @@ describe('버리기', () => {
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
   it('version 16', () => {
-    expect(logic.version).toBe(16)
+    expect(logic.version).toBe(17)
+  })
+})
+
+describe('마을회관 지역 (logic.version 17)', () => {
+  it('v16 세이브 migrate → areas에 hall', () => {
+    const v16 = { ...logic.init(), areas: ['village', 'river', 'forest', 'lake'] }
+    expect(logic.migrate(v16, 16).areas).toEqual(expect.arrayContaining(['hall', 'lake']))
+  })
+  it('기본 지역에 hall', () => { expect(DEFAULT_AREAS).toContain('hall') })
+  it('hall에서 cast는 거절', () => {
+    expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5, spot: 'x' } as unknown as Action, ctx()))).toBeTruthy()
+    expect(err(play(fresh(), { type: 'cast', area: 'hall', power: 0.5 } as unknown as Action, ctx()))).toBeTruthy()
+  })
+  it('hall은 돈으로 여는 지역이 아니다', () => {
+    expect(err(play(fresh(), { type: 'unlockArea', area: 'hall', price: 0 } as unknown as Action, ctx(T0, 10 ** 9)))).toBeTruthy()
   })
 })

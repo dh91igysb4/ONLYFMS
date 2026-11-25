@@ -6,8 +6,9 @@
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
 import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
-import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
-import { playerSprites } from './outfit.ts'
+import { SPRITES, drawSprite, drawSpriteData, type Sprite } from './sprites.ts'
+import { composePose, decodeOutfit, playerSprites } from './outfit.ts'
+import { FAME_ROW, type FameFrame } from './fame.ts'
 import type { Outfit } from './wardrobe.ts'
 import { formatClock, isSnow, nightLevel, type Conditions, type Tide } from './clock.ts'
 
@@ -47,6 +48,8 @@ export type WorldScene = {
   holding?: string | null
   /** 같은 지역의 다른 사람(온라인 설계 §4.3). 그리기만 하고 판정에는 쓰지 않는다 */
   others?: ScenePeer[]
+  /** 마을회관 명예의 전당 액자(fame.ts). backdrop 맵에서만 그린다 */
+  fame?: readonly FameFrame[]
 }
 
 /** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
@@ -690,6 +693,11 @@ function drawPierExtras(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty
 /** 움직이지 않는 맵(물 k번 장)을 타일 범위 [tx0..tx1]×[ty0..ty1]만큼 월드 좌표로 그린다. */
 function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: number, ty0: number, tx1: number, ty1: number): void {
   const { map } = g
+  // 실내 배경 맵(마을회관): 칸 그림 대신 큰 그림 한 장
+  if (map.backdrop) {
+    drawSprite(ctx, map.backdrop, 0, 0, 1)
+    return
+  }
   const x0 = Math.max(0, tx0)
   const y0 = Math.max(0, ty0)
   const x1 = Math.min(map.w - 1, tx1)
@@ -701,12 +709,13 @@ function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: nu
       if (tileAt(map, tx, ty) === 'pier') drawPierExtras(ctx, g, tx, ty)
     }
   }
-  const shop = map.shop
-  if (shop) {
-    const shopRight = shop.tx + shop.w - 1
-    const shopBottom = shop.ty + shop.h - 1
-    if (shop.tx <= x1 && shopRight >= x0 && shop.ty <= y1 && shopBottom >= y0) {
-      drawSprite(ctx, 'shop', shop.tx * TILE, shop.ty * TILE, 1)
+  // 마을회관 외관: 건물 사각형 왼쪽 아래에 맞춰(위로는 사각형을 넘을 수 있다)
+  const b = map.building
+  if (b) {
+    const right = b.tx + b.w - 1
+    const bottom = b.ty + b.h - 1
+    if (b.tx <= x1 && right >= x0 && b.ty <= y1 && bottom >= y0) {
+      drawSprite(ctx, 'hall-exterior', b.tx * TILE, (b.ty + b.h) * TILE - SPRITES['hall-exterior'].h, 1)
     }
   }
 }
@@ -1143,6 +1152,41 @@ function drawTeleporter(ctx: CanvasRenderingContext2D, s: WorldScene, r: Rect, k
 }
 
 /** 월드 좌표로 그리는 움직이는 것들 */
+const FAME_C = { gold: '#c9a54a', goldDark: '#8a6d2a', board: '#7a5232', boardLight: '#a8774a', glass: '#d8e7ee', face: '#9aa3ab', plate: '#e9e2cf' }
+const faceCache = new Map<string, Sprite>()
+/** 캐릭터 기록 문자열 → 정면 그림의 머리(가운데 12×12) */
+function faceOf(avatar: string): Sprite {
+  const hit = faceCache.get(avatar)
+  if (hit) return hit
+  const full = composePose('player-idle-down', decodeOutfit(avatar))
+  const sp: Sprite = { ...full, w: 12, h: 12, rows: full.rows.slice(0, 12).map((r) => r.slice(2, 14)) }
+  faceCache.set(avatar, sp)
+  return sp
+}
+
+/** 명예의 전당 벽 전시(1줄): 박제는 나무 판 + 물고기, 액자는 금테 + 1위 얼굴(없으면 빈 얼굴) */
+function drawFame(ctx: CanvasRenderingContext2D, frames: readonly FameFrame[]): void {
+  const y = FAME_ROW * TILE
+  for (const f of frames) {
+    const x = f.tx * TILE
+    if (f.look === 'mount') {
+      rect(ctx, x + 2, y + 1, 2 * TILE - 4, TILE - 2, FAME_C.board)
+      rect(ctx, x + 4, y + 3, 2 * TILE - 8, TILE - 6, FAME_C.boardLight)
+      if (f.species && SPRITES[`fish-${f.species}`]) drawSprite(ctx, `fish-${f.species}`, x + TILE / 2, y, 1)
+      rect(ctx, x + 10, y + TILE, 12, 2, FAME_C.plate)
+      continue
+    }
+    rect(ctx, x + 1, y + 1, TILE - 2, TILE - 2, FAME_C.gold)
+    rect(ctx, x + 2, y + 2, TILE - 4, TILE - 4, FAME_C.glass)
+    if (f.avatar) drawSpriteData(ctx, faceOf(f.avatar), x + 2, y + 2, 1)
+    else {
+      rect(ctx, x + 5, y + 4, 6, 5, FAME_C.face)
+      rect(ctx, x + 4, y + 10, 8, 3, FAME_C.face)
+    }
+    rect(ctx, x + 4, y + TILE, 8, 2, f.empty ? FAME_C.goldDark : FAME_C.plate)
+  }
+}
+
 function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose, px: number, py: number, cam: Vec, w: number, h: number): void {
   const t = s.tMs
   const b = s.bobber ? { x: Math.round(s.bobber.x), y: Math.round(s.bobber.y) } : null
@@ -1153,6 +1197,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   const ty1 = Math.floor((cam.y + h - 1) / TILE) + 1
 
   // 바닥에 붙은 것(잠긴 문·배·얼음 구멍·뚫는 금)이 맨 먼저
+  if (s.map.backdrop && s.fame) drawFame(ctx, s.fame)
   drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
   drawHoles(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 

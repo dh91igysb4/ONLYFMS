@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { subscribeGoldCapped, type GoldCapped } from '../../lib/walletStore.ts'
 import { formatGold } from '../wallet/format.ts'
 import '../wallet/wallet.css'
@@ -26,6 +26,7 @@ function useGoldCappedToast(): GoldCapped | null {
 /** 지속형 게임 화면 틀 (/world/:game). 게임 화면은 등록부에서 찾아 gameId만 넘긴다. */
 export function WorldPage() {
   const { game = '' } = useParams()
+  const navigate = useNavigate()
   const { profile } = useAuth()
   const found = getWorld(game)
   // 숨김 게임은 관리자에게만 있는 게임이다. 그 밖의 사람에게는 없는 게임과 똑같이 보인다.
@@ -46,7 +47,7 @@ export function WorldPage() {
   return (
     <div className="stack">
       <h2 className="page-title">{mod.manifest.name}</h2>
-      <Component key={game} gameId={game} />
+      <Component key={game} gameId={game} onOpenGames={() => navigate('/games')} />
       {capped && (
         <p className="wallet-cap-toast" role="status">
           오늘 골드 상한을 넘어 일부만 들어왔어요 (+{formatGold(capped.got)} / +{formatGold(capped.asked)})

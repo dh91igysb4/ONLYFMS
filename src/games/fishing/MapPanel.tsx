@@ -77,6 +77,9 @@ type MapPanelProps = {
 }
 
 /** 머리줄·목록 갱신 단위: 시계 표시(10분) 또는 날짜·계절·날씨가 바뀔 때만 새 값 */
+/** 큰 지도 탭: 세계 지도에 그리는 맵이 있는 지역(실내 마을회관 제외) */
+const MAP_AREAS = AREAS.filter((a) => mapFor(a.id)?.onWorldMap !== false)
+
 const condKey = (c: Conditions) => `${c.gameDay}|${formatClock(c.gameMinute)}|${c.season}|${c.weather}`
 
 export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online = [] }: MapPanelProps) {
@@ -108,7 +111,7 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online
   const hourKey = `${cond.gameDay}|${Math.floor(cond.gameMinute / 60)}|${cond.season}|${cond.weather}`
   const fishView = useMemo(() => ({ dex: view.dex, legends: view.legends ?? [], rodTier: view.rodTier }), [view.dex, view.legends, view.rodTier])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const areaRows = useMemo(() => Object.fromEntries(AREAS.map((a) => [a.id, areaFish(a.id, fishView, cond)])) as Record<AreaId, FishRow[]>, [fishView, hourKey])
+  const areaRows = useMemo(() => Object.fromEntries(MAP_AREAS.map((a) => [a.id, areaFish(a.id, fishView, cond)])) as Record<AreaId, FishRow[]>, [fishView, hourKey])
 
   const goTab = (a: AreaId, nextPick: Pick | null = null) => {
     if (a !== here.area) setLastOther(a)
@@ -130,7 +133,7 @@ export function MapPanel({ view, here, now, innerWidth, layers, onLayers, online
     <section className="fish-panel-body fish-mapview" aria-label="지도">
       <p className="muted" data-testid="fish-map-now">{`${SEASON_NAMES[cond.season]} · ${weather} · ${formatClock(cond.gameMinute)} · ${rod}`}</p>
       <div className="fish-dex-tabs fish-map-tabs" role="tablist" aria-label="지역" ref={tabsRef}>
-        {AREAS.map((a) => {
+        {MAP_AREAS.map((a) => {
           const on = a.id === tab
           const open = opened.has(a.id) || a.id === here.area
           return (

@@ -194,3 +194,17 @@ describe('잠긴 문과 열린 지역', () => {
     expect(open.pos.y).toBeLessThan(2 * TILE) // 다리를 건너 북쪽 풀밭
   })
 })
+
+describe('벽 모서리', () => {
+  const m = defineMap('cave', ['YYYYY', 'YFFFY', 'YFFFY', 'YYYYY'], { walls: { v: [[2, 1, 2]] } })
+  it('feetBlocked: 벽 모서리를 걸친 발 사각형은 막힌다, 같은 칸 안은 열림', () => {
+    expect(feetBlocked(m, 2 * TILE, 1.5 * TILE, ALL_AREAS_OPEN)).toBe(true)
+    expect(feetBlocked(m, 1.5 * TILE, 1.5 * TILE, ALL_AREAS_OPEN)).toBe(false)
+    expect(feetBlocked(m, 2.5 * TILE, 1.5 * TILE, ALL_AREAS_OPEN)).toBe(false)
+  })
+  it('stepWalk: 대각선으로 벽을 비벼도 x가 모서리를 넘지 못한다', () => {
+    let p: Player = { pos: { x: 1.5 * TILE, y: 1.2 * TILE }, facing: 'right', moving: false, walkMs: 0 }
+    for (let i = 0; i < 60; i++) p = stepWalk(m, p, { x: Math.SQRT1_2, y: Math.SQRT1_2 }, 16, ALL_AREAS_OPEN)
+    expect(p.pos.x + FEET.w / 2).toBeLessThanOrEqual(2 * TILE)
+  })
+})

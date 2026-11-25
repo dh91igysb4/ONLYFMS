@@ -14,7 +14,7 @@ function makeView(over: Partial<View> = {}): View {
 const setup = (over: Partial<View> = {}, atShop = true, busy = false) => {
   const onWear = vi.fn()
   const onBuy = vi.fn()
-  render(<WardrobePanel view={makeView(over)} atShop={atShop} busy={busy} onWear={onWear} onBuy={onBuy} />)
+  render(<WardrobePanel view={makeView(over)} canBuy={atShop} busy={busy} onWear={onWear} onBuy={onBuy} />)
   return { onWear, onBuy }
 }
 const row = (name: string) => screen.getByRole('button', { name: `${name} 입혀 보기` }).closest('li') as HTMLElement
@@ -41,10 +41,10 @@ describe('WardrobePanel', () => {
     expect(within(row('밀짚모자')).getByText('골드가 부족해요')).toBeTruthy()
   })
 
-  test('상점 밖이면 사기가 꺼지고 어디서 사는지 알려 준다', () => {
+  test('옷 가게 밖이면 사기가 꺼지고 어디서 사는지 알려 준다', () => {
     setup({ gold: 1_000_000 }, false)
     expect((screen.getByRole('button', { name: '남색 야구모자 사기' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText(/옷은 상점에서 살 수 있어요/)).toBeTruthy()
+    expect(screen.getByText(/옷은 마을회관 9번 방 옷 가게에서 살 수 있어요/)).toBeTruthy()
   })
 
   test('업적 품목은 조건 문구만, 채우면 입기', () => {
@@ -89,7 +89,7 @@ describe('WardrobePanel', () => {
     const v = makeView() as Partial<View>
     delete v.wardrobe
     delete v.outfit
-    render(<WardrobePanel view={v as View} atShop busy={false} onWear={() => {}} onBuy={() => {}} />)
+    render(<WardrobePanel view={v as View} canBuy busy={false} onWear={() => {}} onBuy={() => {}} />)
     expect(within(row('청록 비니')).getByText('입는 중')).toBeTruthy()
   })
 })

@@ -73,6 +73,11 @@ vi.mock('../index.ts', async (importOriginal) => {
   return { ...orig, getWorld: (id: string) => { const w = orig.getWorld(id); return w && { ...w, manifest: { ...w.manifest, hidden: roomGate.hidden } } } }
 })
 vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+/** 명예의 전당 불러오기(플랫폼). 테스트마다 결과를 정한다 */
+const fameGate = vi.hoisted(() => ({ load: null as null | ((game: string, admin: boolean) => Promise<unknown>) }))
+vi.mock('../../platform/world/hallOfFame.ts', () => ({
+  loadHallOfFame: vi.fn((game: string, admin: boolean) => (fameGate.load ? fameGate.load(game, admin) : Promise.resolve({ records: [], site: [] }))),
+}))
 /** 지역 전환 테스트가 강 맵을 없는 것처럼 만들 때 쓴다 */
 const mapGate = vi.hoisted(() => ({ hideRiver: false }))
 vi.mock('./maps/index.ts', async (importOriginal) => {
@@ -237,9 +242,11 @@ const pointer = (type: 'down' | 'move' | 'up', el: Element, pointerId: number, x
   else fireEvent.pointerUp(el, init)
 }
 
-/** 상점 문 앞(저장 위치 없음 = SPAWN)에서 스페이스로 상점을 열고, 유령 클릭 방지 시간(300ms)을 넘긴다 */
+/** 마을회관 자판기(상점) 앞 */
+const VENDING: At = { area: 'hall', pos: tileCenter(2, 2), facing: 'left' }
+/** 자판기 앞에서 스페이스로 상점을 열고, 유령 클릭 방지 시간(300ms)을 넘긴다 */
 async function mountAtShop(view = makeView()) {
-  const r = await mount(view, null)
+  const r = await mount(view, VENDING)
   press()
   release()
   await advance(300)
@@ -796,10 +803,10 @@ describe('fishing Game', () => {
   })
 
   test('Escape with a menu open keeps fullscreen; menus open inside the overlay', async () => {
-    const { container } = await mount(makeView(), null)
+    const { container } = await mount(makeView(), VENDING)
     const root = container.querySelector('.fish') as HTMLElement
     fireEvent.click(screen.getByRole('button', { name: '전체화면' }))
-    press() // 상점 문 앞: 떼면 상점이 열린다
+    press() // 자판기 앞: 떼면 상점이 열린다
     release()
     const shop = screen.getByRole('region', { name: '상점' })
     expect(root.contains(shop)).toBe(true)
@@ -1057,9 +1064,9 @@ describe('conditionLabel', () => {
 })
 
 describe('fishing Game: walking and interaction', () => {
-  test('at the spawn spot the touch action reads 상점; the shop opens on release, not on press', async () => {
+  test('at the vending machine the touch action reads 상점; the shop opens on release, not on press', async () => {
     stubTouch()
-    await mount(makeView(), null)
+    await mount(makeView(), VENDING)
     expect(actionButton()).toHaveTextContent('상점')
     expect(actionButton()).toHaveAttribute('aria-disabled', 'false')
     const btn = actionButton()
@@ -1073,7 +1080,7 @@ describe('fishing Game: walking and interaction', () => {
   })
 
   test('Space opens the shop on keyup, not keydown', async () => {
-    await mount(makeView(), null)
+    await mount(makeView(), VENDING)
     press()
     expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
     release()
@@ -1083,7 +1090,7 @@ describe('fishing Game: walking and interaction', () => {
   test('a click landing on a shop button within 300ms of opening does nothing (no ghost click)', async () => {
     stubTouch()
     const rich = makeView({ gold: 2000 })
-    await mount(rich, null)
+    await mount(rich, VENDING)
     route({ buyRod: () => ok({ ...rich, gold: 500, rodTier: 2 }) })
     pointer('down', actionButton(), 2)
     pointer('up', actionButton(), 2)
@@ -1223,13 +1230,13 @@ describe('fishing Game: walking and interaction', () => {
     expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '말', '이모트', '전체화면'])
     expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
-    expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '가방' })).getByText('마을회관 상점에서 팔 수 있어요')).toBeInTheDocument()
   })
 
   test('the bag panel has no sell hint when standing at the shop', async () => {
-    await mount(makeView(), null)
+    await mount(makeView(), VENDING)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
-    expect(screen.queryByText('상점에서 팔 수 있어요')).not.toBeInTheDocument()
+    expect(screen.queryByText('마을회관 상점에서 팔 수 있어요')).not.toBeInTheDocument()
   })
 
   test('터치에서는 시계를 안내 줄 아래(hudTopFor)에, 데스크톱은 맨 위(0)에 그린다', async () => {
@@ -1315,7 +1322,9 @@ describe('fishing Game: walking and interaction', () => {
     await advance(50)
     expect(lastPlayer().pos).toEqual(SPAWN.pos)
     expect(lastPlayer().facing).toBe(SPAWN.facing)
-    expect(actionButton()).toHaveTextContent('상점')
+    // 회관 문 아래 칸: 앞이 길이라 할 일이 없다(상점은 회관 안 자판기)
+    expect(actionButton()).toHaveTextContent('낚시')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
   })
 
   test('losing window focus or opening a menu clears held movement keys', async () => {
@@ -1527,20 +1536,17 @@ describe('fishing Game: walking and interaction', () => {
     expect(lastBar().barVel).toBeLessThan(0)
   })
 
-  test('a stale shop press (release lost) does not swallow the next cast release at the water', async () => {
+  test('a stale place press (release lost) does not swallow the next cast release at the water', async () => {
     const view = makeView()
     const p = pending()
-    await mount(view, null) // 상점 문 앞 (12, 6)
-    press() // 상점 행동을 눌렀지만 뗀 알림을 잃었다 (창 초점은 그대로)
-    // (13, 6)으로 한 칸 옮긴 뒤 아래로 곧장 내려가 (13, 25) 물가에서 바다를 본다
-    key('ArrowRight', true)
-    await advance(Math.round((TILE * 1000) / WALK_SPEED) + 20) // 한 칸 남짓
-    key('ArrowRight', false)
+    await mount(view, { pos: tileCenter(2, 20), facing: 'left' }) // 갯벌 통나무 더미(잠긴 문) 앞
+    press() // 문 행동을 눌렀지만 뗀 알림을 잃었다 (창 초점은 그대로)
+    // 아래로 곧장 내려가 (2, 23) 물가에서 바다를 본다
     key('ArrowDown', true)
-    await advance(7500)
+    await advance(Math.round((3 * TILE * 1000) / WALK_SPEED) + 600)
     key('ArrowDown', false)
     await advance(50)
-    expect(Math.floor(lastPlayer().pos.y / TILE)).toBe(25)
+    expect(Math.floor(lastPlayer().pos.y / TILE)).toBe(23)
     expect(lastPlayer().facing).toBe('down')
     route({ cast: () => ok({ ...view, pending: p }, p) })
     fireEvent.keyDown(window, { key: ' ', code: 'Space' })
@@ -1548,7 +1554,7 @@ describe('fishing Game: walking and interaction', () => {
     release()
     await flush()
     expect(calls('cast')).toHaveLength(1)
-    expect(screen.queryByRole('region', { name: '상점' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /통나무|갯벌/ })).not.toBeInTheDocument()
   })
 
   test('a lost pointer capture on the canvas releases its press', async () => {
@@ -1831,7 +1837,7 @@ describe('fishing Game: 지역 전환', () => {
   test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
     await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
     await advance(50)
-    expect([...lastScene().opened].sort()).toEqual(['forest', 'lake', 'river', 'village'])
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
@@ -2778,15 +2784,22 @@ describe('옷장', () => {
     vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(() => ({ fillRect: vi.fn() }) as unknown as CanvasRenderingContext2D)
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:thumb')
   })
-  test('상점 → 옷 가게 열기 → 사기는 buyWear, 입기는 wear', async () => {
+  test('마을회관 9번 방 행거 앞: 행동 옷 가게 → 옷장, 사기는 buyWear, 입기는 wear; 상점에는 옷 가게 버튼이 없다', async () => {
     const view = makeView({ gold: 10_000 })
     await mountAtShop(view)
+    expect(screen.queryByRole('button', { name: '옷 가게 열기' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    cleanup()
+    stubTouch()
+    await mount(view, { area: 'hall', pos: tileCenter(29, 13), facing: 'left' })
+    expect(actionButton()).toHaveTextContent('옷 가게')
+    pointer('down', actionButton(), 2)
+    pointer('up', actionButton(), 2)
+    await advance(300)
     route({
       buyWear: () => ok({ ...view, gold: 4_000, wardrobe: ['hat:cap'], outfit: { ...DEFAULT_OUTFIT, hat: 'cap' } }),
       wear: () => ok({ ...view, gold: 4_000, wardrobe: ['hat:cap'], outfit: { ...DEFAULT_OUTFIT, hat: 'none' } }),
     })
-    fireEvent.click(screen.getByRole('button', { name: '옷 가게 열기' }))
-    await flush()
     expect(screen.getByRole('heading', { name: '옷장' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '남색 야구모자 사기' }))
     await flush()
@@ -2800,13 +2813,14 @@ describe('옷장', () => {
     expect(vi.mocked(drawWorld).mock.calls.at(-1)?.[1].outfit).toEqual({ ...DEFAULT_OUTFIT, hat: 'none' })
   })
 
-  test('가방의 옷장 버튼으로 열고, 상점 밖이라 사기는 꺼져 있다', async () => {
-    await mount(makeView({ gold: 1_000_000 }))
+  test('가방의 옷장 버튼으로 열면 사기는 꺼져 있고 옷 가게 위치를 알려 준다(자판기 상점 앞에서도)', async () => {
+    await mount(makeView({ gold: 1_000_000 }), VENDING)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     fireEvent.click(screen.getByRole('button', { name: '옷장' }))
     await flush()
     expect(screen.getByRole('heading', { name: '옷장' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '남색 야구모자 사기' })).toBeDisabled()
+    expect(screen.getByText(/옷은 마을회관 9번 방 옷 가게에서 살 수 있어요/)).toBeInTheDocument()
   })
 })
 
@@ -3149,5 +3163,115 @@ describe('fishing Game: 말풍선 (설계 2026-11-25-fishing-chat)', () => {
     const { container } = await mount(makeView(), SAND)
     await advance(50)
     expect(tagOf(container, 'u2')!.querySelector('.fish-peer-say')?.textContent).toBe('3:2로 이김')
+  })
+})
+
+
+describe('마을회관', () => {
+  const at = (tx: number, ty: number, facing: Facing): At => ({ area: 'hall', pos: tileCenter(tx, ty), facing })
+  const act1 = async () => {
+    pointer('down', actionButton(), 2)
+    pointer('up', actionButton(), 2)
+    await advance(300)
+  }
+  const board = (gameId: string, title: string, label: string, rows: { handle: string; text: string; detail: string | null; avatar: string | null }[] = []) =>
+    ({ gameId, group: 'free', key: 'free', title, label, rows })
+  beforeEach(() => { fameGate.load = null })
+
+  test('노트북 앞: 행동 노트북 → onOpenGames 한 번', async () => {
+    stubTouch()
+    const onOpenGames = vi.fn()
+    localStorage.setItem(POS_KEY, JSON.stringify(at(16, 11, 'down')))
+    route({ load: () => ok(makeView()) })
+    render(<Game gameId="fishing" onOpenGames={onOpenGames} />)
+    await flush()
+    expect(actionButton()).toHaveTextContent('노트북')
+    await act1()
+    expect(onOpenGames).toHaveBeenCalledTimes(1)
+  })
+
+  test('잠긴 6번 문 앞: 행동 살펴보기 → 안내', async () => {
+    stubTouch()
+    await mount(makeView(), at(11, 10, 'down'))
+    expect(actionButton()).toHaveTextContent('살펴보기')
+    await act1()
+    expect(screen.getByText('곤의 라면가게 · 준비 중이에요')).toBeInTheDocument()
+  })
+
+  test('엘리베이터: 2·3·4층은 공사 중이라 못 누른다', async () => {
+    stubTouch()
+    await mount(makeView(), at(37, 4, 'right'))
+    expect(actionButton()).toHaveTextContent('엘리베이터')
+    await act1()
+    expect(screen.getByRole('region', { name: '엘리베이터' })).toBeInTheDocument()
+    for (const f of ['2층', '3층', '4층']) expect(screen.getByRole('button', { name: new RegExp(f) })).toBeDisabled()
+    expect(screen.getAllByText('공사 중')).toHaveLength(3)
+  })
+
+  test('명예의 전당 게임 액자: 불러온 게시판의 첫 게임, 다음으로 넘김, 비었으면 안내', async () => {
+    stubTouch()
+    fameGate.load = () => Promise.resolve({
+      records: [],
+      site: [board('ball-run', '볼 런', '최고 점수', [{ handle: 'son', text: '9점', detail: null, avatar: null }]), board('yacht', '요트 다이스', '레이팅')],
+    })
+    await mount(makeView(), at(24, 2, 'up'))
+    expect(actionButton()).toHaveTextContent('보기')
+    await act1()
+    await flush()
+    const panel = screen.getByRole('region', { name: '명예의 전당' })
+    expect(within(panel).getByText('볼 런 · 최고 점수')).toBeInTheDocument()
+    expect(within(panel).getByText('son')).toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: '다음' }))
+    expect(within(panel).getByText('요트 다이스 · 레이팅')).toBeInTheDocument()
+    expect(within(panel).getByText('아직 기록이 없어요')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '다음' })).toBeDisabled()
+  })
+
+  test('게시판이 없는 빈 벽 액자 칸(사이트 게시판 수 이상)에서는 보기가 없다', async () => {
+    stubTouch()
+    fameGate.load = () => Promise.resolve({ records: [], site: [board('ball-run', '볼 런', '최고 점수')] })
+    await mount(makeView(), at(30, 2, 'up'))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('낚시')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('명예의 전당 불러오기 실패: 안내, 회관은 그대로', async () => {
+    stubTouch()
+    fameGate.load = () => Promise.reject(new Error('down'))
+    await mount(makeView(), at(24, 2, 'up'))
+    await act1()
+    await flush()
+    expect(within(screen.getByRole('region', { name: '명예의 전당' })).getByText('불러오지 못했어요')).toBeInTheDocument()
+  })
+
+  test('회관에 있으면 장면에 액자 목록이 넘어간다', async () => {
+    fameGate.load = () => Promise.resolve({ records: [], site: [board('ball-run', '볼 런', '최고 점수')] })
+    await mount(makeView(), at(5, 9, 'down'))
+    await advance(50)
+    expect(lastScene().fame?.map((f) => f.tx)).toEqual([16, 18, 19, 20, 24])
+  })
+
+  test('회관 안에서는 낚시 버튼이 꺼져 있다', async () => {
+    stubTouch()
+    await mount(makeView(), at(5, 9, 'down'))
+    expect(actionButton()).toHaveTextContent('낚시')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('마을 문으로 걸어 들어가면 회관 (4,16), 회관 아래 출구로 나가면 마을 문 앞 (13,8)', async () => {
+    await mount(makeView(), { area: 'village', pos: tileCenter(13, 8), facing: 'up' })
+    key('ArrowUp', true)
+    await advance(400)
+    key('ArrowUp', false)
+    await advance(1500)
+    expect(lastScene().map.id).toBe('hall')
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: 4, ty: 16 })
+    key('ArrowDown', true)
+    await advance(400)
+    key('ArrowDown', false)
+    await advance(1500)
+    expect(lastScene().map.id).toBe('village')
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: 13, ty: 8 })
   })
 })

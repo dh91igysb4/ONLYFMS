@@ -3,7 +3,7 @@ import { inHours, isNight, type Conditions, type Season, type Weather } from './
 import { SPRITES } from './sprites.ts'
 import { M1_FIXTURE, withTempData } from './testFixtures.ts'
 import {
-  AREAS, areaHasSpecies, areaMinRod, rodAtLeast, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
+  AREAS, FISHING_AREAS, areaHasSpecies, areaMinRod, rodAtLeast, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, MYTHIC_CHANCE, TIDE_GRACE_MIN, TP_BASE, TP_PER_10, RODS, SPECIES,
   speciesAvailable, spotOpen, TACKLE_FX, TACKLES, tackleSlots, UNLOCKS, type Species,
 } from './data.ts'
 
@@ -85,8 +85,10 @@ describe('fishing data', () => {
     expect(byId('anchovy').behavior).toBe('dart')
   })
   it('areas and defaults', () => {
-    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
-    expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest'])
+    expect(AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck', 'hall'])
+    expect(FISHING_AREAS.map((a) => a.id)).toEqual(['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
+    expect(DEFAULT_AREAS).toEqual(['village', 'river', 'forest', 'hall'])
+    expect(AREAS.find((a) => a.id === 'hall')).toEqual({ id: 'hall', name: '마을회관', spots: [] })
   })
   it('UNLOCKS: lake·cave·island 5000/15000/50000, 갯벌·늪지 30000/132000, 산정·난파선 264000/330000(v15)(난파선은 백골 이상)', () => {
     expect(Object.keys(UNLOCKS)).toEqual(['lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'])
@@ -266,7 +268,8 @@ describe('speciesAvailable', () => {
 
 describe('areaHasSpecies', () => {
   it('모든 지역 true', () => {
-    for (const a of AREAS) expect(areaHasSpecies(a.id), a.id).toBe(true)
+    for (const a of FISHING_AREAS) expect(areaHasSpecies(a.id), a.id).toBe(true)
+    expect(areaHasSpecies('hall')).toBe(false)
     expect(areaHasSpecies('village')).toBe(true)
     expect(areaHasSpecies('river')).toBe(true)
     expect(areaHasSpecies('forest')).toBe(true)
@@ -296,7 +299,7 @@ describe('찌', () => {
 
 describe('도전과제', () => {
   it('10개, 지역마다 하나(AREAS 순서), id 유일, 제목·설명 있음, count ≥ 1, spot은 그 지역 자리', () => {
-    expect(CHALLENGES.map((c) => c.area)).toEqual(AREAS.map((a) => a.id))
+    expect(CHALLENGES.map((c) => c.area)).toEqual(FISHING_AREAS.map((a) => a.id))
     expect(new Set(CHALLENGES.map((c) => c.id)).size).toBe(CHALLENGES.length)
     expect(CHALLENGES.map((c) => c.id)).toEqual(['pier-perfect', 'river-rain', 'forest-variety', 'lake-night', 'cave-deep', 'island-big', 'tideflat-creek', 'swamp-rain-night', 'summit-perfect', 'wreck-abyss-night'])
     expect(CHALLENGES.at(-2)).toEqual({ id: 'summit-perfect', area: 'summit', title: '얼음 위의 인내', desc: '얼음 구멍에서 완벽하게 3마리 낚기', count: 3, filter: { spot: 'ice', perfect: true }, freeBonusPct: 60 })

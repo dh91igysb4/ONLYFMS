@@ -4,7 +4,7 @@ import { inHours, tideAt, type Conditions, type Season, type Weather } from './c
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
-export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck'
+export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck' | 'hall'
 /** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
@@ -58,8 +58,12 @@ export const AREAS: readonly AreaDef[] = [
   // 낚시 5부 M3: 산정 호수(얼음 구멍·온천), 난파선 앞바다(백골 낚싯대 이상)
   { id: 'summit', name: '산정 호수', spots: ['ice', 'hotspring'] },
   { id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 },
+  // 마을회관(실내, 낚시 자리 없음). 낚시 자리가 빈 지역은 낚시 지역이 아니다(물고기 목록·경제 계산에서 뺀다)
+  { id: 'hall', name: '마을회관', spots: [] },
 ]
-export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest']
+/** 낚시 자리가 있는 지역(물고기 목록·도전과제·경제 계산 대상). 마을회관처럼 자리가 빈 지역은 빠진다 */
+export const FISHING_AREAS: readonly AreaDef[] = AREAS.filter((a) => a.spots.length > 0)
+export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest', 'hall']
 // 돈으로 여는 지역. 기본 지역(DEFAULT_AREAS)은 여기 없다.
 // minRod: 이 단계 이상 낚싯대가 있어야 살 수 있다(서버 unlockArea가 확인)
 export const UNLOCKS: Readonly<Partial<Record<AreaId, { price: number; name: string; minRod?: RodTier }>>> = {

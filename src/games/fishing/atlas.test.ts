@@ -3,7 +3,7 @@ import {
   MARKER_GAP, areaFish, areaRoute, filterFish, firstHop, fishBadge, fixedCells, placeMarkers, spotAnchors, spotAtTile,
   spotFish, spotTiles, teleporterInfo, unlockPlace, type Cell, type FishRow,
 } from './atlas.ts'
-import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId } from './data.ts'
+import { AREAS, CHALLENGES, DEFAULT_AREAS, FISHING_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId } from './data.ts'
 import type { Conditions, Season, Weather } from './clock.ts'
 import { ALL_AREAS_OPEN, TILE, WATER_KINDS, defineMap, interactionAt, isWalkable, tileAt, type Facing, type MapDynamic, type Opened } from './map.ts'
 import { MAPS } from './maps/index.ts'
@@ -95,8 +95,10 @@ describe('placeMarkers', () => {
     expect(placeMarkers(map('forest'), opened('cave')).find((m) => m.kind === 'exit' && m.target === 'cave')).toMatchObject({ dir: 'in' })
   })
 
-  it('마을: 북쪽 출구, 갯벌 통나무 더미(잠김), 선착장(dock.front), 상점(shopSpot), 순간이동기(구조물 가운데); 섬: 선착장, 출구 없음', () => {
+  it('마을: 북쪽 출구, 갯벌 통나무 더미(잠김), 선착장(dock.front), 상점(doorSpot, 회관 문 출구 표시는 없음), 순간이동기(구조물 가운데); 섬: 선착장, 출구 없음', () => {
     const v = placeMarkers(map('village'), opened())
+    expect(v.find((m) => m.kind === 'shop')).toMatchObject({ tx: 13, ty: 8 })
+    expect(v.some((m) => m.kind === 'exit' && m.target === 'hall')).toBe(false)
     expect(v.map((m) => m.kind)).toEqual(['exit', 'gate', 'dock', 'shop', 'teleporter'])
     expect(v[1]).toMatchObject({ area: 'tideflat', tx: 1, ty: 20 })
     expect(v[2]).toMatchObject({ target: 'island', tx: 42, ty: 29 })
@@ -253,7 +255,8 @@ describe('teleporterInfo', () => {
   })
   it('이동기 없는 맵이면 null', () => {
     // 합성 맵을 실제 등록부에 넣지 않으므로, 이동기 없는 지역이 생기면 이 분기를 탄다: 모든 실제 지역은 이동기가 있다
-    for (const a of AREAS) expect(teleporterInfo(a.id, { areas: [...DEFAULT_AREAS] }, 'village')).not.toBeNull()
+    for (const a of FISHING_AREAS) expect(teleporterInfo(a.id, { areas: [...DEFAULT_AREAS] }, 'village')).not.toBeNull()
+    expect(teleporterInfo('hall', { areas: [...DEFAULT_AREAS] }, 'village')).toBeNull()
   })
 })
 

@@ -22,9 +22,10 @@ vi.mock('../../games/index.ts', async (orig) => {
 vi.mock('../../games/ui.ts', async (orig) => {
   const fx = await import('../../test-fixtures/world.ts')
   const { world } = await import('../../lib/api.ts')
-  const Fake = ({ gameId }: { gameId: string }) => (
+  const Fake = ({ gameId, onOpenGames }: { gameId: string; onOpenGames?: () => void }) => (
     <div>
       <p>fake:{gameId}</p>
+      <button onClick={() => onOpenGames?.()}>게임 목록</button>
       <button onClick={() => { void world({ game: gameId, action: 'act', payload: {} }) }}>행동</button>
     </div>
   )
@@ -44,7 +45,7 @@ function stubWorld(body: Record<string, unknown>) {
 function renderAt(game: string) {
   return render(
     <MemoryRouter initialEntries={[`/world/${game}`]}>
-      <Routes><Route path="/world/:game" element={<WorldPage />} /></Routes>
+      <Routes><Route path="/world/:game" element={<WorldPage />} /><Route path="/games" element={<p>게임 목록 화면</p>} /></Routes>
     </MemoryRouter>,
   )
 }
@@ -53,6 +54,12 @@ test('renders the registered component with its gameId and the manifest name', (
   renderAt('test-world')
   expect(screen.getByRole('heading', { name: '테스트 월드' })).toBeInTheDocument()
   expect(screen.getByText('fake:test-world')).toBeInTheDocument()
+})
+
+test('게임 화면이 onOpenGames를 부르면 /games로 간다', () => {
+  renderAt('test-world')
+  fireEvent.click(screen.getByRole('button', { name: '게임 목록' }))
+  expect(screen.getByText('게임 목록 화면')).toBeInTheDocument()
 })
 
 test('unknown game', () => {

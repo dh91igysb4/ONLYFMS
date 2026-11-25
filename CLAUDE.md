@@ -53,6 +53,11 @@
 - 마이그레이션에 `game_modes` (false, false, false) 행과 `hidden_games` 행.
 - 골드는 세이브에 두지 않는다. 지갑을 쓰는 게임은 logic에 `wallet: true`를 두고 `ctx.gold`(잔액)를 읽어 지출을 검사한 뒤 `apply`의 `gold`(정수 증감)로 돌려준다. 옛 세이브의 골드는 `legacyGold`가 한 번 지갑으로 옮긴다(reason `migrate`). 사이트 하루 상한은 게임이 몰라도 된다(핸들러가 `gold_capped`를 응답에 넣고 `WorldPage`가 알린다).
 
+## 마을회관 그림 (`fishing`)
+- 회관 외관·1층 실내 배경은 `python3 scripts/build-hall-art.py`가 `scripts/hall-art/{exterior,interior}.py`로 그려 `src/games/fishing/hallArt.ts`를 만든다(생성 파일, 직접 고치지 않는다). 그림을 바꾸면 이 명령을 다시 돌린다.
+- 회관 맵(`maps/hall.ts`)은 행으로 걷기만 정하고(F 바닥, Y 벽·가구), 방 유리벽은 `walls`(칸 사이 모서리), 상호작용은 `fixtures`로 둔다. 그림과 좌표를 함께 맞춘다.
+- 명예의 전당 데이터는 RPC `hall_of_fame`과 플랫폼 `src/platform/world/hallOfFame.ts`(게시판). 지속형 게임 화면은 `WorldGameProps.onOpenGames`로 게임 목록에 갈 수 있다.
+
 ## 낚시 데이터 갱신 (`fishing`)
 `src/games/fishing/data.ts`(어종·낚싯대)나 `logic.ts`를 바꿔 결과가 달라지면:
 1. `logic.ts`의 `logic.version`을 올린다.

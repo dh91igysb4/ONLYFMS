@@ -458,3 +458,16 @@
 .fish-chat { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .fish-chat .input { flex: 1; min-width: 0; }
 .fish-chat .fish-shop-note { flex-basis: 100%; margin: 0; }
+
+/* 마을회관: 명예의 전당·엘리베이터 창 */
+.fish-fame { display: flex; flex-direction: column; gap: 8px; }
+.fish-fame-title { margin: 0; font-size: 1rem; }
+.fish-fame-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fish-fame-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.fish-fame-rank { font-weight: 700; color: var(--accent-strong); min-width: 2.5em; }
+.fish-fame-handle { font-weight: 600; }
+.fish-fame-value { margin-left: auto; font-variant-numeric: tabular-nums; }
+.fish-fame-detail { flex-basis: 100%; padding-left: calc(2.5em + 8px); font-size: 0.85rem; }
+.fish-fame-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fish-elevator { display: flex; flex-direction: column; gap: 6px; }
+.fish-elevator .btn { justify-content: space-between; }

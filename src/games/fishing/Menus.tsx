@@ -104,7 +104,7 @@ const BAG_MODES: readonly { mode: BagMode; label: string }[] = [
   { mode: 'discard', label: '버리기' },
 ]
 
-/** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 모드에 따라 잠금·자랑·버리기. */
+/** atShop: 상점(마을회관 자판기) 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 모드에 따라 잠금·자랑·버리기. */
 export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard }: BagProps) {
   const [mode, setMode] = useState<BagMode>('lock')
   const [toss, setToss] = useState<number | null>(null)
@@ -169,7 +169,7 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
       <p className="muted">
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
-      {!atShop && <p className="fish-shop-note">상점에서 팔 수 있어요</p>}
+      {!atShop && <p className="fish-shop-note">마을회관 상점에서 팔 수 있어요</p>}
       {(onBrag || onDiscard) && view.bag.length > 0 && (
         <div className="fish-bag-modes" role="group" aria-label="물고기를 누르면">
           {BAG_MODES.filter((m) => m.mode === 'lock' || (m.mode === 'brag' ? onBrag : onDiscard)).map((m) => (
@@ -239,9 +239,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
   )
 }
 
-type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void; onWardrobe?(): void }
+type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
 
-export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, onWardrobe }: ShopProps) {
+export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
@@ -360,15 +360,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle, on
           )
         })}
       </ul>
-      {onWardrobe && (
-        <>
-          <h3 className="fish-panel-sub">옷 가게</h3>
-          <p className="muted">모자·옷·머리·낚싯대 겉모습을 사고 입어 봐요. 성능은 그대로예요</p>
-          <button type="button" className="btn btn-primary btn-sm fish-wear-open" disabled={busy} onClick={onWardrobe}>
-            옷 가게 열기
-          </button>
-        </>
-      )}
+      <p className="muted">옷은 마을회관 9번 방 옷 가게에서 사요</p>
     </section>
   )
 }

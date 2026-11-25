@@ -72,13 +72,14 @@ function Preview({ outfit, turn }: { outfit: Outfit; turn: number }) {
 type Props = {
   view: View
   /** 상점 문 앞인가. 아니면 사기 버튼을 끄고 어디서 사는지 알려 준다 */
-  atShop: boolean
+  /** 옷을 살 수 있는 자리(마을회관 9번 방 행거 앞)인가 */
+  canBuy: boolean
   busy: boolean
   onWear(slot: WearSlot, id: string): void
   onBuy(slot: WearSlot, id: string): void
 }
 
-export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
+export function WardrobePanel({ view, canBuy, busy, onWear, onBuy }: Props) {
   const [slot, setSlot] = useState<WearSlot>('hat')
   const [picked, setPicked] = useState<string | null>(null)
   const [turn, setTurn] = useState(0)
@@ -110,7 +111,7 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
             type="button"
             className="btn btn-primary btn-sm"
             aria-label={`${w.name} ${gold(w.price)}에 사기`}
-            disabled={busy || !atShop || view.gold < w.price}
+            disabled={busy || !canBuy || view.gold < w.price}
             onClick={() => {
               setConfirming(null)
               onBuy(w.slot, w.id)
@@ -129,7 +130,7 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
         type="button"
         className="btn btn-primary btn-sm"
         aria-label={`${w.name} 사기`}
-        disabled={busy || !atShop || view.gold < w.price}
+        disabled={busy || !canBuy || view.gold < w.price}
         onClick={() => (w.price >= CONFIRM_PRICE ? setConfirming(key) : onBuy(w.slot, w.id))}
       >
         사기
@@ -150,7 +151,7 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
           <span className="muted">보유 {gold(view.gold)}</span>
         </div>
       </div>
-      {!atShop && <p className="fish-shop-note">옷은 상점에서 살 수 있어요 · 가진 옷은 어디서나 입어요</p>}
+      {!canBuy && <p className="fish-shop-note">옷은 마을회관 9번 방 옷 가게에서 살 수 있어요 · 가진 옷은 어디서나 입어요</p>}
       <div className="fish-dex-tabs" role="tablist" aria-label="부위">
         {WEAR_SLOTS.map((s) => (
           <button
@@ -192,7 +193,7 @@ export function WardrobePanel({ view, atShop, busy, onWear, onBuy }: Props) {
                   ) : (
                     <span className="muted">{gold(w.price)}</span>
                   )}
-                  {!owned && isShopItem(w) && atShop && view.gold < w.price && <span className="fish-shop-note">골드가 부족해요</span>}
+                  {!owned && isShopItem(w) && canBuy && view.gold < w.price && <span className="fish-shop-note">골드가 부족해요</span>}
                 </span>
               </button>
               {status(w)}

@@ -233,7 +233,7 @@ describe('도전과제 보너스 = 낚시 수입 곡선 (로그 정규화)', () 
   // 처음(대나무·20칸·기본 지역)의 가장 좋은 자리 수입. simulate는 구매 뒤 값만 주므로 따로 잰다(약 11,500)
   const start = Math.max(...DEFAULT_AREAS.flatMap((a) => AREAS.find((x) => x.id === a)!.spots.map((spot) => hourlyIncome(a, spot, { rodTier: 1, bagTier: 1, equipped: [] }))))
   const final = plain[plain.length - 1].incomeAfter
-  const pctOf = (area: AreaId) => CHALLENGES.find((c) => c.area === area)!.freeBonusPct
+  const pctOf = (area: AreaId) => CHALLENGES.find((c) => c.area === area)?.freeBonusPct ?? 0
   const unlocks = plain.filter((m) => m.label.endsWith(' 해금'))
   const areaOfLabel = (label: string) => (Object.entries(UNLOCKS) as [AreaId, { name: string }][]).find(([id]) => label === `${AREAS.find((a) => a.id === id)!.name} 해금`)?.[0]
 

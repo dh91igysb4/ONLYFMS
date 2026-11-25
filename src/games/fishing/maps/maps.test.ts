@@ -8,7 +8,7 @@ import {
   interactionAt,
   isWalkable,
   pierEnd,
-  shopSpot,
+  doorSpot,
   spotFor,
   tileAt,
   type Exit,
@@ -34,7 +34,8 @@ const DIRS: Record<Facing, { dx: number; dy: number }> = {
   right: { dx: 1, dy: 0 },
 }
 const FACINGS: Facing[] = ['up', 'down', 'left', 'right']
-const ALL = Object.values(MAPS) as MapDef[]
+// 세계 지도의 바깥 맵들(실내 마을회관은 map.test.ts에서 따로 본다)
+const ALL = (Object.values(MAPS) as MapDef[]).filter((m) => m.onWorldMap)
 
 const center = (tx: number, ty: number): Vec => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
 const key = (t: Tile): string => `${t.tx},${t.ty}`
@@ -104,13 +105,13 @@ const manhattan = (a: Tile, b: Tile): number => Math.abs(a.tx - b.tx) + Math.abs
 function baseStarts(map: MapDef): Tile[] {
   const starts = ALL.filter((m) => DEFAULT_AREAS.includes(m.id))
     .flatMap((m) => [...m.exits, ...m.docks].filter((e) => e.target === map.id).map(({ entry: { tx, ty } }) => ({ tx, ty })))
-  if (map.id === 'village') starts.push(shopSpot(map)!)
+  if (map.id === 'village') starts.push(doorSpot(map)!)
   return starts
 }
 
 describe('맵 등록부', () => {
   it('모든 지역에 맵이 있고 mapFor가 같은 값을 준다', () => {
-    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'island', 'lake', 'river', 'summit', 'swamp', 'tideflat', 'village', 'wreck'])
+    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'hall', 'island', 'lake', 'river', 'summit', 'swamp', 'tideflat', 'village', 'wreck'])
     for (const { id } of AREAS) {
       expect(mapFor(id)).toBe(MAPS[id])
       expect(mapFor(id)!.id).toBe(id)
@@ -189,7 +190,7 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
 
   it('연결(전부 열림): 도착점(마을은 SPAWN도)에서 모든 출구 칸·선착장 front와 그 지역 모든 낚시 자리에 닿는다', () => {
     const starts: Tile[] = arrivalsInto(map).map(({ tx, ty }) => ({ tx, ty }))
-    if (map.id === 'village') starts.push(shopSpot(map)!)
+    if (map.id === 'village') starts.push(doorSpot(map)!)
     const spots = AREAS.find((a) => a.id === map.id)!.spots
     for (const start of starts) {
       const dist = bfs(map, start)
@@ -226,10 +227,14 @@ describe.each(ALL.map((m) => [m.id, m] as const))('맵 %s', (_id, map) => {
 })
 
 describe('상점', () => {
-  it('마을만 shop이 있고, 다른 맵의 어느 걸을 수 있는 칸·방향에서도 interactionAt이 shop을 주지 않는다', () => {
-    expect(MAPS.village!.shop).not.toBeNull()
+  it('바깥 맵에서는 마을만 건물이 있고, 어느 걸을 수 있는 칸·방향에서도 interactionAt이 shop을 주지 않는다(상점은 회관 자판기)', () => {
+    expect(MAPS.village!.building).not.toBeNull()
+    for (const t of allTiles(MAPS.village!)) {
+      if (!isWalkable(MAPS.village!, t.tx, t.ty, ALL_AREAS_OPEN)) continue
+      for (const f of FACINGS) expect(interactionAt(MAPS.village!, center(t.tx, t.ty), f, ALL_AREAS_OPEN)?.kind).not.toBe('shop')
+    }
     for (const map of ALL.filter((m) => m.id !== 'village')) {
-      expect(map.shop).toBeNull()
+      expect(map.building).toBeNull()
       for (const t of allTiles(map)) {
         if (!isWalkable(map, t.tx, t.ty, ALL_AREAS_OPEN)) continue
         for (const f of FACINGS) expect(interactionAt(map, center(t.tx, t.ty), f, ALL_AREAS_OPEN)?.kind, `${map.id} (${t.tx},${t.ty}) ${f}`).not.toBe('shop')
@@ -241,15 +246,15 @@ describe('상점', () => {
 describe('마을', () => {
   const village = MAPS.village!
 
-  it('SHOP·SPAWN 불변, 부두 끝→문 앞 최단 경로 37칸', () => {
-    expect(village.shop).toEqual({ tx: 10, ty: 2, w: 5, h: 4, doorTx: 12 })
-    expect(village.spawn).toEqual({ pos: center(12, 6), facing: 'down' })
+  it('회관 건물·SPAWN 불변, 부두 끝→회관 문 앞 최단 경로 34칸', () => {
+    expect(village.building).toEqual({ tx: 7, ty: 1, w: 11, h: 7, doorTx: 13 })
+    expect(village.spawn).toEqual({ pos: center(13, 8), facing: 'down' })
     const end = pierEnd(village)!
-    expect(bfs(village, shopSpot(village)!).get(key(end))).toBe(37)
+    expect(bfs(village, doorSpot(village)!).get(key(end))).toBe(34)
   })
 
   it('북쪽 출구는 강, 서쪽 끝 출구는 갯벌로 간다', () => {
-    expect(village.exits.map((e) => [exitSide(e), e.target])).toEqual([['n', 'river'], ['w', 'tideflat']])
+    expect(village.exits.map((e) => [exitSide(e), e.target])).toEqual([['n', 'river'], ['w', 'tideflat'], ['at', 'hall']])
   })
 
   it('선착장 하나(→ 섬): 잠긴 상태에서 걸어서 front에 닿고 그 자리·방향이 dock, front는 부두 끝이 아니다', () => {
@@ -258,7 +263,7 @@ describe('마을', () => {
     const end = pierEnd(village)!
     expect(key(dock.front)).not.toBe(key(end))
     expect(tileAt(village, dock.front.tx, dock.front.ty)).toBe('dock')
-    expect(bfs(village, shopSpot(village)!, BASE_OPEN).has(key(dock.front))).toBe(true)
+    expect(bfs(village, doorSpot(village)!, BASE_OPEN).has(key(dock.front))).toBe(true)
     expect(interactionAt(village, center(dock.front.tx, dock.front.ty), dock.front.facing, BASE_OPEN)).toEqual({ kind: 'dock', target: 'island' })
   })
 

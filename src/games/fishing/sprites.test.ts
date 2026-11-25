@@ -39,7 +39,8 @@ const REQUIRED = [
   ...PLAYER_POSES,
   ...TILES,
   'tile-tree',
-  'shop',
+  'hall-exterior',
+  'hall-interior',
   ...DIGITS,
   'digit-colon',
   ...SEASON_ICONS,
@@ -201,10 +202,22 @@ describe('SPRITES', () => {
     for (const pose of PLAYER_POSES) expect([SPRITES[pose].w, SPRITES[pose].h], pose).toEqual([16, 24])
     for (const tile of TILES) expect([SPRITES[tile].w, SPRITES[tile].h], tile).toEqual([16, 16])
     expect([SPRITES['tile-tree'].w, SPRITES['tile-tree'].h]).toEqual([16, 32])
-    expect(SPRITES.shop.w % 16).toBe(0)
-    expect(SPRITES.shop.h % 16).toBe(0)
-    // 맵의 건물 사각형(B·D 칸)과 같은 크기라 좌상단에 한 번에 그리면 맞는다
-    expect([SPRITES.shop.w, SPRITES.shop.h]).toEqual([VILLAGE.shop!.w * TILE, VILLAGE.shop!.h * TILE])
+    // 마을회관 외관은 건물 사각형(B·D 칸) 폭 안에 들어가고 바닥에 맞춰 그린다(위로는 넘쳐도 된다)
+    expect(SPRITES['hall-exterior'].w).toBe(168)
+    expect(SPRITES['hall-exterior'].w).toBeLessThanOrEqual(VILLAGE.building!.w * TILE)
+    expect(SPRITES.shop).toBeUndefined()
+  })
+
+  it('마을회관 실내 배경은 672×288, 투명 칸 없음, 팔레트 글자는 모두 정의됨', () => {
+    const sp = SPRITES['hall-interior']
+    expect([sp.w, sp.h]).toEqual([672, 288])
+    expect(sp.rows).toHaveLength(288)
+    for (const row of sp.rows) {
+      expect(row.length).toBe(672)
+      expect(row.includes('.')).toBe(false)
+    }
+    const used = new Set(sp.rows.join(''))
+    for (const ch of used) expect(sp.palette[ch], ch).toMatch(/^#[0-9a-f]{6}$/)
   })
 
   it('지역 타일(강·연못·웅덩이·폭포·다리·절벽)은 16×16이고 0/1 쌍은 서로 다르다', () => {

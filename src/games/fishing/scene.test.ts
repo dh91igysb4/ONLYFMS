@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { drawSprite, drawSpriteData } from './sprites.ts'
+import { SPRITES, drawSprite, drawSpriteData } from './sprites.ts'
 import { decodeOutfit, playerSprites } from './outfit.ts'
 import { drawWorld, hudLayout, hudSide, releaseSceneCache, type Box, type Phase, type WorldScene } from './scene.ts'
 import type { BarParams } from './minigame.ts'
 import { TILE, castTarget, defineMap, pierEnd, type Facing, type Opened, type Vec } from './map.ts'
 import { DEFAULT_AREAS, type AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
+import { HALL } from './maps/hall.ts'
 import { cameraFor, type Player } from './walk.ts'
 import type { Conditions } from './clock.ts'
 
@@ -247,18 +248,48 @@ describe('drawWorld without an offscreen canvas (direct drawing)', () => {
     expect(names(777)).toEqual(a)
   })
 
-  test('the shop is drawn once at its tile spot and vertical fence runs use tile-fence-v', () => {
+  test('the hall exterior is drawn once, bottom-aligned on its building rect, and vertical fence runs use tile-fence-v', () => {
     const size = { w: 320, h: 480 }
     const p = player(SPAWN.pos)
     const s = scene('idle', p, size)
     const ctx = new RecordingCtx()
     drawWorld(asCtx(ctx), s, size)
-    const shops = ctx.sprites.filter((c) => c.name === 'shop')
-    expect(shops).toHaveLength(1)
-    expect([shops[0].x, shops[0].y]).toEqual([10 * 16 - s.camera.x, 2 * 16 - s.camera.y])
+    expect(ctx.sprites.some((c) => c.name === 'shop')).toBe(false)
+    const halls = ctx.sprites.filter((c) => c.name === 'hall-exterior')
+    expect(halls).toHaveLength(1)
+    expect([halls[0].x, halls[0].y]).toEqual([7 * 16 - s.camera.x, 8 * 16 - SPRITES['hall-exterior'].h - s.camera.y])
     // 맵 (3, 10)은 위아래에만 울타리가 있다
     const v = ctx.sprites.find((c) => c.name === 'tile-fence-v' && c.x === 3 * 16 - s.camera.x && c.y === 10 * 16 - s.camera.y)
     expect(v).toBeDefined()
+  })
+
+  test('마을회관(backdrop 맵)은 칸 그림 대신 hall-interior를 (0,0)에 한 번 그린다', () => {
+    const size = { w: 320, h: 480 }
+    const p = player({ x: 4 * 16 + 8, y: 16 * 16 + 8 })
+    const s = { ...scene('idle', p, size), map: HALL, camera: cameraFor(HALL, p.pos, size), bobber: null }
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), s, size)
+    const bg = ctx.sprites.filter((c) => c.name === 'hall-interior')
+    expect(bg).toHaveLength(1)
+    expect([bg[0].x + s.camera.x, bg[0].y + s.camera.y]).toEqual([0, 0])
+    expect(ctx.sprites.some((c) => c.name.startsWith('tile-'))).toBe(false)
+  })
+
+  test('마을회관 명예의 전당: 박제는 fish-<id>를 한 번, 액자는 얼굴이 있으면 캐릭터 합성 그림을 그린다', () => {
+    const size = { w: 320, h: 480 }
+    const p = player({ x: 20 * 16 + 8, y: 3 * 16 + 8 })
+    const fame = [
+      { tx: 16, look: 'mount' as const, species: 'grouper', avatar: null, empty: false },
+      { tx: 18, look: 'frame' as const, species: null, avatar: '{}', empty: false },
+      { tx: 19, look: 'frame' as const, species: null, avatar: null, empty: true },
+    ]
+    const s = { ...scene('idle', p, size), map: HALL, camera: cameraFor(HALL, p.pos, size), bobber: null, fame }
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), s, size)
+    expect(ctx.sprites.filter((c) => c.name === 'fish-grouper')).toHaveLength(1)
+    const noFame = new RecordingCtx()
+    drawWorld(asCtx(noFame), { ...s, fame: [] }, size)
+    expect(ctx.rects.length).toBeGreaterThan(noFame.rects.length)
   })
 
   test('pose follows phase, facing and walking; left is the side sprite mirrored', () => {
@@ -387,7 +418,7 @@ describe('drawWorld with an offscreen canvas', () => {
     drawWorld(asCtx(main), { ...s, tMs: 600 }, size)
     drawWorld(asCtx(main), { ...s, tMs: 700 }, size)
     expect(made).toHaveLength(2)
-    expect(made.every((c) => c.rects.length > 0 && c.sprites.some((t) => t.name === 'shop'))).toBe(true)
+    expect(made.every((c) => c.rects.length > 0 && c.sprites.some((t) => t.name === 'hall-exterior'))).toBe(true)
     expect(main.images).toHaveLength(4)
     const [img, sx, sy, sw, sh, dx, dy, dw, dh] = main.images[0]
     expect([sx, sy, sw, sh, dx, dy, dw, dh]).toEqual([s.camera.x, s.camera.y, 195, 280, 0, 0, 195, 280])

@@ -17,17 +17,20 @@ import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.t
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
 import { spriteDataUrl } from './sprites.ts'
 import {
-  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, shopSpot, STATIC_DYNAMIC, TILE, tileOf,
-  type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
+  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, STATIC_DYNAMIC, TILE, tileOf,
+  type Facing, type FameSlot, type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
 } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { cameraFor, feetBlocked, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
 import { loadPosition, savePosition, startPosition } from './position.ts'
-import { Controls, type ActionState } from './Controls.tsx'
+import { Controls, type ActionLabel, type ActionState } from './Controls.tsx'
 import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
 import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
 import { WardrobePanel } from './WardrobePanel.tsx'
+import { ElevatorPanel, FamePanel } from './HallPanels.tsx'
+import { allBoards, boardIndexFor, fameFrames, type FameFrame } from './fame.ts'
+import { loadHallOfFame, type HallOfFame } from '../../platform/world/hallOfFame.ts'
 import { releaseMinimapCache } from './minimap.ts'
 import { decodeOutfit, normalizeOutfit } from './outfit.ts'
 import { DEFAULT_OUTFIT, type Outfit, type WearSlot } from './wardrobe.ts'
@@ -91,7 +94,7 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe'
+type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const outfitMemo = new WeakMap<object, Outfit>()
 /** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
@@ -103,7 +106,7 @@ function outfitOf(view: View | null): Outfit {
   outfitMemo.set(view, o)
   return o
 }
-const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport'])
+const GUARDED: ReadonlySet<Menu> = new Set<Menu>(['shop', 'unlock', 'teleport', 'wardrobe', 'fame', 'elevator'])
 const MENU_LABELS = { bag: '가방', dex: '도감', challenges: '과제', map: '지도' } as const
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
@@ -281,16 +284,15 @@ const COARSE_QUERY = '(any-pointer: coarse)'
 const coarseQuery = (): MediaQueryList | null =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(COARSE_QUERY) : null
 
-/**
- * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
- * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
- */
+/** 서 있는 자리에서 할 수 있는 일(앞 타일·고정물로 정한다, interactionAt) */
 function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
-  const front = interactionAt(map, p.pos, p.facing, opened, dyn)
-  if (front) return front
-  const t = tileOf(p.pos)
-  const door = shopSpot(map)
-  return door && t.tx === door.tx && t.ty === door.ty ? { kind: 'shop' } : null
+  return interactionAt(map, p.pos, p.facing, opened, dyn)
+}
+/** 큰 지도에 보일 내 자리. 세계 지도 밖 맵(실내)이면 첫 출구가 나가는 자리(마을회관 → 마을 문 앞) */
+function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): { area: AreaId; tx: number; ty: number; facing: Facing } {
+  const out = map.exits[0]
+  if (map.onWorldMap || !out) return { area: map.id, ...tileOf(p.pos), facing: p.facing }
+  return { area: out.target, tx: out.entry.tx, ty: out.entry.ty, facing: out.entry.facing }
 }
 function interactionKey(i: Interaction): string {
   if (!i) return ''
@@ -299,7 +301,13 @@ function interactionKey(i: Interaction): string {
   if (i.kind === 'dock') return `dock-${i.target}`
   if (i.kind === 'teleporter') return 'teleporter'
   if (i.kind === 'drill') return 'drill'
-  return 'shop'
+  if (i.kind === 'notice') return `notice-${i.text}`
+  if (i.kind === 'fame') return i.slot.group === 'record' ? `fame-record-${i.slot.key}` : `fame-site-${i.slot.index}`
+  return i.kind
+}
+/** 마을회관 고정물 앞 행동 버튼 이름 */
+const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], ActionLabel>>> = {
+  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기',
 }
 /** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
 const tpOpen = (view: View | null, area: AreaId): boolean =>
@@ -307,7 +315,7 @@ const tpOpen = (view: View | null, area: AreaId): boolean =>
 /** 열린 지역: 기본 지역(마을·강·숲)과 서버 상태의 areas. 아직 못 받았으면 기본 지역만 */
 const openedOf = (view: View | null): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...(view?.areas ?? [])])
 
-export function Game({ gameId }: WorldGameProps) {
+export function Game({ gameId, onOpenGames }: WorldGameProps) {
   const { profile } = useAuth()
   const userId = profile?.id ?? null
   const userIdRef = useRef(userId)
@@ -329,6 +337,32 @@ export function Game({ gameId }: WorldGameProps) {
   const presenceRef = useRef<WorldPresence | null>(null)
   const [onlinePeers, setOnlinePeers] = useState<OnlinePeer[]>([])
   const [view, setView] = useState<View | null>(null)
+  /** 마을회관 명예의 전당(플랫폼 게시판). 회관에 들어갈 때·창을 열 때 불러온다 */
+  const [hof, setHof] = useState<HallOfFame | null>(null)
+  const [hofError, setHofError] = useState(false)
+  const fameFramesRef = useRef<FameFrame[]>(fameFrames(null, gameId))
+  const [fameSlot, setFameSlot] = useState<FameSlot | null>(null)
+  const onOpenGamesRef = useRef(onOpenGames)
+  onOpenGamesRef.current = onOpenGames
+  const refreshFame = () => {
+    loadHallOfFame(gameId, !!profile?.is_admin).then(
+      (h) => {
+        fameFramesRef.current = fameFrames(h, gameId)
+        setHof(h)
+        setHofError(false)
+      },
+      () => setHofError(true),
+    )
+  }
+  const hofRef = useRef<HallOfFame | null>(null)
+  hofRef.current = hof
+  /** 불러온 게시판에 없는 액자 칸(빈 벽): 행동 없음 */
+  const deadFame = (i: Interaction): boolean =>
+    i?.kind === 'fame' && hofRef.current !== null && boardIndexFor(hofRef.current, gameId, i.slot) === null
+  /** 명예의 전당 액자가 있는 맵에 들어왔으면 새로 불러온다 */
+  const enteredMap = (m: MapDef) => {
+    if (m.fixtures.some((f) => f.act.kind === 'fame')) refreshFame()
+  }
   const opened = useMemo(() => openedOf(view), [view])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -425,6 +459,7 @@ export function Game({ gameId }: WorldGameProps) {
     const start = startPosition(savedStart.current, areas)
     rt.map = mapFor(start.area) ?? VILLAGE
     rt.player = { pos: { ...start.pos }, facing: start.facing, moving: false, walkMs: 0 }
+    enteredMap(rt.map)
     const at = interactionFor(rt.map, rt.player, areas, dynNow())
     rt.hereKey = interactionKey(at)
     setHere(at)
@@ -665,6 +700,22 @@ export function Game({ gameId }: WorldGameProps) {
         setNotice(null)
         setTpArea(rt.map.id)
         setMenu('teleport')
+      } else if (at.kind === 'wardrobe') {
+        setNotice(null)
+        setMenu('wardrobe')
+      } else if (at.kind === 'elevator') {
+        setNotice(null)
+        setMenu('elevator')
+      } else if (at.kind === 'fame') {
+        if (deadFame(at)) return
+        setNotice(null)
+        setFameSlot(at.slot)
+        refreshFame()
+        setMenu('fame')
+      } else if (at.kind === 'laptop') {
+        onOpenGamesRef.current?.()
+      } else if (at.kind === 'notice') {
+        flashInfo(at.text, TIDE_NOTICE_MS)
       }
       return
     }
@@ -768,11 +819,13 @@ export function Game({ gameId }: WorldGameProps) {
       }
       tr.swapped = true
       const { tx, ty, facing } = tr.entry
-      if (next !== rt.map) {
+      const changed = next !== rt.map
+      if (changed) {
         setHoles([])
         rt.drill = null
       }
       rt.map = next
+      if (changed) enteredMap(next)
       rt.player = { pos: { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }, facing, moving: false, walkMs: 0 }
       savePlayer()
       const name = tr.say ?? AREAS.find((a) => a.id === next.id)?.name
@@ -865,6 +918,7 @@ export function Game({ gameId }: WorldGameProps) {
       mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
       others,
       holding: showRef.current?.show.kind === 'brag' ? showRef.current.show.species : null,
+      fame: rt.map.backdrop ? fameFramesRef.current : undefined,
     }, size)
   }
 
@@ -1436,10 +1490,12 @@ export function Game({ gameId }: WorldGameProps) {
     : here?.kind === 'dock' ? DOCK_ACTION
       : here?.kind === 'teleporter' ? (tpOpen(view, rt.map.id) ? TELEPORT_ACTION : GATE_ACTION)
         : here?.kind === 'drill' ? DRILL_ACTION
-          : null
+          : here && !deadFame(here) ? FIXTURE_ACTION[here.kind] ?? null
+            : null
   const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
   const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
   const atShop = here?.kind === 'shop'
+  const atWardrobe = here?.kind === 'wardrobe'
   // 낚시가 시작되면(충전~결과) 챔·감기를 위해 늘 누를 수 있다
   const action: ActionState =
     phase !== 'idle' ? { label: '낚시', enabled: true }
@@ -1449,7 +1505,7 @@ export function Game({ gameId }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', wardrobe: '옷장', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -1554,12 +1610,20 @@ export function Game({ gameId }: WorldGameProps) {
                   onBuy={(t) => void buyRod(t)}
                   onBuyBag={(t) => void buyBag(t)}
                   onBuyTackle={(id) => void buyTackle(id)}
-                  onWardrobe={() => setMenu('wardrobe')}
                 />
               )}
               {menu === 'wardrobe' && (
-                <WardrobePanel view={view} atShop={atShop} busy={busy} onWear={(sl, id) => void wear(sl, id)} onBuy={(sl, id) => void buyWear(sl, id)} />
+                <WardrobePanel view={view} canBuy={atWardrobe} busy={busy} onWear={(sl, id) => void wear(sl, id)} onBuy={(sl, id) => void buyWear(sl, id)} />
               )}
+              {menu === 'fame' && (
+                <FamePanel
+                  key={`${fameSlot ? JSON.stringify(fameSlot) : ''}-${hof ? 1 : 0}`}
+                  boards={hof ? allBoards(hof, gameId) : null}
+                  start={hof && fameSlot ? boardIndexFor(hof, gameId, fameSlot) ?? 0 : 0}
+                  error={hofError}
+                />
+              )}
+              {menu === 'elevator' && <ElevatorPanel />}
               {menu === 'unlock' && unlockTarget && (
                 <UnlockPanel view={view} area={unlockTarget} busy={busy} onUnlock={() => void unlock(unlockTarget)} />
               )}
@@ -1568,7 +1632,7 @@ export function Game({ gameId }: WorldGameProps) {
               {menu === 'map' && (
                 <MapPanel
                   view={view}
-                  here={{ area: rt.map.id, ...tileOf(rt.player.pos), facing: rt.player.facing }}
+                  here={mapHere(rt.map, rt.player)}
                   now={serverNow}
                   innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
                   layers={mapLayers}
