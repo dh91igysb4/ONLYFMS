@@ -1,0 +1,56 @@
+{{short description|French football manager (born 1949)}}
+{{Good article}}
+{{pp-blp|expiry=indef|small=yes}}
+{{Use British English|date=January 2019}}
+{{Use dmy dates|date=July 2021}}
+{{Infobox officeholder
+| name             = Arsène Wenger
+| native_name_lang = fr
+| image            = 25th Laureus World Sports Awards - Red Carpet - Arsène Wenger - 240422 192850 (cropped).jpg
+| caption          = Wenger in 2024
+| office           = Chief of Global Football Development of [[FIFA]]
+| term_start       = 13 November 2019
+| predecessor      = ''Office established''
+| 1blankname       = President
+| 1namedata        = [[Gianni Infantino]]
+| birth_name       = Arsène Charles Ernest Wenger
+| birth_date       = {{birth date and age|1949|10|22|df=y}}
+| birth_place      = [[Strasbourg]], Bas-Rhin, France
+| height           = 1.91 m<ref>{{cite web |url=https://www.bdfutbol.com/j/j93761.html |title=Wenger - Footballer |access-date=1 January 2023}}</ref>
+| occupation       = Football manager, football administrator
+| module           = {{Infobox football biography
+| embed          = yes
+| header_color   = lavender
+| position       = [[Midfielder]]
+| youth_years1   = 1963–1969
+| youth_clubs1   = FC Duttlenheim
+| youth_years2   = 1969–1973
+| youth_clubs2   = [[AS Mutzig|Mutzig]]
+| years1         = 1969–1973
+| clubs1         = [[AS Mutzig|Mutzig]]
+| caps1          = –
+| goals1         = –
+| years2         = 1973–1975
+| clubs2         = [[FC Mulhouse|Mulhouse]]
+| caps2          = 56
+| goals2         = 4
+| years3         = 1975–1978
+| clubs3         = [[ASPV Strasbourg]]
+| caps3          = –
+| goals3         = –
+| years4         = 1978–1981
+| clubs4         = [[RC Strasbourg Alsace|RC Strasbourg]]
+| caps4          = 11
+| goals4         = 0
+| total_caps     = 67+
+| total_goals    = 4+
+| manager_years1 = 1984–1987
+| manager_clubs1 = [[AS Nancy|Nancy]]
+| manager_years2 = 1987–1994
+| manager_clubs2 = [[AS Monaco FC|Monaco]]
+| manager_years3 = 1995–1996
+| manager_clubs3 = [[Nagoya Grampus Eight]]
+| manager_years4 = 1996–2018
+| manager_clubs4 = [[Arsenal F.C.|Arsenal]]
+}}
+}}

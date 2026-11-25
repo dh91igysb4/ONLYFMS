@@ -1,0 +1,62 @@
+===Germany===
+Coach: [[Joachim Löw]]
+
+The final squad was announced on 2 June 2014.<ref>{{cite news|title=Low finalises Germany squad |url=https://www.fifa.com/worldcup/news/y=2014/m=6/news=low-finalises-germany-squad-2353140.html |publisher=FIFA |date=2 June 2014 |access-date=2 June 2014 |url-status=dead |archive-url=https://web.archive.org/web/20140603181313/http://www.fifa.com/worldcup/news/y%3D2014/m%3D6/news%3Dlow-finalises-germany-squad-2353140.html |archive-date=3 June 2014 }}</ref> On 7 June, [[Marco Reus]] was replaced by [[Shkodran Mustafi]] after Reus injured his ankle.<ref>{{cite news|url=https://www.dfb.de/news/de/d-fifa-wm/reus-verpasst-wm-loew-nominiert-mustafi-nach/59263.html|title=Reus verpasst WM, Löw nominiert Mustafi nach|date=7 June 2014|access-date=7 June 2014}}</ref>
+
+{{National football squad start}}
+{{National football squad player|no=1|pos=GK|name=[[Manuel Neuer]]|age={{birth date and age2|df=yes|2014|6|12|1986|3|27}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=52}}
+{{National football squad player|no=2|pos=DF|name=[[Kevin Großkreutz]]|age={{birth date and age2|df=yes|2014|6|12|1988|7|19}}|clubnat=GER|club=[[Borussia Dortmund]]|caps=5}}
+{{National football squad player|no=3|pos=DF|name=[[Matthias Ginter]]|age={{birth date and age2|df=yes|2014|6|12|1994|1|19}}|clubnat=GER|club=[[SC Freiburg]]|caps=2}}
+{{National football squad player|no=4|pos=DF|name=[[Benedikt Höwedes]]|age={{birth date and age2|df=yes|2014|6|12|1988|2|29}}|clubnat=GER|club=[[FC Schalke 04|Schalke 04]]|caps=21}}
+{{National football squad player|no=5|pos=DF|name=[[Mats Hummels]]|age={{birth date and age2|df=yes|2014|6|12|1988|12|16}}|clubnat=GER|club=[[Borussia Dortmund]]|caps=30}}
+{{National football squad player|no=6|pos=MF|name=[[Sami Khedira]]|age={{birth date and age2|df=yes|2014|6|12|1987|4|4}}|clubnat=ESP|club=[[Real Madrid CF|Real Madrid]]|caps=46}}
+{{National football squad player|no=7|pos=MF|name=[[Bastian Schweinsteiger]]|age={{birth date and age2|df=yes|2014|6|12|1984|8|1}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=102}}
+{{National football squad player|no=8|pos=MF|name=[[Mesut Özil]]|age={{birth date and age2|df=yes|2014|6|12|1988|10|15}}|clubnat=ENG|club=[[Arsenal F.C.|Arsenal]]|caps=55}}
+{{National football squad player|no=9|pos=FW|name=[[André Schürrle]]|age={{birth date and age2|df=yes|2014|6|12|1990|11|6}}|clubnat=ENG|club=[[Chelsea F.C.|Chelsea]]|caps=33}}
+{{National football squad player|no=10|pos=FW|name=[[Lukas Podolski]]|age={{birth date and age2|df=yes|2014|6|12|1985|6|4}}|clubnat=ENG|club=[[Arsenal F.C.|Arsenal]]|caps=114}}
+{{National football squad player|no=11|pos=FW|name=[[Miroslav Klose]]|age={{birth date and age2|df=yes|2014|6|12|1978|6|9}}|clubnat=ITA|club=[[S.S. Lazio|Lazio]]|caps=132}}
+{{National football squad player|no=12|pos=GK|name=[[Ron-Robert Zieler]]|age={{birth date and age2|df=yes|2014|6|12|1989|2|12}}|clubnat=GER|club=[[Hannover 96]]|caps=3}}
+{{National football squad player|no=13|pos=FW|name=[[Thomas Müller]]|age={{birth date and age2|df=yes|2014|6|12|1989|9|13}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=49}}
+{{National football squad player|no=14|pos=MF|name=[[Julian Draxler]]|age={{birth date and age2|df=yes|2014|6|12|1993|9|20}}|clubnat=GER|club=[[FC Schalke 04|Schalke 04]]|caps=11}}
+{{National football squad player|no=15|pos=DF|name=[[Erik Durm]]|age={{birth date and age2|df=yes|2014|6|12|1992|5|12}}|clubnat=GER|club=[[Borussia Dortmund]]|caps=1}}
+{{National football squad player|no=16|pos=DF|name=[[Philipp Lahm]] ([[Captain (association football)|c]])|age={{birth date and age2|df=yes|2014|6|12|1983|11|11}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=106}}
+{{National football squad player|no=17|pos=DF|name=[[Per Mertesacker]]|age={{birth date and age2|df=yes|2014|6|12|1984|9|29}}|clubnat=ENG|club=[[Arsenal F.C.|Arsenal]]|caps=98}}
+{{National football squad player|no=18|pos=MF|name=[[Toni Kroos]]|age={{birth date and age2|df=yes|2014|6|12|1990|1|4}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=44}}
+{{National football squad player|no=19|pos=MF|name=[[Mario Götze]]|age={{birth date and age2|df=yes|2014|6|12|1992|6|3}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=29}}
+{{National football squad player|no=20|pos=DF|name=[[Jérôme Boateng]]|age={{birth date and age2|df=yes|2014|6|12|1988|9|3}}|clubnat=GER|club=[[FC Bayern Munich|Bayern Munich]]|caps=39}}
+{{National football squad player|no=21|pos=DF|name=[[Shkodran Mustafi]]|age={{birth date and age2|df=yes|2014|6|12|1992|4|17}}|clubnat=ITA|club=[[U.C. Sampdoria|Sampdoria]]|caps=4}}
+{{National football squad player|no=22|pos=GK|name=[[Roman Weidenfeller]]|age={{birth date and age2|df=yes|2014|6|12|1980|8|6}}|clubnat=GER|club=[[Borussia Dortmund]]|caps=3}}
+{{National football squad player|no=23|pos=MF|name=[[Christoph Kramer]]|age={{birth date and age2|df=yes|2014|6|12|1991|2|19}}|clubnat=GER|club=[[Borussia Mönchengladbach]]|caps=5}}
+{{National football squad end}}
+
+===Argentina===
+Coach: [[Alejandro Sabella]]
+
+The final squad was announced on 2 June 2014.<ref>{{cite news|url=https://www.lequipe.fr/Football/Actualites/Banega-n-en-sera-pas/470561|title=Banega n'en sera pas|language=fr|date=2 June 2014|access-date=2 June 2014|work=L'Équipe}}</ref><ref>{{cite news|url=http://www.infobae.com/2014/06/02/1569633-los-dorsales-que-buscaran-la-copa-brasil-messi-encabeza-la-mitica-10|title=Los dorsales que buscarán la Copa en Brasil: Messi encabeza con la mítica 10|language=es|date=2 June 2014|access-date=2 June 2014|publisher=InfoBAE}}</ref>
+
+{{National football squad start}}
+{{National football squad player|no=1|pos=GK|name=[[Sergio Romero]]|age={{birth date and age2|df=yes|2014|6|12|1987|2|22}}|caps=47|club=[[AS Monaco FC|Monaco]]|clubnat=FRA|natvar=1974}} 
+{{National football squad player|no=2|pos=DF|name=[[Ezequiel Garay]]|age={{birth date and age2|df=yes|2014|6|12|1986|10|10}}|caps=18|club=[[S.L. Benfica|Benfica]]<ref>Ezequiel Garay joined [[FC Zenit Saint Petersburg|Zenit Saint Petersburg]] following the tournament. {{cite news|url=http://www.en.fc-zenit.ru/main/news/ct3/58633.html|title=Zenit signs Ezequiel Garay|publisher=FC Zenit|date=25 June 2014|access-date=25 June 2014}}</ref>|clubnat=POR}}
+{{National football squad player|no=3|pos=DF|name=[[Hugo Campagnaro]]|age={{birth date and age2|df=yes|2014|6|12|1980|6|27}}|caps=15|club=[[Inter Milan]]|clubnat=ITA}}
+{{National football squad player|no=4|pos=DF|name=[[Pablo Zabaleta]]|age={{birth date and age2|df=yes|2014|6|12|1985|1|16}}|caps=36|club=[[Manchester City F.C.|Manchester City]]|clubnat=ENG}}
+{{National football squad player|no=5|pos=MF|name=[[Fernando Gago]]|age={{birth date and age2|df=yes|2014|6|12|1986|4|10}}|caps=49|club=[[Boca Juniors]]|clubnat=ARG}}
+{{National football squad player|no=6|pos=MF|name=[[Lucas Biglia]]|age={{birth date and age2|df=yes|2014|6|12|1986|1|30}}|caps=18|club=[[S.S. Lazio|Lazio]]|clubnat=ITA}}
+{{National football squad player|no=7|pos=MF|name=[[Ángel Di María]]|age={{birth date and age2|df=yes|2014|6|12|1988|2|14}}|caps=47|club=[[Real Madrid CF|Real Madrid]]|clubnat=ESP}}
+{{National football squad player|no=8|pos=MF|name=[[Enzo Pérez]]|age={{birth date and age2|df=yes|2014|6|12|1986|2|22}}|caps=7|club=[[S.L. Benfica|Benfica]]|clubnat=POR}}
+{{National football squad player|no=9|pos=FW|name=[[Gonzalo Higuaín]]|age={{birth date and age2|df=yes|2014|6|12|1987|12|10}}|caps=36|club=[[S.S.C. Napoli|Napoli]]|clubnat=ITA}}
+{{National football squad player|no=10|pos=FW|name=[[Lionel Messi]] ([[Captain (association football)|c]])|age={{birth date and age2|df=yes|2014|6|12|1987|6|24}}|caps=86|club=[[FC Barcelona|Barcelona]]|clubnat=ESP}}
+{{National football squad player|no=11|pos=MF|name=[[Maxi Rodríguez]]|age={{birth date and age2|df=yes|2014|6|12|1981|1|2}}|caps=55|club=[[Newell's Old Boys]]|clubnat=ARG}}
+{{National football squad player|no=12|pos=GK|name=[[Agustín Orión]]|age={{birth date and age2|df=yes|2014|6|12|1981|7|26}}|caps=3|club=[[Boca Juniors]]|clubnat=ARG}}
+{{National football squad player|no=13|pos=MF|name=[[Augusto Fernández]]|age={{birth date and age2|df=yes|2014|6|12|1986|4|10}}|caps=9|club=[[RC Celta de Vigo|Celta Vigo]]|clubnat=ESP}}
+{{National football squad player|no=14|pos=MF|name=[[Javier Mascherano]]|age={{birth date and age2|df=yes|2014|6|12|1984|6|8}}|caps=98|club=[[FC Barcelona|Barcelona]]|clubnat=ESP}}
+{{National football squad player|no=15|pos=DF|name=[[Martín Demichelis]]|age={{birth date and age2|df=yes|2014|6|12|1980|12|20}}|caps=38|club=[[Manchester City F.C.|Manchester City]]|clubnat=ENG}}
+{{National football squad player|no=16|pos=DF|name=[[Marcos Rojo]]|age={{birth date and age2|df=yes|2014|6|12|1990|3|20}}|caps=22|club=[[Sporting CP]]|clubnat=POR}}
+{{National football squad player|no=17|pos=DF|name=[[Federico Fernández (footballer)|Federico Fernández]]|age={{birth date and age2|df=yes|2014|6|12|1989|2|21}}|caps=26|club=[[S.S.C. Napoli|Napoli]]|clubnat=ITA}}
+{{National football squad player|no=18|pos=FW|name=[[Rodrigo Palacio]]|age={{birth date and age2|df=yes|2014|6|12|1982|2|5}}|caps=22|club=[[Inter Milan]]|clubnat=ITA}}
+{{National football squad player|no=19|pos=MF|name=[[Ricky Álvarez]]|age={{birth date and age2|df=yes|2014|6|12|1988|4|12}}|caps=7|club=[[Inter Milan]]|clubnat=ITA}}
+{{National football squad player|no=20|pos=FW|name=[[Sergio Agüero]]|age={{birth date and age2|df=yes|2014|6|12|1988|6|2}}|caps=51|club=[[Manchester City F.C.|Manchester City]]|clubnat=ENG}}
+{{National football squad player|no=21|pos=GK|name=[[Mariano Andújar]]|age={{birth date and age2|df=yes|2014|6|12|1983|7|30}}|caps=10|club=[[Calcio Catania|Catania]]<ref>Andújar joined [[S.S.C. Napoli|Napoli]] following the tournament. {{cite news|url=http://www.sscnapoli.it/static/news/Il-Napoli-ufficializza-l-acquisto-di-Andujar-1847.aspx|title=Il portiere argentino restera' in prestito al Catania fino a giugno|publisher=SSC Napoli|date=1 January 2014|access-date=4 July 2014}}</ref>|clubnat=ITA}}
+{{National football squad player|no=22|pos=FW|name=[[Ezequiel Lavezzi]]|age={{birth date and age2|df=yes|2014|6|12|1985|5|3}}|caps=31|club=[[Paris Saint-Germain F.C.|Paris Saint-Germain]]|clubnat=FRA|natvar=1974}}
+{{National football squad player|no=23|pos=DF|name=[[José María Basanta]]|age={{birth date and age2|df=yes|2014|6|12|1984|4|3}}|caps=10|club=[[C.F. Monterrey|Monterrey]]|clubnat=MEX}}
+{{National football squad end}}
+

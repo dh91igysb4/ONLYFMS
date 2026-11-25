@@ -1,0 +1,415 @@
+==Winners==
+{| class="wikitable plainrowheaders"
+|+Key
+!scope="row"|'''Player {{small|(X)}}'''
+|Name of the player and number of times they had won the award at that point (if more than one)
+|-
+!scope="row" style="text-align:center"|'''Games'''
+|The number of [[Premier League]] games played by the winner that season{{#tag:ref|This does not necessarily match the total number of games in a season.|group=upper-alpha}}
+|-
+!scope="row" style="text-align:center"|'''Rate'''
+|The winner's goals-to-games ratio that season
+|-
+!scope="row" style="text-align:center; background:#B0C4DE"|{{dagger}}
+|Indicates multiple award winners in the same season
+|-
+!scope="row" style="text-align:center; background:#FFE6BD"|{{double-dagger}}
+|Indicates player also won the [[European Golden Shoe]] in the same season
+|-
+!scope="row" style="text-align:center; background:#ffb"|§
+|Denotes the club were [[List of English football champions|Premier League champions]] in the same season
+|-
+!scope="row" style="text-align:center; background:#bbffbb"|{{number sign}}
+|Premier League record
+|}
+
+{| class="wikitable sortable plainrowheaders"
+|+Premier League Golden Boot winners
+!scope="col"|Season
+!scope="col"|Player
+!scope="col"|Nationality
+!scope="col"|Club
+!scope="col"|Goals
+!scope="col"|Games{{#tag:ref|From the [[1995–96 FA Premier League|1995–96 season]] onwards, the Premier League was reduced from 22 teams to 20,<ref>{{cite news |title=Roller-coaster years |url=https://news.bbc.co.uk/sport2/hi/football/teams/m/man_city/1317152.stm |work=BBC Sport|publisher=BBC|date=7 May 2001 |access-date=30 November 2013 }}</ref> thus reducing the number of games in a league season from 42 to 38.|group=upper-alpha}}
+!scope="col"|Rate
+!scope="col" class="unsortable"|Ref(s)
+|-
+|[[1992–93 FA Premier League|1992–93]]
+!scope="row"|{{sortname|Teddy|Sheringham}}
+|{{flagu|England}}
+|[[Tottenham Hotspur F.C.|Tottenham Hotspur]]{{#tag:ref|[[Teddy Sheringham]] scored his first goal of the [[1992–93 FA Premier League|1992–93 season]] as a [[Nottingham Forest F.C.|Nottingham Forest]] player,<ref>{{cite web |title=Player Profile – Teddy Sheringham |url=http://www.premierleague.com/en-gb/players/profile.career-history.html/teddy-sheringham |publisher=Premier League |access-date=7 October 2013 }}</ref> while the rest of his goals were scored for [[Tottenham Hotspur F.C.|Tottenham Hotspur]] following his transfer in August 1992.|group=upper-alpha}}
+|style="text-align:center"|22
+|style="text-align:center"|41
+|style="text-align:center"|0.54
+|style="text-align:center"|<ref name=top>{{cite news|title=Top Ten – Golden Boot |url=http://www.skysports.com/interactive/top_tens_story/0,25722,11065_6134449,00.html |date=May 2010 |access-date=7 October 2013 |publisher=Sky Sports |url-status=dead |archive-url=https://web.archive.org/web/20141008220608/http://www.skysports.com/interactive/top_tens_story/0%2C25722%2C11065_6134449%2C00.html |archive-date= 8 October 2014 }}</ref>
+|-
+|[[1993–94 FA Premier League|1993–94]]
+!scope="row"|{{sortname|Andy|Cole}}
+|{{flagu|England}}
+|[[Newcastle United F.C.|Newcastle United]]
+|style="text-align:center"|34
+|style="text-align:center"|40
+|style="text-align:center"|0.85
+|style="text-align:center"|<ref name=top/>
+|-
+|[[1994–95 FA Premier League|1994–95]]
+!scope="row"|{{sortname|Alan|Shearer}} 
+|{{flagu|England}}
+!scope="row" style="background:#ffb"|[[Blackburn Rovers F.C.|Blackburn Rovers]]{{sup|§}}
+|style="text-align:center"|34
+|style="text-align:center"|42
+|style="text-align:center"|0.81
+|style="text-align:center"|<ref name=top/><ref name=footsteps>{{cite news |title=Van Persie follows in Shearer's footsteps |url=https://www.fifa.com/worldfootball/clubfootball/news/newsid=2081340.html |archive-url=https://web.archive.org/web/20130608121138/http://www.fifa.com/worldfootball/clubfootball/news/newsid=2081340.html |url-status=dead |archive-date=8 June 2013 |date=20 May 2013 |access-date=7 October 2013 |work=FIFA.com |publisher=FIFA }}</ref>
+|-
+|[[1995–96 FA Premier League|1995–96]]
+!scope="row"|{{sortname|Alan|Shearer}} {{small|(2)}}
+|{{flagu|England}}
+|[[Blackburn Rovers F.C.|Blackburn Rovers]]
+|style="text-align:center"|31
+|style="text-align:center"|35
+|style="text-align:center"|0.89
+|style="text-align:center"|<ref name=top/><ref name=footsteps/>
+|-
+|[[1996–97 FA Premier League|1996–97]]
+!scope="row"|{{sortname|Alan|Shearer}} {{small|(3)}}
+|{{flagu|England}}
+|[[Newcastle United F.C.|Newcastle United]]
+|style="text-align:center"|25
+|style="text-align:center"|31
+|style="text-align:center"|0.81
+|style="text-align:center"|<ref name=top/><ref name=footsteps/>
+|-
+| rowspan="3" style="background:#B0C4DE" | [[1997–98 FA Premier League|1997–98]]{{sup|{{dagger}}}}
+!scope="row"|{{sortname|Chris|Sutton}}
+|{{flagu|England}}
+|[[Blackburn Rovers F.C.|Blackburn Rovers]]
+|style="text-align:center"|18
+|style="text-align:center"|35
+|style="text-align:center"|0.51
+|style="text-align:center"|<ref name=top/>
+|-
+!scope="row"|{{sortname|Dion|Dublin}}
+|{{flagu|England}}
+|[[Coventry City F.C.|Coventry City]]
+|style="text-align:center"|18
+|style="text-align:center"|36
+|style="text-align:center"|0.50
+|style="text-align:center"|<ref name=top/><ref>{{cite web |title=Dublin: Rooney the cream of the crop |url=http://espnfc.com/columns/story?id=789691&sec=england&root=england&cc=5739 |date=24 May 2010 |access-date=7 October 2013 |first=Mark |last=Lomas |publisher=ESPN Internet Ventures |work=ESPN }}</ref>
+|-
+!scope="row"|{{sortname|Michael|Owen}} 
+|{{flagu|England}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|18
+|style="text-align:center"|36
+|style="text-align:center"|0.50
+|style="text-align:center"|<ref name=top/>
+|-
+| rowspan="3" style="background:#B0C4DE" | [[1998–99 FA Premier League|1998–99]]{{sup|{{dagger}}}}
+!scope="row"|{{sortname|Michael|Owen}} {{small|(2)}}
+|{{flagu|England}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|18
+|style="text-align:center"|30
+|style="text-align:center"|0.60
+|style="text-align:center"|<ref name=top/>
+|-
+!scope="row"|{{sortname|Dwight|Yorke}}
+|{{flagu|Trinidad and Tobago}}
+!scope="row" style="background:#ffb"|[[Manchester United F.C.|Manchester United]]{{sup|§}}
+|style="text-align:center"|18
+|style="text-align:center"|33
+|style="text-align:center"|0.55
+|style="text-align:center"|<ref name=asked>{{cite news |title=Question Nobody asked |url=http://www.independent.ie/sport/soccer/question-nobody-asked-26626033.html |date=25 January 2010 |access-date=7 October 2013 |newspaper=Irish Independent }}</ref>
+|-
+!scope="row"|{{sortname|Jimmy Floyd|Hasselbaink}} 
+|{{flagu|Netherlands}}
+|[[Leeds United F.C.|Leeds United]]
+|style="text-align:center"|18
+|style="text-align:center"|36
+|style="text-align:center"|0.50
+|style="text-align:center"|<ref name=top/>
+|-
+|[[1999–2000 FA Premier League|1999–2000]]
+!scope="row" style="background:#FFE6BD"|{{sortname|Kevin|Phillips|Kevin Phillips (English footballer)}}{{sup|{{double-dagger}}}}
+|{{flagu|England}}
+|[[Sunderland A.F.C.|Sunderland]]
+|style="text-align:center"|30
+|style="text-align:center"|36
+|style="text-align:center"|0.83
+|style="text-align:center"|<ref name=break/><ref>{{cite news |title=Phillips nets Golden prize |url=https://news.bbc.co.uk/sport2/hi/football/teams/s/sunderland/856691.stm |work=BBC Sport|publisher=BBC|date=29 July 2000 |access-date=7 October 2013 }}</ref>
+|-
+|[[2000–01 FA Premier League|2000–01]]
+!scope="row"|{{sortname|Jimmy Floyd|Hasselbaink}} {{small|(2)}}
+|{{flagu|Netherlands}}
+|[[Chelsea F.C.|Chelsea]]
+|style="text-align:center"|23
+|style="text-align:center"|35
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref>{{cite news |title=Chelsea clinch Uefa Cup spot |url=https://news.bbc.co.uk/sport2/hi/football/eng_prem/1338414.stm |work=BBC Sport|publisher=BBC|date=19 May 2001 |access-date=7 October 2013 }}</ref>
+|-
+|[[2001–02 FA Premier League|2001–02]]
+!scope="row"|{{sort|Henry 1|{{sortname|Thierry|Henry}}}} 
+|{{flagu|France|1974}}
+!scope="row" style="background:#ffb"|[[Arsenal F.C.|Arsenal]]{{sup|§}}
+|style="text-align:center"|24
+|style="text-align:center"|33
+|style="text-align:center"|0.73
+|style="text-align:center"|<ref name=asked/>
+|-
+|[[2002–03 FA Premier League|2002–03]]
+!scope="row"|{{sortname|Ruud van|Nistelrooy}}
+|{{flagu|Netherlands}}
+!scope="row" style="background:#ffb"|[[Manchester United F.C.|Manchester United]]{{sup|§}}
+|style="text-align:center"|25
+|style="text-align:center"|34
+|style="text-align:center"|0.74
+|style="text-align:center"|<ref>{{cite news |title=Van Nistelrooy nets Golden Boot |url=https://news.bbc.co.uk/sport2/hi/football/eng_prem/3018753.stm |work=BBC Sport|publisher=BBC|date=11 May 2003 |access-date=7 October 2013 }}</ref>
+|-
+|[[2003–04 FA Premier League|2003–04]]
+!scope="row" style="background:#FFE6BD"|{{sort|Henry 2|{{sortname|Thierry|Henry}}}}{{sup|{{double-dagger}}}} {{small|(2)}}
+|{{flagu|France|1974}}
+!scope="row" style="background:#ffb"|[[Arsenal F.C.|Arsenal]]{{sup|§}}
+|style="text-align:center"|30
+|style="text-align:center"|37
+|style="text-align:center"|0.81
+|style="text-align:center"|<ref name="fits"/><ref name=asked/>
+|-
+|[[2004–05 FA Premier League|2004–05]]
+!scope="row" style="background:#FFE6BD"|{{sort|Henry 3|{{sortname|Thierry|Henry}}}}{{sup|{{double-dagger}}}} {{small|(3)}}
+|{{flagu|France|1974}}
+|[[Arsenal F.C.|Arsenal]]
+|style="text-align:center"|25
+|style="text-align:center"|32
+|style="text-align:center"|0.78
+|style="text-align:center"|<ref name=fits/>
+|-
+|[[2005–06 FA Premier League|2005–06]]
+!scope="row"|{{sort|Henry 4|{{sortname|Thierry|Henry}}}} {{small|(4)}}
+|{{flagu|France|1974}}
+|[[Arsenal F.C.|Arsenal]]
+|style="text-align:center"|27
+|style="text-align:center"|32
+|style="text-align:center"|0.84
+|style="text-align:center"|<ref name=top/>
+|-
+|[[2006–07 FA Premier League|2006–07]]
+!scope="row"|{{sortname|Didier|Drogba}} 
+|{{flagu|Ivory Coast}}
+|[[Chelsea F.C.|Chelsea]]
+|style="text-align:center"|20
+|style="text-align:center"|36
+|style="text-align:center"|0.56
+|style="text-align:center"|<ref>{{cite news |title=Drogba collects Golden Boot award |url=https://news.bbc.co.uk/sport2/hi/football/teams/c/chelsea/6664459.stm |work=BBC Sport|publisher=BBC|date=18 May 2007 |access-date=7 October 2013 }}</ref>
+|-
+|[[2007–08 Premier League|2007–08]]
+!scope="row" style="background:#FFE6BD"|{{sortname|Cristiano|Ronaldo}}{{sup|{{double-dagger}}}}
+|{{flagu|Portugal}}
+!scope="row" style="background:#ffb"|[[Manchester United F.C.|Manchester United]]{{sup|§}}
+|style="text-align:center"|31
+|style="text-align:center"|34
+|style="text-align:center"|0.91
+|style="text-align:center"|<ref name=ronaldo/><ref name="Madeira"/>
+|-
+|[[2008–09 Premier League|2008–09]]
+!scope="row"|{{sortname|Nicolas|Anelka}}
+|{{flagu|France|1974}}
+|[[Chelsea F.C.|Chelsea]]
+|style="text-align:center"|19
+|style="text-align:center"|36
+|style="text-align:center"|0.53
+|style="text-align:center"|<ref>{{cite news |title=Anelka tops Premier League scoring charts |url=http://uk.reuters.com/article/soccer-england-chelsea-anelka-idUKLO49811820090524 |archive-url=https://web.archive.org/web/20160804202258/http://uk.reuters.com/article/soccer-england-chelsea-anelka-idUKLO49811820090524 |url-status=dead |archive-date=4 August 2016 |date=24 May 2009 |access-date=7 October 2013 |first=Martyn |last=Herman |publisher=Reuters}}</ref>
+|-
+|[[2009–10 Premier League|2009–10]]
+!scope="row"|{{sortname|Didier|Drogba}} {{small|(2)}}
+|{{flagu|Ivory Coast}}
+!scope="row" style="background:#ffb"|[[Chelsea F.C.|Chelsea]]{{sup|§}}
+|style="text-align:center"|29
+|style="text-align:center"|32
+|style="text-align:center"|0.91
+|style="text-align:center"|<ref>{{cite news |title=Terry calls for fresh investment to build on success |url=http://www.irishtimes.com/sport/terry-calls-for-fresh-investment-to-build-on-success-1.663646 |date=11 May 2010 |access-date=7 October 2013 |newspaper=The Irish Times }} '''{{subscription required}}'''</ref>
+|-
+|rowspan="2" style="background:#B0C4DE" | [[2010–11 Premier League|2010–11]]{{sup|{{dagger}}}}
+!scope="row"|{{sortname|Carlos|Tevez}}
+|{{flagu|Argentina}}
+|[[Manchester City F.C.|Manchester City]]
+|style="text-align:center"|20
+|style="text-align:center"|31
+|style="text-align:center"|0.65
+|style="text-align:center"|<ref name=share>{{cite news |title=Berbatov, Tevez share Premier League 'golden boot' on drama-filled last day |url=http://www.sofiaecho.com/2011/05/23/1093879_berbatov-tevez-share-premier-league-golden-boot-on-drama-filled-last-day |date=23 May 2011 |access-date=7 October 2013 |newspaper=The Sofia Echo }}</ref>
+|-
+!scope="row"|{{sortname|Dimitar|Berbatov}}
+|{{flagu|Bulgaria}}
+!scope="row" style="background:#ffb"|[[Manchester United F.C.|Manchester United]]{{sup|§}}
+|style="text-align:center"|20
+|style="text-align:center"|32
+|style="text-align:center"|0.63
+|style="text-align:center"|<ref name=share/>
+|-
+|[[2011–12 Premier League|2011–12]]
+!scope="row"|{{sortname|Robin van|Persie}} 
+|{{flagu|Netherlands}}
+|[[Arsenal F.C.|Arsenal]]
+|style="text-align:center"|30
+|style="text-align:center"|38{{#tag:ref|[[Arsenal F.C.|Arsenal]]'s official website incorrectly lists Van Persie as having played 37 games in the 2011–12 season. He played all 38 games, as confirmed by the [[Premier League]].<ref>{{cite web |title=Player Profile – Robin Van Persie |url=http://www.premierleague.com/en-gb/players/profile.career-history.html/robin-van-persie |publisher=Premier League |access-date=7 October 2013 |archive-date=7 March 2016 |archive-url=https://web.archive.org/web/20160307165351/http://www.premierleague.com/en-gb/players/profile.career-history.html/robin-van-persie |url-status=dead }}</ref>|group=upper-alpha}}
+|style="text-align:center"|0.79
+|style="text-align:center"|<ref>{{cite news |title=Van Persie wins Premier League Golden Boot |url=http://www.arsenal.com/news/news-archive/van-persie-wins-premier-league-golden-boot |work=Arsenal.com |publisher=Arsenal FC |date=14 May 2012 |access-date=7 October 2013 |url-status=dead |archive-url=https://web.archive.org/web/20131203014426/http://www.arsenal.com/news/news-archive/van-persie-wins-premier-league-golden-boot |archive-date=3 December 2013}}</ref>
+|-
+|[[2012–13 Premier League|2012–13]]
+!scope="row"|{{sortname|Robin van|Persie}} {{small|(2)}}
+|{{flagu|Netherlands}}
+!scope="row" style="background:#ffb"|[[Manchester United F.C.|Manchester United]]{{sup|§}}
+|style="text-align:center"|26
+|style="text-align:center"|38
+|style="text-align:center"|0.68
+|style="text-align:center"|<ref name=retains>{{cite news |title=Robin van Persie retains Barclays Golden Boot Award |url=http://www.premierleague.com/en-gb/news/news/2012-13/may/robin-van-persie-wins-barclays-golden-boot.html |publisher=Premier League |date=22 May 2013 |access-date=7 October 2013 |url-status=dead |archive-url=https://web.archive.org/web/20131226103543/http://www.premierleague.com/en-gb/news/news/2012-13/may/robin-van-persie-wins-barclays-golden-boot.html |archive-date=26 December 2013}}</ref>
+|-
+|[[2013–14 Premier League|2013–14]]
+!scope="row" style="background:#FFE6BD"|{{sortname|Luis|Suárez|dab=Uruguayan footballer| |Suarez, Luis}}{{sup|{{double-dagger}}}}
+|{{flagu|Uruguay}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|31
+|style="text-align:center"|33
+|style="text-align:center"|0.94
+|style="text-align:center"|<ref name=suarez>{{cite news|title=Luis Suarez & Tony Pulis win Barclays Premier League awards|url=https://www.bbc.co.uk/sport/football/27389970|work=BBC Sport|publisher=BBC|date=13 May 2014|access-date=13 May 2014}}</ref>
+|-
+|[[2014–15 Premier League|2014–15]]
+!scope="row"|{{sortname|Sergio|Agüero| |Aguero, Sergio}}
+|{{flagu|Argentina}}
+|[[Manchester City F.C.|Manchester City]]
+|style="text-align:center"|26
+|style="text-align:center"|33
+|style="text-align:center"|0.79
+|style="text-align:center"|<ref>{{cite web|url=http://www.premierleague.com/en-gb/news/news/2014-15/may/250515-sergio-aguero-and-joe-hart-seal-golden-awards-double-for-manchester-city.html|title=Aguero and Hart seal Golden Awards double for Man City|publisher=Premier League|date=25 May 2015|access-date=26 May 2015|archive-url=https://web.archive.org/web/20150526024954/http://www.premierleague.com/en-gb/news/news/2014-15/may/250515-sergio-aguero-and-joe-hart-seal-golden-awards-double-for-manchester-city.html|archive-date=26 May 2015}}</ref>
+|-
+|[[2015–16 Premier League|2015–16]]
+!scope="row"|{{sortname|Harry|Kane}} 
+|{{flagu|England}}
+|[[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+|style="text-align:center"|25
+|style="text-align:center"|38
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref>{{cite web|url=http://www.skysports.com/football/news/12028/10283818/tottenhams-harry-kane-clinches-premier-league-golden-boot.html|title=Tottenham's Harry Kane clinches Premier League Golden Boot|publisher=Sky Sports|date=15 May 2016|access-date=15 May 2016|archive-url=https://web.archive.org/web/20150526024954/http://www.skysports.com/football/news/12028/10283818/tottenhams-harry-kane-clinches-premier-league-golden-boot|archive-date=26 May 2015 }}</ref>
+|-
+|[[2016–17 Premier League|2016–17]]
+!scope="row"|{{sortname|Harry|Kane}} {{small|(2)}}
+|{{flagu|England}}
+|[[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+|style="text-align:center"|29
+|style="text-align:center"|30
+|style="text-align:center"|0.97
+|style="text-align:center"|<ref name="The Independent">{{cite web |date=21 May 2017 |title=Tottenham striker Harry Kane wins the Premier League's Golden Boot for the second season in a row |url=https://www.independent.co.uk/sport/football/premier-league/harry-kane-premier-league-golden-boot-tottenham-hotspur-a7747771.html |access-date=21 May 2017 |newspaper=The Independent}}</ref>
+|-
+|[[2017–18 Premier League|2017–18]]
+!scope="row"|{{sortname|Mohamed|Salah}} 
+|{{flagu|Egypt}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|32
+|style="text-align:center"|36
+|style="text-align:center"|0.89
+|style="text-align:center"|<ref>{{cite web|url=https://www.liverpoolfc.com/news/first-team/301806-liverpool-fc-mohamed-salah-premier-league-golden-boot|title=Mohamed Salah wins Golden Boot with new PL record|newspaper=The Independent|date=13 May 2018|access-date=13 May 2018}}</ref>
+|-
+|rowspan="3" style="background:#B0C4DE" | [[2018–19 Premier League|2018–19]]{{sup|{{dagger}}}}
+!scope="row"|{{sortname|Pierre-Emerick|Aubameyang}}
+|{{flagu|Gabon}}
+|[[Arsenal F.C.|Arsenal]]
+|style="text-align:center"|22
+|style="text-align:center"|36
+|style="text-align:center"|0.61
+|style="text-align:center"|<ref name="AMS">{{cite web|url=https://www.premierleague.com/news/1215671|title=Aubameyang, Salah and Mane share Golden Boot
+|publisher=Premier League|date=12 May 2019|access-date=12 May 2019}}</ref>
+|-
+!scope="row"|{{sortname|Sadio|Mané| |Mane, Sadio}}
+|{{flagu|Senegal}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|22
+|style="text-align:center"|36
+|style="text-align:center"|0.61
+|style="text-align:center"|<ref name="AMS"/>
+|-
+!scope="row"|{{sortname|Mohamed|Salah}} {{small|(2)}}
+|{{flagu|Egypt}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|22
+|style="text-align:center"|38
+|style="text-align:center"|0.58
+|style="text-align:center"|<ref name="AMS"/>
+|-
+|[[2019–20 Premier League|2019–20]]
+!scope="row"|{{sortname|Jamie|Vardy}}
+|{{flagu|England}}
+|[[Leicester City F.C.|Leicester City]]
+|style="text-align:center"|23
+|style="text-align:center"|35
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref>{{cite web |url= https://www.bbc.co.uk/sport/football/53518988 |title= Premier League Golden Boot: Leicester City's Jamie Vardy wins with 23 goals |author=<!--Not stated--> |date= 26 July 2020 |website= [[BBC Sport]] |publisher= [[BBC]]|access-date= 29 February 2024}}</ref>
+|-
+|[[2020–21 Premier League|2020–21]]
+!scope="row"|{{sortname|Harry|Kane}} {{small|(3)}}
+|{{flagu|England}}
+|[[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+|style="text-align:center"|23
+|style="text-align:center"|35
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref name="Kane3">{{cite news|title=Kane wins double with Golden Boot and Playmaker awards|url=https://www.premierleague.com/news/2154211 |publisher=Premier League|access-date=23 May 2021|date=23 May 2021}}</ref>
+|-
+|rowspan="2" style="background:#B0C4DE" | [[2021–22 Premier League|2021–22]]{{sup|{{dagger}}}}
+!scope="row"|{{sortname|Mohamed|Salah}} {{small|(3)}}
+|{{flagu|Egypt}}
+|[[Liverpool F.C.|Liverpool]]
+|style="text-align:center"|23
+|style="text-align:center"|35
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref name=":2122">{{cite news|title=Golden Boot: Mohamed Salah and Son Heung-min finish as Premier League's top scorers
+|url=https://www.bbc.com/sport/football/61470030 |work=BBC Sport|access-date=22 May 2022|date=22 May 2022}}</ref>
+|-
+!scope="row"|{{sortname|Son|Heung-min| |Son, Heung-min}}
+|{{flagu|South Korea}}
+|[[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+|style="text-align:center"|23
+|style="text-align:center"|35
+|style="text-align:center"|0.66
+|style="text-align:center"|<ref name=":2122"/>
+|-
+|[[2022–23 Premier League|2022–23]]
+!scope="row" style="background:#FFE6BD"|{{sortname|Erling|Haaland}}{{sup|{{double-dagger}}}} 
+|{{flagu|Norway}}
+!scope="row" style="background:#ffb"|[[Manchester City F.C.|Manchester City]]{{sup|§}}
+|style="text-align:center; background:#bbffbb"|36{{sup|{{number sign}}}}
+|style="text-align:center"|35
+|style="text-align:center"|1.03
+|style="text-align:center"| <ref>{{cite news |url=https://www.premierleague.com/news/3486228 |title=Haaland claims 2022/23 Golden Boot |publisher=Premier League |access-date=29 May 2023 |date=28 May 2023}}</ref>
+|-
+|[[2023–24 Premier League|2023–24]]
+!scope="row"|{{sortname|Erling|Haaland}} {{small|(2)}}
+|{{flagu|Norway}}
+!scope="row" style="background:#ffb"|[[Manchester City F.C.|Manchester City]]{{sup|§}}
+|style="text-align:center"|27
+|style="text-align:center"|31
+|style="text-align:center"|0.87
+|style="text-align:center"|<ref>{{cite news |url=https://www.premierleague.com/news/4021187 |title=Haaland claims second successive Golden Boot |publisher=Premier League |access-date=20 May 2024 |date=19 May 2024}}</ref>
+|-
+|[[2024–25 Premier League|2024–25]]
+!scope="row"|{{sortname|Mohamed|Salah}} {{small|(4)}}
+|{{flagu|Egypt}}
+!scope="row" style="background:#ffb"|[[Liverpool F.C.|Liverpool]]{{sup|§}}
+|style="text-align:center"|29
+|style="text-align:center"|38
+|style="text-align:center"|0.76
+|style="text-align:center"|<ref>{{cite news |url=https://www.premierleague.com/news/4314803 |title=Salah makes history with Golden Boot and Playmaker awards |publisher=Premier League |access-date=25 May 2025 |date=25 May 2025}}</ref>
+|-
+|[[2025–26 Premier League|2025–26]]
+!scope="row"|{{sortname|Erling|Haaland}} {{small|(3)}}
+|{{flagu|Norway}}
+|[[Manchester City F.C.|Manchester City]]
+|style="text-align:center"|27
+|style="text-align:center"|35
+|style="text-align:center"|0.77
+|style="text-align:center"|<ref>{{cite news |url=https://www.premierleague.com/news/4591856/haaland-wins-202526-premier-league-golden-boot-award |title=Haaland wins 2025/26 Premier League Golden Boot award |publisher=Premier League |access-date=24 May 2026 |date=24 May 2026}}</ref>
+|}
+{{Gallery
+|width=240|height=220
+|File:C Ronaldo.jpg|[[Cristiano Ronaldo]], the 2008 winner, is one of five players to win the [[European Golden Shoe]] alongside the Golden Boot.|alt1=Cristiano Ronaldo – wearing a long-sleeved red jersey, white shorts with a number 7 on the left-leg side and a white armband on the left arm – prepares to take a free kick.
+|File:Dwight Yorke 2007 cropped.jpg|[[Dwight Yorke]], the 1999 co-recipient, was the first Golden Boot winner from outside Europe.|alt2=Dwight Yorke wearing a long-sleeved red-and-white-striped football jersey and white shorts with a number 34 on the left leg.
+|File:ManCity20240722-031 (cropped).jpg|[[Erling Haaland]], the 2023 winner, holds the record for the most goals in a Premier League season.|alt3=Erling Haaland wearing a blue football jersey.
+}}
+
