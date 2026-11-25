@@ -18,7 +18,7 @@
 | `caps.csv` | 국가대표 경력 | 위키데이터 |
 | `honours.csv` | 리그 우승(대상 리그만), 축구 개인상 | 위키데이터 |
 | `honour_catalog.csv` | 우승·수상·대표팀 대회·감독 수집 목록이자 화면 이름표(한글 이름) | 직접 |
-| `honours_extra.csv` | 컵·대륙 대회 팀 우승, 선수 단위 우승(리그 포함), 대표팀 엔트리(`squad:`), 개인상(`award:`), 월드컵 결승 득점(`final_goal:`) | 위키데이터 + 위키백과 (`npm run football:honours`) |
+| `honours_extra.csv` | 리그·컵·대륙 대회 팀 우승(적재 때 `honours.csv`의 같은 대회·시즌 팀 우승을 대신), 선수 단위 우승(리그 포함), 대표팀 엔트리(`squad:`), 개인상(`award:`), 월드컵 결승 득점(`final_goal:`) | 위키데이터 + 위키백과 (`npm run football:honours`) |
 | `managers.csv`, `manager_spells.csv` | 카탈로그 감독과 팀별 재임 시즌 | 위키백과 감독 문서 정보상자 |
 | `season_memberships.csv` | 시즌별 소속 팀(주 소속·머문 날·추정 여부) | `spells.csv`에서 계산(`npm run football:seasons`) |
 | `openfootball/team_competitions.csv` | openfootball 경기 일정에서 뽑아 우리 ID로 이은 참가팀 | openfootball (퍼블릭 도메인) |
@@ -120,7 +120,7 @@ npm run football:honours -- --no-cache                # 캐시(.cache/honours/) 
 ```
 
 - 카탈로그 한 줄 = 수집 단위. `page`는 위키백과 문서 제목이고 `제목#절`이면 그 절만(하위 절 제외) 읽는다. 대표팀 대회는 `{year}` 틀.
-- 컵·대륙 대회 우승팀은 위키데이터 시즌 항목(P3450·P1346), 빠진 시즌만 `page`의 결승 표. 위키데이터가 틀리면 `manual/honour_winners.csv`로 덮어쓴다.
+- 리그·컵·대륙 대회 우승팀은 위키데이터 시즌 항목(P3450·P1346), 빠진 시즌만 `page`의 결승·역대 우승 표(리그는 그 대회가 1부였던 시기만). 둘이 다르면 "우승팀 불일치"를 찍으니 맞는 쪽을 `manual/honour_winners.csv`에 적는다.
 - 선수 우승 = 그 시즌 그 팀 소속(시즌 소속 파일). 한 시즌 클럽 소속이 둘 이상인 선수의 그 시즌은 만들지 않는다(시즌 중간 이적·반 시즌 임대).
 - 끝에 카탈로그 줄별 "행 N, 버린 선수·팀 M, 메모"를 찍는다. 버린 수는 우리 DB에 없는 선수(주로 아시아·옛 선수)다.
 - `football:fetch`로 선수 목록이 바뀌면 `football:seasons`·`football:honours`도 다시 돌린다(없어진 선수를 가리키는 행은 CSV 검사에서 걸린다).
