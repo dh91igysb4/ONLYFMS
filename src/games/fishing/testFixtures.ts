@@ -71,3 +71,19 @@ export const M1_FIXTURE: Required<Pick<TempData, 'species' | 'areas' | 'unlocks'
     { ...base, id: 'tmp-deep-a', name: '시험 다랑어', rarity: 'common', basePrice: 200, minRod: 5, area: TMP_DEEP },
   ],
 }
+
+/** 어종 확장(2026-11-25) 전부터 있던 어종 수(앞에서부터 이만큼이 옛 데이터) */
+export const SPECIES_BEFORE_EXPANSION = 94
+
+/** describe 안에서 부른다: 각 테스트 동안 SPECIES를 앞 n종으로 잘라 두고, 끝나면 되돌린다(옛 데이터 판정 고정 테스트용) */
+export function withSpeciesPrefix(n: number): void {
+  let cut: Species[] = []
+  beforeEach(() => {
+    const species = SPECIES as Species[]
+    cut = species.splice(n)
+  })
+  afterEach(() => {
+    ;(SPECIES as Species[]).push(...cut)
+    cut = []
+  })
+}

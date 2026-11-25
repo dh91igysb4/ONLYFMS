@@ -5,7 +5,7 @@ import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wea
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
-import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
+import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
@@ -189,20 +189,6 @@ describe('rollCatch', () => {
     })
   })
 
-  it('찌 없음(equipped []): 고정 rng 열의 결과가 v4 코드와 같다', () => {
-    const c = (rodTier: CastCtx['rodTier'], power: number, sizeBonus: number, area: CastCtx['area'], spot: string, k: Conditions) =>
-      ctxOf({ rodTier, power, sizeBonus, area, spot, cond: k })
-    const ctxs = [
-      c(1, 0.5, 0, 'village', 'shore', cond('spring', 12)),
-      c(3, 0.95, 0.25, 'village', 'pier', cond('winter', 12)),
-      c(4, 0.3, 0, 'river', 'river', cond('summer', 22)),
-      c(3, 0.1, 0, 'forest', 'pond', cond('spring', 22)),
-    ]
-    const rows = [[0.01, 0.5, 0.5, 0.5, 0.5], [0.5, 0.1, 0.2, 0.3, 0.4], [0.5, 0.45, 0.9, 0.7, 0.0], [0.5, 0.99, 0.5, 0.25, 0.99], [0.09, 0.84, 0.1, 0.8, 0.6]]
-    const got = ctxs.flatMap((x) => rows.map((r) => { const o = rollCatch(sequence(...r), x); return [o.species, o.sizeCm, o.biteDelayMs] }))
-    // 이 값은 찌 도입 전(logic.version 4) 코드로 계산한 것이다. 바꾸지 말 것.
-    expect(got).toEqual([["goby",14,3750],["anchovy",10,3300],["horse-mackerel",29,1500],["rockfish",28,5955],["mullet",62,4200],["grouper",129,3750],["goby",16,3300],["mackerel",43,1500],["yellowtail",93,5955],["yellowtail",107,4200],["aucha-perch",18,3000],["pale-chub",10,2640],["dark-chub",15,1200],["eel",49,4764],["mandarin-fish",48,3360],["century-snakehead",113,3750],["crucian",14,3300],["carp",60,1500],["carp",37,5955],["crucian",25,4200]])
-  })
   it('equipped에 서버 효과가 없는 찌(cork·trap·barbed)만 있어도 결과는 같다', () => {
     const rng = (): (() => number) => rngFromSeed(seedBytes(61))
     const a = rng(), b = rng()
@@ -251,6 +237,36 @@ describe('rollCatch', () => {
           rollCatch(rng, ctxOf({ ...over, equipped }))
           expect(rng.n).toBe(5)
         }
+      }
+    }
+  })
+})
+
+describe('rollCatch 옛 데이터 고정', () => {
+  // 어종 확장(v19) 뒤에도 v4 판정과 같음을 보려고 앞 94종으로 잘라서 돈다
+  withSpeciesPrefix(SPECIES_BEFORE_EXPANSION)
+  it('찌 없음(equipped []): 고정 rng 열의 결과가 v4 코드와 같다', () => {
+    const c = (rodTier: CastCtx['rodTier'], power: number, sizeBonus: number, area: CastCtx['area'], spot: string, k: Conditions) =>
+      ctxOf({ rodTier, power, sizeBonus, area, spot, cond: k })
+    const ctxs = [
+      c(1, 0.5, 0, 'village', 'shore', cond('spring', 12)),
+      c(3, 0.95, 0.25, 'village', 'pier', cond('winter', 12)),
+      c(4, 0.3, 0, 'river', 'river', cond('summer', 22)),
+      c(3, 0.1, 0, 'forest', 'pond', cond('spring', 22)),
+    ]
+    const rows = [[0.01, 0.5, 0.5, 0.5, 0.5], [0.5, 0.1, 0.2, 0.3, 0.4], [0.5, 0.45, 0.9, 0.7, 0.0], [0.5, 0.99, 0.5, 0.25, 0.99], [0.09, 0.84, 0.1, 0.8, 0.6]]
+    const got = ctxs.flatMap((x) => rows.map((r) => { const o = rollCatch(sequence(...r), x); return [o.species, o.sizeCm, o.biteDelayMs] }))
+    // 이 값은 찌 도입 전(logic.version 4) 코드로 계산한 것이다. 바꾸지 말 것.
+    expect(got).toEqual([["goby",14,3750],["anchovy",10,3300],["horse-mackerel",29,1500],["rockfish",28,5955],["mullet",62,4200],["grouper",129,3750],["goby",16,3300],["mackerel",43,1500],["yellowtail",93,5955],["yellowtail",107,4200],["aucha-perch",18,3000],["pale-chub",10,2640],["dark-chub",15,1200],["eel",49,4764],["mandarin-fish",48,3360],["century-snakehead",113,3750],["crucian",14,3300],["carp",60,1500],["carp",37,5955],["crucian",25,4200]])
+  })
+})
+
+describe('어종 확장(2026-11-25): 대나무 낚싯대', () => {
+  it('대나무 낚싯대(1단계)에서는 새 희귀도 나오지 않는다', () => {
+    for (const spot of ['pond', 'waterfall']) {
+      for (const r1 of [0.5, 0.9, 0.999]) {
+        const s = byId(rollCatch(sequence(0.5, r1, 0.5, 0.5, 0.5), ctxOf({ rodTier: 1, area: 'forest', spot, cond: cond('spring', 12) })).species)
+        expect(s.rarity, `${spot} ${r1}`).not.toBe('rare')
       }
     }
   })
