@@ -313,3 +313,6 @@ export const SELL_DECAY: readonly (readonly [upTo: number, pct: number])[] = [
   [450, 20],
   [Infinity, 5],
 ]
+
+/** 희귀도 이름(지도 물고기 목록·자랑 카드) */
+export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설', mythic: '신화' }
