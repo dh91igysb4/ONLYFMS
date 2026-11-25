@@ -2,13 +2,15 @@
 // 조작 없음: 마지막 자리에 지금 옷차림으로 서 있는 캐릭터를 게임 시계의 낮밤·날씨와 함께 그린다.
 // 맑은 날은 게임 10분(실제 10초)마다, 비·눈이면 100ms마다 다시 그리고, 탭이 숨거나 화면 밖이면 멈춘다.
 // 캔버스 내부 색은 낚시 캔버스 예외. 링크·접근 이름은 부모(HomePage)가 단다.
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { worldPlayers, type WorldPlayer } from '../../lib/api.ts'
 import { now } from '../../lib/serverTime.ts'
 import type { WorldPreviewProps } from '../ui.ts'
 import { conditionsAt, tideAt } from './clock.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { loadPosition } from './position.ts'
+import { PREVIEW_ISLE_KEY } from './logic.ts'
 import { onlineSummary, previewScale, previewState, redrawDelayMs } from './preview.ts'
 import { drawWorld, releaseSceneCache } from './scene.ts'
 import { cameraFor } from './walk.ts'
@@ -20,6 +22,13 @@ export function Preview({ userId, records, size, onFail, online }: WorldPreviewP
   const side = Math.max(1, Math.floor(size / scale))
   const failRef = useRef(onFail)
   failRef.current = onFail
+  // 섬에 있는 친구를 "{아이디}의 섬"으로 쓰려고 섬 주인 목록을 한 번 받는다(실패하면 "누군가의 섬")
+  const [players, setPlayers] = useState<readonly WorldPlayer[]>([])
+  useEffect(() => {
+    let live = true
+    worldPlayers('fishing', PREVIEW_ISLE_KEY).then((p) => { if (live) setPlayers(p) }, () => {})
+    return () => { live = false }
+  }, [])
 
   useEffect(() => {
     const canvas = ref.current
@@ -29,7 +38,7 @@ export function Preview({ userId, records, size, onFail, online }: WorldPreviewP
       return
     }
     ctx.imageSmoothingEnabled = false
-    const map = mapFor(st.area) ?? VILLAGE
+    const map = mapFor(st.area, st.isle) ?? VILLAGE
     const view = { w: side, h: side }
     let timer: ReturnType<typeof setTimeout> | null = null
     let onScreen = true
@@ -103,7 +112,7 @@ export function Preview({ userId, records, size, onFail, online }: WorldPreviewP
     }
   }, [st, side, scale])
 
-  const summary = onlineSummary(online ?? [])
+  const summary = onlineSummary(online ?? [], { selfId: userId, players })
   return (
     <>
       {summary && <p className="home-valley-online">{summary}</p>}

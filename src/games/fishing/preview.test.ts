@@ -5,6 +5,7 @@ import { DEFAULT_AREAS } from './data.ts'
 import { TILE } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { decodeOutfit } from './outfit.ts'
+import { isleArrival, placeKey } from './isle.ts'
 import { PREVIEW_RAIN_FRAME_MS, onlineSummary, previewScale, previewState, redrawDelayMs } from './preview.ts'
 
 const center = (tx: number, ty: number) => ({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 })
@@ -86,5 +87,27 @@ describe('onlineSummary', () => {
   })
   test('모르는 지역이면 아이디만', () => {
     expect(onlineSummary([p('son', 'atlantis', 'fish')])).toBe('접속 중 1명 · son')
+  })
+})
+
+describe('내 섬 미리보기(내 섬 설계 §5.5)', () => {
+  const arr = isleArrival('crescent')
+  const onIsle = { area: 'isle' as const, pos: center(arr.tx, arr.ty), facing: 'up' as const }
+  test('기록 isle이 있으면 그 섬에 서 있고, 없거나 모르는 모양이면 마을', () => {
+    const s = previewState(onIsle, [{ key: 'isle', detail: 'crescent' }])
+    expect([s.area, s.isle, s.player.pos]).toEqual(['isle', 'crescent', onIsle.pos])
+    expect(previewState(onIsle, []).area).toBe('village')
+    expect(previewState(onIsle, []).isle).toBeNull()
+    expect(previewState(onIsle, [{ key: 'isle', detail: 'zzz' }]).area).toBe('village')
+  })
+  test('섬에 있는 친구 요약: 아는 주인은 "{아이디}의 섬", 모르면 "누군가의 섬", 내 섬이면 "내 섬"', () => {
+    const me = '00000000-0000-0000-0000-0000000000aa'
+    const mj = '00000000-0000-0000-0000-0000000000bb'
+    const names = { selfId: me, players: [{ id: mj, handle: 'mj' }] }
+    const peer = (handle: string, area: string) => ({ id: handle, handle, area, act: 'walk' as const, tx: 1, ty: 1 })
+    expect(onlineSummary([peer('kim', placeKey('isle', mj))], names)).toBe('접속 중 1명 · kim mj의 섬')
+    expect(onlineSummary([peer('kim', placeKey('isle', '00000000-0000-0000-0000-0000000000cc'))], names)).toBe('접속 중 1명 · kim 누군가의 섬')
+    expect(onlineSummary([peer('kim', placeKey('isle', me))], names)).toBe('접속 중 1명 · kim 내 섬')
+    expect(onlineSummary([peer('kim', placeKey('isle', mj))])).toBe('접속 중 1명 · kim 누군가의 섬')
   })
 })

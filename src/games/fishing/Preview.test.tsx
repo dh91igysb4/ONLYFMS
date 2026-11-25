@@ -9,7 +9,13 @@ vi.mock('./scene.ts', async (orig) => ({
   releaseSceneCache: vi.fn(),
 }))
 
+vi.mock('../../lib/api.ts', async (orig) => ({
+  ...(await orig<typeof import('../../lib/api.ts')>()),
+  worldPlayers: vi.fn(async () => [{ id: '00000000-0000-0000-0000-0000000000bb', handle: 'mj', avatar: null }]),
+}))
+
 import { drawWorld, releaseSceneCache } from './scene.ts'
+import { worldPlayers } from '../../lib/api.ts'
 import { Preview } from './Preview.tsx'
 import { DEFAULT_AREAS } from './data.ts'
 
@@ -73,6 +79,13 @@ describe('Preview', () => {
     unmount()
     const again = mount(320, [])
     expect(again.container.querySelector('.home-valley-online')).toBeNull()
+  })
+
+  test('섬에 있는 친구는 섬 주인 아이디로 요약한다(world_players를 한 번 불러 쓴다)', async () => {
+    const { container } = mount(320, [{ id: 'u2', handle: 'son', area: 'isle-000000000000000000000000000000bb', act: 'walk', tx: 1, ty: 1 }])
+    await act(async () => {})
+    expect(worldPlayers).toHaveBeenCalledWith('fishing', 'isle')
+    expect(container.querySelector('.home-valley-online')?.textContent).toBe('접속 중 1명 · son mj의 섬')
   })
 
   test('마운트하면 대기 장면을 한 번 그린다', () => {
