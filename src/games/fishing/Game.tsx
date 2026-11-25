@@ -1834,6 +1834,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   onLayers={setMapLayers}
                   online={onlinePeers}
                   names={{ selfId: userId, players: islePlayers }}
+                  place={placeKey(rt.map.id, rt.map.id === 'isle' ? rt.owner ?? userId : null)}
                 />
               )}
               {menu === 'teleport' && (
