@@ -3,7 +3,8 @@ import { AREAS, TP_BASE, TP_PER_10, type AreaId } from './data.ts'
 import { MAPS } from './maps/index.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 
-const IDS = AREAS.map((a) => a.id)
+// 이동기가 있는 지역(1차 마을회관은 이동기 없음)
+const IDS = AREAS.map((a) => a.id).filter((id) => MAPS[id]?.teleporter)
 const pairs = (ids: AreaId[]) => ids.flatMap((a) => ids.filter((b) => b !== a).map((b) => [a, b] as const))
 
 describe('teleporterWorld', () => {

@@ -53,8 +53,12 @@ const teleporterCell = (map: MapDef): Cell | null => (map.teleporter ? rectMid(m
 export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
   const out: PlaceMarker[] = []
   const coveredBy = (area: AreaId) => map.gates.some((g) => g.area === area) || map.docks.some((d) => d.target === area)
+  const b = map.building
+  const atDoor = (e: MapDef['exits'][number]) => !!b && 'at' in e && e.at.tx <= b.doorTx && b.doorTx < e.at.tx + e.at.w && e.at.ty <= b.ty + b.h - 1 && b.ty + b.h - 1 < e.at.ty + e.at.h
   for (const e of map.exits) {
     if (!opened.has(e.target) && coveredBy(e.target)) continue
+    // 건물 문 출구는 '상점' 표시가 대신한다
+    if (atDoor(e)) continue
     out.push({ kind: 'exit', ...exitCell(map, e), target: e.target, dir: 'at' in e ? 'in' : e.edge })
   }
   for (const g of map.gates) if (!opened.has(g.area)) out.push({ kind: 'gate', ...rectMid(g.tiles), area: g.area })

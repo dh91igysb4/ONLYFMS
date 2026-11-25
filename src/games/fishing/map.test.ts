@@ -34,6 +34,7 @@ import {
 import type { AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
 import { RIVER } from './maps/river.ts'
+import { HALL } from './maps/hall.ts'
 import { DEFAULT_AREAS } from './data.ts'
 import { feetBlocked, stepWalk, type Player } from './walk.ts'
 
@@ -143,11 +144,8 @@ describe('map grid', () => {
 })
 
 describe('shop', () => {
-  it('footprint is a 4x3..6x4 block of building tiles with one door in its bottom row', () => {
-    expect(SHOP.w).toBeGreaterThanOrEqual(4)
-    expect(SHOP.w).toBeLessThanOrEqual(6)
-    expect(SHOP.h).toBeGreaterThanOrEqual(3)
-    expect(SHOP.h).toBeLessThanOrEqual(4)
+  it('마을회관 건물은 11x7(tx7~17, ty1~7), 문은 맨 아래 줄 (13,7)', () => {
+    expect(SHOP).toEqual({ tx: 7, ty: 1, w: 11, h: 7, doorTx: 13 })
     expect(SHOP.doorTx).toBeGreaterThan(SHOP.tx)
     expect(SHOP.doorTx).toBeLessThan(SHOP.tx + SHOP.w - 1)
     const doorTy = SHOP.ty + SHOP.h - 1
@@ -874,5 +872,58 @@ describe('실내 맵 엔진', () => {
     const n = defineMap('cave', rows, { onWorldMap: false, backdrop: 'x' })
     expect(n.onWorldMap).toBe(false)
     expect(n.backdrop).toBe('x')
+  })
+})
+
+describe('마을회관', () => {
+  const fromEntry = reachableTiles(HALL, [{ tx: 4, ty: 16 }], ALL_AREAS_OPEN)
+  it('마을 문(13,7)은 회관 출구, 들어가면 (4,16) 위', () => {
+    expect(exitAt(VILLAGE, center(13, 7))).toMatchObject({ target: 'hall', entry: { tx: 4, ty: 16, facing: 'up' } })
+  })
+  it('회관 아래 출구 두 곳은 마을 문 아래(13,8)로', () => {
+    for (const tx of [3, 5, 31, 33]) expect(exitAt(HALL, center(tx, 17)), String(tx)).toMatchObject({ target: 'village', entry: { tx: 13, ty: 8, facing: 'down' } })
+    expect(exitAt(HALL, center(6, 17))).toBeNull()
+  })
+  it('42x18, 실내, 세계 지도 밖, 배경 hall-interior', () => {
+    expect([HALL.w, HALL.h]).toEqual([42, 18])
+    expect(HALL.indoor).toBe(true)
+    expect(HALL.onWorldMap).toBe(false)
+    expect(HALL.backdrop).toBe('hall-interior')
+  })
+  it('입구에서 고정물 front 전부에 걸어서 닿는다', () => {
+    for (const f of HALL.fixtures) expect(fromEntry.has(`${f.front.tx},${f.front.ty}`), JSON.stringify(f)).toBe(true)
+  })
+  it('두 출구 칸 모두 입구에서 닿는다', () => {
+    expect(fromEntry.has('32,17')).toBe(true)
+  })
+  it('잠긴 6·8번 방 안 칸에는 닿지 않는다', () => {
+    expect(fromEntry.has('12,14')).toBe(false)
+    expect(fromEntry.has('22,14')).toBe(false)
+  })
+  it('7번·9번 방 안, 엘리베이터 구역에는 닿는다', () => {
+    expect(fromEntry.has('17,14')).toBe(true)
+    expect(fromEntry.has('29,13')).toBe(true)
+    expect(fromEntry.has('37,8')).toBe(true)
+  })
+  it('자판기 앞에서 왼쪽을 보면 상점, 행거 앞은 옷 가게, 노트북·엘리베이터·명예의 전당', () => {
+    expect(interactionAt(HALL, center(2, 2), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'shop' })
+    expect(interactionAt(HALL, center(29, 13), 'left', ALL_AREAS_OPEN)).toEqual({ kind: 'wardrobe' })
+    expect(interactionAt(HALL, center(16, 11), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'laptop' })
+    expect(interactionAt(HALL, center(37, 4), 'right', ALL_AREAS_OPEN)).toEqual({ kind: 'elevator' })
+    expect(interactionAt(HALL, center(17, 2), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'fame', slot: { group: 'record', key: 'biggest' } })
+    expect(interactionAt(HALL, center(34, 2), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'fame', slot: { group: 'site', index: 10 } })
+    expect(interactionAt(HALL, center(11, 10), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '곤의 라면가게 · 준비 중이에요' })
+    expect(interactionAt(HALL, center(22, 10), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '들어갈 수 없어요' })
+    expect(interactionAt(HALL, center(39, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '2층은 공사 중이에요' })
+  })
+  it('회관에는 낚시 자리·순간이동기가 없다', () => {
+    expect(HALL.spots).toEqual({})
+    expect(HALL.teleporter).toBeNull()
+  })
+  it('회관 안 어떤 칸에서도 낚시 상호작용이 없다', () => {
+    for (const k of fromEntry) {
+      const [tx, ty] = k.split(',').map(Number)
+      for (const f of FACINGS) expect(interactionAt(HALL, center(tx, ty), f, ALL_AREAS_OPEN)?.kind === 'fish').toBe(false)
+    }
   })
 })

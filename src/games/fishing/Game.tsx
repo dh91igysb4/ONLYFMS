@@ -18,7 +18,7 @@ import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type SceneP
 import { spriteDataUrl } from './sprites.ts'
 import {
   addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, STATIC_DYNAMIC, TILE, tileOf,
-  type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
+  type Facing, type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
 } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -284,6 +284,12 @@ const coarseQuery = (): MediaQueryList | null =>
 /** 서 있는 자리에서 할 수 있는 일(앞 타일·고정물로 정한다, interactionAt) */
 function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
   return interactionAt(map, p.pos, p.facing, opened, dyn)
+}
+/** 큰 지도에 보일 내 자리. 세계 지도 밖 맵(실내)이면 첫 출구가 나가는 자리(마을회관 → 마을 문 앞) */
+function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>): { area: AreaId; tx: number; ty: number; facing: Facing } {
+  const out = map.exits[0]
+  if (map.onWorldMap || !out) return { area: map.id, ...tileOf(p.pos), facing: p.facing }
+  return { area: out.target, tx: out.entry.tx, ty: out.entry.ty, facing: out.entry.facing }
 }
 function interactionKey(i: Interaction): string {
   if (!i) return ''
@@ -1561,7 +1567,7 @@ export function Game({ gameId }: WorldGameProps) {
               {menu === 'map' && (
                 <MapPanel
                   view={view}
-                  here={{ area: rt.map.id, ...tileOf(rt.player.pos), facing: rt.player.facing }}
+                  here={mapHere(rt.map, rt.player)}
                   now={serverNow}
                   innerWidth={fit.w * fit.scale - 2 * PANEL_PAD}
                   layers={mapLayers}

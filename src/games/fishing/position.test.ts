@@ -120,6 +120,13 @@ describe('startPosition (첫 서버 상태를 받은 뒤 시작 자리)', () => 
   const AT_SPAWN = { area: 'village', pos: SPAWN.pos, facing: SPAWN.facing }
   const at = (area: AreaId, tx: number, ty: number) => ({ area, pos: center(tx, ty), facing: 'up' as const })
 
+  test('마을회관 안 걷는 칸(7번 방)은 그대로, 막힌 칸·잠긴 방 안·옛 열림(hall 없음)은 마을 시작 위치', () => {
+    expect(startPosition(at('hall', 17, 14), opened())).toEqual(at('hall', 17, 14))
+    expect(startPosition(at('hall', 16, 12), opened())).toEqual(AT_SPAWN)
+    expect(startPosition(at('hall', 12, 14), opened())).toEqual(AT_SPAWN)
+    expect(startPosition(at('hall', 17, 14), new Set<AreaId>(['village', 'river', 'forest']))).toEqual(AT_SPAWN)
+  })
+
   test('nothing saved starts at the village spawn', () => {
     expect(startPosition(null, opened())).toEqual(AT_SPAWN)
   })
