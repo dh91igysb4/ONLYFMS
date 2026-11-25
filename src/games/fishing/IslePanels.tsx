@@ -201,7 +201,7 @@ export function WorkbenchPanel({ isle, gold, busy, onCraft, onClear, onBuild, on
 }
 
 /** 섬 꾸미기 놓기 창: 보관함의 꾸미기를 골라 앞 칸에 놓는다 */
-export function DecoPanel({ box, busy, onPick }: { box: Partial<Record<DecoId, number>>; busy: boolean; onPick: (id: DecoId) => void }) {
+export function DecoPanel({ box, busy, allowed = () => true, onPick }: { box: Partial<Record<DecoId, number>>; busy: boolean; allowed?: (id: DecoId) => boolean; onPick: (id: DecoId) => void }) {
   const have = DECOS.filter((d) => (box[d.id] ?? 0) > 0)
   return (
     <section className="fish-panel-body fish-furn" aria-label="꾸미기 놓기">
@@ -210,7 +210,7 @@ export function DecoPanel({ box, busy, onPick }: { box: Partial<Record<DecoId, n
       ) : (
         <div className="fish-furn-list">
           {have.map((d) => (
-            <button key={d.id} type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onPick(d.id)}>{`${d.name} ${box[d.id]}개`}</button>
+            <button key={d.id} type="button" className="btn btn-ghost btn-sm" disabled={busy || !allowed(d.id)} onClick={() => onPick(d.id)}>{`${d.name} ${box[d.id]}개`}</button>
           ))}
         </div>
       )}

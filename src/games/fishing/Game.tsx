@@ -2004,7 +2004,18 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 />
               )}
               {menu === 'isle' && <IsleChoosePanel busy={busy} onChoose={(l) => void chooseIsle(l)} />}
-              {menu === 'deco' && <DecoPanel box={view.isle?.decoBox ?? {}} busy={busy} onPick={placeDeco} />}
+              {menu === 'deco' && (
+                <DecoPanel
+                  box={view.isle?.decoBox ?? {}}
+                  busy={busy}
+                  allowed={(id) => {
+                    const sh = shapeOf(view.isle)
+                    const sp = furnSpotRef.current
+                    return !!sh && !!sp && canDecorate(sh, sp.tx, sp.ty, id)
+                  }}
+                  onPick={placeDeco}
+                />
+              )}
               {menu === 'furn' && <FurnPanel furniture={view.isle?.furniture ?? {}} busy={busy} onPick={placeFurn} />}
               {menu === 'workbench' && view.isle && !(view.isle.tools && view.isle.mats && view.isle.furniture && view.isle.decoBox && typeof view.isle.house === 'number') && (
                 <p className="muted">게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요</p>

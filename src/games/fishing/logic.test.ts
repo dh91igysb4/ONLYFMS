@@ -4,7 +4,8 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, ISLE_LAYOUTS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { isleArrival, isleNodes } from './isle.ts'
+import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
+import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
@@ -2570,8 +2571,23 @@ describe('내 섬 D단계 바깥 꾸미기 (v25, 설계 2026-11-26-my-isle-d §4
     expect(m.deco).toEqual([{ id: 'bench', ...spot }])
     expect(m.decoBox).toEqual({ fence: 2, pot: 1, lamp: 1 })
   })
-  it('기록 deco(놓은 수, 하나 이상일 때)', () => {
+  it('기록 deco(꾸미기를 가진 적이 있으면 0도 기록해 치운 뒤에도 맞게)', () => {
     expect(logic.records!(fresh({ isle: isle({ deco: [{ id: 'bench', ...spot }] }) })).find((r) => r.key === 'deco')).toEqual({ key: 'deco', value: 1 })
+    expect(logic.records!(fresh({ isle: isle({ decoBox: { bench: 1 } }) })).find((r) => r.key === 'deco')).toEqual({ key: 'deco', value: 0 })
     expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('deco')
+  })
+  it('개간 뒤 새 땅·자원 칸을 막는 꾸미기는 보관함으로 돌린다', () => {
+    // 구역 1 칸 둘레의 땅을 울타리로 최대한 막고 개간하면, 다시 닿게 되도록 몇 개가 돌아온다
+    const zone1 = [...isleZoneTiles('crescent')].filter(([, z]) => z === 1).map(([k]) => k.split(',').map(Number))
+    const deco: { id: 'fence'; tx: number; ty: number }[] = []
+    for (const [x, y] of zone1) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (canDecorate({ layout: 'crescent', deco }, x + dx, y + dy, 'fence')) deco.push({ id: 'fence', tx: x + dx, ty: y + dy })
+    }
+    const r = ok(play(fresh({ gold: 1e6, isle: isle({ mats: { wood: 99, stone: 99, iron: 99 }, deco }) }), { type: 'clear', zone: 1, price: 5120 }, ctx()))
+    const after = r.state.isle!
+    expect(after.deco.length + (after.decoBox.fence ?? 0)).toBe(deco.length)
+    const m = isleMap('crescent', 1, 0, after.deco)
+    const reach = reachableTiles(m, [isleArrival('crescent')], ALL_AREAS_OPEN)
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (isWalkable(m, x, y, ALL_AREAS_OPEN)) expect(reach.has(`${x},${y}`), `${x},${y}`).toBe(true)
   })
 })

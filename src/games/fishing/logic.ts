@@ -793,6 +793,20 @@ function migrate(raw: unknown, fromVersion: number): State {
   }
 }
 
+/**
+ * 놓인 꾸미기를 지금 섬 상태 기준으로 순서대로 다시 놓아 본다(canDecorate). 안 되는 것은 보관함으로(상한 없이 — 잃지 않게).
+ * migrate와 개간(clear) 뒤에 쓴다: 개간으로 새로 생긴 땅·자원 칸을 막는 꾸미기가 남지 않게.
+ */
+function replayDeco(shape: { layout: IsleLayoutId; cleared: number; house: number }, list: readonly DecoPlaced[], box: Partial<Record<DecoId, number>>) {
+  const decoBox = { ...box }
+  const deco: DecoPlaced[] = []
+  for (const d of list) {
+    if (deco.length < DECO_MAX && canDecorate({ ...shape, deco }, d.tx, d.ty, d.id)) deco.push({ id: d.id, tx: d.tx, ty: d.ty })
+    else decoBox[d.id] = (decoBox[d.id] ?? 0) + 1
+  }
+  return { deco, decoBox }
+}
+
 /** 내 섬: v21 이하에는 없다(null), v22는 {layout}만(B 기본값), 모르는 모양은 null. 깨진 값은 기본값·범위 안으로 */
 function migrateIsle(raw: unknown): IsleState | null {
   if (!isObj(raw) || !ISLE_LAYOUTS.some((l) => l.id === raw.layout)) return null
@@ -820,22 +834,12 @@ function migrateIsle(raw: unknown): IsleState | null {
   }
   const cleared = int(raw.cleared, 0, ISLE_ZONES, 0)
   // 바깥 꾸미기(v25): 보관함, 놓인 것(지금 섬 모양·개간·집 기준 canDecorate 순서대로, 안 되는 것은 보관함으로)
-  const decoBox: Partial<Record<DecoId, number>> = {}
-  const addDeco = (id: DecoId, n: number) => {
-    const v = Math.min(FURN_CAP, (decoBox[id] ?? 0) + n)
-    if (v > 0) decoBox[id] = v
-  }
-  if (isObj(raw.decoBox)) for (const [id, n] of Object.entries(raw.decoBox)) if (isDecoId(id)) addDeco(id, int(n, 0, FURN_CAP, 0))
-  const deco: DecoPlaced[] = []
-  if (Array.isArray(raw.deco)) {
-    for (const d of raw.deco) {
-      if (!isObj(d) || !isDecoId(d.id)) continue
-      const ok = deco.length < DECO_MAX && Number.isInteger(d.tx) && Number.isInteger(d.ty) &&
-        canDecorate({ layout: base.layout, cleared, house, deco }, d.tx as number, d.ty as number, d.id)
-      if (ok) deco.push({ id: d.id, tx: d.tx as number, ty: d.ty as number })
-      else addDeco(d.id, 1)
-    }
-  }
+  const box: Partial<Record<DecoId, number>> = {}
+  if (isObj(raw.decoBox)) for (const [id, n] of Object.entries(raw.decoBox)) if (isDecoId(id) && int(n, 0, FURN_CAP, 0) > 0) box[id] = int(n, 0, FURN_CAP, 0)
+  const listed: DecoPlaced[] = Array.isArray(raw.deco)
+    ? raw.deco.filter((d): d is DecoPlaced => isObj(d) && isDecoId(d.id) && Number.isInteger(d.tx) && Number.isInteger(d.ty))
+    : []
+  const { deco, decoBox } = replayDeco({ layout: base.layout, cleared, house }, listed, box)
   return {
     layout: base.layout,
     cleared,
@@ -905,7 +909,8 @@ function records(state: State): WorldRecord[] {
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
     { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
     // 0구역은 기록하지 않는다(섬만 고른 사람이 명예의 전당 0구역 줄에 몰리지 않게)
-    ...(state.isle && state.isle.deco.length > 0 ? [{ key: 'deco', value: state.isle.deco.length }] : []),
+    // 꾸미기를 하나라도 가진 적이 있으면 0도 기록한다(모두 치우면 기록이 줄어야 해서)
+    ...(state.isle && (state.isle.deco.length > 0 || Object.keys(state.isle.decoBox).length > 0) ? [{ key: 'deco', value: state.isle.deco.length }] : []),
     ...(state.isle && state.isle.house > 0 ? [{ key: 'house', value: state.isle.house, detail: `${state.isle.house}/${HOUSE_MAX}` }] : []),
     ...(state.isle && state.isle.cleared > 0 ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
   ]
@@ -930,9 +935,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
   // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
-  // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
-  // 24: 내 섬 C단계(집: build·makeFurn·place·pickUp, isle에 house·furniture·placed, 지역 home). v23 섬은 집 0(설계 2026-11-26-my-isle-c-design.md)
   // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
+  // 24: 내 섬 C단계(집: build·makeFurn·place·pickUp, isle에 house·furniture·placed, 지역 home). v23 섬은 집 0(설계 2026-11-26-my-isle-c-design.md)
+  // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
   version: 25,
   wallet: true,
   init,
@@ -1028,7 +1033,9 @@ function clearZone(state: State, a: Record<string, unknown>, gold: number): Out 
   if (a.price !== cost.gold) return { error: 'price_changed' }
   if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
   if (gold < cost.gold) return { error: 'not_enough_gold' }
-  return { state: { ...state, isle: { ...isle, cleared: k, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold, result: { cleared: k } }
+  // 새로 드러난 땅·자원 칸을 막는 꾸미기는 보관함으로(D)
+  const { deco, decoBox } = replayDeco({ layout: isle.layout, cleared: k, house: isle.house }, isle.deco, isle.decoBox)
+  return { state: { ...state, isle: { ...isle, cleared: k, mats: minusMats(isle.mats, cost), deco, decoBox } }, gold: -cost.gold, result: { cleared: k } }
 }
 
 /** 집을 한 단계 올린다 */
