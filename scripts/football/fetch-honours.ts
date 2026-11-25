@@ -8,7 +8,7 @@
 // 선수 단위 우승(리그 포함)은 매번 팀 우승 전체와 시즌 소속으로 다시 계산한다(§3.1).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { managerSeasons, nationalTitles, playerTitles } from './honours.ts'
+import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles } from './honours.ts'
 import { parseAwardList, parseFinals, parseManagerInfobox, parseSquads, type Hit } from './honourParsers.ts'
 import { FILES, sortRows } from './schema.ts'
 import { calendarOf, type Membership } from './seasons.ts'
@@ -33,6 +33,9 @@ const teamById = new Map(teams.map((t) => [t.id, t]))
 const players = new Set(read('players.csv').map((p) => p.id))
 const clubIds = new Set(teams.filter((t) => t.kind === 'club').map((t) => t.id))
 const nationalIds = new Set(teams.filter((t) => t.kind === 'national').map((t) => t.id))
+const nationalByHeading = nationalTeamFinder(teams as unknown as { id: string; kind: string; name_en: string }[])
+// 직접 고친 우승팀 (위키데이터가 틀리거나 비었을 때)
+const winnerFixes = read('manual/honour_winners.csv') as unknown as { honour: string; season: string; team_id: string }[]
 
 /** 리그 시즌 상(시즌 시작 연도). 나머지 상은 시상 연도 (설계 §3.4) */
 const SEASON_AWARDS = new Set(['Q233454'])
@@ -109,7 +112,7 @@ async function editions(comp: Row): Promise<{ season: number; winner: string | n
 
 async function collectCup(c: Row): Promise<Honour[]> {
   const eds = await editions(c)
-  const out: Honour[] = eds.filter((e) => e.winner).map((e) => ({ honour: c.id, season: String(e.season), team_id: e.winner!, player_id: '' }))
+  const out: Honour[] = applyWinnerFixes(eds.filter((e) => e.winner).map((e) => ({ honour: c.id, season: String(e.season), team_id: e.winner!, player_id: '' })), winnerFixes, c.id)
   const have = new Set(out.map((h) => h.season))
   if (c.page) {
     const p = await page(c.page)
@@ -130,17 +133,18 @@ async function collectCup(c: Row): Promise<Honour[]> {
 
 async function collectInternational(c: Row): Promise<Honour[]> {
   const eds = await editions(c)
-  const out: Honour[] = []
+  const out: Honour[] = applyWinnerFixes(eds.filter((e) => e.winner && nationalIds.has(e.winner)).map((e) => ({ honour: c.id, season: String(e.season), team_id: e.winner!, player_id: '' })), winnerFixes, c.id)
   for (const e of eds) {
-    if (e.winner && nationalIds.has(e.winner)) out.push({ honour: c.id, season: String(e.season), team_id: e.winner, player_id: '' })
     if (!c.page) continue
     const p = await page(c.page, e.season)
     if (!p) { rep(c.id).note.push(`문서 없음: ${c.page.replace('{year}', String(e.season))}`); continue }
     const squads = parseSquads(p.text)
     if (!squads.length) { rep(c.id).note.push(`파싱 실패: ${p.title}`); continue }
-    const q = await resolve([...squads.map((s) => `${s.team} national football team`), ...squads.flatMap((s) => s.players)])
+    const unknown = squads.filter((s) => !nationalByHeading(s.team)).map((s) => `${s.team} national football team`)
+    const q = await resolve([...unknown, ...squads.flatMap((s) => s.players)])
     for (const s of squads) {
-      const team = q.get(`${s.team} national football team`)
+      // 절 제목을 우리 대표팀 이름으로 먼저 맞추고(남녀 동음이의 문서 회피), 못 맞추면 위키백과 제목으로(예: West Germany → 독일)
+      const team = nationalByHeading(s.team) ?? q.get(`${s.team} national football team`)
       if (!team || !nationalIds.has(team)) { rep(c.id).note.push(`${e.season} ${s.team} 대표팀 없음`); continue }
       for (const pl of s.players) {
         const id = q.get(pl)

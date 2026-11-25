@@ -94,6 +94,13 @@ export function wikiLinks(t: string): string[] {
 /** 사람이 보는 글자: 링크는 표시 글자, 틀·태그·굵게 표시는 뺀다 */
 export function plainText(t: string): string {
   let s = stripRefs(stripComments(t))
+  // 감싸기만 하는 틀({{nowrap|…}}, {{small|…}} 등)은 안쪽 글자를 남긴다
+  for (let prev = ''; prev !== s;) {
+    prev = s
+    s = s.replace(/\{\{\s*(?:nowrap|small|nobold|big|center|resize)\s*\|((?:[^{}]|\{\{[^{}]*\}\})*)\}\}/gi, '$1')
+    // {{sort|정렬키|보이는 글자}}
+    s = s.replace(/\{\{\s*sort\s*\|[^{}|]*\|((?:[^{}]|\{\{[^{}]*\}\})*)\}\}/gi, '$1')
+  }
   for (const b of topLevelBlocks(s)) s = s.replace(b, '')
   return s.replace(/\[\[(?:[^[\]|]*\|)?([^[\]]*)\]\]/g, '$1').replace(/'{2,}/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 }
@@ -159,14 +166,13 @@ export function tables(text: string): string[][][] {
   return out
 }
 
-/** 제목이 name인 절의 본문(하위 절 포함, 같거나 높은 수준의 다음 제목 전까지). 없으면 null */
+/** 제목이 name인 절의 본문(다음 제목 전까지, 하위 절은 빼고 — 'Wins by club' 같은 통계 표가 섞이지 않게). 없으면 null */
 export function sectionText(t: string, name: string): string | null {
   const lines = t.split('\n')
   const head = (l: string) => /^(={2,6})\s*(.+?)\s*\1\s*$/.exec(l)
   const i = lines.findIndex((l) => { const h = head(l); return !!h && plainText(h[2]) === name })
   if (i < 0) return null
-  const level = head(lines[i])![1].length
   let j = i + 1
-  for (; j < lines.length; j++) { const h = head(lines[j]); if (h && h[1].length <= level) break }
+  while (j < lines.length && !head(lines[j])) j++
   return lines.slice(i + 1, j).join('\n').trim()
 }

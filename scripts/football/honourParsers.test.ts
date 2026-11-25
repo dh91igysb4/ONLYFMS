@@ -17,7 +17,8 @@ describe('wikitext', () => {
   })
   test('section_text', () => {
     const t = '== A ==\na\n=== Golden Ball ===\nball\n==== sub ====\nsub\n=== Golden Boot ===\nboot'
-    expect(sectionText(t, 'Golden Ball')).toBe('ball\n==== sub ====\nsub')
+    expect(sectionText(t, 'Golden Ball')).toBe('ball')
+    expect(sectionText(t, 'sub')).toBe('sub')
     expect(sectionText(t, 'Nope')).toBeNull()
   })
   test('comments_stripped', () => {
@@ -48,6 +49,20 @@ describe('awards', () => {
   test('award_skip_not_awarded', () => {
     expect(parseAwardList(fx('ballon_dor'), { from: 1987, seasonCol: 'year' }).some((x) => x.season === 2020)).toBe(false)
   })
+  test('award_club_before_player', () => {
+    // 쉬페르리그 득점왕 표는 클럽 칸이 선수 칸보다 앞이다: {{Sortname}} 선수 칸을 고른다
+    const t = '{|\n|-\n| [[1995–96 Süper Lig|1995–96]] || [[Galatasaray S.K. (football)|Galatasaray]] || {{flagicon|Turkey}} {{Sortname|Metin|Oktay}} (1) || 23\n|}'
+    expect(parseAwardList(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 1995, link: 'Metin Oktay' }])
+  })
+  test('award_nested_sortname', () => {
+    // PL 골든부트 2003–04: {{sort|Henry 2|{{sortname|Thierry|Henry}}}}
+    const t = '{|\n|-\n| [[2003–04 FA Premier League|2003–04]] || {{sort|Henry 2|{{sortname|Thierry|Henry}}}} {{small|(2)}} || [[Arsenal F.C.|Arsenal]]\n|}'
+    expect(parseAwardList(t, { from: 1992, seasonCol: 'start' })).toEqual([{ season: 2003, link: 'Thierry Henry' }])
+  })
+  test('award_season_in_nowrap', () => {
+    const t = '{|\n|-\n| {{nowrap|[[1999–2000 La Liga|1999–2000]]}} || {{flagicon|Spain}} {{sortname||Salva|Salva Ballesta}} || [[Racing de Santander|Racing]]\n|}'
+    expect(parseAwardList(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 1999, link: 'Salva Ballesta' }])
+  })
   test('award_ties', () => {
     const h = parseAwardList(fx('pl_golden_boot'), { from: 1992, seasonCol: 'start' }).filter((x) => x.season === 2018)
     expect(h.map((x) => x.link).sort()).toEqual(['Mohamed Salah', 'Pierre-Emerick Aubameyang', 'Sadio Mané'])
@@ -61,6 +76,14 @@ describe('finals', () => {
     expect(h.find((x) => x.season === 2006)?.link).toBe('AS Roma')
     expect(new Set(h.map((x) => x.season)).size).toBe(h.length)
     expect(h.length).toBeGreaterThanOrEqual(38)
+  })
+})
+
+describe('finals_more', () => {
+  test('finals_season_in_sort', () => {
+    // List of Belgian Cup finals: 회차 칸 다음 {{sort|키|[[시즌]]}}
+    const t = '{|\n|-\n| 68th || {{sort|2022–23 Belgian Cup (68)|[[2022–23 Belgian Cup|2022–23]]}} || [[Royal Antwerp FC|Antwerp]] || [[2023 Belgian Cup final|2–0]] || [[KV Mechelen|Mechelen]]\n|}'
+    expect(parseFinals(t, { from: 1987, seasonCol: 'start' })).toEqual([{ season: 2022, link: 'Royal Antwerp FC' }])
   })
 })
 

@@ -2,10 +2,14 @@
 // 순수 함수만. 수집기(fetch-wikidata.ts)는 열과 정렬을 여기서 가져다 쓰고, data.test.ts가 같은 규칙으로 검사한다.
 import { cmp, type Row } from './wikidata.ts'
 
-export const FILE_NAMES = [
+/** 위키데이터 수집기(fetch-wikidata.ts)가 쓰는 파일 */
+export const CORE_FILE_NAMES = [
   'nations', 'competitions', 'competition_eras', 'teams', 'team_competitions', 'players', 'aliases', 'external_ids', 'spells', 'caps', 'honours',
-  'honour_catalog', 'honours_extra', 'managers', 'manager_spells',
 ] as const
+/** 우승·수상·감독 수집기(fetch-honours.ts)의 설정·출력. 위키데이터 수집기는 이 파일들을 쓰지 않는다 */
+export const HONOUR_FILE_NAMES = ['honour_catalog', 'honours_extra', 'managers', 'manager_spells'] as const
+export const FILE_NAMES = [...CORE_FILE_NAMES, ...HONOUR_FILE_NAMES] as const
+export type CoreFileName = typeof CORE_FILE_NAMES[number]
 export type FileName = typeof FILE_NAMES[number]
 
 /**

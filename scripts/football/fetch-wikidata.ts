@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { HISTORY_FROM, LEAGUES, type League } from './leagues.ts'
-import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
+import { checkDataset, CORE_FILE_NAMES, FILE_NAMES, FILES, sortRows, type CoreFileName, type Dataset } from './schema.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
   competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, leaguesFor, progressLine, seasonChunks, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
@@ -174,7 +174,7 @@ async function main() {
   // 8. 쓰기 (팀은 유스·2군 제외, 경력·시즌 참가팀은 남은 팀만). 열과 행 순서는 schema.ts가 정한다
   const keptIds = new Set(keptTeams.map((t) => t.id))
   const honours = [...seasons.honours.filter((h) => keptIds.has(h.team_id)), ...awards]
-  const out: Record<FileName, object[]> = {
+  const out: Record<CoreFileName, object[]> = {
     competitions: competitionList(o.leagues),
     competition_eras: competitionEras(o.leagues, o.windows),
     nations,
@@ -187,12 +187,14 @@ async function main() {
     caps: caps.filter((x) => keptPlayers.has(x.player_id)),
     honours,
   }
-  for (const f of FILE_NAMES) writeFileSync(join(o.out, `${f}.csv`), toCsv(FILES[f].columns, sortRows(f, out[f]) as Record<string, unknown>[]))
+  for (const f of CORE_FILE_NAMES) writeFileSync(join(o.out, `${f}.csv`), toCsv(FILES[f].columns, sortRows(f, out[f]) as Record<string, unknown>[]))
 
   // 9. 쓴 결과를 CSV 규칙으로 검사 (npm test의 data.test.ts와 같은 규칙)
   const written = {} as Dataset['files'], headers = {} as Dataset['headers']
   for (const f of FILE_NAMES) {
-    const text = readFileSync(join(o.out, `${f}.csv`), 'utf8')
+    // 우승·수상 파일은 football:honours가 쓴다. 시험 수집 폴더처럼 없으면 빈 파일로 본다
+    const file = join(o.out, `${f}.csv`)
+    const text = existsSync(file) ? readFileSync(file, 'utf8') : `${FILES[f].columns.join(',')}\n`
     written[f] = parseCsv(text)
     headers[f] = text.split(/\r?\n/, 1)[0].split(',')
   }

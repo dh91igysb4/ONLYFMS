@@ -1,6 +1,6 @@
 // 선수 우승·대표팀 우승·감독 시즌 계산 (설계 2026-11-25-football-honours-design.md §3.1·§3.5)
 import { expect, test } from 'vitest'
-import { managerSeasons, nationalTitles, playerTitles } from './honours.ts'
+import { applyWinnerFixes, managerSeasons, nationalTeamFinder, nationalTitles, playerTitles } from './honours.ts'
 
 const m = (player_id: string, season: string, team_id: string) => ({ player_id, season, team_id, primary: 'true', days: '300', estimated: 'true' })
 const win = (honour: string, season: string, team_id: string) => ({ honour, season, team_id, player_id: '' })
@@ -32,4 +32,28 @@ test('manager_seasons', () => {
   expect(managerSeasons(2005, 2010, 'year', 2026)).toEqual({ from_season: 2005, to_season: 2010 })
   expect(managerSeasons(2019, 2019, 'split', 2026)).toEqual({ from_season: 2019, to_season: 2019 })
   expect(managerSeasons(2019, null, 'split', 2026)).toEqual({ from_season: 2019, to_season: 2026 })
+})
+
+test('winner_fix_replaces_and_adds', () => {
+  const wins = [win('Q260858', '2008', 'Tesp')]
+  const fixes = [{ honour: 'Q260858', season: '2004', team_id: 'Tgre' }, { honour: 'Q260858', season: '2008', team_id: 'Tesp2' }]
+  expect(applyWinnerFixes(wins, fixes, 'Q260858')).toEqual([win('Q260858', '2004', 'Tgre'), win('Q260858', '2008', 'Tesp2')])
+})
+test('winner_fix_other_competition_untouched', () => {
+  expect(applyWinnerFixes([win('Q1', '2004', 'A')], [{ honour: 'Q2', season: '2004', team_id: 'B' }], 'Q1')).toEqual([win('Q1', '2004', 'A')])
+})
+
+test('national_team_by_heading', () => {
+  const find = nationalTeamFinder([
+    { id: 'Qswe', kind: 'national', name_en: "Sweden men's national football team" },
+    { id: 'Qusa', kind: 'national', name_en: "United States men's national soccer team" },
+    { id: 'Qger', kind: 'national', name_en: "Germany men's national association football team" },
+    { id: 'Qirl', kind: 'national', name_en: 'Republic of Ireland national football team' },
+    { id: 'Qclub', kind: 'club', name_en: 'Sweden FC' },
+  ])
+  expect(find('Sweden')).toBe('Qswe')
+  expect(find('United States')).toBe('Qusa')
+  expect(find('Germany')).toBe('Qger')
+  expect(find('Republic of Ireland')).toBe('Qirl')
+  expect(find('Narnia')).toBeUndefined()
 })

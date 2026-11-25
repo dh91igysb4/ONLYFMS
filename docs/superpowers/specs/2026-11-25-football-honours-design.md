@@ -84,6 +84,8 @@ B를 쓰되, 월드컵 결승 득점자처럼 작고 거의 변하지 않는 목
 
 **위키백과 링크 → 우리 ID:** 표 안의 선수·팀 링크를 문서 제목으로 모아 위키데이터 sitelink로 QID를 찾는다(지난번 시즌 참가팀 채울 때와 같은 방법). 리다이렉트를 따라간다. 우리 `players.csv`·`teams.csv`에 없는 QID는 버리고 상·대회별로 버린 수를 출력한다. 팀 이름 불일치를 바로잡는 고정 표(지난번 Estrela·Den Bosch·Beşiktaş처럼)를 둔다.
 
+**구현 중 더한 것 (2026-11-25):** 카탈로그 `page`에 `제목#절`을 쓰면 그 절만(하위 절 제외) 읽는다(한 문서에 여러 표가 있는 상). 위키데이터 우승팀이 틀리거나 둘 이상이면 `manual/honour_winners.csv`(`honour,season,team_id,source_url`)로 덮어쓴다(유로 2004에 포르투갈·그리스가 함께 적혀 있었다). 엔트리 절 제목은 `teams.csv` 대표팀 이름으로 먼저 맞춘다("Sweden national football team" 같은 위키백과 제목은 남녀 동음이의 문서라 QID가 틀린다). 위키백과 API는 이 환경에서 연속 호출에 429를 자주 돌려줘 호출 간격 5초·재시도를 두고, QID는 위키데이터 sitelink 질의로 먼저 찾는다.
+
 호출 예절: User-Agent를 밝히고, 429면 `Retry-After`만큼 기다린다. 응답은 캐시 폴더(git 제외)에 저장해 다시 돌릴 때 재사용한다.
 
 ### 3.4 출력과 스키마
@@ -138,7 +140,7 @@ B를 쓰되, 월드컵 결승 득점자처럼 작고 거의 변하지 않는 목
 
 ## 4. 데이터 계층 설계에서 바뀌는 곳
 - §6 스키마: `football_honour_catalog`, `football_managers`, `football_manager_spells` 추가. `football_honours`에 선수 단위 우승·엔트리·결승 득점 행이 생긴다(열은 그대로).
-- §5.3 직접 입력: `manual/world_cup_final_scorers.csv`.
+- §5.3 직접 입력: `manual/world_cup_final_scorers.csv`, `manual/honour_winners.csv`.
 - §11 한계: "우승은 팀 단위만"이 "선수 단위(소속 기준, 시즌 중간 이적 제외)"로 바뀐다.
 
 ## 5. 구현자에게 맡기는 것

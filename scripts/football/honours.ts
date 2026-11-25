@@ -51,3 +51,29 @@ export function managerSeasons(from: number, to: number | null, cal: Calendar, c
   if (cal === 'year' || to <= from) return { from_season: from, to_season: Math.max(from, to) }
   return { from_season: from, to_season: to - 1 }
 }
+
+/**
+ * 직접 고친 우승팀(manual/honour_winners.csv: honour,season,team_id,source_url)을 대회 comp의 팀 우승에 덮어쓴다.
+ * 위키데이터 우승팀이 틀리거나 둘 이상이거나 빠졌을 때 쓴다(예: 유로 2004에 포르투갈·그리스가 함께 적힘).
+ */
+export function applyWinnerFixes(wins: readonly Honour[], fixes: readonly { honour: string; season: string; team_id: string }[], comp: string): Honour[] {
+  const mine = fixes.filter((f) => f.honour === comp)
+  const fixed = new Set(mine.map((f) => f.season))
+  const out = [...wins.filter((w) => !(w.honour === comp && fixed.has(w.season))), ...mine.map((f) => ({ honour: comp, season: f.season, team_id: f.team_id, player_id: '' }))]
+  return out.sort((a, b) => cmp(a.honour, b.honour) || cmp(a.season, b.season) || cmp(a.team_id, b.team_id))
+}
+
+/**
+ * 엔트리 문서 나라 절 제목("Sweden") → 우리 대표팀 id. teams.csv 대표팀 영문 이름에서 "men's national … team"을 떼어 맞춘다.
+ * ("Sweden national football team" 같은 위키백과 제목은 남녀 대표팀 동음이의 문서라 QID로 찾으면 틀린다.)
+ */
+export function nationalTeamFinder(teams: readonly { id: string; kind: string; name_en: string }[]): (heading: string) => string | undefined {
+  const key = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+  const m = new Map<string, string>()
+  for (const t of teams) {
+    if (t.kind !== 'national') continue
+    const country = t.name_en.replace(/\s+(men's\s+)?national\s+(association\s+)?(football|soccer)\s+team$/i, '')
+    if (country !== t.name_en && !m.has(key(country))) m.set(key(country), t.id)
+  }
+  return (heading) => m.get(key(heading))
+}

@@ -23,17 +23,25 @@ function seasonOf(cell: string, col: SeasonOpts['seasonCol']): number | null {
 /** 칸의 첫 링크. {{sortname|이름|성|링크|정렬키}}도 링크로 본다 */
 function firstLink(cell: string): string | null {
   let s = stripRefs(stripComments(cell))
-  for (const b of templates(s, /^sortname$/i)) {
+  // {{sort|키|{{sortname|…}}}}처럼 다른 틀 안에 있어도 찾는다: 안쪽부터 링크로 바꾼다
+  for (;;) {
+    const i = s.search(/\{\{\s*sortname\s*\|/i)
+    if (i < 0) break
+    let depth = 0, j = i
+    for (; j < s.length - 1; j++) {
+      if (s[j] === '{' && s[j + 1] === '{') { depth++; j++ } else if (s[j] === '}' && s[j + 1] === '}') { depth--; j++; if (depth === 0) break }
+    }
+    const b = s.slice(i, j + 1)
     const { positional, named } = templateArgs(b)
     const [first = '', last = '', link = ''] = positional
     const dab = named.get('dab')
     const target = link.trim() || `${first.trim()} ${last.trim()}`.trim() + (dab ? ` (${dab})` : '')
-    s = s.replace(b, `[[${target}]]`)
+    s = s.slice(0, i) + `[[${target}]]` + s.slice(j + 1)
   }
   return wikiLinks(s)[0] ?? null
 }
 
-function seasonTable(t: string, opts: SeasonOpts): Hit[] {
+function seasonTable(t: string, opts: SeasonOpts, preferSortname = false): Hit[] {
   const out: Hit[] = []
   const seen = new Set<string>()
   for (const table of tables(t)) {
@@ -46,7 +54,10 @@ function seasonTable(t: string, opts: SeasonOpts): Hit[] {
       if (rest.some((c) => /not awarded|no award|cancelled|abandoned/i.test(plainText(c)))) continue
       if (rest.some((c) => RANK_BELOW_FIRST.test(plainText(c)))) continue
       let link: string | null = null
-      for (const c of rest) { link = firstLink(c); if (link) break }
+      // 수상자 표: {{sortname}} 칸이 있으면 그 칸이 선수다(클럽 칸이 앞에 오는 표 대비)
+      const sortCell = preferSortname ? rest.find((c) => /\{\{\s*sortname\s*\|/i.test(c)) : undefined
+      if (sortCell) link = firstLink(sortCell)
+      else for (const c of rest) { link = firstLink(c); if (link) break }
       if (!link) continue
       const k = `${season}|${link}`
       if (seen.has(k)) continue
@@ -59,7 +70,7 @@ function seasonTable(t: string, opts: SeasonOpts): Hit[] {
 
 /** 수상자 목록 표 */
 export function parseAwardList(t: string, opts: SeasonOpts): Hit[] {
-  return seasonTable(t, opts)
+  return seasonTable(t, opts, true)
 }
 
 /** 역대 결승·우승 표. 시즌당 하나(첫 행)만 */

@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { checkDataset, checkHistoryClubs, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
+import { checkDataset, checkHistoryClubs, CORE_FILE_NAMES, FILE_NAMES, FILES, HONOUR_FILE_NAMES, sortRows, type Dataset, type FileName } from './schema.ts'
 import { parseCsv, toCsv, type Row } from './wikidata.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -222,4 +222,11 @@ describe('honours_extra (설계 2026-11-25-football-honours-design.md §3.4)', (
   test('catalog_kind', () => {
     expect(check((d) => { d.files.honour_catalog[0].kind = 'trophy' })).toContainEqual(expect.stringMatching(/^honour_catalog:2: kind trophy 허용 안 됨/))
   })
+})
+
+test('wikidata_collector_does_not_write_honour_files', () => {
+  // football:fetch가 honours 수집기 출력(honours_extra 등)을 빈 파일로 덮어쓰지 않게, 위키데이터 수집기 파일 목록에서 뺀다
+  expect(CORE_FILE_NAMES).not.toContain('honours_extra')
+  expect(CORE_FILE_NAMES).not.toContain('honour_catalog')
+  expect([...CORE_FILE_NAMES, ...HONOUR_FILE_NAMES].sort()).toEqual([...FILE_NAMES].sort())
 })
