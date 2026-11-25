@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { qLineage, qSeasonYears, summarizeSeasons } from './eras.ts'
+import { qByLabel, qLineage, qSeasonYears, summarizeSeasons } from './eras.ts'
 
 test('qLineage_asks_previous_and_next_competitions', () => {
   const q = qLineage(['Q9448'])
@@ -17,4 +17,10 @@ test('qSeasonYears_counts_participants_per_season', () => {
 test('summarizeSeasons_range_count_and_seasons_with_teams', () => {
   const s = summarizeSeasons([{ c: 'Q1', year: '1990', teams: '20' }, { c: 'Q1', year: '1992', teams: '0' }])
   expect(s.get('Q1')).toEqual({ first: 1990, last: 1992, count: 2, withTeams: 1 })
+})
+
+test('qByLabel_finds_competitions_with_season_items_by_english_label', () => {
+  const q = qByLabel('Football League Second Division')
+  expect(q).toContain('rdfs:label "Football League Second Division"@en')
+  expect(q).toContain('wdt:P3450')
 })

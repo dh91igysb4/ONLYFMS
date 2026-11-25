@@ -77,7 +77,7 @@ export function qLeagueClubs(leagues: readonly League[]): string {
  * 거르기 위해 from년에 40세 이하였던 선수만 받는다(생일이 없으면 받는다).
  */
 export function qPlayersAtTeams(teams: readonly string[], from: number, to: number): string {
-  return `SELECT DISTINCT ?p WHERE {
+  return `SELECT DISTINCT ?p ?pLabel ?team ?teamLabel WHERE {
   VALUES ?team { ${ids(teams)} }
   ?p p:P54 ?st . ?st ps:P54 ?team .
   ${IS_FOOTBALLER}
@@ -87,7 +87,18 @@ export function qPlayersAtTeams(teams: readonly string[], from: number, to: numb
   FILTER(!BOUND(?s) || ?s <= ${day(to + 1, '06-30')})
   OPTIONAL { ?p wdt:P569 ?b }
   FILTER(!BOUND(?b) || ?b >= ${day(from - 40, '01-01')})
+  OPTIONAL { ?p rdfs:label ?pLabel FILTER(LANG(?pLabel) = "en") }
+  OPTIONAL { ?team rdfs:label ?teamLabel FILTER(LANG(?teamLabel) = "en") }
 }`
+}
+
+/** 선수 찾기 진행 한 줄: 묶음의 클럽 이름(최대 6), 이번 묶음에서 새로 찾은 선수 수와 예시 3명 */
+export function progressLine(label: string, done: number, total: number, rows: readonly Row[], seen: ReadonlySet<string>): string {
+  const teams = [...new Set(rows.map((r) => r.teamLabel || r.team).filter(Boolean))]
+  const fresh = new Map<string, string>()
+  for (const r of rows) if (r.p && !seen.has(r.p) && !fresh.has(r.p)) fresh.set(r.p, r.pLabel || r.p)
+  const ex = [...fresh.values()].slice(0, 3)
+  return `${label} ${done}/${total} — ${teams.slice(0, 6).join(', ')}${teams.length > 6 ? ' …' : ''} — 새 선수 ${fresh.size}명${ex.length ? ` (예: ${ex.join(', ')})` : ''}`
 }
 
 /** 레전드 명단 확인: 직업이 축구 선수(P106)인 항목만 돌려준다 */

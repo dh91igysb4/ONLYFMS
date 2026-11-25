@@ -17,7 +17,7 @@ import { HISTORY_FROM, LEAGUES, type League } from './leagues.ts'
 import { checkDataset, FILE_NAMES, FILES, sortRows, type Dataset, type FileName } from './schema.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
-  competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, leaguesFor, seasonChunks, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
+  competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, leaguesFor, progressLine, seasonChunks, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
   qPlayersAtTeams, qSeasons, qSpells, qTeams, teamStarts, toCsv, type Row, type Team, type TeamCompetition, type Window,
 } from './wikidata.ts'
 import { batched, log, query } from './wdqs.ts'
@@ -113,7 +113,11 @@ async function main() {
   const found = new Set<string>()
   for (const [from, teams] of [...byStart].sort((a, b) => a[0] - b[0])) {
     const before = found.size
-    for (const r of await batched(`선수 찾기 (${from}~)`, teams, 20, (c) => qPlayersAtTeams(c, from, to), o.cache)) found.add(r.p)
+    const label = `선수 찾기 (${from}~)`
+    await batched(label, teams, 20, (c) => qPlayersAtTeams(c, from, to), o.cache, (rows, done, total) => {
+      log(progressLine(label, done, total, rows, found))
+      for (const r of rows) found.add(r.p)
+    })
     log(`  ${from}~ 팀 ${teams.length}개: 새 선수 ${found.size - before}명`)
   }
   log(`선수 ${found.size}명`)

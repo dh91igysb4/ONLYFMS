@@ -45,3 +45,14 @@ export function summarizeSeasons(rows: readonly Row[]): Map<string, SeasonSummar
   }
   return m
 }
+
+/** 영어 라벨이 정확히 같은 항목 중 시즌 항목(P3450)이 붙은 대회와 시즌 수. 전신 대회 QID를 이름으로 찾을 때 쓴다 */
+export function qByLabel(label: string): string {
+  const lit = JSON.stringify(label)
+  return `SELECT ?c (COUNT(DISTINCT ?season) AS ?seasons) (MIN(YEAR(?start)) AS ?first) (MAX(YEAR(?start)) AS ?last) WHERE {
+  ?c rdfs:label ${lit}@en .
+  ?season wdt:P3450 ?c .
+  OPTIONAL { ?season wdt:P580 ?s0 } OPTIONAL { ?season wdt:P585 ?p0 }
+  BIND(COALESCE(?s0, ?p0) AS ?start)
+} GROUP BY ?c`
+}

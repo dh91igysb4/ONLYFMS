@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, seasonChunks, leaguesFor, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
+  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, seasonChunks, leaguesFor, progressLine, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -205,7 +205,7 @@ test('league_table_seasons_and_teams', () => {
   expect(PL.id).toBe('Q9448')
   expect(PL.seasons).toBe(15)
   for (const l of LEAGUES.filter((x) => x.id !== PL.id)) expect(l.seasons).toBe(10)
-  for (const l of LEAGUES) expect(l.teams).toBeGreaterThanOrEqual(10)
+  for (const l of LEAGUES) expect(teamsAt(l.teams, 2026)).toBeGreaterThanOrEqual(10)
   expect(new Set(LEAGUES.map((l) => l.id)).size).toBe(LEAGUES.length)
 })
 
@@ -456,4 +456,17 @@ test('leaguesFor_off_drops_eras', () => {
   expect(leaguesFor([L92], null)[0].eras).toBeUndefined()
   expect(leaguesFor([L92], 1987)[0].eras).toHaveLength(1)
   expect(competitionList(leaguesFor([L92], null)).map((c) => c.id)).toEqual(['L92'])
+})
+
+test('qPlayersAtTeams_returns_english_labels_for_progress', () => {
+  const q = qPlayersAtTeams(['Q9617'], 1987, 2026)
+  expect(q).toContain('?pLabel')
+  expect(q).toContain('?teamLabel')
+})
+
+test('progressLine_names_teams_and_new_players', () => {
+  const line = progressLine('선수 찾기 (1987~)', 40, 316,
+    [{ p: 'Q1', pLabel: 'Tony Adams', team: 'Q9617', teamLabel: 'Arsenal F.C.' }, { p: 'Q2', pLabel: 'Ian Wright', team: 'Q9617', teamLabel: 'Arsenal F.C.' },
+     { p: 'Q3', pLabel: 'Old', team: 'Q9616', teamLabel: 'Chelsea F.C.' }], new Set(['Q3']))
+  expect(line).toBe('선수 찾기 (1987~) 40/316 — Arsenal F.C., Chelsea F.C. — 새 선수 2명 (예: Tony Adams, Ian Wright)')
 })

@@ -52,6 +52,7 @@ npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~
 - `manual/history_clubs.csv`(`team_id,from,note`): 참가 기록에 없어 선수 수집 대상에서 빠지는 옛 클럽. `from`이 비면 1987.
 - 전신 대회 찾기: `npm run football:eras` — 리그별 이전 대회(P155·P1365)와 시즌 항목 연도·참가팀 커버리지를 찍는다. 결과로 `leagues.ts`의 `since`·`eras`·시즌별 `teams`(정원 계단)를 채운다.
 - 위키데이터·openfootball에 없는 옛 시즌 참가팀은 영어 위키백과 시즌 문서를 보고 `manual/team_competitions.csv`에 넣고 `source_url` 열에 그 문서 주소를 적는다(시즌 참가팀만 예외적으로 위키백과를 근거로 인정. 경력은 아님). 넣은 뒤 `npm run football:openfootball -- --merge`로 반영한다.
+- 진행 표시: 선수 찾기는 묶음마다 `선수 찾기 (1987~) 40/316 — 아스널, 첼시 … — 새 선수 1,203명 (예: …)`처럼 클럽 이름과 새로 찾은 선수를 화면에 찍는다.
 - 시간: 전체 수집이 몇 시간 걸릴 수 있다. 끊기면 같은 명령을 다시 돌리면 캐시(`.cache/wikidata/`)로 이어진다.
 
 ### Windows PowerShell에서 돌리기
