@@ -701,7 +701,7 @@ function drawStatic(ctx: CanvasRenderingContext2D, g: MapGfx, k: number, tx0: nu
       if (tileAt(map, tx, ty) === 'pier') drawPierExtras(ctx, g, tx, ty)
     }
   }
-  const shop = map.shop
+  const shop = map.building
   if (shop) {
     const shopRight = shop.tx + shop.w - 1
     const shopBottom = shop.ty + shop.h - 1

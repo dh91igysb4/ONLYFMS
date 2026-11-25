@@ -201,10 +201,10 @@ describe('SPRITES', () => {
     for (const pose of PLAYER_POSES) expect([SPRITES[pose].w, SPRITES[pose].h], pose).toEqual([16, 24])
     for (const tile of TILES) expect([SPRITES[tile].w, SPRITES[tile].h], tile).toEqual([16, 16])
     expect([SPRITES['tile-tree'].w, SPRITES['tile-tree'].h]).toEqual([16, 32])
-    expect(SPRITES.shop.w % 16).toBe(0)
-    expect(SPRITES.shop.h % 16).toBe(0)
+    expect(SPRITES.building.w % 16).toBe(0)
+    expect(SPRITES.building.h % 16).toBe(0)
     // 맵의 건물 사각형(B·D 칸)과 같은 크기라 좌상단에 한 번에 그리면 맞는다
-    expect([SPRITES.shop.w, SPRITES.shop.h]).toEqual([VILLAGE.shop!.w * TILE, VILLAGE.shop!.h * TILE])
+    expect([SPRITES.building.w, SPRITES.building.h]).toEqual([VILLAGE.building!.w * TILE, VILLAGE.building!.h * TILE])
   })
 
   it('지역 타일(강·연못·웅덩이·폭포·다리·절벽)은 16×16이고 0/1 쌍은 서로 다르다', () => {

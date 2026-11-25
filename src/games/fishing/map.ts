@@ -16,6 +16,8 @@ export type TileKind = 'water' | 'sand' | 'grass' | 'path' | 'pier' | 'tree' | '
   | 'creek' | 'reed' | 'marsh' | 'bog' | 'boardwalk' | 'deadtree'
   // 낚시 5부 M3: 눈(걷는 칸)·온천(물)·눈 소나무(키 큰 장애물)·갑판(걷는 칸)·선체(장애물)·돛대(키 큰 장애물)·심해(물)
   | 'snow' | 'hotspring' | 'snowpine' | 'deck' | 'hull' | 'mast' | 'deep'
+  // 마을회관: 실내 바닥(걷는 칸)·실내 벽과 가구(못 걷는 칸). 그림은 맵 backdrop이 그린다
+  | 'floor' | 'wall'
 export type Facing = 'up' | 'down' | 'left' | 'right'
 export type Vec = { x: number; y: number } // 월드 픽셀. 캐릭터 pos는 발 중앙
 
@@ -62,9 +64,11 @@ export const TILE_CHARS: Readonly<Record<string, TileKind>> = {
   n: 'hull', // 선체
   M: 'mast', // 돛대
   v: 'deep', // 심해
+  F: 'floor', // 실내 바닥
+  Y: 'wall', // 실내 벽·가구
 }
 
-const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock', 'boardwalk', 'snow', 'deck'])
+const WALKABLE: ReadonlySet<TileKind> = new Set<TileKind>(['sand', 'grass', 'path', 'pier', 'flower', 'bridge', 'cave-floor', 'cave-mouth', 'dock', 'boardwalk', 'snow', 'deck', 'floor', 'door'])
 
 /** 낚시를 던질 수 있는 물 종류. 용암도 낚시하는 물로 친다(동굴 가장 깊은 곳). 폭포는 포함하지 않는다. */
 type WaterKind = 'water' | 'river' | 'pond' | 'basin' | 'lake' | 'cave-pool' | 'crystal' | 'lava' | 'lagoon' | 'creek' | 'marsh' | 'bog' | 'hotspring' | 'deep'
@@ -127,6 +131,27 @@ export type Dock = { front: TileFacing; target: AreaId; entry: TileFacing; boat:
  */
 export type Teleporter = { tiles: Rect; front: TileFacing }
 
+/** 명예의 전당 액자 칸: 이 게임 기록 하나(record) 또는 사이트 게시판 순번(site) */
+export type FameSlot = { group: 'record'; key: string } | { group: 'site'; index: number }
+/** 고정물(자판기·행거·노트북 등) 앞에서 할 수 있는 일 */
+export type FixtureAct =
+  | { kind: 'shop' }
+  | { kind: 'wardrobe' }
+  | { kind: 'laptop' }
+  | { kind: 'elevator' }
+  | { kind: 'notice'; text: string }
+  | { kind: 'fame'; slot: FameSlot }
+/** front 칸에 서서 front.facing을 보면 act */
+export type Fixture = { front: TileFacing; act: FixtureAct }
+/**
+ * 칸 사이 벽 모서리. v: [x, y0, y1] = x 열의 왼쪽 모서리를 y0..y1 줄(포함)에서 막는다.
+ * h: [y, x0, x1] = y 줄의 위쪽 모서리를 x0..x1 열(포함)에서 막는다. 얇은 유리벽처럼 칸을 차지하지 않는 벽.
+ */
+export type WallSpec = {
+  v?: readonly (readonly [x: number, y0: number, y1: number])[]
+  h?: readonly (readonly [y: number, x0: number, x1: number])[]
+}
+
 /** 열린 지역들. 기본 지역(마을·강·숲)은 늘 들어 있다 */
 export type Opened = ReadonlySet<AreaId>
 
@@ -139,8 +164,8 @@ export type MapDef = {
   rows: readonly string[]
   w: number
   h: number
-  /** 상점 건물 자리(타일, 문 줄 포함). 문은 맨 아래 줄의 doorTx 열. 문이 없는 맵은 null */
-  shop: { tx: number; ty: number; w: number; h: number; doorTx: number } | null
+  /** 건물(마을회관) 자리(타일, 문 줄 포함). 문은 맨 아래 줄의 doorTx 열이고 걸을 수 있다(보통 안쪽 출구). 문이 없는 맵은 null */
+  building: { tx: number; ty: number; w: number; h: number; doorTx: number } | null
   spawn: { pos: Vec; facing: Facing }
   /** 물 종류(밀물 진흙 mud, 얼음 구멍 hole 포함) → 낚시 자리 id. 여기 없는 물은 낚시할 수 없다 */
   spots: Partial<Record<SpotKey, string>>
@@ -159,6 +184,14 @@ export type MapDef = {
   fog: boolean
   /** 늘 눈: 비 오는 날을 계절과 무관하게 눈으로 그린다(출현 조건은 그대로 rain) */
   snowy: boolean
+  /** 칸 사이 벽 모서리 키(`v:x,y` = x 열 왼쪽, `h:x,y` = y 줄 위쪽) */
+  walls: ReadonlySet<string>
+  /** 고정물 */
+  fixtures: readonly Fixture[]
+  /** 큰 지도·미니맵에 그리는 맵인가(실내 지역 마을회관은 false) */
+  onWorldMap: boolean
+  /** 칸 그림 대신 정적 레이어에 (0,0)부터 그릴 스프라이트 이름. 없으면 null */
+  backdrop: string | null
 }
 
 export function tileAt(map: MapDef, tx: number, ty: number): TileKind | null {
@@ -180,6 +213,34 @@ function waterKeyAt(map: MapDef, tx: number, ty: number, dyn: MapDynamic): SpotK
   if (kind === 'mud') return dyn.tide === 'high' ? 'mud' : null
   if (kind === 'ice') return dyn.holes.has(`${tx},${ty}`) ? 'hole' : null
   return kind !== null && WATER_KINDS.has(kind) ? (kind as WaterKind) : null
+}
+
+/** (tx,ty)에서 (tx+dx,ty+dy) 이웃 칸으로 가는 모서리가 벽인가. dx·dy는 하나만 ±1 */
+export function blockedBetween(map: MapDef, tx: number, ty: number, dx: number, dy: number): boolean {
+  if (map.walls.size === 0) return false
+  if (dx !== 0) return map.walls.has(`v:${dx > 0 ? tx + 1 : tx},${ty}`)
+  return map.walls.has(`h:${tx},${dy > 0 ? ty + 1 : ty}`)
+}
+
+/** 픽셀 사각형의 열린 안쪽(x0<x<x1, y0<y<y1)을 벽 모서리가 지나는가 */
+export function edgeHits(map: MapDef, x0: number, y0: number, x1: number, y1: number): boolean {
+  if (map.walls.size === 0) return false
+  const eps = 1e-6
+  const tx0 = Math.floor((x0 + eps) / TILE)
+  const tx1 = Math.floor((x1 - eps) / TILE)
+  const ty0 = Math.floor((y0 + eps) / TILE)
+  const ty1 = Math.floor((y1 - eps) / TILE)
+  // 세로 모서리 X*TILE이 x0<..<x1 안에 있으면, 사각형이 걸친 줄들에서 그 모서리를 본다
+  for (let X = tx0 + 1; X <= tx1; X++) for (let ty = ty0; ty <= ty1; ty++) if (map.walls.has(`v:${X},${ty}`)) return true
+  for (let Y = ty0 + 1; Y <= ty1; Y++) for (let tx = tx0; tx <= tx1; tx++) if (map.walls.has(`h:${tx},${Y}`)) return true
+  return false
+}
+
+function wallKeys(spec: WallSpec | undefined): ReadonlySet<string> {
+  const out = new Set<string>()
+  for (const [x, y0, y1] of spec?.v ?? []) for (let y = y0; y <= y1; y++) out.add(`v:${x},${y}`)
+  for (const [y, x0, x1] of spec?.h ?? []) for (let x = x0; x <= x1; x++) out.add(`h:${x},${y}`)
+  return out
 }
 
 const inRect = (r: Rect, tx: number, ty: number): boolean => tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h
@@ -205,8 +266,8 @@ function findTiles(map: MapDef, kind: TileKind): { tx: number; ty: number }[] {
   return out
 }
 
-// 상점 건물 자리: 문 D와 건물 B를 감싸는 사각형. 맵 글자에서 읽어 오므로 맵을 고치면 함께 바뀐다.
-function computeShop(map: MapDef): MapDef['shop'] {
+// 건물 자리: 문 D와 건물 B를 감싸는 사각형. 맵 글자에서 읽어 오므로 맵을 고치면 함께 바뀐다.
+function computeBuilding(map: MapDef): MapDef['building'] {
   const doors = findTiles(map, 'door')
   if (doors.length === 0) return null
   if (doors.length !== 1) throw new Error(`map needs exactly one door, found ${doors.length}`)
@@ -215,7 +276,7 @@ function computeShop(map: MapDef): MapDef['shop'] {
   const ty = Math.min(...parts.map((p) => p.ty))
   const w = Math.max(...parts.map((p) => p.tx)) - tx + 1
   const h = Math.max(...parts.map((p) => p.ty)) - ty + 1
-  if (doors[0].ty !== ty + h - 1) throw new Error('shop door must be in the bottom row of the building')
+  if (doors[0].ty !== ty + h - 1) throw new Error('building door must be in the bottom row of the building')
   return { tx, ty, w, h, doorTx: doors[0].tx }
 }
 
@@ -223,6 +284,7 @@ type MapOpts = {
   spots?: MapDef['spots']; exits?: Exit[]; gates?: Gate[]; docks?: Dock[]; indoor?: boolean
   world?: MapDef['world']; teleporter?: Teleporter
   tidal?: boolean; fog?: boolean; snowy?: boolean
+  walls?: WallSpec; fixtures?: Fixture[]; onWorldMap?: boolean; backdrop?: string
 }
 
 const rectInside = (map: MapDef, r: Rect): boolean =>
@@ -241,6 +303,9 @@ function checkPlaces(map: MapDef): void {
   })
   map.exits.forEach((e, i) => {
     if ('at' in e && !rectInside(map, e.at)) throw new Error(`exit ${i} (${e.target}) rect is outside the map`)
+  })
+  map.fixtures.forEach((f, i) => {
+    if (!tileWalkable(map, f.front.tx, f.front.ty)) throw new Error(`fixture ${i} front is not walkable`)
   })
   const tp = map.teleporter
   if (tp) {
@@ -267,15 +332,16 @@ export function defineMap(id: AreaId, rows: readonly string[], opts: MapOpts = {
     if (row.length !== w) throw new Error(`map row ${i} has length ${row.length}, expected ${w}`)
   })
   const map: MapDef = {
-    id, rows, w, h: rows.length, shop: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' },
+    id, rows, w, h: rows.length, building: null, spawn: { pos: { x: 0, y: 0 }, facing: 'down' },
     spots: opts.spots ?? {}, exits: opts.exits ?? [], gates: opts.gates ?? [], docks: opts.docks ?? [], indoor: opts.indoor ?? false,
     world: opts.world ?? { tx: 0, ty: 0 }, teleporter: opts.teleporter ?? null,
     tidal: opts.tidal ?? false, fog: opts.fog ?? false, snowy: opts.snowy ?? false,
+    walls: wallKeys(opts.walls), fixtures: opts.fixtures ?? [], onWorldMap: opts.onWorldMap ?? true, backdrop: opts.backdrop ?? null,
   }
   checkPlaces(map)
-  map.shop = computeShop(map)
+  map.building = computeBuilding(map)
   // 시작 위치: 문 앞(문 바로 아래 타일), 문이 없으면 첫 걸을 수 있는 칸
-  const at = shopSpot(map) ?? firstWalkable(map)
+  const at = doorSpot(map) ?? firstWalkable(map)
   map.spawn = { pos: tileCenter(at.tx, at.ty), facing: 'down' }
   return map
 }
@@ -285,9 +351,9 @@ function firstWalkable(map: MapDef): { tx: number; ty: number } {
   throw new Error('map has no walkable tile')
 }
 
-/** 문 바로 아래 타일. 여기 서서 위를 보면 상점. 상점이 없으면 null. */
-export function shopSpot(map: MapDef): { tx: number; ty: number } | null {
-  return map.shop ? { tx: map.shop.doorTx, ty: map.shop.ty + map.shop.h } : null
+/** 건물 문 바로 아래 타일. 건물이 없으면 null. */
+export function doorSpot(map: MapDef): { tx: number; ty: number } | null {
+  return map.building ? { tx: map.building.doorTx, ty: map.building.ty + map.building.h } : null
 }
 
 /** 부두는 모래사장에서 아래(바다 쪽)로 뻗는다. 맨 끝 = 가장 아래 부두 타일. 부두가 없으면 null. */
@@ -341,7 +407,7 @@ export function reachableTiles(
   for (const s of starts) visit(s.tx, s.ty)
   for (let i = 0; i < queue.length; i++) {
     const { tx, ty } = queue[i]
-    for (const { dx, dy } of Object.values(STEP)) visit(tx + dx, ty + dy)
+    for (const { dx, dy } of Object.values(STEP)) if (!blockedBetween(map, tx, ty, dx, dy)) visit(tx + dx, ty + dy)
   }
   return seen
 }
@@ -360,6 +426,7 @@ export function nearestDryTile(map: MapDef, from: { tx: number; ty: number }, op
     const found: { tx: number; ty: number }[] = []
     for (const c of layer) {
       for (const { dx, dy } of Object.values(STEP)) {
+        if (blockedBetween(map, c.tx, c.ty, dx, dy)) continue
         const n = { tx: c.tx + dx, ty: c.ty + dy }
         const k = `${n.tx},${n.ty}`
         if (seen.has(k)) continue
@@ -375,7 +442,7 @@ export function nearestDryTile(map: MapDef, from: { tx: number; ty: number }, op
 }
 
 export type Interaction =
-  | { kind: 'shop' }
+  | FixtureAct
   | { kind: 'fish'; spot: string }
   | { kind: 'gate'; area: AreaId }
   | { kind: 'dock'; target: AreaId }
@@ -397,7 +464,7 @@ const standsAt = (here: { tx: number; ty: number }, facing: Facing, at: TileFaci
 // 서 있는 타일 = tileOf(pos), 앞 타일 = 서 있는 타일 + facing.
 // 잠긴 문의 front에서 그 방향을 보면 gate, 선착장 front에서 그 방향을 보면 dock(열림과 무관: 화면이 구매/출발을 가른다).
 // 앞 칸이 순간이동기 구조물이면 teleporter(켜짐과 무관: 화면이 목록/안내를 가른다).
-// 그 외: 앞이 상점 문이고 위를 보면 상점, 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
+// 고정물 front에서 그 방향을 보면 고정물의 act. 그 외: 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
 // 낚시 5부: 앞이 얼음이고 구멍이 아니면(맵에 얼음 구멍 자리가 있을 때) drill, 앞이 구멍·밀물 진흙이면 그 자리 낚시.
 export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
   const here = tileOf(pos)
@@ -405,12 +472,13 @@ export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Ope
   if (gate) return { kind: 'gate', area: gate.area }
   const dock = map.docks.find((d) => standsAt(here, facing, d.front))
   if (dock) return { kind: 'dock', target: dock.target }
+  const fixture = map.fixtures.find((f) => standsAt(here, facing, f.front))
+  if (fixture) return fixture.act
   const { dx, dy } = STEP[facing]
   if (map.teleporter && inRect(map.teleporter.tiles, here.tx + dx, here.ty + dy)) return { kind: 'teleporter' }
   const fx = here.tx + dx
   const fy = here.ty + dy
   const front = tileAt(map, fx, fy)
-  if (front === 'door') return facing === 'up' ? { kind: 'shop' } : null
   if (front === 'ice' && map.spots.hole !== undefined && !dyn.holes.has(`${fx},${fy}`)) return { kind: 'drill' }
   const key = waterKeyAt(map, fx, fy, dyn)
   if (key === 'mud' || key === 'hole') {

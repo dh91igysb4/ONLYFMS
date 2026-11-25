@@ -17,7 +17,7 @@ import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.t
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
 import { spriteDataUrl } from './sprites.ts'
 import {
-  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, shopSpot, STATIC_DYNAMIC, TILE, tileOf,
+  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, STATIC_DYNAMIC, TILE, tileOf,
   type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
 } from './map.ts'
 import { mapFor } from './maps/index.ts'
@@ -281,16 +281,9 @@ const COARSE_QUERY = '(any-pointer: coarse)'
 const coarseQuery = (): MediaQueryList | null =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(COARSE_QUERY) : null
 
-/**
- * 서 있는 자리에서 할 수 있는 일. 앞 타일로 정하되(interactionAt),
- * 상점 문 앞 칸에서는 어느 쪽을 보든 상점이다(시작 위치가 문 앞에서 아래를 본다).
- */
+/** 서 있는 자리에서 할 수 있는 일(앞 타일·고정물로 정한다, interactionAt) */
 function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
-  const front = interactionAt(map, p.pos, p.facing, opened, dyn)
-  if (front) return front
-  const t = tileOf(p.pos)
-  const door = shopSpot(map)
-  return door && t.tx === door.tx && t.ty === door.ty ? { kind: 'shop' } : null
+  return interactionAt(map, p.pos, p.facing, opened, dyn)
 }
 function interactionKey(i: Interaction): string {
   if (!i) return ''

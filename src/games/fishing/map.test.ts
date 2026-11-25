@@ -14,7 +14,8 @@ import {
   openExitAt,
   pierEnd,
   reachableTiles,
-  shopSpot,
+  doorSpot,
+  blockedBetween,
   spotFor,
   tileAt,
   tileOf,
@@ -39,8 +40,8 @@ import { feetBlocked, stepWalk, type Player } from './walk.ts'
 const MAP_W = VILLAGE.w
 const MAP_H = VILLAGE.h
 const MAP_ROWS = VILLAGE.rows
-const SHOP = VILLAGE.shop!
-const SHOP_SPOT = shopSpot(VILLAGE)!
+const SHOP = VILLAGE.building!
+const SHOP_SPOT = doorSpot(VILLAGE)!
 const SPAWN = VILLAGE.spawn
 const PIER_END = pierEnd(VILLAGE)!
 
@@ -104,10 +105,10 @@ describe('map grid', () => {
     const underTeleporter = (tx: number, ty: number) => tx >= t.tx && tx < t.tx + t.w && ty >= t.ty && ty < t.ty + t.h
     const walkable = new Set<TileKind>()
     for (const { tx, ty } of allTiles()) if (isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN)) walkable.add(tileAt(VILLAGE, tx, ty)!)
-    expect([...walkable].sort()).toEqual(['dock', 'flower', 'grass', 'path', 'pier', 'sand'])
+    expect([...walkable].sort()).toEqual(['dock', 'door', 'flower', 'grass', 'path', 'pier', 'sand'])
     for (const { tx, ty } of allTiles()) {
       const k = tileAt(VILLAGE, tx, ty)!
-      const expected = !underTeleporter(tx, ty) && ['sand', 'grass', 'path', 'pier', 'flower', 'dock'].includes(k)
+      const expected = !underTeleporter(tx, ty) && ['sand', 'grass', 'path', 'pier', 'flower', 'dock', 'door'].includes(k)
       expect(isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN), `(${tx},${ty})`).toBe(expected)
     }
   })
@@ -167,26 +168,11 @@ describe('shop', () => {
     expect(isWalkable(VILLAGE, SHOP_SPOT.tx, SHOP_SPOT.ty, ALL_AREAS_OPEN)).toBe(true)
   })
 
-  it('SPAWN facing up interacts with the shop; other facings do not', () => {
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'shop' })
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'down', ALL_AREAS_OPEN)).toBeNull()
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'left', ALL_AREAS_OPEN)).toBeNull()
-    expect(interactionAt(VILLAGE, SPAWN.pos, 'right', ALL_AREAS_OPEN)).toBeNull()
+  it('문 칸은 걸을 수 있고, 문 앞에서 위를 봐도 상점 상호작용은 없다(문은 출구)', () => {
+    expect(isWalkable(VILLAGE, SHOP.doorTx, SHOP.ty + SHOP.h - 1, ALL_AREAS_OPEN)).toBe(true)
+    for (const f of FACINGS) expect(interactionAt(VILLAGE, SPAWN.pos, f, ALL_AREAS_OPEN)?.kind === 'shop', f).toBe(false)
   })
 
-  it('SHOP_SPOT is the only tile in the map with a shop interaction', () => {
-    const shopTiles: { tx: number; ty: number }[] = []
-    for (const { tx, ty } of allTiles()) {
-      for (const f of FACINGS) {
-        const hit = interactionAt(VILLAGE, center(tx, ty), f, ALL_AREAS_OPEN)
-        if (hit?.kind === 'shop') {
-          expect(f).toBe('up')
-          shopTiles.push({ tx, ty })
-        }
-      }
-    }
-    expect(shopTiles).toEqual([SHOP_SPOT])
-  })
 })
 
 describe('fishing spots', () => {
@@ -395,8 +381,8 @@ describe('defineMap', () => {
 
   it('has shop null and spawns on the first walkable tile when there is no door', () => {
     const map = defineMap('river', ['TTTT', 'T,,T', 'TTTT'])
-    expect(map.shop).toBeNull()
-    expect(shopSpot(map)).toBeNull()
+    expect(map.building).toBeNull()
+    expect(doorSpot(map)).toBeNull()
     expect(pierEnd(map)).toBeNull()
     expect(map.spawn).toEqual({ pos: center(1, 1), facing: 'down' })
     expect([map.w, map.h]).toEqual([4, 3])
@@ -404,8 +390,8 @@ describe('defineMap', () => {
 
   it('computes the shop and spawns in front of the door', () => {
     const map = defineMap('village', ['BBB,', 'BDB,', ',,,,'])
-    expect(map.shop).toEqual({ tx: 0, ty: 0, w: 3, h: 2, doorTx: 1 })
-    expect(shopSpot(map)).toEqual({ tx: 1, ty: 2 })
+    expect(map.building).toEqual({ tx: 0, ty: 0, w: 3, h: 2, doorTx: 1 })
+    expect(doorSpot(map)).toEqual({ tx: 1, ty: 2 })
     expect(map.spawn).toEqual({ pos: center(1, 2), facing: 'down' })
   })
 })
@@ -851,5 +837,42 @@ describe('산정 호수·난파선 타일', () => {
   it('castTarget: 바다·심해가 섞여도 계속 날아가고 선체 앞에서 멈춘다', () => {
     const m = defineMap('lake', ['e~vvvn'], { spots: { water: 'wreck', deep: 'abyss' } })
     expect(castTarget(m, center(0, 0), 'right', 1)).toEqual(center(4, 0))
+  })
+})
+
+describe('실내 맵 엔진', () => {
+  const rows = ['YYYYY', 'YFFFY', 'YFFFY', 'YYYYY']
+  const m = defineMap('cave', rows, {
+    walls: { v: [[2, 1, 2]] },
+    fixtures: [{ front: { tx: 1, ty: 1, facing: 'up' }, act: { kind: 'notice', text: '안내' } }],
+  })
+  it('F는 걷고 Y는 못 걷는다', () => {
+    expect(isWalkable(m, 1, 1, ALL_AREAS_OPEN)).toBe(true)
+    expect(isWalkable(m, 0, 1, ALL_AREAS_OPEN)).toBe(false)
+  })
+  it('벽 모서리: blockedBetween은 양방향, 다른 모서리는 열림', () => {
+    expect(blockedBetween(m, 1, 1, 1, 0)).toBe(true)
+    expect(blockedBetween(m, 2, 1, -1, 0)).toBe(true)
+    expect(blockedBetween(m, 1, 1, 0, 1)).toBe(false)
+    expect(blockedBetween(m, 2, 1, 1, 0)).toBe(false)
+  })
+  it('reachableTiles는 벽 모서리를 건너지 않는다', () => {
+    const r = reachableTiles(m, [{ tx: 1, ty: 1 }], ALL_AREAS_OPEN)
+    expect(r.has('1,2')).toBe(true)
+    expect(r.has('2,1')).toBe(false)
+  })
+  it('고정물 front에서 그 방향을 보면 act, 다른 방향은 null', () => {
+    expect(interactionAt(m, center(1, 1), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '안내' })
+    expect(interactionAt(m, center(1, 1), 'down', ALL_AREAS_OPEN)).toBeNull()
+  })
+  it('고정물 front가 못 걷는 칸이면 throw', () => {
+    expect(() => defineMap('cave', rows, { fixtures: [{ front: { tx: 0, ty: 0, facing: 'up' }, act: { kind: 'laptop' } }] })).toThrow(/fixture 0 front/)
+  })
+  it('onWorldMap 기본 true, backdrop 기본 null; 지정하면 그대로', () => {
+    expect(VILLAGE.onWorldMap).toBe(true)
+    expect(VILLAGE.backdrop).toBeNull()
+    const n = defineMap('cave', rows, { onWorldMap: false, backdrop: 'x' })
+    expect(n.onWorldMap).toBe(false)
+    expect(n.backdrop).toBe('x')
   })
 })

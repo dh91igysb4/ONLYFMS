@@ -5,7 +5,7 @@
 import { AREAS, CHALLENGES, DEFAULT_AREAS, SPECIES, speciesAvailable, spotOpen, type AreaId, type Rarity, type Species } from './data.ts'
 import { inHours, type Conditions } from './clock.ts'
 import {
-  ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, shopSpot, tileAt,
+  ALL_AREAS_OPEN, TILE, WATER_KINDS, interactionAt, isWalkable, reachableTiles, doorSpot, tileAt,
   type Facing, type MapDef, type MapDynamic, type Opened, type Rect,
 } from './map.ts'
 import { MAPS, mapFor } from './maps/index.ts'
@@ -59,7 +59,7 @@ export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
   }
   for (const g of map.gates) if (!opened.has(g.area)) out.push({ kind: 'gate', ...rectMid(g.tiles), area: g.area })
   for (const d of map.docks) out.push({ kind: 'dock', tx: d.front.tx, ty: d.front.ty, target: d.target })
-  const shop = shopSpot(map)
+  const shop = doorSpot(map)
   if (shop) out.push({ kind: 'shop', ...shop })
   const tp = teleporterCell(map)
   if (tp) out.push({ kind: 'teleporter', ...tp })
@@ -70,7 +70,7 @@ export function placeMarkers(map: MapDef, opened: Opened): PlaceMarker[] {
 export function fixedCells(map: MapDef): Cell[] {
   const out: Cell[] = map.exits.map((e) => exitCell(map, e))
   for (const d of map.docks) out.push({ tx: d.front.tx, ty: d.front.ty })
-  const shop = shopSpot(map)
+  const shop = doorSpot(map)
   if (shop) out.push(shop)
   const tp = teleporterCell(map)
   if (tp) out.push(tp)

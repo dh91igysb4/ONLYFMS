@@ -1,5 +1,5 @@
 // 낚시 마을 이동·충돌·카메라. 순수 함수만 (React·DOM 없음).
-import { STATIC_DYNAMIC, TILE, isWalkable, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
+import { STATIC_DYNAMIC, TILE, edgeHits, isWalkable, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
 import { MAX_DT_MS } from './minigame.ts'
 
 export const WALK_SPEED = 72 // px/s (초당 4.5타일)
@@ -36,7 +36,7 @@ export function feetBlocked(map: MapDef, x: number, y: number, opened: Opened, d
   const ty0 = Math.floor((y - FEET.h / 2 + EDGE_EPS) / TILE)
   const ty1 = Math.floor((y + FEET.h / 2 - EDGE_EPS) / TILE)
   for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(map, tx, ty, opened, dyn)) return true
-  return false
+  return edgeHits(map, x - FEET.w / 2, y - FEET.h / 2, x + FEET.w / 2, y + FEET.h / 2)
 }
 
 export function stepWalk(map: MapDef, p: Player, input: MoveInput, dtMs: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Player {
