@@ -3235,6 +3235,17 @@ describe('fishing Game: 말풍선 (설계 2026-11-25-fishing-chat)', () => {
     expect(lastTick().show).toBeUndefined()
   })
 
+  test('빈 입력칸(공백만 포함)에서 엔터를 치면 말 입력칸이 닫히고 아무것도 보내지 않는다', async () => {
+    await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '말' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '할 말' }), { target: { value: '   ' } })
+    fireEvent.submit(screen.getByRole('textbox', { name: '할 말' }))
+    await advance(50)
+    expect(screen.queryByRole('textbox', { name: '할 말' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '말' })).toHaveAttribute('aria-pressed', 'false')
+    expect(lastTick().show).toBeUndefined()
+  })
+
   test('3초 안에 다시 말하면 보내지 않고 알린다; 3초 뒤에는 된다', async () => {
     await mount(makeView(), SAND)
     fireEvent.click(screen.getByRole('button', { name: '말' }))

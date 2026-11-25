@@ -1295,7 +1295,14 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   /** 말하기: 정리한 말이 비면 무시, 3초에 한 번. 보낸 뒤 입력칸은 비우고 열어 둔다 */
   function chat() {
     const text = cleanChat(chatText)
-    if (!text) return
+    if (!text) {
+      // 빈 채로 엔터 = 입력칸 닫기(게임으로 초점을 돌려 바로 걷게)
+      setChatOpen(false)
+      setChatText('')
+      setChatHint(null)
+      focusGame()
+      return
+    }
     const now = Date.now()
     if (now - lastChatAt.current < CHAT_GAP_MS) {
       setChatHint('잠시 뒤에 다시 말할 수 있어요')
