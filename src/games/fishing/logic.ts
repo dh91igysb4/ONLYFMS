@@ -2,7 +2,7 @@
 import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
-  AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
+  AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, FRIDGE_SIZE, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
   LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
   TIDE_GRACE_MIN, UNLOCKS,
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId,
@@ -168,10 +168,15 @@ export function progressChallenges(
   return { challenges, completed }
 }
 
-/** 그 지역 순간이동기가 켜져 있는가: 지역이 열려 있고 그 지역 과제를 깼다 */
+/**
+ * 그 지역 순간이동기가 켜져 있는가: 지역이 열려 있고 그 지역 과제를 깼다.
+ * 과제가 없는 지역(마을회관)은 이동기가 있으면 열려 있는 것만으로 켜진다(v18).
+ */
 export function teleporterOpen(state: Pick<State, 'areas' | 'challenges'>, area: AreaId): boolean {
+  if (!state.areas.includes(area)) return false
   const ch = CHALLENGES.find((c) => c.area === area)
-  return !!ch && state.areas.includes(area) && state.challenges[ch.id]?.done === true
+  if (!ch) return teleporterWorld(area) !== null
+  return state.challenges[ch.id]?.done === true
 }
 
 // ---------------------------------------------------------------- WorldLogic
@@ -222,8 +227,12 @@ export type State = {
   buffs: BuffId[]
   /** 오늘(KST) 판 마릿수(판매 마릿수 감쇠, v15). day가 오늘이 아니면 0으로 본다 */
   sold: Sold
+  /** 마을회관 냉장고(보관만, FRIDGE_SIZE칸, v18). 잠금 표시는 그대로 둔다 */
+  fridge: Fish[]
   pending: Pending | null
 }
+/** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
+export type DiscardAt = 'bag' | 'trash'
 export type Action =
   | { type: 'cast'; area: string; power: number; spot?: string }
   | { type: 'hook' }
@@ -231,7 +240,10 @@ export type Action =
   | { type: 'sell' }
   | { type: 'lock'; index: number; locked: boolean }
   // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed. species·sizeCm이 그 칸과 다르면 bag_changed
-  | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number }
+  | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number; at?: DiscardAt }
+  // 마을회관 냉장고(v18): species·sizeCm이 그 칸과 다르면 bag_changed / fridge_changed
+  | { type: 'store'; index: number; species: string; sizeCm: number }
+  | { type: 'takeOut'; index: number; species: string; sizeCm: number }
   // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
   | { type: 'buyRod'; tier: number; price: number }
   | { type: 'buyBag'; tier: number; price: number }
@@ -245,7 +257,7 @@ export type Action =
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
 // sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
-export type View = Omit<State, 'pending' | 'buffs' | 'sold'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; gold: number }
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -279,6 +291,7 @@ const init = (): State => ({
   outfit: { ...DEFAULT_OUTFIT },
   buffs: [],
   sold: { day: '', n: 0 },
+  fridge: [],
   pending: null,
 })
 
@@ -433,9 +446,12 @@ function sell(state: State, now: number): Out {
   }
 }
 
-/** 버리기 환경부담금(설계 2026-11-25-fishing-brag-discard): 판매가(감쇠 전, 버프 포함)의 10% 올림, 최소 1 G. 화면도 이 함수를 쓴다 */
-export function discardFee(f: Pick<Fish, 'species' | 'sizeCm' | 'perfect'>, buffs: readonly BuffId[]): number {
-  return Math.max(1, Math.ceil(sellPrice(f, buffs) / 10))
+/**
+ * 버리기 환경부담금(마을회관 설계 §5, v18): 판매가(감쇠 전, 버프 포함)의 가방 50%·쓰레기통 5% 올림, 최소 1 G.
+ * 화면도 이 함수를 쓴다.
+ */
+export function discardFee(f: Pick<Fish, 'species' | 'sizeCm' | 'perfect'>, buffs: readonly BuffId[], at: DiscardAt = 'bag'): number {
+  return Math.max(1, Math.ceil(sellPrice(f, buffs) / (at === 'trash' ? 20 : 2)))
 }
 
 function discard(state: State, a: Record<string, unknown>, gold: number): Out {
@@ -445,10 +461,35 @@ function discard(state: State, a: Record<string, unknown>, gold: number): Out {
   // 화면이 본 물고기와 다르면(다른 탭·응답 유실로 칸이 밀림) 버리지 않는다
   if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
   if (f.locked) return { error: 'locked' }
-  const fee = discardFee(f, state.buffs ?? [])
+  if (a.at !== undefined && a.at !== 'bag' && a.at !== 'trash') return { error: 'bad_action' }
+  const fee = discardFee(f, state.buffs ?? [], a.at === 'trash' ? 'trash' : 'bag')
   if (a.fee !== fee) return { error: 'price_changed' }
   if (gold < fee) return { error: 'not_enough_gold' }
   return { state: { ...state, bag: state.bag.filter((_, j) => j !== i) }, result: { fee }, gold: -fee }
+}
+
+const validIndex = (i: unknown, len: number): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < len
+
+/** 가방 칸 → 냉장고 끝(잠금 유지) */
+function store(state: State, a: Record<string, unknown>): Out {
+  if (state.pending) return { error: 'busy' }
+  if (!validIndex(a.index, state.bag.length)) return { error: 'bad_action' }
+  const f = state.bag[a.index]
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+  if (state.fridge.length >= FRIDGE_SIZE) return { error: 'fridge_full' }
+  const i = a.index
+  return { state: { ...state, bag: state.bag.filter((_, j) => j !== i), fridge: [...state.fridge, f] } }
+}
+
+/** 냉장고 칸 → 가방 끝 */
+function takeOut(state: State, a: Record<string, unknown>): Out {
+  if (state.pending) return { error: 'busy' }
+  if (!validIndex(a.index, state.fridge.length)) return { error: 'bad_action' }
+  const f = state.fridge[a.index]
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'fridge_changed' }
+  if (state.bag.length >= bagSize(state.bagTier)) return { error: 'bag_full' }
+  const i = a.index
+  return { state: { ...state, fridge: state.fridge.filter((_, j) => j !== i), bag: [...state.bag, f] } }
 }
 
 function lock(state: State, a: Record<string, unknown>): Out {
@@ -582,16 +623,21 @@ function migrate(raw: unknown, fromVersion: number): State {
     ? raw.areas.filter((x): x is AreaId => typeof x === 'string' && knownAreas.includes(x))
     : []
   const areas = [...new Set<AreaId>([...DEFAULT_AREAS, ...extra])]
-  const bag: Fish[] = []
-  if (Array.isArray(raw.bag)) {
-    for (const f of raw.bag) {
+  const fishList = (v: unknown): Fish[] => {
+    const out: Fish[] = []
+    if (!Array.isArray(v)) return out
+    for (const f of v) {
       if (isObj(f) && knownSpecies(f.species) && isNum(f.sizeCm) && typeof f.perfect === 'boolean') {
         // v4까지는 잠금이 없었다: 가방에 있던 전설은 잠가 둔다. v5부터는 저장된 잠금 그대로.
         const locked = fromVersion < 5 ? !!speciesById(f.species).legend : f.locked === true
-        bag.push({ species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
+        out.push({ species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
       }
     }
+    return out
   }
+  const bag = fishList(raw.bag)
+  // v17 이하에는 냉장고가 없다
+  const fridge = fishList(raw.fridge).slice(0, FRIDGE_SIZE)
   const dex: State['dex'] = {}
   if (isObj(raw.dex)) {
     for (const [id, e] of Object.entries(raw.dex)) {
@@ -650,6 +696,7 @@ function migrate(raw: unknown, fromVersion: number): State {
     outfit,
     buffs,
     sold: parseSold(raw.sold),
+    fridge,
     pending: null,
   }
 }
@@ -693,7 +740,7 @@ export const logic: WorldLogic<State, Action, View> = {
   //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
   // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
   // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
-  version: 17,
+  version: 18,
   wallet: true,
   init,
   migrate,
@@ -730,6 +777,10 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return sell(state, ctx.now)
     case 'lock':
       return lock(state, action)
+    case 'store':
+      return store(state, action)
+    case 'takeOut':
+      return takeOut(state, action)
     case 'discard':
       return discard(state, action, ctx.gold)
     case 'buyRod':
