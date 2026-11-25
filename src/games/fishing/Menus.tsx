@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SHOES, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { discardFee, freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type DiscardAt, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
@@ -242,9 +242,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
   )
 }
 
-type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyTackle(id: TackleId): void }
+type ShopProps = { view: View; busy: boolean; onSell(): void; onBuy(tier: number): void; onBuyBag(tier: number): void; onBuyShoes?(tier: number): void; onBuyTackle(id: TackleId): void }
 
-export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: ShopProps) {
+export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyShoes, onBuyTackle }: ShopProps) {
   // 잠긴 물고기는 팔리지 않는다 (서버 sell과 같은 규칙)
   const selling = view.bag.filter((f) => !f.locked)
   const lockedCount = view.bag.length - selling.length
@@ -253,6 +253,9 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
   const bagValue = saleEstimate(selling, buffsOf(view), soldNow)
   const top = RODS[RODS.length - 1].tier
   const topBag = BAGS[BAGS.length - 1].tier
+  // 옛 서버 응답(shoesTier 없음)은 기본 장화
+  const shoesTier = view.shoesTier ?? 1
+  const topShoes = SHOES[SHOES.length - 1].tier
   const slots = tackleSlots(view.rodTier)
   const ownedTackles = view.tackles ?? []
   const equippedTackles = view.equipped ?? []
@@ -324,6 +327,38 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyTackle }: 
                   aria-label={`${name} 구매`}
                   disabled={busy || short}
                   onClick={() => onBuyBag(bag.tier)}
+                >
+                  구매
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <h3 className="fish-panel-sub">신발</h3>
+      {shoesTier >= topShoes && <p className="fish-shop-note">신발은 최고 단계예요</p>}
+      <ul className="fish-rods" aria-label="신발 목록">
+        {SHOES.map((sh) => {
+          const owned = sh.tier <= shoesTier
+          const next = sh.tier === shoesTier + 1
+          const short = view.gold < sh.price
+          return (
+            <li key={sh.tier} className={`fish-rod${owned ? ' fish-rod-owned' : ''}`}>
+              <div className="fish-rod-info">
+                <strong>{sh.name}</strong>
+                <span className="muted">{sh.price === 0 ? '기본' : gold(sh.price)}</span>
+                <span className="muted">{`걷기 ×${sh.speed}`}</span>
+                {owned && <span className="fish-rod-state">{sh.tier === shoesTier ? '사용 중' : '보유'}</span>}
+                {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
+                {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
+              </div>
+              {next && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  aria-label={`${sh.name} 구매`}
+                  disabled={busy || short}
+                  onClick={() => onBuyShoes?.(sh.tier)}
                 >
                   구매
                 </button>

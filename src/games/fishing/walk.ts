@@ -4,6 +4,8 @@ import { MAX_DT_MS } from './minigame.ts'
 
 export const WALK_SPEED = 72 // px/s (초당 4.5타일)
 export const FEET = { w: 10, h: 6 } // pos 중심의 발 사각형
+/** 한 걸음(쪼갠 이동) 최대 거리. 발 높이(6)보다 작아야 얇은 벽을 건너뛰지 않는다. 기본 속도·최대 dt(3.6px)는 쪼개지지 않는다 */
+const MAX_SUBSTEP_PX = 4
 
 export type Player = { pos: Vec; facing: Facing; moving: boolean; walkMs: number }
 export type MoveInput = { x: number; y: number } // 길이 ≤ 1
@@ -39,17 +41,23 @@ export function feetBlocked(map: MapDef, x: number, y: number, opened: Opened, d
   return edgeHits(map, x - FEET.w / 2, y - FEET.h / 2, x + FEET.w / 2, y + FEET.h / 2)
 }
 
-export function stepWalk(map: MapDef, p: Player, input: MoveInput, dtMs: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Player {
+/** speed: 신발 배율(shoeSpeed, 기본 1) */
+export function stepWalk(map: MapDef, p: Player, input: MoveInput, dtMs: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC, speed = 1): Player {
   const dt = Math.min(Math.max(dtMs, 0), MAX_DT_MS)
   if (input.x === 0 && input.y === 0) return { pos: { ...p.pos }, facing: p.facing, moving: false, walkMs: 0 }
 
-  const dist = (WALK_SPEED * dt) / 1000
+  const dist = (WALK_SPEED * speed * dt) / 1000
+  // 한 번에 MAX_SUBSTEP_PX보다 멀리 가면 쪼갠다: 얇은 유리벽(칸 사이 모서리)을 발 높이(6px)보다 큰 걸음으로 건너뛰지 않게(빠른 신발)
+  const n = Math.max(1, Math.ceil(dist / MAX_SUBSTEP_PX))
+  const d = dist / n
   let x = p.pos.x
   let y = p.pos.y
-  const nx = x + input.x * dist
-  if (!feetBlocked(map, nx, y, opened, dyn)) x = nx
-  const ny = y + input.y * dist
-  if (!feetBlocked(map, x, ny, opened, dyn)) y = ny
+  for (let i = 0; i < n; i++) {
+    const nx = x + input.x * d
+    if (!feetBlocked(map, nx, y, opened, dyn)) x = nx
+    const ny = y + input.y * d
+    if (!feetBlocked(map, x, ny, opened, dyn)) y = ny
+  }
 
   const facing: Facing =
     Math.abs(input.x) >= Math.abs(input.y) ? (input.x < 0 ? 'left' : 'right') : input.y < 0 ? 'up' : 'down'

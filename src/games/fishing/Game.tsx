@@ -10,7 +10,7 @@ import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../pl
 import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
-import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
+import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -880,7 +880,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       stepTransition(dt)
     } else if (rt.phase === 'idle' && !menuRef.current && !rt.drill) {
       const input = rt.stick.x !== 0 || rt.stick.y !== 0 ? rt.stick : keysVector(rt.keys)
-      rt.player = stepWalk(rt.map, rt.player, input, dt, opened, dyn)
+      rt.player = stepWalk(rt.map, rt.player, input, dt, opened, dyn, shoeSpeed(viewRef.current?.shoesTier ?? 1))
       // 걷는 중에만 출구를 본다(낚시 단계·메뉴·전환 중에는 보지 않는다). 안 연 지역·맵이 없는 지역으로 가는 출구는 무시한다
       const exit = openExitAt(rt.map, rt.player.pos, opened)
       if (exit && mapFor(exit.target)) {
@@ -1375,6 +1375,15 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     }
   }
 
+  async function buyShoes(tier: number) {
+    setNotice(null)
+    try {
+      await act({ type: 'buyShoes', tier, price: SHOES.find((s) => s.tier === tier)?.price ?? -1 })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
   async function buyTackle(id: TackleId) {
     setNotice(null)
     try {
@@ -1674,6 +1683,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   onSell={() => void sell()}
                   onBuy={(t) => void buyRod(t)}
                   onBuyBag={(t) => void buyBag(t)}
+                  onBuyShoes={(t) => void buyShoes(t)}
                   onBuyTackle={(id) => void buyTackle(id)}
                 />
               )}

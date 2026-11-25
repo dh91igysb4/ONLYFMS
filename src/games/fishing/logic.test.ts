@@ -343,7 +343,8 @@ function migrateW(raw: unknown, from: number): WS {
 }
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
 // v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
-const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[] }
+// + v20 신발(옛 세이브는 기본 장화)
+const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[], shoesTier: 1 }
 const ok = (r: Played) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
   return r
@@ -360,7 +361,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(19)
+    expect(logic.version).toBe(20)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -1625,7 +1626,7 @@ describe('migrate 버프 (v11)', () => {
   })
   it('v10(옷장) 세이브: 산 옷·업적 옷·입은 옷이 그대로 남고 buffs []', () => {
     const v10 = { ...v9, wardrobe: ['hat:straw', 'top:marine', 'hat:crown'], outfit: { ...DEFAULT_OUTFIT, hat: 'straw', top: 'marine' } }
-    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 }, fridge: [] })
+    expect(migrateW(v10, 10)).toEqual({ ...v10, buffs: [], sold: { day: '', n: 0 }, fridge: [], shoesTier: 1 })
     // 옷장 행동은 v11에서도 그대로
     const s = migrateW(v10, 10)
     const r = play(s, { type: 'wear', slot: 'hat', id: 'crown' }, { now: T0, rng: fixedRng })
@@ -2017,7 +2018,7 @@ describe('v14 지갑 계약', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
-    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [] })
+    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1 })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2188,8 +2189,35 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 19', () => {
-    expect(logic.version).toBe(19)
+  it('version 20', () => {
+    expect(logic.version).toBe(20)
+  })
+})
+
+describe('신발 (logic.version 20)', () => {
+  it('buyShoes 1→2 at 1,000 gold: shoesTier 2, 골드 -1,000, 다른 값 그대로', () => {
+    const r = ok(play(fresh({ gold: 1000, totalEarned: 900 }), { type: 'buyShoes', tier: 2, price: 1000 }, ctx()))
+    expect(r.state).toMatchObject({ gold: 0, shoesTier: 2, totalEarned: 900, bagTier: 1, rodTier: 1 })
+  })
+  it('buyShoes: 2→3 6,000, 3→4 30,000; 모자라면 not_enough_gold, 다른 가격이면 price_changed', () => {
+    expect(ok(play(fresh({ gold: 6000, shoesTier: 2 }), { type: 'buyShoes', tier: 3, price: 6000 }, ctx())).state).toMatchObject({ gold: 0, shoesTier: 3 })
+    expect(ok(play(fresh({ gold: 30000, shoesTier: 3 }), { type: 'buyShoes', tier: 4, price: 30000 }, ctx())).state).toMatchObject({ gold: 0, shoesTier: 4 })
+    expect(err(play(fresh({ gold: 999 }), { type: 'buyShoes', tier: 2, price: 1000 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 1e6 }), { type: 'buyShoes', tier: 2, price: 900 }, ctx()))).toBe('price_changed')
+  })
+  it('buyShoes: 건너뛰기·형식 오류·지금 단계·최고 다음은 bad_tier', () => {
+    const rich = deepFreeze(fresh({ gold: 1e6 }))
+    for (const tier of [3, '2', 2.5, 1, 0, NaN, null, 5]) {
+      expect(err(play(rich, { type: 'buyShoes', tier, price: 1000 } as unknown as Action, ctx()))).toBe('bad_tier')
+    }
+    expect(err(play(deepFreeze(fresh({ gold: 1e6, shoesTier: 4 })), { type: 'buyShoes', tier: 5, price: 0 }, ctx()))).toBe('bad_tier')
+  })
+  it('migrate: v19 세이브(신발 없음)는 기본 장화, 저장된 단계는 그대로, 모르는 값은 1', () => {
+    const v19 = { ...logic.init() } as Record<string, unknown>
+    delete v19.shoesTier
+    expect(logic.migrate(structuredClone(v19), 19)).toEqual({ ...logic.init(), shoesTier: 1 })
+    expect(logic.migrate({ ...logic.init(), shoesTier: 3 }, 20).shoesTier).toBe(3)
+    for (const bad of [0, 5, '2', 2.5, null]) expect(logic.migrate({ ...logic.init(), shoesTier: bad }, 20).shoesTier).toBe(1)
   })
 })
 

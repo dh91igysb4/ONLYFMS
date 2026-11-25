@@ -1680,6 +1680,31 @@ describe('fishing Game: walking and interaction', () => {
     expect(screen.getByText('0/30')).toBeInTheDocument()
   })
 
+  test('shop: 신발 4종(이름·가격·속도), shoesTier 없는 응답은 기본 장화 사용 중, 딱 맞는 골드로 운동화를 사면 buyShoes', async () => {
+    const view = makeView({ gold: 1000 })
+    await mountAtShop(view)
+    route({ buyShoes: () => ok({ ...view, gold: 0, shoesTier: 2 }) })
+    const shoes = screen.getByRole('list', { name: '신발 목록' })
+    for (const t of ['기본 장화', '운동화', '러닝화', '재원이의 군화']) expect(within(shoes).getByText(t)).toBeInTheDocument()
+    expect(within(shoes).getByText('걷기 ×1.25')).toBeInTheDocument()
+    expect(within(shoes).getByText('30,000 G')).toBeInTheDocument()
+    expect(within(shoes).getByText('사용 중')).toBeInTheDocument()
+    const buy = within(shoes).getByRole('button', { name: '운동화 구매' })
+    expect(buy).toBeEnabled()
+    expect(within(shoes).queryByRole('button', { name: '러닝화 구매' })).not.toBeInTheDocument()
+    fireEvent.click(buy)
+    await flush()
+    expect(calls('buyShoes')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyShoes', tier: 2, price: 1000 } }])
+  })
+
+  test('shop: 신발은 1 G 모자라면 꺼지고, 최고 단계면 그렇게 알린다', async () => {
+    const { unmount } = await mountAtShop(makeView({ gold: 999 }))
+    expect(within(screen.getByRole('list', { name: '신발 목록' })).getByRole('button', { name: '운동화 구매' })).toBeDisabled()
+    unmount()
+    await mountAtShop(makeView({ gold: 0, shoesTier: 4 }))
+    expect(screen.getByText('신발은 최고 단계예요')).toBeInTheDocument()
+  })
+
   test('shop: a bag upgrade is disabled one gold short, and the top bag says so', async () => {
     const { unmount } = await mountAtShop(makeView({ gold: 799 }))
     const bags = screen.getByRole('list', { name: '가방 목록' })

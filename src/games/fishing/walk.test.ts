@@ -69,6 +69,12 @@ describe('stepWalk', () => {
     expect(Math.hypot(p.pos.x - start.x, p.pos.y - start.y)).toBeLessThan(WALK_SPEED + 0.5)
   })
 
+  it('신발 배율: speed 1.75면 같은 입력·시간의 이동 거리가 1.75배', () => {
+    const start = player(center(open!.tx, open!.ty))
+    const a = stepWalk(VILLAGE, start, { x: 1, y: 0 }, 40, ALL_AREAS_OPEN)
+    const b = stepWalk(VILLAGE, start, { x: 1, y: 0 }, 40, ALL_AREAS_OPEN, undefined, 1.75)
+    expect(b.pos.x - start.pos.x).toBeCloseTo((a.pos.x - start.pos.x) * 1.75, 6)
+  })
   it('물을 향해 아래로 걸으면 발이 물과 겹치기 전에 멈춘다', () => {
     const shore = findTile((tx, ty) => isWalkable(VILLAGE, tx, ty, ALL_AREAS_OPEN) && !isWalkable(VILLAGE, tx, ty + 1, ALL_AREAS_OPEN) && ty + 1 < MAP_H)
     expect(shore).not.toBeNull()
@@ -206,5 +212,12 @@ describe('벽 모서리', () => {
     let p: Player = { pos: { x: 1.5 * TILE, y: 1.2 * TILE }, facing: 'right', moving: false, walkMs: 0 }
     for (let i = 0; i < 60; i++) p = stepWalk(m, p, { x: Math.SQRT1_2, y: Math.SQRT1_2 }, 16, ALL_AREAS_OPEN)
     expect(p.pos.x + FEET.w / 2).toBeLessThanOrEqual(2 * TILE)
+  })
+  it('가장 빠른 신발(×1.75)로 한 프레임(MAX_DT_MS) 걸어도 얇은 가로 벽을 건너뛰지 않는다(발 높이 6px < 한 프레임 6.3px)', () => {
+    const g = defineMap('cave', ['YYYYY', 'YFFFY', 'YFFFY', 'YYYYY'], { walls: { h: [[2, 1, 3]] } })
+    // 발 아래쪽이 벽 모서리 0.1px 위
+    let p: Player = { pos: { x: 2.5 * TILE, y: 2 * TILE - FEET.h / 2 - 0.1 }, facing: 'down', moving: false, walkMs: 0 }
+    for (let i = 0; i < 5; i++) p = stepWalk(g, p, { x: 0, y: 1 }, MAX_DT_MS, ALL_AREAS_OPEN, undefined, 1.75)
+    expect(p.pos.y + FEET.h / 2).toBeLessThanOrEqual(2 * TILE)
   })
 })
