@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { discardFee, freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type View } from './logic.ts'
+import { discardFee, freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type DiscardAt, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -93,8 +93,10 @@ type BagProps = {
   onWardrobe?(): void
   /** 자랑하기: 이 칸의 물고기를 든다(설계 2026-11-25-fishing-brag-discard). 없으면 모드를 보이지 않는다 */
   onBrag?(index: number): void
-  /** 버리기: 확인한 칸과 화면이 본 환경부담금 */
-  onDiscard?(index: number, fee: number): void
+  /** 버리기: 확인한 칸, 화면이 본 환경부담금, 버리는 곳 */
+  onDiscard?(index: number, fee: number, at: DiscardAt): void
+  /** 버리는 곳(v18). 'trash'(마을회관 쓰레기통)면 버리기 모드로 열고 부담금 5%. 기본 'bag'(50%) */
+  discardAt?: DiscardAt
 }
 
 type BagMode = 'lock' | 'brag' | 'discard'
@@ -105,8 +107,8 @@ const BAG_MODES: readonly { mode: BagMode; label: string }[] = [
 ]
 
 /** atShop: 상점(마을회관 자판기) 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 모드에 따라 잠금·자랑·버리기. */
-export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard }: BagProps) {
-  const [mode, setMode] = useState<BagMode>('lock')
+export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard, discardAt = 'bag' }: BagProps) {
+  const [mode, setMode] = useState<BagMode>(discardAt === 'trash' ? 'discard' : 'lock')
   const [toss, setToss] = useState<number | null>(null)
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
   const slots = tackleSlots(view.rodTier)
@@ -195,11 +197,12 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
       )}
       {mode === 'discard' && toss !== null && view.bag[toss] && knownSpecies(view.bag[toss].species) && (() => {
         const f = view.bag[toss]
-        const fee = discardFee(f, buffsOf(view))
+        const fee = discardFee(f, buffsOf(view), discardAt)
+        const cheaper = discardAt === 'bag' ? ` · 쓰레기통에 버리면 ${gold(discardFee(f, buffsOf(view), 'trash'))}` : ''
         return (
           <div className="fish-discard-confirm">
-            <span>{`${speciesName(f.species)} ${f.sizeCm}cm 버리기 · 환경부담금 ${gold(fee)}`}</span>
-            <button type="button" className="btn btn-primary btn-sm" aria-label="버리기 확인" disabled={busy} onClick={() => { setToss(null); onDiscard?.(toss, fee) }}>
+            <span>{`${speciesName(f.species)} ${f.sizeCm}cm 버리기 · 환경부담금 ${gold(fee)}${cheaper}`}</span>
+            <button type="button" className="btn btn-primary btn-sm" aria-label="버리기 확인" disabled={busy} onClick={() => { setToss(null); onDiscard?.(toss, fee, discardAt) }}>
               버리기
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setToss(null)}>
