@@ -19,5 +19,6 @@ export const manifest: Manifest = {
     { key: 'challenges', label: '도전과제', unit: '개' },
     { key: 'isle_cleared', label: '섬 개간', unit: '구역' },
     { key: 'house', label: '집', unit: '단계' },
+    { key: 'deco', label: '섬 꾸미기', unit: '개' },
   ],
 }
