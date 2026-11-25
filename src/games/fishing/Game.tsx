@@ -8,6 +8,8 @@ import { getWorld } from '../index.ts'
 import { joinWorldRoom, type WorldRoom } from '../../platform/world/room.ts'
 import { joinWorldPresence, type OnlinePeer, type WorldPresence } from '../../platform/world/presence.ts'
 import { syncTags, type Tag } from './peerTags.ts'
+import { BRAG_MS, bragCard, EMOTE_MS, EMOTES, encodeBrag, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
+import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SPECIES, UNLOCKS, type AreaId, type BuffId, type TackleId } from './data.ts'
 import { sellPrice, teleporterOpen, type Action, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
@@ -311,6 +313,9 @@ export function Game({ gameId }: WorldGameProps) {
   // 온라인(같은 지역 친구, 설계 2026-11-24-fishing-online-design.md): 숨김 게임이면 관리자만 방에 들어간다
   const canOnline = !!profile?.id && !!profile?.handle && !(getWorld(gameId)?.manifest.hidden && !profile?.is_admin)
   const roomRef = useRef<{ area: AreaId; room: WorldRoom } | null>(null)
+  /** 지금 내 자랑·이모트(설계 2026-11-25-fishing-brag-discard). until은 Date.now() 기준 끝 시각 */
+  const showRef = useRef<{ code: string; show: Show; until: number } | null>(null)
+  const [emoteOpen, setEmoteOpen] = useState(false)
   const tagsRef = useRef<HTMLDivElement>(null)
   const peerOutfits = useRef(new Map<string, Outfit>())
   // 다른 지역까지 포함한 접속 중 친구(온라인 2단계-1): 게임 전체 프레즌스, 지역과 무관하게 한 번 들어간다
@@ -825,6 +830,9 @@ export function Game({ gameId }: WorldGameProps) {
     const fishing = rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' || rt.phase === 'lost'
     const { pos } = rt.player
     const camera = cameraFor(rt.map, { x: Math.round(pos.x), y: Math.round(pos.y) }, size)
+    // 자랑·이모트 끝내기: 시간이 지나면, 자랑은 걷거나 낚시를 시작하면 바로
+    const sh = showRef.current
+    if (sh && (Date.now() >= sh.until || (sh.show.kind === 'brag' && (rt.player.moving || rt.phase !== 'idle' || rt.trans)))) showRef.current = null
     const others = stepOnline(camera)
     drawWorld(ctx, {
       map: rt.map,
@@ -848,6 +856,7 @@ export function Game({ gameId }: WorldGameProps) {
       drill: rt.drill,
       mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
       others,
+      holding: showRef.current?.show.kind === 'brag' ? showRef.current.show.species : null,
     }, size)
   }
 
@@ -871,6 +880,19 @@ export function Game({ gameId }: WorldGameProps) {
     const room = roomRef.current?.room
     const tags: Tag[] = []
     const out: ScenePeer[] = []
+    const mine = showRef.current
+    /** 이름표 자리(머리 위, 자랑으로 든 물고기가 있으면 그 위)와 카드·이모트 */
+    const tagFor = (id: string, handle: string, x0: number, y0: number, show: Show | null): Tag => {
+      const fish = show?.kind === 'brag' ? SPRITES[`fish-${show.species}`] : undefined
+      const x = (Math.round(x0) - Math.round(camera.x)) * fit.scale
+      const y = (Math.round(y0) - PEER_H - (fish ? fish.h * 2 + 4 : 0) - Math.round(camera.y)) * fit.scale
+      const t: Tag = { id, handle, x, y, visible: x >= 0 && x <= fit.w * fit.scale && y >= 0 && y <= fit.h * fit.scale }
+      if (show?.kind === 'brag') t.card = bragCard(show)
+      if (show?.kind === 'emote') t.emote = show.char
+      return t
+    }
+    // 내 자랑·이모트는 친구가 없어도 내 화면에 보인다(이름표도 그동안만)
+    if (mine && profile?.id && profile.handle && !rt.trans) tags.push(tagFor(profile.id, profile.handle, rt.player.pos.x, rt.player.pos.y, mine.show))
     if (room && profile?.id && profile.handle) {
       const t = Date.now()
       const p = rt.player
@@ -879,6 +901,7 @@ export function Game({ gameId }: WorldGameProps) {
       room.tick(t, {
         id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
         outfit: JSON.stringify(outfitOf(viewRef.current)),
+        ...(mine ? { show: mine.code } : {}),
       })
       const memo = peerOutfits.current
       for (const o of room.peers(t)) {
@@ -888,10 +911,10 @@ export function Game({ gameId }: WorldGameProps) {
           if (memo.size > 64) memo.clear()
           memo.set(o.outfit, outfit)
         }
-        out.push({ pos: { x: o.x, y: o.y }, facing: o.facing, moving: o.moving, walkMs: o.moving ? t : 0, act: o.act, outfit })
-        const x = (Math.round(o.x) - Math.round(camera.x)) * fit.scale
-        const y = (Math.round(o.y) - PEER_H - Math.round(camera.y)) * fit.scale
-        tags.push({ id: o.id, handle: o.handle, x, y, visible: x >= 0 && x <= fit.w * fit.scale && y >= 0 && y <= fit.h * fit.scale })
+        const show = parseShow(o.show)
+        const holding = show?.kind === 'brag' ? show.species : null
+        out.push({ pos: { x: o.x, y: o.y }, facing: o.facing, moving: o.moving, walkMs: o.moving ? t : 0, act: o.act, outfit, holding })
+        tags.push(tagFor(o.id, o.handle, o.x, o.y, show))
       }
     }
     if (tagsRef.current) syncTags(tagsRef.current, tags)
@@ -1150,6 +1173,34 @@ export function Game({ gameId }: WorldGameProps) {
         const got = c ? ` · 오늘 상한으로 ${gold(c.got)}만 들어왔어요` : ''
         setNotice({ kind: 'info', text: `${gold(res.result.earned)}어치를 팔았어요${got}` })
       }
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
+  /** 자랑하기: 가방을 닫고 BRAG_MS 동안 든다. 걷거나 던지면 frame이 끝낸다 */
+  function brag(index: number) {
+    const f = viewRef.current?.bag[index]
+    if (!f) return
+    const code = encodeBrag(f)
+    const show = parseShow(code)
+    if (!show) return
+    showRef.current = { code, show, until: Date.now() + BRAG_MS }
+    closeMenu()
+  }
+
+  function emote(id: EmoteId) {
+    const code = encodeEmote(id)
+    const show = parseShow(code)
+    if (show) showRef.current = { code, show, until: Date.now() + EMOTE_MS }
+    setEmoteOpen(false)
+  }
+
+  async function discard(index: number, fee: number) {
+    setNotice(null)
+    try {
+      const res = await act<{ fee: number }>({ type: 'discard', index, fee })
+      if (alive.current && res.result) setNotice({ kind: 'info', text: `버렸어요 · 환경부담금 ${gold(res.result.fee)}` })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
@@ -1464,7 +1515,7 @@ export function Game({ gameId }: WorldGameProps) {
                 </button>
               </div>
               {menu === 'bag' && (
-                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} />
+                <BagPanel view={view} atShop={atShop} busy={busy} onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onWardrobe={() => setMenu('wardrobe')} onBrag={brag} onDiscard={(i, fee) => void discard(i, fee)} />
               )}
               {menu === 'shop' && (
                 <ShopPanel
@@ -1508,6 +1559,15 @@ export function Game({ gameId }: WorldGameProps) {
       {!fullscreen && notices}
 
       <div className="fish-bottom" ref={bottomRef}>
+        {emoteOpen && (
+          <div className="fish-emotes" role="group" aria-label="이모트">
+            {EMOTES.map((e) => (
+              <button key={e.id} type="button" className="btn btn-ghost btn-sm" onClick={() => emote(e.id)}>
+                {e.char}
+              </button>
+            ))}
+          </div>
+        )}
         <span className="fish-bag-count">
           가방 <strong>{view.bag.length}/{bagSize(view.bagTier)}</strong>
         </span>
@@ -1524,6 +1584,15 @@ export function Game({ gameId }: WorldGameProps) {
               {MENU_LABELS[m]}
             </button>
           ))}
+          <button
+            type="button"
+            className={`btn btn-sm ${emoteOpen ? 'btn-primary' : 'btn-ghost'}`}
+            aria-pressed={emoteOpen}
+            aria-expanded={emoteOpen}
+            onClick={() => setEmoteOpen((o) => !o)}
+          >
+            이모트
+          </button>
           <button
             type="button"
             className={`btn btn-sm ${fullscreen ? 'btn-primary' : 'btn-ghost'}`}

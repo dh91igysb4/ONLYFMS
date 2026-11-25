@@ -3,7 +3,7 @@
 // 안 잡은 물고기는 실루엣·등급·"지금" 칩만(이름·그림·조건은 alt·aria-label 어디에도 없다).
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { OnlinePeer } from '../../platform/world/presence.ts'
-import { AREAS, RARITY_NAMES, RODS, rodAtLeast, UNLOCKS, type AreaId, type Rarity } from './data.ts'
+import { AREAS, RARITY_NAMES, RODS, rodAtLeast, UNLOCKS, type AreaId } from './data.ts'
 import { LOW_TIDE_HOURS, SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
   areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, teleporterInfo, unlockPlace,
