@@ -3,7 +3,7 @@ import { LEAGUES } from './leagues.ts'
 import {
   applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
-  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
+  seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
 
 const PL = LEAGUES[0]
@@ -415,4 +415,29 @@ test('coverage_includes_eras_with_season_team_counts', () => {
   expect(era.counts).toEqual([0, 0, 0, 22, 0])
   expect(lg.counts).toEqual([0, 20, 0, 0])
   expect(lg.warn).toEqual([true, true, true, true]) // 1993은 정원 22에 못 미침, 1995 정원 20
+})
+
+test('historyStarts_off_keeps_starts', () => {
+  const r = historyStarts(new Map([['Q1', 2017], ['Q2', 2012]]), [], null)
+  expect([...r.starts]).toEqual([['Q1', 2017], ['Q2', 2012]])
+  expect(r.added).toEqual([])
+})
+
+test('historyStarts_pulls_every_team_back_to_from', () => {
+  const r = historyStarts(new Map([['Q1', 2017], ['Q2', 2012]]), [], 1987)
+  expect([...r.starts]).toEqual([['Q1', 1987], ['Q2', 1987]])
+})
+
+test('historyStarts_merges_history_clubs', () => {
+  const r = historyStarts(new Map([['Q1', 2017]]), [{ team_id: 'Q3', from: '1990' }, { team_id: 'Q1', from: '' }, { team_id: 'x', from: '' }], 1987)
+  expect([...r.starts]).toEqual([['Q1', 1987], ['Q3', 1990]])
+  expect(r.added).toEqual(['Q3'])
+  expect(r.invalid).toEqual(['x'])
+})
+
+test('applyLeagueNations_uses_era_competitions_too', () => {
+  const t = { id: 'Qold', kind: 'club', nation_id: 'Q145' } as unknown as Team
+  const n = applyLeagueNations([t], [{ team_id: 'Qold', competition_id: 'E1', season: '1990' }], [L92])
+  expect(n).toBe(1)
+  expect(t.nation_id).toBe(PL.nation_id)
 })

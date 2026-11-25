@@ -215,6 +215,25 @@ export function teamStarts(teamComps: readonly TeamCompetition[], leagueClubs: r
   return new Map([...m].sort((a, b) => cmp(a[0], b[0])))
 }
 
+/**
+ * 옛 선수 수집(설계 2026-11-25 §3.1·§3.2): 모든 대상 팀의 시작 연도를 from까지 당기고, manual/history_clubs.csv(team_id,from,note)
+ * 클럽을 같은 규칙(더 이른 해가 이김)으로 더한다. from이 null이면 그대로. 키는 QID 순.
+ */
+export function historyStarts(starts: ReadonlyMap<string, number>, historyClubs: readonly Row[], from: number | null): { starts: Map<string, number>; added: string[]; invalid: string[] } {
+  if (from === null) return { starts: new Map(starts), added: [], invalid: [] }
+  const m = new Map([...starts].map(([t, y]) => [t, Math.min(y, from)]))
+  const added: string[] = [], invalid: string[] = []
+  for (const r of historyClubs) {
+    const id = (r.team_id ?? '').trim()
+    if (!/^Q\d+$/.test(id)) { invalid.push(id); continue }
+    const y = r.from ? Number(r.from) : from
+    const cur = m.get(id)
+    if (cur === undefined) added.push(id)
+    m.set(id, cur === undefined ? y : Math.min(cur, y))
+  }
+  return { starts: new Map([...m].sort((a, b) => cmp(a[0], b[0]))), added: added.sort(cmp), invalid }
+}
+
 /** 레전드 수동 명단(manual/legends.csv)을 찾은 선수에 더한다. QID가 아닌 값은 invalid로 돌려준다 */
 export function mergeLegends(found: readonly string[], legends: readonly Row[]): { ids: string[]; added: string[]; invalid: string[] } {
   const have = new Set(found)
@@ -537,7 +556,7 @@ export function mergeTeamComps(a: readonly TeamCompetition[], manual: readonly R
  * 잉글랜드 대표팀(Q21)과 어긋나기 때문이다. 바꾼 개수를 돌려준다.
  */
 export function applyLeagueNations(teams: readonly Team[], teamComps: readonly TeamCompetition[], leagues: readonly League[]): number {
-  const nationOf = new Map(leagues.map((l) => [l.id, l.nation_id]))
+  const nationOf = new Map(leagues.flatMap((l) => [[l.id, l.nation_id] as const, ...(l.eras ?? []).map((e) => [e.id, l.nation_id] as const)]))
   const byTeam = new Map(teamComps.map((t) => [t.team_id, nationOf.get(t.competition_id)]))
   let n = 0
   for (const t of teams) {
