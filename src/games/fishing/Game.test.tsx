@@ -8,7 +8,7 @@ import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
-import { kstDay, price, type PendingView, type View } from './logic.ts'
+import { discardFee, kstDay, price, type PendingView, type View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -1217,10 +1217,10 @@ describe('fishing Game: walking and interaction', () => {
     expect(actionButton()).not.toHaveAttribute('disabled')
   })
 
-  test('the bottom row has bag, dex, challenges, map and fullscreen but no shop; the bag says where to sell', async () => {
+  test('the bottom row has bag, dex, challenges, map, emote and fullscreen but no shop; the bag says where to sell', async () => {
     const { container } = await mount()
     const bottom = container.querySelector('.fish-bottom') as HTMLElement
-    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '전체화면'])
+    expect(within(bottom).getAllByRole('button').map((b) => b.textContent)).toEqual(['가방', '도감', '과제', '지도', '이모트', '전체화면'])
     expect(screen.queryByRole('button', { name: '상점' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     expect(within(screen.getByRole('region', { name: '가방' })).getByText('상점에서 팔 수 있어요')).toBeInTheDocument()
@@ -2976,5 +2976,117 @@ describe('fishing Game: 다른 지역 친구(프레즌스)', () => {
     await mount(makeView(), SAND)
     await advance(50)
     expect(presGate.joins).toHaveLength(0)
+  })
+})
+
+describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-brag-discard)', () => {
+  const mack = { species: 'mackerel', sizeCm: 40, perfect: false }
+  const peer = (over: Record<string, unknown> = {}) => ({
+    id: 'u2', handle: 'son', x: SAND.pos.x, y: SAND.pos.y, facing: 'down', moving: false, act: 'walk', outfit: '{}', ...over,
+  })
+  const lastTick = () => roomGate.joins.at(-1)!.room.tick.mock.calls.at(-1)![1] as { show?: string }
+  const tagOf = (c: HTMLElement, id: string) => c.querySelector<HTMLElement>(`span.fish-peer-tag[data-id="${id}"]`)
+  const bagRegion = () => screen.getByRole('region', { name: '가방' })
+  beforeEach(() => {
+    roomGate.joins = []
+    roomGate.peers = []
+    roomGate.hidden = false
+    authGate.admin = false
+  })
+
+  test('자랑하기: 물고기를 누르면 가방이 닫히고 6초 동안 들며, 내 이름표 아래 카드·tick show', async () => {
+    const { container } = await mount(makeView({ bag: [mack] }), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '자랑하기' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
+    expect(screen.queryByRole('region', { name: '가방' })).toBeNull()
+    await advance(50)
+    expect(lastScene().holding).toBe('mackerel')
+    expect(lastTick().show).toBe('b:mackerel:40:0')
+    const me = tagOf(container, 'u1')!
+    expect(me.querySelector('.fish-peer-name')?.textContent).toBe('kane')
+    expect(me.querySelector('.fish-peer-card')?.textContent).toBe(`고등어 40cm · ${price('mackerel', 40, false).toLocaleString('ko-KR')} G · 흔함`)
+    await advance(6100)
+    expect(lastScene().holding ?? null).toBeNull()
+    expect(lastTick().show).toBeUndefined()
+    expect(tagOf(container, 'u1')).toBeNull()
+    expect(calls('lock')).toHaveLength(0)
+  })
+
+  test('잡은 직후 결과가 떠 있을 때 자랑해도 들고 있는다(결과가 끝나도 이어서)', async () => {
+    const view = makeView({ rodTier: 3 })
+    await castAndWait(view, 3000)
+    const fish = { species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
+    route({
+      hook: () => ok(view, { species: 'grouper', sizeCm: 100 }),
+      resolve: () => ok({ ...view, bag: [mack, fish], dex: { grouper: { count: 1, maxCm: 100 } }, legends: ['grouper'] }, { caught: fish }),
+    })
+    await advance(3100)
+    press()
+    release()
+    await flush()
+    vi.mocked(barResult).mockImplementation(() => 'caught')
+    await advance(200 + MIN_FIGHT_MS)
+    expect(screen.getByText('전설의 물고기!')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '자랑하기' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
+    await advance(50)
+    expect(lastScene().holding).toBe('mackerel')
+    await advance(2600)
+    expect(screen.queryByText('전설의 물고기!')).not.toBeInTheDocument()
+    expect(lastScene().holding).toBe('mackerel')
+  })
+
+  test('자랑 중에 걸으면 바로 끝난다', async () => {
+    await mount(makeView({ bag: [mack] }), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '자랑하기' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
+    await advance(50)
+    expect(lastScene().holding).toBe('mackerel')
+    key('ArrowRight', true)
+    await advance(100)
+    key('ArrowRight', false)
+    expect(lastScene().holding ?? null).toBeNull()
+  })
+
+  test('친구 show: 자랑이면 머리 위 물고기와 카드, 이모트면 이모트, 잘못된 값은 무시', async () => {
+    roomGate.peers = [peer({ show: 'b:mackerel:40:1' }), peer({ id: 'u3', handle: 'kim', show: 'e:lol' }), peer({ id: 'u4', handle: 'lee', show: 'b:mackerel:999:0' })]
+    const { container } = await mount(makeView(), SAND)
+    await advance(50)
+    const others = lastScene().others ?? []
+    expect(others.map((o) => o.holding ?? null)).toEqual(['mackerel', null, null])
+    expect(tagOf(container, 'u2')!.querySelector('.fish-peer-card')?.textContent).toContain('고등어 ★퍼펙트 40cm')
+    expect(tagOf(container, 'u3')!.querySelector('.fish-peer-emote')?.textContent).toBe('😂')
+    expect(tagOf(container, 'u4')!.querySelector('.fish-peer-card')).toBeNull()
+  })
+
+  test('이모트: 고르면 3초 동안 내 머리 위에 뜨고 tick show', async () => {
+    const { container } = await mount(makeView(), SAND)
+    fireEvent.click(screen.getByRole('button', { name: '이모트' }))
+    fireEvent.click(screen.getByRole('button', { name: '👍' }))
+    await advance(50)
+    expect(lastTick().show).toBe('e:like')
+    expect(tagOf(container, 'u1')!.querySelector('.fish-peer-emote')?.textContent).toBe('👍')
+    await advance(3100)
+    expect(lastTick().show).toBeUndefined()
+  })
+
+  test('버리기: 확인 줄의 환경부담금으로 discard를 보내고 알린다; 잠긴 물고기는 버릴 수 없다', async () => {
+    const locked = { ...mack, sizeCm: 30, locked: true as const }
+    const view = makeView({ gold: 1000, bag: [mack, locked] })
+    await mount(view, SAND)
+    const fee = discardFee(mack, [])
+    route({ discard: () => ok({ ...view, gold: 1000 - fee, bag: [locked] }, { fee }) })
+    fireEvent.click(screen.getByRole('button', { name: '가방' }))
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '버리기' }))
+    expect(within(bagRegion()).getByRole('button', { name: /고등어 30cm/ })).toBeDisabled()
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
+    expect(within(bagRegion()).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    fireEvent.click(within(bagRegion()).getByRole('button', { name: '버리기 확인' }))
+    await flush()
+    expect(calls('discard')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discard', index: 0, fee, species: 'mackerel', sizeCm: 40 } }])
+    expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
   })
 })

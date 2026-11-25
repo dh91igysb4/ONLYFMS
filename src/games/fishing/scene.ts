@@ -43,12 +43,15 @@ export type WorldScene = {
   drill?: { tx: number; ty: number; ms: number } | null
   /** 신화를 잡은 뒤 지난 시간(ms). MYTHIC_FLASH_MS 동안 캐릭터 둘레에 빛고리. 없으면 null */
   mythicFlashMs?: number | null
+  /** 자랑: 내 캐릭터가 머리 위로 든 어종 id. 없으면 null·생략 */
+  holding?: string | null
   /** 같은 지역의 다른 사람(온라인 설계 §4.3). 그리기만 하고 판정에는 쓰지 않는다 */
   others?: ScenePeer[]
 }
 
 /** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
-export type ScenePeer = { pos: Vec; facing: Facing; moving: boolean; walkMs: number; act: 'walk' | 'fish'; outfit: Outfit }
+/** holding: 자랑으로 머리 위에 든 어종 id(설계 2026-11-25-fishing-brag-discard). 없으면 null·생략 */
+export type ScenePeer = { pos: Vec; facing: Facing; moving: boolean; walkMs: number; act: 'walk' | 'fish'; outfit: Outfit; holding?: string | null }
 
 /** 화면 좌표 사각형 */
 export type Box = { x: number; y: number; w: number; h: number }
@@ -881,7 +884,8 @@ function drawTrack(ctx: CanvasRenderingContext2D, bar: Bar, params: BarParams, t
 function drawOutcome(ctx: CanvasRenderingContext2D, s: WorldScene, cx: number, top: number, w: number): void {
   const t = s.tMs
   const inX = (x: number, sw: number) => Math.max(0, Math.min(w - sw, x))
-  if (s.phase === 'caught' && s.caughtSpecies && SPRITES[`fish-${s.caughtSpecies}`]) {
+  // 자랑으로 다른 물고기를 들었으면 그 물고기만 보인다(같은 자리에 겹치지 않게)
+  if (s.phase === 'caught' && !s.holding && s.caughtSpecies && SPRITES[`fish-${s.caughtSpecies}`]) {
     const fish = SPRITES[`fish-${s.caughtSpecies}`]
     const fx = inX(cx - fish.w, fish.w * 2)
     const fy = Math.max(0, top - fish.h * 2 - 2 - (Math.floor(t / 400) % 2))
@@ -1203,11 +1207,28 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   drawPlayer(ctx, s, pose, px, py, tip)
   for (const it of tall) if (it.key > feet) it.draw()
 
+  // 자랑으로 든 물고기는 나무보다도 위(누가 무엇을 들었는지 가려지지 않게). 모르는 어종은 그리지 않는다
+  if (s.holding) drawHeld(ctx, s.holding, Math.round(s.player.pos.x), py, t)
+  for (const o of s.others ?? []) if (o.holding) drawHeld(ctx, o.holding, Math.round(o.pos.x), Math.round(o.pos.y) - PLAYER_H, t)
+
   // 입질 느낌표는 찌 위, 나무보다도 위
   if (b && s.phase === 'bite') {
     const hop = Math.floor(t / 120) % 2
     drawSprite(ctx, 'bang', b.x + 3, b.y - 28 - hop, 2)
   }
+}
+
+/** 머리 위로 든 물고기(월드 좌표, 잡았을 때 그림과 같은 2배·반짝임). cx = 캐릭터 가운데 x, top = 캐릭터 그림 위 끝 y */
+function drawHeld(ctx: CanvasRenderingContext2D, species: string, cx: number, top: number, t: number): void {
+  const name = `fish-${species}`
+  const fish = SPRITES[name]
+  if (!fish) return
+  const fx = cx - fish.w
+  const fy = top - fish.h * 2 - 2 - (Math.floor(t / 400) % 2)
+  drawSprite(ctx, name, fx, fy, 2)
+  const blink = Math.floor(t / 250) % 2
+  drawSprite(ctx, 'sparkle', fx - 6, fy + (blink ? 2 : 8), 1)
+  drawSprite(ctx, 'sparkle', fx + fish.w * 2 + 1, fy + (blink ? 10 : 4), 1)
 }
 
 /** 친구 캐릭터: 낚시 중이면 던진 자세, 아니면 내 캐릭터와 같은 대기·걷기 규칙. 찌·줄은 그리지 않는다 */

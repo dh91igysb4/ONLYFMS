@@ -230,6 +230,8 @@ export type Action =
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
   | { type: 'lock'; index: number; locked: boolean }
+  // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed. species·sizeCm이 그 칸과 다르면 bag_changed
+  | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number }
   // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
   | { type: 'buyRod'; tier: number; price: number }
   | { type: 'buyBag'; tier: number; price: number }
@@ -429,6 +431,24 @@ function sell(state: State, now: number): Out {
     result: { earned },
     gold: earned,
   }
+}
+
+/** 버리기 환경부담금(설계 2026-11-25-fishing-brag-discard): 판매가(감쇠 전, 버프 포함)의 10% 올림, 최소 1 G. 화면도 이 함수를 쓴다 */
+export function discardFee(f: Pick<Fish, 'species' | 'sizeCm' | 'perfect'>, buffs: readonly BuffId[]): number {
+  return Math.max(1, Math.ceil(sellPrice(f, buffs) / 10))
+}
+
+function discard(state: State, a: Record<string, unknown>, gold: number): Out {
+  const i = a.index
+  if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= state.bag.length) return { error: 'bad_action' }
+  const f = state.bag[i]
+  // 화면이 본 물고기와 다르면(다른 탭·응답 유실로 칸이 밀림) 버리지 않는다
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+  if (f.locked) return { error: 'locked' }
+  const fee = discardFee(f, state.buffs ?? [])
+  if (a.fee !== fee) return { error: 'price_changed' }
+  if (gold < fee) return { error: 'not_enough_gold' }
+  return { state: { ...state, bag: state.bag.filter((_, j) => j !== i) }, result: { fee }, gold: -fee }
 }
 
 function lock(state: State, a: Record<string, unknown>): Out {
@@ -672,7 +692,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 14: 골드를 플랫폼 지갑으로(지갑 설계 §6). 세이브에서 gold를 빼고, 판매·구매는 apply의 gold 증감, view.gold는 지갑 잔액.
   //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
   // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
-  version: 15,
+  // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
+  version: 16,
   wallet: true,
   init,
   migrate,
@@ -709,6 +730,8 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return sell(state, ctx.now)
     case 'lock':
       return lock(state, action)
+    case 'discard':
+      return discard(state, action, ctx.gold)
     case 'buyRod':
       return buyRod(state, action, ctx.gold)
     case 'buyBag':

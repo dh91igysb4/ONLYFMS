@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  IDLE_SEND_MS, MAX_HANDLE, MAX_OUTFIT, PEER_TIMEOUT_MS, markSent, moveIntervalMs, newSendClock, parsePeerState,
+  IDLE_SEND_MS, MAX_HANDLE, MAX_OUTFIT, MAX_SHOW, PEER_TIMEOUT_MS, markSent, moveIntervalMs, newSendClock, parsePeerState,
   peersAt, prunePeers, receivePeer, shouldSend, type PeerBook, type PeerState,
 } from './peers.ts'
 
@@ -97,5 +97,25 @@ describe('peer book', () => {
     receivePeer(b, st({ id: 'a', y: 300 }), 0, 'me')
     receivePeer(b, st({ id: 'b', y: 100 }), 0, 'me')
     expect(peersAt(b, 0).map((p) => p.id)).toEqual(['b', 'a'])
+  })
+})
+
+describe('show (게임이 해석하는 짧은 문자열, 설계 2026-11-25-fishing-brag-discard)', () => {
+  test('없으면 없는 그대로, 128자 이하 문자열은 유지', () => {
+    expect(parsePeerState(st())).not.toHaveProperty('show')
+    expect(parsePeerState({ ...st(), show: 'e:like' })?.show).toBe('e:like')
+    expect(parsePeerState({ ...st(), show: 'x'.repeat(MAX_SHOW) })?.show).toHaveLength(MAX_SHOW)
+  })
+  test('잘못된 show는 그 칸만 버리고 위치는 받는다', () => {
+    for (const bad of [5, null, 'x'.repeat(MAX_SHOW + 1), { a: 1 }]) {
+      const p = parsePeerState({ ...st(), show: bad })
+      expect(p, JSON.stringify(bad)).not.toBeNull()
+      expect(p).not.toHaveProperty('show')
+    }
+  })
+  test('peersAt가 show를 그대로 내보낸다', () => {
+    const book: PeerBook = new Map()
+    receivePeer(book, { ...st(), show: 'e:wow' }, 1000, 'me')
+    expect(peersAt(book, 1000)[0].show).toBe('e:wow')
   })
 })

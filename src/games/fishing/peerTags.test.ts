@@ -9,7 +9,7 @@ describe('syncTags', () => {
     const c = document.createElement('div')
     syncTags(c, [tag('a', 'kane', 10, 20), tag('b', 'son', 30, 40)])
     const s = spans(c)
-    expect(s.map((x) => x.textContent)).toEqual(['kane', 'son'])
+    expect(s.map((x) => x.querySelector('.fish-peer-name')?.textContent)).toEqual(['kane', 'son'])
     expect(s[0].dataset.id).toBe('a')
     expect(s[0].style.transform).toBe('translate(10px, 20px)')
     expect(s[1].style.transform).toBe('translate(30px, 40px)')
@@ -36,7 +36,24 @@ describe('syncTags', () => {
     const first = spans(c)[0]
     syncTags(c, [tag('a', 'kane2', 5, 6)])
     expect(spans(c)[0]).toBe(first)
-    expect(first.textContent).toBe('kane2')
+    expect(first.querySelector('.fish-peer-name')?.textContent).toBe('kane2')
     expect(first.style.transform).toBe('translate(5px, 6px)')
+  })
+})
+
+describe('자랑 카드·이모트 (설계 2026-11-25-fishing-brag-discard)', () => {
+  test('card는 이름 아래 한 줄(희귀도 tone 클래스), emote는 이름 위. 빠지면 지운다', () => {
+    const c = document.createElement('div')
+    syncTags(c, [{ ...tag('a', 'kane'), card: { text: '고등어 40cm · 100 G · 흔함', tone: 'legend' }, emote: '👍' }])
+    const s = spans(c)[0]
+    expect(s.querySelector('.fish-peer-name')?.textContent).toBe('kane')
+    const card = s.querySelector<HTMLElement>('.fish-peer-card')!
+    expect(card.textContent).toBe('고등어 40cm · 100 G · 흔함')
+    expect(card.dataset.tone).toBe('legend')
+    expect(s.querySelector('.fish-peer-emote')?.textContent).toBe('👍')
+    syncTags(c, [tag('a', 'kane')])
+    expect(s.querySelector('.fish-peer-card')).toBeNull()
+    expect(s.querySelector('.fish-peer-emote')).toBeNull()
+    expect(s.querySelector('.fish-peer-name')?.textContent).toBe('kane')
   })
 })

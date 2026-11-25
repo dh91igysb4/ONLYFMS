@@ -4,7 +4,7 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, decayedSale, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, TMP_DEEP, TMP_FLAT, TMP_MYTH, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -341,7 +341,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(15)
+    expect(logic.version).toBe(16)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -1864,8 +1864,8 @@ describe('v14 지갑 계약', () => {
     ...WEAR.filter(isShopItem).map((w): [string, State, unknown, number] => [`buyWear ${w.slot}:${w.id}`, base(), { type: 'buyWear', slot: w.slot, id: w.id }, w.price]),
   ]
 
-  it('version 15(v14 지갑 계약 유지), wallet: true, LAST_GOLD_IN_SAVE 13, init·view 세이브에 gold 없음, view.gold = ctx.gold', () => {
-    expect(logic.version).toBe(15)
+  it('version 14 이상(v14 지갑 계약 유지), wallet: true, LAST_GOLD_IN_SAVE 13, init·view 세이브에 gold 없음, view.gold = ctx.gold', () => {
+    expect(logic.version).toBeGreaterThanOrEqual(14)
     expect(logic.wallet).toBe(true)
     expect(LAST_GOLD_IN_SAVE).toBe(13)
     expect(logic.init()).not.toHaveProperty('gold')
@@ -2086,8 +2086,8 @@ describe('판매 마릿수 감쇠', () => {
     }
   })
 
-  it('version 15', () => {
-    expect(logic.version).toBe(15)
+  it('version 15 이상(판매 마릿수 감쇠)', () => {
+    expect(logic.version).toBeGreaterThanOrEqual(15)
   })
 })
 
@@ -2106,5 +2106,45 @@ describe('구매 가격 확인 (v15)', () => {
     expect(ok(play(s, { type: 'buyRod', tier: 5, price: 448_000 }, ctx())).state).toMatchObject({ rodTier: 5, gold: 552_000 })
     expect(ok(play(s, { type: 'buyBag', tier: 4, price: 80_000 }, ctx())).state).toMatchObject({ bagTier: 4, gold: 920_000 })
     expect(ok(play(s, { type: 'unlockArea', area: 'summit', price: 264_000 }, ctx())).state.gold).toBe(736_000)
+  })
+})
+
+// ---------------------------------------------------------------- 버리기·환경부담금 (설계 2026-11-25-fishing-brag-discard, v16)
+describe('버리기', () => {
+  const mack = (sizeCm = 40): Fish => ({ species: 'mackerel', sizeCm, perfect: false })
+  it('discardFee: 판매가(감쇠 전, 버프 포함)의 10% 올림, 최소 1', () => {
+    expect(discardFee(mack(), [])).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 10)))
+    expect(discardFee({ species: 'anchovy', sizeCm: 8, perfect: false }, [])).toBeGreaterThanOrEqual(1)
+    const g = { species: 'grouper', sizeCm: 140, perfect: true }
+    expect(discardFee(g, ['dragon-pearl'])).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 10))
+  })
+  it('discard: 그 칸만 빠지고 골드에서 부담금, 판 마릿수·totalEarned 그대로', () => {
+    const fee = discardFee(mack(), [])
+    const s = fresh({ gold: 100, bag: [mack(30), mack(), mack(35)], sold: { day: '2026-11-25', n: 3 }, totalEarned: 7 })
+    const r = ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx()))
+    expect(r.state.bag).toEqual([mack(30), mack(35)])
+    expect(r.state.gold).toBe(100 - fee)
+    expect(r.state.sold).toEqual({ day: '2026-11-25', n: 3 })
+    expect(r.state.totalEarned).toBe(7)
+    expect(r.result).toEqual({ fee })
+  })
+  it('discard 거절: 잠김 locked, 골드 부족 not_enough_gold, 부담금 다름·없음 price_changed, 칸 잘못 bad_action', () => {
+    const fee = discardFee(mack(), [])
+    const s = fresh({ gold: 100, bag: [mack(), { ...mack(), locked: true }] })
+    expect(err(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('locked')
+    expect(err(play(fresh({ gold: fee - 1, bag: [mack()] }), { type: 'discard', index: 0, fee, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(s, { type: 'discard', index: 0, fee: fee + 1, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('price_changed')
+    expect(err(play(s, { type: 'discard', index: 0, species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('price_changed')
+    for (const index of [-1, 2, 0.5, '0', undefined]) expect(err(play(s, { type: 'discard', index, fee }, ctx())), String(index)).toBe('bad_action')
+  })
+  it('discard: 보낸 어종·크기가 그 칸과 다르면 bag_changed(옛 화면이 다른 물고기를 버리지 않게)', () => {
+    const fee = discardFee(mack(), [])
+    const s = fresh({ gold: 100, bag: [mack(30), mack()] })
+    expect(err(play(s, { type: 'discard', index: 0, fee: discardFee(mack(30), []), species: 'mackerel', sizeCm: 40 }, ctx()))).toBe('bag_changed')
+    expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
+    expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
+  })
+  it('version 16', () => {
+    expect(logic.version).toBe(16)
   })
 })

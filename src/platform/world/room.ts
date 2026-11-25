@@ -18,7 +18,7 @@ export type WorldRoom = {
 
 export const roomName = (gameId: string, areaId: string) => `world:${gameId}:${areaId}`
 
-const sigOf = (m: Omit<PeerState, 't'>) => `${m.facing}|${m.moving ? 1 : 0}|${m.act}|${m.outfit}`
+const sigOf = (m: Omit<PeerState, 't'>) => `${m.facing}|${m.moving ? 1 : 0}|${m.act}|${m.outfit}|${m.show ?? ''}`
 
 export function joinWorldRoom(gameId: string, areaId: string, selfId: string): WorldRoom {
   const book: PeerBook = new Map()

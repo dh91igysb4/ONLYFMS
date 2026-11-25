@@ -1458,6 +1458,40 @@ describe('친구 캐릭터(others)', () => {
     return calls
   }
 
+  test('자랑: holding이면 내 머리 위에, 친구 holding이면 친구 머리 위에 물고기를 든다(설계 2026-11-25-fishing-brag-discard)', () => {
+    const none = new RecordingCtx()
+    dataCalls(none)
+    drawWorld(asCtx(none), scene('idle', me, size), size)
+    expect(none.sprites.filter((x) => x.name.startsWith('fish-'))).toHaveLength(0)
+    const mine = new RecordingCtx()
+    dataCalls(mine)
+    const s1 = scene('idle', me, size, { holding: 'grouper' })
+    drawWorld(asCtx(mine), s1, size)
+    const f1 = mine.sprites.filter((x) => x.name === 'fish-grouper')
+    expect(f1).toHaveLength(1)
+    expect(f1[0].y).toBeLessThan(Math.round(me.pos.y) - s1.camera.y - 24)
+    const theirs = new RecordingCtx()
+    dataCalls(theirs)
+    const at = tileCentre(22, 22)
+    const s2 = scene('idle', me, size, { others: [{ ...peer(at), holding: 'mackerel' }] })
+    drawWorld(asCtx(theirs), s2, size)
+    const f2 = theirs.sprites.filter((x) => x.name === 'fish-mackerel')
+    expect(f2).toHaveLength(1)
+    expect(f2[0].y).toBeLessThan(Math.round(at.y) - s2.camera.y - 24)
+    // 모르는 어종은 그리지 않는다
+    const bad = new RecordingCtx()
+    dataCalls(bad)
+    drawWorld(asCtx(bad), scene('idle', me, size, { holding: 'nope' }), size)
+    expect(bad.sprites.filter((x) => x.name.startsWith('fish-'))).toHaveLength(0)
+  })
+
+  test('잡은 직후 자랑으로 다른 물고기를 들면 잡은 물고기는 그리지 않는다', () => {
+    const c = new RecordingCtx()
+    dataCalls(c)
+    drawWorld(asCtx(c), scene('caught', me, size, { holding: 'grouper' }), size)
+    expect(c.sprites.filter((x) => x.name.startsWith('fish-')).map((x) => x.name)).toEqual(['fish-grouper'])
+  })
+
   test('others가 없으면 친구를 그리지 않는다', () => {
     const ctx = new RecordingCtx()
     const calls = dataCalls(ctx)

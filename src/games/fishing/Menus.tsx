@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
-import { freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type View } from './logic.ts'
+import { discardFee, freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
 import { spriteDataUrl } from './sprites.ts'
 
@@ -91,10 +91,23 @@ type BagProps = {
   onLock(index: number, locked: boolean): void
   /** 옷장 창 열기 */
   onWardrobe?(): void
+  /** 자랑하기: 이 칸의 물고기를 든다(설계 2026-11-25-fishing-brag-discard). 없으면 모드를 보이지 않는다 */
+  onBrag?(index: number): void
+  /** 버리기: 확인한 칸과 화면이 본 환경부담금 */
+  onDiscard?(index: number, fee: number): void
 }
 
-/** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 잠금을 뒤집는다. */
-export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: BagProps) {
+type BagMode = 'lock' | 'brag' | 'discard'
+const BAG_MODES: readonly { mode: BagMode; label: string }[] = [
+  { mode: 'lock', label: '잠금' },
+  { mode: 'brag', label: '자랑하기' },
+  { mode: 'discard', label: '버리기' },
+]
+
+/** atShop: 상점 문 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 모드에 따라 잠금·자랑·버리기. */
+export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard }: BagProps) {
+  const [mode, setMode] = useState<BagMode>('lock')
+  const [toss, setToss] = useState<number | null>(null)
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
   const slots = tackleSlots(view.rodTier)
   const fishing = view.pending !== null
@@ -157,7 +170,44 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: Ba
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
       {!atShop && <p className="fish-shop-note">상점에서 팔 수 있어요</p>}
-      {view.bag.length > 0 && <p className="muted">물고기를 누르면 잠가서 팔리지 않게 해요</p>}
+      {(onBrag || onDiscard) && view.bag.length > 0 && (
+        <div className="fish-bag-modes" role="group" aria-label="물고기를 누르면">
+          {BAG_MODES.filter((m) => m.mode === 'lock' || (m.mode === 'brag' ? onBrag : onDiscard)).map((m) => (
+            <button
+              key={m.mode}
+              type="button"
+              className={`btn btn-sm ${mode === m.mode ? 'btn-primary' : 'btn-ghost'}`}
+              aria-pressed={mode === m.mode}
+              onClick={() => {
+                setMode(m.mode)
+                setToss(null)
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {view.bag.length > 0 && (
+        <p className="muted">
+          {mode === 'lock' ? '물고기를 누르면 잠가서 팔리지 않게 해요' : mode === 'brag' ? '들어 올릴 물고기를 골라요' : '버릴 물고기를 골라요 · 잠긴 물고기는 못 버려요'}
+        </p>
+      )}
+      {mode === 'discard' && toss !== null && view.bag[toss] && knownSpecies(view.bag[toss].species) && (() => {
+        const f = view.bag[toss]
+        const fee = discardFee(f, buffsOf(view))
+        return (
+          <div className="fish-discard-confirm">
+            <span>{`${speciesName(f.species)} ${f.sizeCm}cm 버리기 · 환경부담금 ${gold(fee)}`}</span>
+            <button type="button" className="btn btn-primary btn-sm" aria-label="버리기 확인" disabled={busy} onClick={() => { setToss(null); onDiscard?.(toss, fee) }}>
+              버리기
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setToss(null)}>
+              취소
+            </button>
+          </div>
+        )
+      })()}
       <ul className="fish-bag">
         {cells.map((f, i) =>
           f ? (
@@ -165,10 +215,14 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe }: Ba
               <button
                 type="button"
                 className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}${isLegend(f.species) ? ' fish-cell-legend' : ''}${isMythic(f.species) ? ' fish-cell-mythic' : ''}`}
-                aria-pressed={!!f.locked}
-                aria-label={`${isLegend(f.species) ? '전설 ' : isMythic(f.species) ? '신화 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.locked ? '잠금 해제' : '잠금'}`}
-                disabled={busy}
-                onClick={() => onLock(i, !f.locked)}
+                aria-pressed={mode === 'lock' ? !!f.locked : mode === 'discard' ? toss === i : undefined}
+                aria-label={`${isLegend(f.species) ? '전설 ' : isMythic(f.species) ? '신화 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${mode === 'brag' ? '자랑하기' : mode === 'discard' ? '버리기' : f.locked ? '잠금 해제' : '잠금'}`}
+                disabled={busy || (mode !== 'lock' && !knownSpecies(f.species)) || (mode === 'discard' && !!f.locked)}
+                onClick={() => {
+                  if (mode === 'brag') onBrag?.(i)
+                  else if (mode === 'discard') setToss(i)
+                  else onLock(i, !f.locked)
+                }}
               >
                 {f.locked && <span className="fish-cell-lock" aria-hidden="true" />}
                 {knownSpecies(f.species) && <img src={spriteDataUrl(`fish-${f.species}`, ICON_SCALE)} alt="" />}

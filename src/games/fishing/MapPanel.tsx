@@ -3,7 +3,7 @@
 // 안 잡은 물고기는 실루엣·등급·"지금" 칩만(이름·그림·조건은 alt·aria-label 어디에도 없다).
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { OnlinePeer } from '../../platform/world/presence.ts'
-import { AREAS, RODS, rodAtLeast, UNLOCKS, type AreaId, type Rarity } from './data.ts'
+import { AREAS, RARITY_NAMES, RODS, rodAtLeast, UNLOCKS, type AreaId } from './data.ts'
 import { LOW_TIDE_HOURS, SEASON_NAMES, conditionsAt, formatClock, isSnow, type Conditions } from './clock.ts'
 import {
   areaFish, areaRoute, filterFish, firstHop, fishBadge, placeMarkers, spotAnchors, spotAtTile, spotFish, teleporterInfo, unlockPlace,
@@ -18,7 +18,7 @@ import type { View } from './logic.ts'
 
 export type MapLayers = { paths: boolean; spots: boolean; now: boolean; undiscovered: boolean }
 export const DEFAULT_LAYERS: MapLayers = { paths: true, spots: true, now: false, undiscovered: false }
-export const RARITY_NAMES: Record<Rarity, string> = { common: '흔함', uncommon: '드묾', rare: '희귀', legend: '전설', mythic: '신화' }
+export { RARITY_NAMES }
 
 const MARK_SCALE = 2
 /** 표시 버튼(28px)·현재 위치(18px)의 반폭 */

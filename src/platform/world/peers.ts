@@ -5,6 +5,8 @@ export type Facing = 'up' | 'down' | 'left' | 'right'
 export type PeerAct = 'walk' | 'fish'
 export type PeerState = {
   id: string; handle: string; x: number; y: number; facing: Facing; moving: boolean; act: PeerAct; outfit: string; t: number
+  /** 게임이 해석하는 짧은 문자열(자랑·이모트 등). 플랫폼은 내용을 모른다 */
+  show?: string
 }
 
 /** 멈춰 있을 때 보내는 간격(ms, 사용자 결정) */
@@ -13,6 +15,7 @@ export const IDLE_SEND_MS = 2500
 export const PEER_TIMEOUT_MS = 10_000
 export const MAX_HANDLE = 32
 export const MAX_OUTFIT = 512
+export const MAX_SHOW = 128
 
 const FACINGS: readonly string[] = ['up', 'down', 'left', 'right']
 const ACTS: readonly string[] = ['walk', 'fish']
@@ -39,10 +42,13 @@ export function parsePeerState(raw: unknown): PeerState | null {
   if (typeof r.act !== 'string' || !ACTS.includes(r.act)) return null
   if (typeof r.moving !== 'boolean') return null
   if (typeof r.outfit !== 'string' || r.outfit.length > MAX_OUTFIT) return null
-  return {
+  const out: PeerState = {
     id: r.id, handle: r.handle, x: r.x, y: r.y, facing: r.facing as Facing, moving: r.moving, act: r.act as PeerAct,
     outfit: r.outfit, t: r.t,
   }
+  // 잘못된 show는 그 칸만 버린다(위치는 받는다)
+  if (typeof r.show === 'string' && r.show.length <= MAX_SHOW) out.show = r.show
+  return out
 }
 
 export type SendClock = { lastAt: number; lastSig: string; lastN: number }
