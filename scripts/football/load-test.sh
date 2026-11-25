@@ -31,6 +31,9 @@ snapshot() {
     union all select 'caps', md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from public.football_caps x
     union all select 'honours', md5(coalesce(string_agg(x::text, '|' order by x::text), ''))
       from (select honour, season, team_id, player_id from public.football_honours) x
+    union all select 'honour_catalog', md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from public.football_honour_catalog x
+    union all select 'managers', md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from public.football_managers x
+    union all select 'manager_spells', md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from public.football_manager_spells x
   ) s"
 }
 
@@ -40,8 +43,8 @@ copy() { rm -rf "$WORK/$1"; cp -r "$FIX" "$WORK/$1"; echo "$WORK/$1"; }
 # 1. 적재와 멱등
 if load "$FIX"; then pass 'load_fixtures'; else fail 'load_fixtures'; cat "$WORK/load.log"; exit 1; fi
 S1="$(snapshot)"
-# 해시 질의가 실패해 빈 값끼리 비교하는 일이 없게, 11개 테이블 해시가 다 있는지 먼저 본다
-[ "$(printf '%s' "$S1" | grep -oE '[a-z_]+=[0-9a-f]{32}' | wc -l)" = 11 ] && pass 'snapshot_has_11_tables' || { fail 'snapshot_has_11_tables'; exit 1; }
+# 해시 질의가 실패해 빈 값끼리 비교하는 일이 없게, 14개 테이블 해시가 다 있는지 먼저 본다
+[ "$(printf '%s' "$S1" | grep -oE '[a-z_]+=[0-9a-f]{32}' | wc -l)" = 14 ] && pass 'snapshot_has_14_tables' || { fail 'snapshot_has_14_tables'; exit 1; }
 [ "$(q "select count(*) from public.football_players where not retired")" = 5 ] && pass 'players_loaded' || fail 'players_loaded'
 [ "$(q "select count(*) from public.football_spells")" = 4 ] && pass 'spells_loaded' || fail 'spells_loaded'
 [ "$(q "select birth_date || '/' || birth_precision from public.football_players where id = 'x-kim-minsu-1995'")" = '1995/year' ] \
