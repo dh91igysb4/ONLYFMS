@@ -3,7 +3,7 @@ import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
   AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
-  LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
+  LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
   TIDE_GRACE_MIN, UNLOCKS,
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId,
 } from './data.ts'
@@ -220,6 +220,8 @@ export type State = {
   outfit: Outfit
   /** 신화 버프(영구, 늘 켜짐). BUFFS 순서, 중복 없음. 신화를 잡는 resolve에서 더한다 */
   buffs: BuffId[]
+  /** 오늘(KST) 판 마릿수(판매 마릿수 감쇠, v15). day가 오늘이 아니면 0으로 본다 */
+  sold: Sold
   pending: Pending | null
 }
 export type Action =
@@ -272,6 +274,7 @@ const init = (): State => ({
   wardrobe: [],
   outfit: { ...DEFAULT_OUTFIT },
   buffs: [],
+  sold: { day: '', n: 0 },
   pending: null,
 })
 
@@ -373,13 +376,54 @@ function catchFacts(p: Pending, perfect: boolean): CatchFacts | null {
   return { area: raw.area as AreaId, spot: raw.spot, cond, species: p.species, sizeCm: p.sizeCm, perfect }
 }
 
-function sell(state: State): Out {
+// ---------------------------------------------------------------- 판매 마릿수 감쇠 (설계 2026-11-25, v15)
+export type Sold = { day: string; n: number }
+const KST_MS = 9 * 3600 * 1000
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** now(ms)의 KST 날짜 'YYYY-MM-DD' */
+export function kstDay(now: number): string {
+  return new Date(now + KST_MS).toISOString().slice(0, 10)
+}
+
+/** 오늘(KST) 판 마릿수. 저장된 날짜가 오늘이 아니면 0 */
+export function soldToday(sold: Sold, now: number): number {
+  return sold.day === kstDay(now) ? sold.n : 0
+}
+
+/** 오늘 nth번째(1부터) 판 물고기의 판매가 배율(%) */
+export function sellRatePct(nth: number): number {
+  for (const [upTo, pct] of SELL_DECAY) if (nth <= upTo) return pct
+  return SELL_DECAY[SELL_DECAY.length - 1][1]
+}
+
+/** 오늘 이미 before마리 판 뒤 fish를 순서대로 팔 때의 합. 물고기마다 round(sellPrice × 배율 / 100). 화면 예상가도 이 함수를 쓴다 */
+export function decayedSale(fish: readonly Pick<Fish, 'species' | 'sizeCm' | 'perfect'>[], buffs: readonly BuffId[], before: number): { earned: number; count: number } {
+  let earned = 0
+  fish.forEach((f, i) => {
+    earned += Math.round((sellPrice(f, buffs) * sellRatePct(before + i + 1)) / 100)
+  })
+  return { earned, count: fish.length }
+}
+
+function parseSold(v: unknown): Sold {
+  if (isObj(v) && typeof v.day === 'string' && DAY_RE.test(v.day) && isNum(v.n) && Number.isInteger(v.n) && v.n >= 0) return { day: v.day, n: v.n }
+  return { day: '', n: 0 }
+}
+
+function sell(state: State, now: number): Out {
   // 잠긴 물고기는 팔지 않고 순서 그대로 남긴다
   const selling = state.bag.filter((f) => !f.locked)
   if (selling.length === 0) return { error: 'bag_empty' }
-  const earned = selling.reduce((sum, f) => sum + sellPrice(f, state.buffs ?? []), 0)
+  const before = soldToday(state.sold, now)
+  const { earned } = decayedSale(selling, state.buffs ?? [], before)
   return {
-    state: { ...state, totalEarned: state.totalEarned + earned, bag: state.bag.filter((f) => f.locked) },
+    state: {
+      ...state,
+      totalEarned: state.totalEarned + earned,
+      bag: state.bag.filter((f) => f.locked),
+      sold: { day: kstDay(now), n: before + selling.length },
+    },
     result: { earned },
     gold: earned,
   }
@@ -580,6 +624,7 @@ function migrate(raw: unknown, fromVersion: number): State {
     wardrobe,
     outfit,
     buffs,
+    sold: parseSold(raw.sold),
     pending: null,
   }
 }
@@ -621,7 +666,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 13: 산정 호수·난파선 앞바다 지역과 어종 19종(신화 천지 백룡·용왕). 세이브 형식은 12와 같다
   // 14: 골드를 플랫폼 지갑으로(지갑 설계 §6). 세이브에서 gold를 빼고, 판매·구매는 apply의 gold 증감, view.gold는 지갑 잔액.
   //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
-  version: 14,
+  // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
+  version: 15,
   wallet: true,
   init,
   migrate,
@@ -655,7 +701,7 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
     case 'resolve':
       return resolve(state, action, ctx.now)
     case 'sell':
-      return sell(state)
+      return sell(state, ctx.now)
     case 'lock':
       return lock(state, action)
     case 'buyRod':
