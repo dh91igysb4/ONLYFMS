@@ -9,6 +9,8 @@ import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, wit
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
 const byId = (id: string) => SPECIES.find((s) => s.id === id)!
+/** 그 지역·자리에 나올 수 있는 일반·전설 어종 id(조건 무시) */
+const spotIds = (area: string, spot: string) => SPECIES.filter((s) => s.area === area && (!s.spots || s.spots.includes(spot))).map((s) => s.id)
 
 describe('price', () => {
   it('min size, max size, perfect', () => {
@@ -53,7 +55,8 @@ describe('rollCatch', () => {
   it('rod 1 겨울 밤: uncommon을 뽑아도 결과는 후보 안, 예외 없음', () => {
     const c = ctxOf({ cond: cond('winter', 22) })
     const allowed = new Set(SPECIES.filter((s) => speciesAvailable(s, 'village', 'shore', c.cond, 1)).map((s) => s.id))
-    expect([...allowed].sort()).toEqual(['goby', 'hairtail', 'horse-mackerel', 'rockfish', 'squid'])
+    // 어종 확장(v19): 노래미·학꽁치·넙치가 늘 나온다
+    expect([...allowed].sort()).toEqual(['goby', 'greenling', 'hairtail', 'halfbeak', 'horse-mackerel', 'olive-flounder', 'rockfish', 'squid'])
     const rng = rngFromSeed(seedBytes(2))
     for (let i = 0; i < 5000; i++) expect(allowed.has(rollCatch(rng, c).species)).toBe(true)
     // r1=0.99 → uncommon
@@ -357,7 +360,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(18)
+    expect(logic.version).toBe(19)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -521,11 +524,13 @@ describe('fishing WorldLogic', () => {
     it('{area:"cave", spot:"cave3"} → 불꽃잉어·용암장어·화룡어만, 열린 세이브 필요', () => {
       const seen = new Set<string>()
       for (let seed = 0; seed < 400; seed++) seen.add(cast(open(), 'cave', 'cave3', seed).species)
-      expect([...seen].every((id) => ['ember-carp', 'lava-eel', 'fire-dragonfish'].includes(id))).toBe(true)
+      // 어종 확장(v19): 용암 자리에 확장 어종(동굴새우·석순고기·숯망둑·등불고기·용암게)도 나온다
+      expect([...seen].every((id) => spotIds('cave', 'cave3').includes(id))).toBe(true)
       expect(seen.has('ember-carp')).toBe(true)
       const low = new Set<string>()
       for (let seed = 0; seed < 300; seed++) low.add(cast(open(2), 'cave', 'cave3', seed).species)
-      expect([...low]).toEqual(['ember-carp'])
+      expect(low.has('ember-carp')).toBe(true)
+      expect(low.has('lava-eel') || low.has('fire-dragonfish')).toBe(false)
       const mid = new Set<string>()
       for (let seed = 0; seed < 400; seed++) mid.add(cast(open(3), 'cave', 'cave3', seed).species)
       expect(mid.has('lava-eel')).toBe(true)
@@ -538,8 +543,11 @@ describe('fishing WorldLogic', () => {
         for (let seed = 0; seed < 300; seed++) seen.add(cast(open(1), 'cave', spot, seed).species)
         return [...seen].sort()
       }
-      expect(ids('cave1').every((id) => ['blind-fish', 'cave-crayfish'].includes(id))).toBe(true)
-      expect(ids('cave2').every((id) => ['crystal-fry', 'bat-catfish'].includes(id))).toBe(true)
+      // 어종 확장(v19): 공용 동굴 어종과 자리별 확장 어종이 더해졌다. 다른 자리 전용 어종은 안 나온다
+      expect(ids('cave1').every((id) => spotIds('cave', 'cave1').includes(id))).toBe(true)
+      expect(ids('cave2').every((id) => spotIds('cave', 'cave2').includes(id))).toBe(true)
+      expect(ids('cave1')).not.toContain('crystal-fry')
+      expect(ids('cave2')).not.toContain('blind-fish')
     })
     it('섬 lagoon·sea는 각 자리 어종만', () => {
       for (const spot of ['lagoon', 'sea']) {
@@ -575,8 +583,10 @@ describe('fishing WorldLogic', () => {
     it("{area:'forest', spot:'waterfall'} → 버들치·열목어만", () => {
       const seen = new Set<string>()
       for (let seed = 0; seed < 400; seed++) seen.add(castAt('forest', 'waterfall', seed).species)
-      expect([...seen].every((id) => ['stream-minnow', 'lenok'].includes(id))).toBe(true)
+      // 어종 확장(v19): 폭포 확장 어종(쉬리·참종개·퉁가리·미유기·둑중개·금송어)도 나온다. 연못 어종은 안 나온다
+      expect([...seen].every((id) => spotIds('forest', 'waterfall').includes(id))).toBe(true)
       expect(seen.has('stream-minnow')).toBe(true)
+      expect(seen.has('crucian')).toBe(false)
     })
     it("{area:'forest'} 자리 생략 → pond, {area:'forest', spot:'river'} → bad_spot, {area:'lake'} → bad_area", () => {
       expect(castAt('forest', undefined, 1).spot).toBe('pond')
@@ -864,18 +874,18 @@ describe('fishing WorldLogic', () => {
     expect(m.pending).toBeNull()
   })
 
-  it("records: empty state -> 0, 0, '0/94'; after a catch biggest detail is the species name", () => {
+  it("records: empty state -> 0, 0, '0/169'; after a catch biggest detail is the species name", () => {
     expect(logic.records(logic.init())).toEqual([
       { key: 'total_earned', value: 0 },
       { key: 'biggest', value: 0 },
-      { key: 'dex', value: 0, detail: '0/94' },
+      { key: 'dex', value: 0, detail: '0/169' },
       { key: 'challenges', value: 0, detail: '0/10' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
     expect(logic.records(s)).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
-      { key: 'dex', value: 2, detail: '2/94' },
+      { key: 'dex', value: 2, detail: '2/169' },
       { key: 'challenges', value: 0, detail: '0/10' },
     ])
   })
@@ -1488,8 +1498,14 @@ describe('신화 추첨 (합성 지역)', () => {
       ctxOf({ rodTier, power, sizeBonus, area, spot, cond: c, buffs: [] })
     const ctxs = [k(1, 0.5, 0, 'village', 'shore', cond('spring', 12)), k(3, 0.95, 0.25, 'village', 'pier', cond('winter', 12))]
     const rows = [[0.01, 0.5, 0.5, 0.5, 0.5], [0.5, 0.1, 0.2, 0.3, 0.4], [0.5, 0.45, 0.9, 0.7, 0.0]]
-    const got = ctxs.flatMap((x) => rows.map((r) => { const o = rollCatch(sequence(...r), x); return [o.species, o.sizeCm, o.biteDelayMs] }))
-    expect(got).toEqual([["goby",14,3750],["anchovy",10,3300],["horse-mackerel",29,1500],["grouper",129,3750],["goby",16,3300],["mackerel",43,1500]])
+    // 어종 확장(v19) 75종(앞 94종 뒤, 합성 어종 앞)을 잠시 빼고 옛 데이터로 돈다
+    const cut = (SPECIES as Species[]).splice(SPECIES_BEFORE_EXPANSION, 75)
+    try {
+      const got = ctxs.flatMap((x) => rows.map((r) => { const o = rollCatch(sequence(...r), x); return [o.species, o.sizeCm, o.biteDelayMs] }))
+      expect(got).toEqual([["goby",14,3750],["anchovy",10,3300],["horse-mackerel",29,1500],["grouper",129,3750],["goby",16,3300],["mackerel",43,1500]])
+    } finally {
+      ;(SPECIES as Species[]).splice(SPECIES_BEFORE_EXPANSION, 0, ...cut)
+    }
   })
   it('imugi-scale: 같은 rng에서 입질 ×0.85(반올림), 어종·크기 같음; 회전 찌와 곱', () => {
     for (const rodTier of [1, 4, 6] as const) {
@@ -1796,8 +1812,8 @@ describe('산정 호수·난파선 (logic.version 13)', () => {
     expect(b.state.buffs).toEqual(['imugi-scale', 'dragon-breath', 'dragon-pearl'])
     expect(b.state.legends).toContain('dragon-king')
   })
-  it('records: dex n/94', () => {
-    expect(logic.records(logic.init()).find((r) => r.key === 'dex')).toEqual({ key: 'dex', value: 0, detail: '0/94' })
+  it('records: dex n/169', () => {
+    expect(logic.records(logic.init()).find((r) => r.key === 'dex')).toEqual({ key: 'dex', value: 0, detail: '0/169' })
   })
   it('migrate v12 세이브(갯벌·늪지·이무기) → 그대로; v13 세이브(산정·난파선·새 신화·버프 셋) → 그대로, version 13', () => {
     const v12 = {
@@ -2172,8 +2188,26 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 18', () => {
-    expect(logic.version).toBe(18)
+  it('version 19', () => {
+    expect(logic.version).toBe(19)
+  })
+})
+
+describe('어종 확장 (logic.version 19)', () => {
+  const hookedOn = (species: string, sizeCm: number, area: AreaId, spot: string): WS =>
+    fresh({ pending: { species, sizeCm, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area, spot, cond: cond('spring', 12), power: 0.5 } })
+  it('migrate: v18 세이브는 진행 중 낚시(pending)만 비우고(버전이 바뀌면 늘 그렇다) 나머지는 그대로, 바로 다시 던질 수 있다', () => {
+    const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ species: 'koi', sizeCm: 50, perfect: false }], dex: { mackerel: { count: 1, maxCm: 40 } } } as WS
+    const m = logic.migrate(structuredClone(v18), 18)
+    expect(m).toEqual({ ...v18, pending: null })
+    const again = ok(play({ ...m, gold: 0 } as WS, { type: 'cast', area: 'village', power: 0.5, spot: 'shore' }, ctx()))
+    expect(again.state.pending).not.toBeNull()
+  })
+  it('새 어종을 잡으면 dex·가방에 들어가고 판매가가 0보다 크다', () => {
+    const r = ok(play(hookedOn('koi', 60, 'forest', 'pond'), { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(r.state.bag).toEqual([{ species: 'koi', sizeCm: 60, perfect: false }])
+    expect(r.state.dex).toHaveProperty('koi')
+    expect(sellPrice({ species: 'koi', sizeCm: 60, perfect: false })).toBeGreaterThan(0)
   })
 })
 

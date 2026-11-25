@@ -740,7 +740,8 @@ export const logic: WorldLogic<State, Action, View> = {
   //     v13 이하 세이브의 gold는 legacyGold로 한 번 옮긴다(LAST_GOLD_IN_SAVE)
   // 15: 판매 마릿수 감쇠(세이브 sold, 옛 세이브는 0마리)와 후반 가격 조정(설계 2026-11-25-fishing-sell-decay-design.md)
   // 16: 버리기(discard, 환경부담금). 세이브 형식은 15와 같다(설계 2026-11-25-fishing-brag-discard-design.md)
-  version: 18,
+  // 19: 어종 확장 75종(같은 rng에서 추첨 결과가 달라진다). 세이브 형식은 18과 같다(설계 2026-11-25-fishing-species-expansion-design.md)
+  version: 19,
   wallet: true,
   init,
   migrate,
