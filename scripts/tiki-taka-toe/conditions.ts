@@ -105,7 +105,10 @@ function clubLabels(names: ReadonlyMap<string, string>, reserved: ReadonlySet<st
   return out
 }
 
-const SURNAME_PARTICLES = new Set(['판', '반', '텐', '델', '데', '디', 'van', 'ten', 'del', 'de', 'di', 'da'])
+/** 한글 표기에서 성이 앞에 오는 나라(일본·중국·한국·북한·대만·홍콩·마카오): "가가와 신지" → "가가와" */
+const FAMILY_FIRST_NATIONS = new Set(['Q17', 'Q148', 'Q884', 'Q423', 'Q865', 'Q8646', 'Q14773'])
+
+const SURNAME_PARTICLES = new Set(['판', '반', '텐', '테어', '델', '데', '디', 'ter', 'van', 'ten', 'del', 'de', 'di', 'da'])
 /** "루이 판 할" → "판 할", "아르센 벵거" → "벵거" */
 export function surname(full: string): string {
   const t = full.trim().split(/\s+/)
@@ -244,11 +247,24 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
     .filter((p) => Number(p.popularity) >= TEAMMATE_MIN_POPULARITY && clubSeasons.has(p.id))
     .sort((a, b) => Number(b.popularity) - Number(a.popularity) || clubSeasons.get(b.id)! - clubSeasons.get(a.id)! || cmp(a.id, b.id))
     .slice(0, opts.teammateAnchors ?? TEAMMATE_ANCHORS)
-  for (const a of anchors.sort((x, y) => cmp(x.id, y.id))) {
+  // 감독 머리칸과 같은 성 규칙("즐라탄 이브라히모비치" → "이브라히모비치", 한 단어 이름은 그대로).
+  // 성이 앞인 나라는 첫 토큰. 기준 선수끼리 짧은 이름이 겹치면(다비드 실바·치아구 실바) 전체 이름.
+  const sorted = anchors.sort((x, y) => cmp(x.id, y.id))
+  const shortName = (full: string, nation: string) => {
+    const t = full.trim().split(/\s+/)
+    return FAMILY_FIRST_NATIONS.has(nation) && t.length > 1 ? t[0] : surname(full)
+  }
+  const names = sorted.map((a) => {
+    const ko = a.name_ko || a.name_en
+    return { a, ko, en: a.name_en, sko: shortName(ko, a.nation_id), sen: shortName(a.name_en, a.nation_id) }
+  })
+  const count = (key: 'sko' | 'sen', v: string) => names.filter((n) => n[key] === v).length
+  for (const { a, ko, en, sko, sen } of names) {
     const mates = new Set<string>()
     for (const { season, team } of singleSeasons.get(a.id) ?? []) for (const p of singleAt.get(`${team}|${season}`) ?? []) if (p !== a.id) mates.add(p)
-    const name = a.name_ko || a.name_en
-    emit({ id: `teammate:${a.id}`, kind: 'teammate', label_ko: `${withParticle(name)} 뛴 선수`, label_en: `Played with ${a.name_en}`, ref: a.id, themes: ALL }, mates)
+    const lko = count('sko', sko) > 1 ? ko : sko
+    const len = count('sen', sen) > 1 ? en : sen
+    emit({ id: `teammate:${a.id}`, kind: 'teammate', label_ko: `${withParticle(lko)} 뛴 선수`, label_en: `Played with ${len}`, ref: a.id, themes: ALL }, mates)
   }
 
   // ---- 우승·대표팀 대회·개인상·결승 득점

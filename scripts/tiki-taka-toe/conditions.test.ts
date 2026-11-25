@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { parseCsv, type Row } from '../football/wikidata.ts'
-import { buildConditions, clubLabel, CONTINENTS, mergeHonours, readFootballData, type FootballData } from './conditions.ts'
+import { buildConditions, clubLabel, CONTINENTS, mergeHonours, readFootballData, surname, type FootballData } from './conditions.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const REAL = join(ROOT, 'data', 'football')
@@ -101,7 +101,36 @@ describe('buildConditions', () => {
     })
     const r = buildConditions(d)
     expect([...r.players.get('teammate:P1')!].sort()).toEqual(['P2', 'P5'])
-    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('즐라탄 이브라히모비치와 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('이브라히모비치와 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_en).toBe('Played with Ibrahimović')
+  })
+
+  test('teammate_label_surname_and_particle', () => {
+    const d = data({
+      players: rows('id,name_ko,name_en,nation_id,popularity',
+        'P1,데이비드 베컴,David Beckham,Q21,100', 'P2,네이마르,Neymar,Q155,100', 'P3,로빈 판 페르시,Robin van Persie,Q55,100', 'P4,선수 넷,Player Four,Q21,50'),
+      season_memberships: ms('P1,2000,CA', 'P2,2000,CA', 'P3,2000,CA', 'P4,2000,CA'),
+    })
+    const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
+    expect(label('teammate:P1')).toBe('베컴과 뛴 선수') // 받침 있음 → 과
+    expect(label('teammate:P2')).toBe('네이마르와 뛴 선수') // 한 단어 이름은 그대로
+    expect(label('teammate:P3')).toBe('판 페르시와 뛴 선수') // 감독과 같은 성 규칙
+    expect(surname('마르크안드레 테어 슈테겐')).toBe('테어 슈테겐')
+    expect(surname('Marc-André ter Stegen')).toBe('ter Stegen')
+  })
+
+  test('teammate_label_family_name_first_and_clash', () => {
+    const d = data({
+      players: rows('id,name_ko,name_en,nation_id,popularity',
+        'P1,가가와 신지,Shinji Kagawa,Q17,100', 'P2,오카자키 신지,Shinji Okazaki,Q17,100',
+        'P3,다비드 실바,David Silva,Q29,100', 'P5,치아구 실바,Thiago Silva,Q155,100', 'P4,선수 넷,Player Four,Q21,50'),
+      season_memberships: ms('P1,2000,CA', 'P2,2000,CA', 'P3,2000,CA', 'P5,2000,CA', 'P4,2000,CA'),
+    })
+    const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
+    expect(label('teammate:P1')).toBe('가가와와 뛴 선수') // 일본 이름은 성이 앞
+    expect(label('teammate:P2')).toBe('오카자키와 뛴 선수')
+    expect(label('teammate:P3')).toBe('다비드 실바와 뛴 선수') // 성이 겹치면 전체 이름
+    expect(label('teammate:P5')).toBe('치아구 실바와 뛴 선수')
   })
 
   test('teammate_anchors_popularity_then_club_seasons', () => {
@@ -244,7 +273,7 @@ describe('mergeHonours', () => {
 describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
   test('zlatan_is_teammate_anchor', () => {
     const r = buildConditions(readFootballData(REAL))
-    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('즐라탄 이브라히모비치와 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('이브라히모비치와 뛴 선수')
     expect(r.conditions.filter((c) => c.kind === 'teammate')).toHaveLength(150)
   }, 60_000)
 
