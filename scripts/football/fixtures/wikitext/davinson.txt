@@ -1,0 +1,59 @@
+{{Infobox football biography
+| name = Davinson Sánchez
+| image = Dávinson Sánchez, Colombia NT presidential send-off, Jun 2026.jpg
+| caption = Sánchez with [[Colombia national football team|Colombia]] in 2026
+| full_name = Davinson Sánchez Mina<ref>{{cite news |url=https://www.lequipe.fr/Football/FootballFicheJoueur59820.html |title=Davinson Sanchez |newspaper=L'Équipe |location=Paris |access-date=21 February 2019}}</ref>
+| birth_date = {{birth date and age|1996|6|12|df=y}}<ref>{{cite web |url=https://www.fifadata.com/documents/FWC/2018/pdf/FWC_2018_SQUADLISTS.PDF |title=FIFA World Cup Russia 2018: List of Players: Colombia |publisher=FIFA |page=5 |date=15 July 2018 |archive-url=https://web.archive.org/web/20190611000407/https://www.fifadata.com/documents/FWC/2018/pdf/FWC_2018_SQUADLISTS.PDF |archive-date=11 June 2019}}</ref>
+| birth_place = [[Caloto, Cauca|Caloto]], Cauca, Colombia
+| height = 1.88 m<ref>{{Cite web |url=https://www.premierleague.com/en/players/173904/davinson-sanchez/overview |title=Davinson Sánchez: Overview |publisher=Premier League |access-date=26 September 2026}}</ref>
+| position = [[Defender (association football)#Centre-back|Centre-back]]
+| current_club = [[Galatasaray S.K. (football)|Galatasaray]]
+| club_number = 6
+| youth_years1 =
+| youth_clubs1 = [[América de Cali]]
+| youth_years2 = 2012–2013
+| youth_clubs2 = [[Atlético Nacional]]
+| years1 = 2013–2016
+| clubs1 = [[Atlético Nacional]]
+| caps1 = 26
+| goals1 = 0
+| years2 = 2016
+| clubs2 = [[Jong Ajax|Ajax II]]
+| caps2 = 1
+| goals2 = 0
+| years3 = 2016–2017
+| clubs3 = [[AFC Ajax|Ajax]]
+| caps3 = 32
+| goals3 = 6
+| years4 = 2017–2023
+| clubs4 = [[Tottenham Hotspur F.C.|Tottenham Hotspur]]
+| caps4 = 143
+| goals4 = 3
+| years5 = 2023–
+| clubs5 = [[Galatasaray S.K. (football)|Galatasaray]]
+| caps5 = 90
+| goals5 = 7
+| national_years1 = 2013
+| national_team1 = [[Colombia national under-17 football team|Colombia U17]]
+| national_caps1 = 2
+| national_goals1 = 0
+| national_years2 = 2014–2015
+| national_team2 = [[Colombia national under-20 football team|Colombia U20]]
+| national_caps2 = 14
+| national_goals2 = 0
+| national_years3 = 2016
+| national_team3 = [[Colombia national under-23 football team|Colombia Olympic]]
+| national_caps3 = 2
+| national_goals3 = 0
+| national_years4 = 2016–
+| national_team4 = [[Colombia national football team|Colombia]]
+| national_caps4 = 89
+| national_goals4 = 4
+| medal_templates = {{MedalCountry|{{fb|COL}}}}
+{{MedalSport|Men's [[association football|football]]}}
+{{MedalCompetition|[[Copa América]]}}
+{{Medal|RU|[[2024 Copa América|2024 United States]]|}}
+{{Medal|3rd|[[2021 Copa América|2021 Brazil]]|}}
+| club_update = 19 September 2026
+| national_team_update = 6 October 2026
+}}

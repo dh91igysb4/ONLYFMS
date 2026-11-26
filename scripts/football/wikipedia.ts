@@ -70,3 +70,24 @@ export async function titlesToQids(titles: readonly string[], cache: Cache, fetc
   }
   return out
 }
+
+/** 여러 문서의 위키텍스트(50개씩 한 요청). 요청한 제목 → 리다이렉트를 따라간 실제 제목과 본문. 없는 문서는 맵에 없다 */
+export async function wikitexts(titles: readonly string[], cache: Cache, fetcher: typeof fetch = fetch, opts: ApiOpts = {}): Promise<Map<string, { title: string; text: string }>> {
+  const out = new Map<string, { title: string; text: string }>()
+  const uniq = [...new Set(titles)].sort()
+  for (let i = 0; i < uniq.length; i += 50) {
+    const chunk = uniq.slice(i, i + 50)
+    const r = await api({ action: 'query', prop: 'revisions', rvprop: 'content', rvslots: 'main', redirects: '1', titles: chunk.join('|') }, cache, fetcher, opts)
+    const q = (r.query ?? {}) as { normalized?: { from: string; to: string }[]; redirects?: { from: string; to: string }[]; pages?: { title: string; missing?: boolean; revisions?: { slots: { main: { content: string } } }[] }[] }
+    const norm = new Map((q.normalized ?? []).map((x) => [x.from, x.to]))
+    const red = new Map((q.redirects ?? []).map((x) => [x.from, x.to]))
+    const text = new Map((q.pages ?? []).filter((p) => !p.missing && p.revisions?.length).map((p) => [p.title, p.revisions![0].slots.main.content]))
+    for (const t of chunk) {
+      const n = norm.get(t) ?? t
+      const real = red.get(n) ?? n
+      const body = text.get(real)
+      if (body !== undefined) out.set(t, { title: real, text: body })
+    }
+  }
+  return out
+}

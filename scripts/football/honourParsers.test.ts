@@ -2,11 +2,11 @@
 // 픽스처는 2026-11-25에 받은 실제 문서를 잘라 둔 것이다:
 //   ballon_dor = "Ballon d'Or" Winners 절, pl_golden_boot = "Premier League Golden Boot" Winners 절,
 //   coppa_italia_finals = "List of Coppa Italia finals" 결승 절, wc2014_squads = "2014 FIFA World Cup squads" 독일·아르헨티나 절,
-//   wenger = "Arsène Wenger" 정보상자.
+//   wenger = "Arsène Wenger" 정보상자, davinson = "Davinson Sánchez" 정보상자(2026-11-26).
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { parseAwardList, parseFinals, parseManagerInfobox, parseSquads } from './honourParsers.ts'
+import { parseAwardList, parseFinals, parseManagerInfobox, parsePlayerInfobox, parseSquads } from './honourParsers.ts'
 import { sectionText, stripComments, tables, templates, wikiLinks } from './wikitext.ts'
 
 const fx = (name: string) => readFileSync(join(import.meta.dirname, 'fixtures', 'wikitext', `${name}.txt`), 'utf8')
@@ -123,6 +123,26 @@ describe('managers', () => {
     expect(parseManagerInfobox(t)).toEqual([
       { club: 'Arsenal F.C.', from: 2019, to: null, caretaker: false },
       { club: 'Arsenal F.C.', from: 2019, to: 2019, caretaker: true },
+    ])
+  })
+})
+
+describe('player infobox', () => {
+  test('senior_clubs_davinson', () => {
+    expect(parsePlayerInfobox(fx('davinson'))).toEqual([
+      { club: 'Atlético Nacional', from: 2013, to: 2016, loan: false },
+      { club: 'Jong Ajax', from: 2016, to: 2016, loan: false },
+      { club: 'AFC Ajax', from: 2016, to: 2017, loan: false },
+      { club: 'Tottenham Hotspur F.C.', from: 2017, to: 2023, loan: false },
+      { club: 'Galatasaray S.K. (football)', from: 2023, to: null, loan: false },
+    ])
+  })
+  test('loan_arrow_and_skips_youth_national', () => {
+    const t = '{{Infobox football biography\n| youthyears1 = 2005–2010\n| youthclubs1 = [[Arsenal F.C.|Arsenal]]\n| years1 = 2010–2014\n| clubs1 = [[Arsenal F.C.|Arsenal]]\n| years2 = 2012\n| clubs2 = → [[Watford F.C.|Watford]] (loan)\n| years3 = 2014-\n| clubs3 = [[Everton F.C.]]\n| years4 = 2015\n| clubs4 = Total\n| national_years1 = 2015–\n| national_team1 = [[England national football team|England]]\n}}'
+    expect(parsePlayerInfobox(t)).toEqual([
+      { club: 'Arsenal F.C.', from: 2010, to: 2014, loan: false },
+      { club: 'Watford F.C.', from: 2012, to: 2012, loan: true },
+      { club: 'Everton F.C.', from: 2014, to: null, loan: false },
     ])
   })
 })

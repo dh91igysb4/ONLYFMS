@@ -19,7 +19,7 @@ const t0 = Date.now()
 const data = readFootballData(join(ROOT, 'data', 'football'))
 const { conditions, players: sets } = buildConditions(data)
 const popularity = new Map(data.players.map((p) => [p.id, Number(p.popularity) || 0]))
-const playerName = new Map(data.players.map((p) => [p.id, p.name_ko || p.name_en]))
+const playerName = new Map(data.players.map((p) => [p.id, p.name_en]))
 const byId = new Map(conditions.map((c) => [c.id, c]))
 console.log(`조건 ${conditions.length}개 (${((Date.now() - t0) / 1000).toFixed(1)}초)`)
 

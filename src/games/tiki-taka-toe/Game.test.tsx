@@ -78,12 +78,12 @@ describe('tiki-taka-toe Game', () => {
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '앙리' } })
     await act(async () => { await vi.advanceTimersByTimeAsync(400) })
     expect(rpc).toHaveBeenCalledWith('football_search', { p_q: '앙리', p_kind: 'player', p_lim: 8 })
-    const opt = within(dialog).getByRole('button', { name: /티에리 앙리/ })
+    const opt = within(dialog).getByRole('button', { name: /Thierry Henry/ }) // 선수 이름은 영어
     expect(opt.textContent).toContain('프랑스')
     expect(opt.textContent).toContain('1977')
     expect(within(dialog).getByRole('button', { name: /Henry Other/ })).toBeTruthy()
     fireEvent.click(opt)
-    expect(p.onAction).toHaveBeenCalledWith({ type: 'guess', cell: 1, playerId: 'p1', name: '티에리 앙리' })
+    expect(p.onAction).toHaveBeenCalledWith({ type: 'guess', cell: 1, playerId: 'p1', name: 'Thierry Henry' })
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -121,8 +121,8 @@ describe('tiki-taka-toe Game', () => {
     fireEvent.click(cellBtn(2))
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '앙리' } })
     await act(async () => { await vi.advanceTimersByTimeAsync(400) })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /앙리/ }))
-    expect(p.onAction).toHaveBeenLastCalledWith({ type: 'guess', cell: 2, playerId: 'p1', name: '앙리', offerDraw: true })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Henry/ }))
+    expect(p.onAction).toHaveBeenLastCalledWith({ type: 'guess', cell: 2, playerId: 'p1', name: 'Henry', offerDraw: true })
     a.unmount()
 
     // 상대 제안
