@@ -4,7 +4,7 @@ export const manifest: Manifest = {
   id: 'tiki-taka-toe',
   name: '티키타카토',
   description: '가로·세로 조건을 모두 만족하는 선수로 3칸 한 줄을 먼저 만든다',
-  hidden: true,
+  hidden: false,
   category: 'duel',
   modes: { daily: false, contest: false, free: false },
   puzzleSource: 'generate',

@@ -42,7 +42,7 @@ describe('buildHallOfFame', () => {
   })
 
   it('사이트: 자유 플레이 게임(등록부 순서) 다음 대전', () => {
-    expect(hof.site.map((b) => b.gameId)).toEqual(['who-are-ya', 'toothbrush', 'ball-run', 'sneak-exam', 'neon-rider', 'yacht'])
+    expect(hof.site.map((b) => b.gameId)).toEqual(['who-are-ya', 'toothbrush', 'ball-run', 'sneak-exam', 'neon-rider', 'yacht', 'tiki-taka-toe'])
     expect(hof.site.map((b) => b.group)).toEqual(['free', 'free', 'free', 'free', 'free', 'duel'])
   })
 
@@ -64,7 +64,7 @@ describe('buildHallOfFame', () => {
     for (const bad of [null, 'x', { records: 3 }, { records: [{ game_id: 'fishing' }] }]) {
       const h = buildHallOfFame(bad, false)
       expect(h.records).toHaveLength(7)
-      expect(h.site).toHaveLength(6)
+      expect(h.site).toHaveLength(7)
       expect([...h.records, ...h.site].every((b) => b.rows.length === 0), JSON.stringify(bad)).toBe(true)
     }
   })
