@@ -36,7 +36,7 @@ describe('tiki-taka-toe logic', () => {
 
   test('manifest', () => {
     expect(manifest.id).toBe('tiki-taka-toe')
-    expect(manifest.hidden).toBe(true)
+    expect(manifest.hidden).toBe(false)
     expect(manifest.duel?.prepare).toBe('ttt_pick_puzzle')
   })
 
