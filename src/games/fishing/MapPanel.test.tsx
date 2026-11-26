@@ -393,4 +393,17 @@ describe('MapPanel: 다른 지역 친구', () => {
       names={{ selfId: null, players: [{ id: '00000000-0000-0000-0000-0000000000bb', handle: 'mj' }] }} />)
     expect(screen.getByTestId('fish-map-away').textContent).toBe('다른 곳: kim mj의 섬')
   })
+
+  it('나와 같은 장소(같은 섬)에 있는 친구는 "다른 곳"에 넣지 않는다', () => {
+    const isle = 'isle-000000000000000000000000000000bb'
+    const peers: OnlinePeer[] = [
+      { id: 'u9', handle: 'kim', area: isle, act: 'walk', tx: 1, ty: 1 },
+      { id: 'u8', handle: 'son', area: 'isle-000000000000000000000000000000cc', act: 'walk', tx: 1, ty: 1 },
+    ]
+    const { unmount } = render(<MapPanel view={makeView()} here={VILLAGE_HERE} now={Date.now} innerWidth={300} layers={DEFAULT_LAYERS} onLayers={() => {}} online={peers} place={isle} />)
+    expect(screen.getByTestId('fish-map-away').textContent).toBe('다른 곳: son 누군가의 섬')
+    unmount()
+    render(<MapPanel view={makeView()} here={VILLAGE_HERE} now={Date.now} innerWidth={300} layers={DEFAULT_LAYERS} onLayers={() => {}} online={peers.slice(0, 1)} place={isle} />)
+    expect(screen.queryByTestId('fish-map-away')).toBeNull()
+  })
 })
