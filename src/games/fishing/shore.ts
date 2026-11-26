@@ -44,6 +44,8 @@ export type ShoreField = {
   fp: Map<number, Rect | null>
   /** shoreBands 캐시(칸 번호 → 픽셀 값) */
   bands: Map<number, Float32Array | null>
+  /** 건물 사각형의 막는 픽셀(1 = 그림의 불투명 픽셀 또는 그림이 덮지 않는 곳). 건물·그림이 없으면 null, 아직 안 만들었으면 undefined */
+  bmask: Uint8Array | null | undefined
 }
 
 const WALKWET: ReadonlySet<TileKind> = new Set<TileKind>(['pier', 'bridge', 'dock', 'boardwalk', 'deck'])
@@ -85,9 +87,50 @@ export function shoreField(map: MapDef, tide: Tide): ShoreField {
       else cls.push(g === 'water' ? 'water' : 'land')
     }
   }
-  const f: ShoreField = { map, tide: t, ground, cls, val, ctx: ctxv, fp: new Map(), bands: new Map() }
+  const f: ShoreField = { map, tide: t, ground, cls, val, ctx: ctxv, fp: new Map(), bands: new Map(), bmask: undefined }
   byTide.set(t, f)
   return f
+}
+
+/** 건물 외관 그림(건물 사각형 왼쪽 아래에 맞춰 그린다 — scene.ts drawStatic과 같은 자리)의 막는 픽셀 */
+function buildingMask(map: MapDef): Uint8Array | null {
+  const b = map.building
+  const art = b ? SPRITES[map.buildingSprite] : undefined
+  if (!b || !art) return null
+  const w = b.w * TILE
+  const h = b.h * TILE
+  const top = h - art.h // 사각형 위쪽 기준 그림 윗줄(음수면 위로 넘친다)
+  const mask = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const ch = art.rows[y - top]?.[x]
+      mask[y * w + x] = ch === undefined || x >= art.w || (ch !== '.' && ch !== ' ') ? 1 : 0
+    }
+  }
+  return mask
+}
+
+/** 건물 칸이고 그림 픽셀로 막는가를 정할 수 있으면 true(문 칸 제외) */
+export function isBuildingTile(f: ShoreField, tx: number, ty: number): boolean {
+  return tileAt(f.map, tx, ty) === 'building' && maskOf(f) !== null
+}
+
+/** 건물 픽셀은 처음 쓸 때 만든다(스프라이트를 건물 칸에 닿을 때만 읽는다) */
+function maskOf(f: ShoreField): Uint8Array | null {
+  if (f.bmask === undefined) f.bmask = buildingMask(f.map)
+  return f.bmask
+}
+
+/** 월드 px (x, y)가 건물 그림의 막는 픽셀인가. 건물 사각형 밖이면 false */
+export function buildingSolid(f: ShoreField, x: number, y: number): boolean {
+  const b = f.map.building
+  const mask = b ? maskOf(f) : null
+  if (!b || !mask) return false
+  const lx = Math.floor(x - b.tx * TILE)
+  const ly = Math.floor(y - b.ty * TILE)
+  const w = b.w * TILE
+  if (lx < 0 || ly < 0 || lx >= w || ly >= b.h * TILE) return false
+  return mask[ly * w + lx] === 1
 }
 
 export function shoreClassAt(f: ShoreField, tx: number, ty: number): ShoreClass {

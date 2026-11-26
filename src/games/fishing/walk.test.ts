@@ -5,6 +5,8 @@ import { VILLAGE } from './maps/village.ts'
 import { MAX_DT_MS } from './minigame.ts'
 import { FEET, WALK_SPEED, cameraFor, feetBlocked, joystickVector, keysVector, pointBlocked, stepWalk, type Player } from './walk.ts'
 import { shoreField, wetness } from './shore.ts'
+import { isleMap } from './isle.ts'
+import { SPRITES } from './sprites.ts'
 
 const MAP_W = VILLAGE.w
 const MAP_H = VILLAGE.h
@@ -307,5 +309,32 @@ describe('검토 수정: 물체 사이·울타리 모서리', () => {
   it('절벽 옆 물은 물가 띠 없이 물이다', () => {
     const map = m(['ccc', '~~~', ',,,'])
     expect(wetness(shoreField(map, 'high'), TILE + 8, TILE + 0.5)).toBeGreaterThanOrEqual(0.5)
+  })
+})
+
+describe('건물은 그림 픽셀로 막는다', () => {
+  const isle = isleMap('crescent', 8)
+  const b = isle.building!
+  const bx = b.tx * TILE
+  const by = b.ty * TILE
+
+  it('텐트 위쪽 왼쪽 칸의 빈 곳(삼각형 바깥)에 설 수 있다', () => {
+    expect(feetBlocked(isle, bx + 6, by + 4, ALL_AREAS_OPEN)).toBe(false)
+  })
+  it('텐트 천에는 설 수 없다', () => {
+    expect(feetBlocked(isle, bx + TILE + 8, by + 8, ALL_AREAS_OPEN)).toBe(true)
+    expect(feetBlocked(isle, bx + 8, by + TILE + 8, ALL_AREAS_OPEN)).toBe(true)
+  })
+  it('pointBlocked는 텐트 그림의 불투명 픽셀과 같다', () => {
+    const art = SPRITES[isle.buildingSprite]
+    const top = (b.ty + b.h) * TILE - art.h
+    for (let y = by; y < by + b.h * TILE; y++) for (let x = bx; x < bx + b.w * TILE; x++) {
+      const tx = Math.floor(x / TILE)
+      const ty = Math.floor(y / TILE)
+      if (tx === b.doorTx && ty === b.ty + b.h - 1) continue
+      const ch = art.rows[y - top]?.[x - bx]
+      const opaque = ch !== undefined && ch !== '.' && ch !== ' '
+      expect([x, y, pointBlocked(isle, x + 0.5, y + 0.5, ALL_AREAS_OPEN)]).toEqual([x, y, opaque])
+    }
   })
 })

@@ -1,6 +1,6 @@
 // 낚시 마을 이동·충돌·카메라. 순수 함수만 (React·DOM 없음).
 import { STATIC_DYNAMIC, TILE, edgeHits, isWalkable, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
-import { SHORE_BLOCK, footprintAt, shoreField, wetness, type ShoreField } from './shore.ts'
+import { SHORE_BLOCK, buildingSolid, footprintAt, isBuildingTile, shoreField, wetness, type ShoreField } from './shore.ts'
 import { MAX_DT_MS } from './minigame.ts'
 
 export const WALK_SPEED = 72 // px/s (초당 4.5타일)
@@ -42,6 +42,8 @@ function tileBlocks(map: MapDef, f: ShoreField, tx: number, ty: number, opened: 
   if (map.gates.some((g) => !opened.has(g.area) && inRect(g.tiles, tx, ty))) return true
   if (map.teleporter && inRect(map.teleporter.tiles, tx, ty)) return true
   if (isWalkable(map, tx, ty, opened, dyn)) return false
+  // 건물 칸은 그림 픽셀로 따로 본다(텐트처럼 칸을 다 채우지 않는 그림)
+  if (isBuildingTile(f, tx, ty)) return false
   const cls = f.cls[ty * map.w + tx]
   if (cls === 'water') return false
   return !(cls === 'land' && footprintAt(f, tx, ty))
@@ -56,12 +58,23 @@ function shoreBlocks(f: ShoreField, x: number, y: number): boolean {
   return (cls === 'water' || cls === 'land') && wetness(f, x, y) >= SHORE_BLOCK
 }
 
+/** 발 사각형이 건물 칸 (tx, ty) 안에서 건물 그림의 막는 픽셀과 겹치는가 */
+function buildingHits(f: ShoreField, tx: number, ty: number, x0: number, y0: number, x1: number, y1: number): boolean {
+  const px0 = Math.max(tx * TILE, Math.floor(x0 + EDGE_EPS))
+  const px1 = Math.min((tx + 1) * TILE, Math.ceil(x1 - EDGE_EPS))
+  const py0 = Math.max(ty * TILE, Math.floor(y0 + EDGE_EPS))
+  const py1 = Math.min((ty + 1) * TILE, Math.ceil(y1 - EDGE_EPS))
+  for (let py = py0; py < py1; py++) for (let px = px0; px < px1; px++) if (buildingSolid(f, px, py)) return true
+  return false
+}
+
 /** 한 점이 막혔는가(칸 판정 + 발밑 + 물가선). 시험·그림 비교용 */
 export function pointBlocked(map: MapDef, x: number, y: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): boolean {
   const f = shoreField(map, dyn.tide)
   const tx = Math.floor(x / TILE)
   const ty = Math.floor(y / TILE)
   if (tileBlocks(map, f, tx, ty, opened, dyn)) return true
+  if (isBuildingTile(f, tx, ty)) return buildingSolid(f, x, y)
   const fp = f.cls[ty * map.w + tx] !== 'fixed' ? footprintAt(f, tx, ty) : null
   if (fp) {
     const lx = x - tx * TILE
@@ -90,6 +103,7 @@ export function feetBlocked(map: MapDef, x: number, y: number, opened: Opened, d
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
       if (tileBlocks(map, f, tx, ty, opened, dyn)) return true
+      if (isBuildingTile(f, tx, ty) && buildingHits(f, tx, ty, x0, y0, x1, y1)) return true
       const fp = f.cls[ty * map.w + tx] !== 'fixed' ? footprintAt(f, tx, ty) : null
       if (fp) {
         const fx0 = tx * TILE + fp.tx
