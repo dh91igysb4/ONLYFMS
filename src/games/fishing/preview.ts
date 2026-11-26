@@ -4,6 +4,7 @@ import { AVATAR_RECORD_KEY } from '../types.ts'
 import type { Conditions } from './clock.ts'
 import { AREAS, DEFAULT_AREAS, ISLE_LAYOUTS, type AreaId, type IsleLayoutId } from './data.ts'
 import { placeName } from './isle.ts'
+import { HOUSE_MAX, ISLE_ZONES } from './isleEcon.ts'
 import { PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY } from './logic.ts'
 import type { Opened } from './map.ts'
 import { decodeOutfit } from './outfit.ts'
@@ -14,7 +15,7 @@ import type { Outfit } from './wardrobe.ts'
 import type { OnlinePeer } from '../../platform/world/presence.ts'
 
 export type PreviewRecord = { key: string; detail: string | null }
-export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit; isle: IsleLayoutId | null }
+export type PreviewState = { area: AreaId; player: Player; opened: Opened; outfit: Outfit; isle: IsleLayoutId | null; isleCleared: number; house: number }
 
 /** 비·눈이 오는 동안 다시 그리는 간격(ms) */
 export const PREVIEW_RAIN_FRAME_MS = 100
@@ -34,9 +35,17 @@ export function previewState(saved: SavedPosition | null, records: PreviewRecord
   const opened = openedFrom(detailOf(PREVIEW_AREAS_KEY))
   const outfit = decodeOutfit(detailOf(AVATAR_RECORD_KEY) ?? '')
   // 내 섬 모양(기록 isle, 고른 뒤에만 있다). 모르는 값이면 섬이 없는 것으로 본다
-  const isle = ISLE_LAYOUTS.find((l) => l.id === detailOf(PREVIEW_ISLE_KEY))?.id ?? null
-  const start = startPosition(saved, opened, isle)
-  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit, isle }
+  // 값은 "모양:치운 구역 수:집 단계"(v24). 옛 값은 뒤가 없어 0. 미리보기의 집 안에는 가구를 그리지 않는다
+  const [shape, done, built] = (detailOf(PREVIEW_ISLE_KEY) ?? '').split(':')
+  const isle = ISLE_LAYOUTS.find((l) => l.id === shape)?.id ?? null
+  const num = (v: string | undefined, max: number) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? Math.max(0, Math.min(max, Math.floor(n))) : 0
+  }
+  const isleCleared = num(done, ISLE_ZONES)
+  const house = num(built, HOUSE_MAX)
+  const start = startPosition(saved, opened, isle ? { layout: isle, cleared: isleCleared, house } : null)
+  return { area: start.area, player: { pos: start.pos, facing: start.facing, moving: false, walkMs: 0 }, opened, outfit, isle, isleCleared, house }
 }
 
 /** 정사각형 한 변(CSS px)에 맞는 정수 배율 1~4. 논리 장면 한 변은 floor(size / scale) */

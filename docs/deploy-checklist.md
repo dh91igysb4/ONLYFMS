@@ -167,6 +167,27 @@ curl -sS -i -X POST "<함수 주소>" -H "x-worker-token: <값>" -H 'content-typ
   - 클라우드 환경 네트워크 설정에 `*.supabase.co`를 허용할 수 있으면 클라우드 예약 작업으로 만들고, 토큰은 예약 작업 설정에 둔다.
   - 안 되면 맥에서 매일 15:30 KST에 도는 "이 컴퓨터 필요" 예약 작업으로 만들고, 저장소 루트 `.env.local`에 `SUGGEST_WORKER_TOKEN=<값>`을 넣는다(`.env.local`은 커밋하지 않는다).
 
+## 내 섬 D단계 배포 (`feat/my-isle-d`, 낚시 `logic.version` 25)
+설계 `docs/superpowers/specs/2026-11-26-my-isle-d-design.md`. 바깥 꾸미기 10종 만들기·놓기·치우기, 꾸미기 모드 버튼. DB 변경 없음. B·C를 먼저 배포한다.
+
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (v25를 배포한 뒤에는 v24로 되돌리지 않는다 — 옛 migrate가 꾸미기를 지운다)
+- [ ] 머지·Vercel 배포. 열어 둔 낚시 탭은 새로고침
+- [ ] 확인: 작업대 꾸미기 탭 만들기, 내 섬 아래 메뉴 "꾸미기" 켜고 빈 땅 앞 "놓기", 놓은 것 앞 "치우기", 돌길·꽃밭은 밟고 지나가는지, 친구 계정으로 그 섬에 가면 꾸민 모양이 보이는지(꾸미기 버튼 없음)
+
+## 내 섬 C단계 배포 (`feat/my-isle-c`, 낚시 `logic.version` 24)
+설계 `docs/superpowers/specs/2026-11-26-my-isle-c-design.md`. 집 단계(텐트 → 큰 집), 집 안(지역 `home`), 가구 만들기·놓기·치우기. DB 변경 없음. B를 먼저 배포한다.
+
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (v24를 배포한 뒤에는 v23으로 되돌리지 않는다 — 옛 migrate가 집·가구를 지운다)
+- [ ] 머지·Vercel 배포. 열어 둔 낚시 탭은 새로고침
+- [ ] 확인: 작업대 집 탭 짓기 → 오두막 그림, 문으로 들어가 집 안, 가구 만들기 → 집 안 빈 칸 "놓기", 놓은 가구 "치우기", 친구 계정으로 그 집에 들어가 가구가 보이는지(놓기 없음), 프로필 기록 "집"
+
+## 내 섬 B단계 배포 (`feat/my-isle-b`, 낚시 `logic.version` 23)
+설계 `docs/superpowers/specs/2026-11-26-my-isle-b-design.md`. 자원 칸 캐기·작업대(도구 올리기)·8구역 개간. DB 변경 없음.
+
+- [ ] `npx supabase@2 functions deploy world --no-verify-jwt` (`logic.ts`·`isle.ts`·`isleEcon.ts`·`maps/isle-*.ts`가 바뀌었다. v23을 배포한 뒤에는 v22로 되돌리지 않는다 — 옛 migrate가 재료·개간을 지운다)
+- [ ] 머지·Vercel 배포. 열어 둔 낚시 탭은 새로고침
+- [ ] 확인: 내 섬 나무 앞 "베기" → 나무 +1, 같은 칸 다시 → "오늘은 다 캤어요", 작업대 창 재료 줄·도구 올리기·개간하기 → 넓어진 섬, 친구 계정으로 그 섬에 가면 넓어진 모양, 프로필 기록 "섬 개간"
+
 ## 내 섬 A단계 배포 (`feat/my-isle-a`, 낚시 `logic.version` 22)
 설계 `docs/superpowers/specs/2026-11-25-my-island-design.md` §5. 마을 선착장 배 창(섬·내 섬·친구 섬), 섬 모양 고르기, 남의 섬 구경(world `visit`), RPC `world_players`.
 

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-import { BoatPanel, IsleChoosePanel } from './IslePanels.tsx'
+import { BoatPanel, DecoPanel, IsleChoosePanel } from './IslePanels.tsx'
 
 const noop = () => {}
 
@@ -34,5 +34,13 @@ describe('IsleChoosePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '쌍둥이 만 섬' }))
     expect(onChoose).toHaveBeenCalledWith('twin')
     expect(screen.getByRole('button', { name: '초승달 섬' })).toBeInTheDocument()
+  })
+})
+
+describe('DecoPanel', () => {
+  test('그 칸에 못 놓는 꾸미기(막는 것)는 버튼이 꺼진다', () => {
+    render(<DecoPanel box={{ path: 1, fence: 2 }} busy={false} allowed={(id) => id === 'path'} onPick={() => {}} />)
+    expect(screen.getByRole('button', { name: '돌길 1개' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '울타리 2개' })).toBeDisabled()
   })
 })

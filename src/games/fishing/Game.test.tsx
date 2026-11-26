@@ -8,11 +8,12 @@ import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
-import { discardFee, kstDay, price, type PendingView, type View } from './logic.ts'
+import { discardFee, kstDay, newIsle, price, type PendingView, type View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
-import { isleArrival, isleMap } from './isle.ts'
+import { isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
+import { homeArrival, homeMap } from './home.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
 import { CAVE } from './maps/cave.ts'
@@ -83,7 +84,7 @@ vi.mock('../../platform/world/hallOfFame.ts', () => ({
 const mapGate = vi.hoisted(() => ({ hideRiver: false }))
 vi.mock('./maps/index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./maps/index.ts')>()
-  return { ...orig, mapFor: (area: AreaId, layout?: 'crescent' | 'twin' | null) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area, layout)) }
+  return { ...orig, mapFor: (area: AreaId, shape?: Parameters<typeof orig.mapFor>[1]) => (mapGate.hideRiver && area === 'river' ? null : orig.mapFor(area, shape)) }
 })
 vi.mock('./minimap.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./minimap.ts')>()
@@ -1863,7 +1864,7 @@ describe('fishing Game: 지역 전환', () => {
   test('장면의 opened는 서버 상태 areas의 집합이다', async () => {
     await mount(makeView({ areas: ['village', 'river', 'forest', 'lake'] }), NEAR_EXIT)
     await advance(50)
-    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'isle', 'lake', 'river', 'village'])
+    expect([...lastScene().opened].sort()).toEqual(['forest', 'hall', 'home', 'isle', 'lake', 'river', 'village'])
   })
 
   test('전환 중(페이드 아웃·인)에는 방향키를 눌러도 움직이지 않는다', async () => {
@@ -3519,7 +3520,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
 
   test('친구 섬: visit 뒤 페이드로 친구 모양 섬에 도착, 방은 isle-<친구 id>, 도착 알림, 위치 저장 안 함, 텐트 안내 없음', async () => {
     playersMock.mockResolvedValue([{ id: FRIEND, handle: 'mj', avatar: null }])
-    visitMock.mockResolvedValue({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: { layout: 'twin' }, outfit: DEFAULT_OUTFIT } })
+    visitMock.mockResolvedValue({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: newIsle('twin'), outfit: DEFAULT_OUTFIT } })
     await openBoat(makeView())
     const before = localStorage.getItem(POS_KEY)
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '친구 섬' }))
@@ -3562,7 +3563,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     await advance(300)
     const panel = isleChoosePanel()
     expect(within(panel).getByText('고르면 바꿀 수 없어요')).toBeInTheDocument()
-    route({ isleChoose: () => ok({ ...view, isle: { layout: 'crescent' } }) })
+    route({ isleChoose: () => ok({ ...view, isle: newIsle('crescent') }) })
     fireEvent.click(within(panel).getByRole('button', { name: '초승달 섬' }))
     await flush()
     expect(calls('isleChoose')[0]).toMatchObject({ payload: { type: 'isleChoose', layout: 'crescent' } })
@@ -3604,7 +3605,7 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     fireEvent.click(within(boatPanel()).getByRole('button', { name: 'mj의 섬' }))
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    resolveVisit({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: { layout: 'twin' }, outfit: DEFAULT_OUTFIT } })
+    resolveVisit({ owner: { id: FRIEND, handle: 'mj' }, view: { isle: newIsle('twin'), outfit: DEFAULT_OUTFIT } })
     await flush()
     await advance(400)
     expect(lastScene().map.id).toBe('village')
@@ -3617,20 +3618,20 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
     fireEvent.click(within(isleChoosePanel()).getByRole('button', { name: '초승달 섬' }))
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    resolveChoose({ view: { ...view, isle: { layout: 'crescent' } }, result: null, server_now: Date.now() })
+    resolveChoose({ view: { ...view, isle: newIsle('crescent') }, result: null, server_now: Date.now() })
     await flush()
     await advance(400)
     expect(lastScene().map.id).toBe('village')
   })
 
   test('이미 고른 내 섬: 배 창의 내 섬은 바로 출발, 섬 선착장 → 마을 (42,28)', async () => {
-    await openBoat(makeView({ isle: { layout: 'twin' } }))
+    await openBoat(makeView({ isle: newIsle('twin') }))
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '내 섬' }))
     await advance(400)
     expect(lastScene().map).toBe(isleMap('twin'))
     cleanup()
     const d = isleMap('twin').docks[0]
-    await mount(makeView({ isle: { layout: 'twin' } }), { area: 'isle', pos: tileCenter(d.front.tx, d.front.ty), facing: d.front.facing })
+    await mount(makeView({ isle: newIsle('twin') }), { area: 'isle', pos: tileCenter(d.front.tx, d.front.ty), facing: d.front.facing })
     await advance(50)
     expect(lastScene().map).toBe(isleMap('twin'))
     await interact()
@@ -3642,8 +3643,335 @@ describe('내 섬 A단계 (내 섬 설계 §5)', () => {
   test('내 섬 텐트 앞은 살펴보기(안내)', async () => {
     stubTouch()
     const tent = isleMap('crescent').fixtures[0].front
-    await mount(makeView({ isle: { layout: 'crescent' } }), { area: 'isle', pos: tileCenter(tent.tx, tent.ty), facing: tent.facing })
+    await mount(makeView({ isle: newIsle('crescent') }), { area: 'isle', pos: tileCenter(tent.tx, tent.ty), facing: tent.facing })
     await advance(50)
     expect(actionButton()).toHaveTextContent('살펴보기')
+  })
+})
+
+describe('내 섬 B단계: 캐기·작업대·개간 (설계 2026-11-26-my-isle-b §5.5)', () => {
+  const workbenchPanel = () => screen.getByRole('region', { name: '작업대' })
+  async function interact() {
+    press()
+    release()
+    await advance(300)
+  }
+  const near = (layout: 'crescent' | 'twin', cleared: number, tx: number, ty: number): At | null => {
+    const m = isleMap(layout, cleared)
+    for (const [f, dx, dy] of [['up', 0, 1], ['down', 0, -1], ['left', 1, 0], ['right', -1, 0]] as const) {
+      if (!feetBlocked(m, tileCenter(tx + dx, ty + dy).x, tileCenter(tx + dx, ty + dy).y, new Set(DEFAULT_AREAS))) return { area: 'isle', pos: tileCenter(tx + dx, ty + dy), facing: f }
+    }
+    return null
+  }
+  beforeEach(() => {
+    roomGate.joins = []
+    vi.mocked(worldPlayers).mockReset().mockResolvedValue([])
+  })
+
+  test('나무 칸 앞: 행동 버튼 베기 → gather 요청, 안내 "나무 +1"', async () => {
+    stubTouch()
+    const tree = isleNodes('crescent').find((n) => n.zone === 0 && n.kind === 'tree')!
+    const view = makeView({ isle: newIsle('crescent') })
+    await mount(view, near('crescent', 0, tree.tx, tree.ty))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('베기')
+    route({ gather: () => ok({ ...view, isle: { ...newIsle('crescent'), mats: { wood: 1, stone: 0, iron: 0 } } }, { res: 'wood', n: 1 }) })
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await flush()
+    expect(calls('gather')[0]).toMatchObject({ payload: { type: 'gather', id: tree.id } })
+    expect(screen.getByText('나무 +1')).toBeInTheDocument()
+  })
+
+  test('오늘 이미 캤으면 안내', async () => {
+    const rock = isleNodes('crescent').find((n) => n.zone === 0 && n.kind === 'rock')!
+    await mount(makeView({ isle: newIsle('crescent') }), near('crescent', 0, rock.tx, rock.ty))
+    await advance(50)
+    route({ gather: () => Promise.reject(new ApiError('gathered', 400)) })
+    press()
+    release()
+    await flush()
+    expect(screen.getByText('오늘은 다 캤어요')).toBeInTheDocument()
+  })
+
+  test('작업대: 재료·도구·개간 탭, 도구 올리기와 개간 요청, 개간하면 넓어진 섬', async () => {
+    const isle = { ...newIsle('twin'), mats: { wood: 50, stone: 50, iron: 50 } }
+    const view = makeView({ gold: 100000, isle })
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(view, { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    await interact()
+    const panel = workbenchPanel()
+    expect(screen.getByRole('heading', { name: '작업대' })).toBeInTheDocument()
+    expect(within(panel).getByText('나무 50 · 돌 50 · 철 50')).toBeInTheDocument()
+    route({ craft: () => ok({ ...view, gold: 96000, isle: { ...isle, tools: { axe: 2, pick: 1, shovel: 1 } } }) })
+    fireEvent.click(within(panel).getAllByRole('button', { name: '올리기' })[0])
+    await flush()
+    expect(calls('craft')[0]).toMatchObject({ payload: { type: 'craft', tool: 'axe', tier: 2, price: 4000 } })
+    fireEvent.click(within(workbenchPanel()).getByRole('tab', { name: '개간' }))
+    expect(within(workbenchPanel()).getByText('구역 1/8')).toBeInTheDocument()
+    route({ clear: () => ok({ ...view, gold: 90880, isle: { ...isle, cleared: 1 } }, { cleared: 1 }) })
+    fireEvent.click(within(workbenchPanel()).getByRole('button', { name: '개간하기' }))
+    await flush()
+    expect(calls('clear')[0]).toMatchObject({ payload: { type: 'clear', zone: 1, price: 5120 } })
+    expect(screen.queryByRole('region', { name: '작업대' })).not.toBeInTheDocument()
+    await advance(400)
+    expect(lastScene().map).toBe(isleMap('twin', 1))
+    expect(screen.getByText('개간했어요 (1/8)')).toBeInTheDocument()
+  })
+
+  test('옛 서버(v22, isle에 재료 없음)여도 작업대 창이 죽지 않고 새로고침 안내', async () => {
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(makeView({ isle: { layout: 'twin' } as unknown as View['isle'] }), { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    await interact()
+    expect(screen.getByText('게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요')).toBeInTheDocument()
+  })
+
+  test('저장 위치가 개간한 칸이면 서버 cleared로 그 맵에서 시작', async () => {
+    const [k] = [...isleZoneTiles('twin')].find(([, z]) => z === 1)!
+    const [x, y] = k.split(',').map(Number)
+    await mount(makeView({ isle: { ...newIsle('twin'), cleared: 2 } }), { area: 'isle', pos: tileCenter(x, y), facing: 'up' })
+    await advance(50)
+    expect(lastScene().map).toBe(isleMap('twin', 2))
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: x, ty: y })
+  })
+
+  test('친구 섬은 친구의 cleared로 그린다', async () => {
+    vi.mocked(worldPlayers).mockResolvedValue([{ id: 'f1', handle: 'mj', avatar: null }])
+    vi.mocked(worldVisit).mockResolvedValue({ owner: { id: 'f1', handle: 'mj' }, view: { isle: { layout: 'twin', cleared: 5 }, outfit: DEFAULT_OUTFIT } })
+    const dock = VILLAGE.docks[0].front
+    await mount(makeView(), { area: 'village', pos: tileCenter(dock.tx, dock.ty), facing: dock.facing })
+    await advance(50)
+    await interact()
+    const boat = screen.getByRole('region', { name: '배' })
+    fireEvent.click(within(boat).getByRole('button', { name: '친구 섬' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('region', { name: '배' })).getByRole('button', { name: 'mj의 섬' }))
+    await flush()
+    await advance(400)
+    expect(lastScene().map).toBe(isleMap('twin', 5))
+  })
+})
+
+describe('내 섬 C단계: 집 (설계 2026-11-26-my-isle-c §4.5)', () => {
+  async function interact() {
+    press()
+    release()
+    await advance(300)
+  }
+  const walkUp = async (ms: number) => {
+    key('ArrowUp', true)
+    await advance(ms)
+    key('ArrowUp', false)
+    await advance(50)
+  }
+  beforeEach(() => {
+    roomGate.joins = []
+    vi.mocked(worldPlayers).mockReset().mockResolvedValue([])
+  })
+
+  test('집 1단계: 문으로 들어가면 집 안 도착 칸, 방 키 home-<내 id>, 아래 문으로 나가면 섬 문 앞', async () => {
+    const isle = { ...newIsle('twin'), house: 1 }
+    const m = isleMap('twin', 0, 1)
+    const b = m.building!
+    await mount(makeView({ isle }), { area: 'isle', pos: tileCenter(b.doorTx, b.ty + b.h), facing: 'up' })
+    await advance(50)
+    await walkUp(260)
+    await advance(800)
+    expect(lastScene().map).toBe(homeMap('twin', 1))
+    const a = homeArrival(1)
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: a.tx, ty: a.ty })
+    expect(roomGate.joins.at(-1)!.area).toBe('home-u1')
+    expect(screen.getByText('내 집')).toBeInTheDocument()
+    key('ArrowDown', true)
+    await advance(260)
+    key('ArrowDown', false)
+    await advance(800)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 1))
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: b.doorTx, ty: b.ty + b.h })
+  })
+
+  test('집 안 빈 바닥 앞 "놓기" → 가구 고르기 창 → place 요청, 놓은 가구 앞 "치우기" → pickUp', async () => {
+    stubTouch()
+    const isle = { ...newIsle('twin'), house: 1, furniture: { chair: 1 } }
+    const view = makeView({ isle })
+    await mount(view, { area: 'home', pos: tileCenter(1, 3), facing: 'up' })
+    await advance(50)
+    expect(lastScene().map).toBe(homeMap('twin', 1))
+    expect(actionButton()).toHaveTextContent('놓기')
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await advance(300)
+    const panel = screen.getByRole('region', { name: '가구 놓기' })
+    const placed = { ...isle, furniture: {}, placed: [{ id: 'chair' as const, tx: 1, ty: 2 }] }
+    route({ place: () => ok({ ...view, isle: placed }) })
+    fireEvent.click(within(panel).getByRole('button', { name: '의자 1개' }))
+    await flush()
+    expect(calls('place')[0]).toMatchObject({ payload: { type: 'place', id: 'chair', tx: 1, ty: 2 } })
+    await advance(50)
+    expect(lastScene().map).toBe(homeMap('twin', 1, placed.placed))
+    expect(actionButton()).toHaveTextContent('치우기')
+    route({ pickUp: () => ok({ ...view, isle }) })
+    pointer('down', actionButton(), 4)
+    pointer('up', actionButton(), 4)
+    await flush()
+    expect(calls('pickUp')[0]).toMatchObject({ payload: { type: 'pickUp', tx: 1, ty: 2 } })
+  })
+
+  test('집이 있는 섬·집 안에서 큰 지도를 열면 마을 선착장 자리(죽지 않는다)', async () => {
+    const isle = { ...newIsle('twin'), house: 1 }
+    await mount(makeView({ isle }), { area: 'isle', pos: tileCenter(isleArrival('twin').tx, isleArrival('twin').ty), facing: 'up' })
+    await advance(50)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(screen.getByRole('region', { name: '지도' })).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+    cleanup()
+    await mount(makeView({ isle }), { area: 'home', pos: tileCenter(1, 3), facing: 'up' })
+    await advance(50)
+    fireEvent.click(screen.getByRole('button', { name: '지도' }))
+    expect(within(screen.getByRole('region', { name: '지도' })).getByRole('tab', { selected: true })).toHaveTextContent('바닷가 마을')
+  })
+
+  test('경계 가까이 서서 앞 칸에 가구를 놓아도 갇히지 않는다(칸 가운데로 옮긴다)', async () => {
+    const isle = { ...newIsle('twin'), house: 1, furniture: { chair: 1 } }
+    const view = makeView({ isle })
+    await mount(view, { area: 'home', pos: { x: 2 * TILE + TILE / 2, y: 4 * TILE + 1 }, facing: 'up' })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    const placed = { ...isle, furniture: {}, placed: [{ id: 'chair' as const, tx: 2, ty: 3 }] }
+    route({ place: () => ok({ ...view, isle: placed }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '가구 놓기' })).getByRole('button', { name: '의자 1개' }))
+    await flush()
+    await advance(50)
+    expect(lastScene().player.pos).toEqual(tileCenter(2, 4))
+    key('ArrowRight', true)
+    await advance(300)
+    key('ArrowRight', false)
+    expect(lastScene().player.pos.x).toBeGreaterThan(tileCenter(2, 4).x)
+  })
+
+  test('옛 서버(v23, 집 값 없음)여도 작업대 창이 죽지 않는다', async () => {
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    const v23 = { ...newIsle('twin'), house: undefined, furniture: undefined, placed: undefined } as unknown as View['isle']
+    await mount(makeView({ isle: v23 }), { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    expect(screen.getByText('게임이 새 버전으로 바뀌는 중이에요. 잠시 뒤 새로고침해 주세요')).toBeInTheDocument()
+  })
+
+  test('작업대 집 탭: 다음 단계 짓기, 가구 탭: 만들기', async () => {
+    const isle = { ...newIsle('twin'), mats: { wood: 500, stone: 500, iron: 500 } }
+    const view = makeView({ gold: 1e6, isle })
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(view, { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    await interact()
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '집' }))
+    route({ build: () => ok({ ...view, isle: { ...isle, house: 1 } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('button', { name: '짓기' }))
+    await flush()
+    expect(calls('build')[0]).toMatchObject({ payload: { type: 'build', level: 1, price: 34850 } })
+    await advance(50)
+    expect(lastScene().map.buildingSprite).toBe('hut')
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '가구' }))
+    route({ makeFurn: () => ok({ ...view, isle: { ...isle, house: 1, furniture: { bed: 1 } } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getAllByRole('button', { name: '만들기' })[0])
+    await flush()
+    expect(calls('makeFurn')[0]).toMatchObject({ payload: { type: 'makeFurn', id: 'bed', price: 3000 } })
+  })
+
+  test('친구 집: 들어가 구경, 가구가 보이고 놓기·치우기 없음', async () => {
+    stubTouch()
+    vi.mocked(worldPlayers).mockResolvedValue([{ id: 'f1', handle: 'mj', avatar: null }])
+    const placed = [{ id: 'bed', tx: 1, ty: 2 }]
+    vi.mocked(worldVisit).mockResolvedValue({ owner: { id: 'f1', handle: 'mj' }, view: { isle: { layout: 'twin', cleared: 0, house: 1, placed }, outfit: DEFAULT_OUTFIT } })
+    const dock = VILLAGE.docks[0].front
+    await mount(makeView(), { area: 'village', pos: tileCenter(dock.tx, dock.ty), facing: dock.facing })
+    await advance(50)
+    await interact()
+    fireEvent.click(within(screen.getByRole('region', { name: '배' })).getByRole('button', { name: '친구 섬' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('region', { name: '배' })).getByRole('button', { name: 'mj의 섬' }))
+    await flush()
+    await advance(400)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 1))
+    // 섬 도착(24,30) → 위 1 → 왼쪽 4 → 위 11칸이면 집 문 앞(20,18), 한 칸 더 위가 문
+    const walk = async (code: string, tiles: number) => {
+      key(code, true)
+      await advance(Math.round((tiles * TILE * 1000) / WALK_SPEED))
+      key(code, false)
+      await advance(50)
+    }
+    await walk('ArrowUp', 1)
+    await walk('ArrowLeft', 4)
+    await walk('ArrowUp', 13)
+    await advance(800)
+    expect(lastScene().map).toBe(homeMap('twin', 1, placed as never))
+    expect(roomGate.joins.at(-1)!.area).toBe('home-f1')
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+  })
+})
+
+describe('내 섬 D단계: 바깥 꾸미기 (설계 2026-11-26-my-isle-d §4.5)', () => {
+  const arr = isleArrival('twin')
+  const spot = { tx: arr.tx - 2, ty: arr.ty - 1 }
+  const at: At = { area: 'isle', pos: tileCenter(spot.tx, spot.ty + 1), facing: 'up' }
+  beforeEach(() => {
+    roomGate.joins = []
+    vi.mocked(worldPlayers).mockReset().mockResolvedValue([])
+  })
+
+  test('꾸미기 버튼은 내 섬에서만, 켜면 빈 땅 앞 "놓기" → 고르기 창 → decorate, 놓은 것 앞 "치우기"', async () => {
+    stubTouch()
+    const isle = { ...newIsle('twin'), decoBox: { bench: 1 } }
+    const view = makeView({ isle })
+    await mount(view, at)
+    await advance(50)
+    expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '꾸미기' }))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('놓기')
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await advance(300)
+    const deco = [{ id: 'bench' as const, ...spot }]
+    route({ decorate: () => ok({ ...view, isle: { ...isle, decoBox: {}, deco } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '꾸미기 놓기' })).getByRole('button', { name: '벤치 1개' }))
+    await flush()
+    expect(calls('decorate')[0]).toMatchObject({ payload: { type: 'decorate', id: 'bench', ...spot } })
+    await advance(50)
+    expect(lastScene().map).toBe(isleMap('twin', 0, 0, deco))
+    expect(actionButton()).toHaveTextContent('치우기')
+    route({ undecorate: () => ok({ ...view, isle }) })
+    pointer('down', actionButton(), 4)
+    pointer('up', actionButton(), 4)
+    await flush()
+    expect(calls('undecorate')[0]).toMatchObject({ payload: { type: 'undecorate', ...spot } })
+  })
+
+  test('마을에서는 꾸미기 버튼이 없다', async () => {
+    await mount(makeView({ isle: newIsle('twin') }), SAND)
+    await advance(50)
+    expect(screen.queryByRole('button', { name: '꾸미기' })).not.toBeInTheDocument()
+  })
+
+  test('작업대 꾸미기 탭: 만들기', async () => {
+    const isle = { ...newIsle('twin'), mats: { wood: 50, stone: 50, iron: 50 } }
+    const view = makeView({ gold: 1e6, isle })
+    const wb = isleMap('twin').fixtures.find((f) => f.act.kind === 'workbench')!.front
+    await mount(view, { area: 'isle', pos: tileCenter(wb.tx, wb.ty), facing: wb.facing })
+    await advance(50)
+    press()
+    release()
+    await advance(300)
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getByRole('tab', { name: '꾸미기' }))
+    route({ makeDeco: () => ok({ ...view, isle: { ...isle, decoBox: { path: 1 } } }) })
+    fireEvent.click(within(screen.getByRole('region', { name: '작업대' })).getAllByRole('button', { name: '만들기' })[0])
+    await flush()
+    expect(calls('makeDeco')[0]).toMatchObject({ payload: { type: 'makeDeco', id: 'path', price: 100 } })
   })
 })

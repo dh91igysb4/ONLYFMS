@@ -39,6 +39,8 @@ export const MINIMAP_LOOK: Readonly<Record<TileKind, Look>> = {
   door: look('#9fcbd8', '#4a3a4a', ['bbb', 'bmb', 'bmb']),
   floor: look('#4a5a75', '#4a5a75'),
   wall: look('#efe9df', '#efe9df'),
+  bench: look('#78b85c', '#8b5a2b', ['bbb', 'bmb', 'bbb']),
+  deco: look('#78b85c', '#c9a06a', ['bbb', 'bmb', 'bbb']),
   cliff: look('#8f8993', '#5a5560', ['bbb', 'bbb', 'mmm']),
   'cave-floor': look('#4a4553', '#4a4553'),
   'cave-wall': look('#25212c', '#25212c'),

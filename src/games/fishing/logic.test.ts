@@ -4,7 +4,9 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, newlyEarned, ownsWear, unlockMet, WEAR, wearKey } from './wardrobe.ts'
 import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weather } from './clock.ts'
 import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, ISLE_LAYOUTS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
-import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type Pending, type State, type View } from './logic.ts'
+import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
+import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
+import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -361,7 +363,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(22)
+    expect(logic.version).toBe(25)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
     })
@@ -2226,8 +2228,8 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 22', () => {
-    expect(logic.version).toBe(22)
+  it('version 25', () => {
+    expect(logic.version).toBe(25)
   })
 })
 
@@ -2362,34 +2364,35 @@ describe('마을회관 지역 (logic.version 17)', () => {
   })
 })
 
+const ISLE0: IsleState = { layout: 'crescent', cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] }, house: 0, furniture: {}, placed: [], decoBox: {}, deco: [] }
 describe('내 섬 A단계(v22, 내 섬 설계 §5)', () => {
   it('처음엔 섬이 없고 isleChoose로 고른다', () => {
     expect(logic.init().isle).toBeNull()
     expect(ISLE_LAYOUTS.map((l) => l.id)).toEqual(['crescent', 'twin'])
     const r = ok(play(fresh(), { type: 'isleChoose', layout: 'twin' }, ctx()))
-    expect(r.state.isle).toEqual({ layout: 'twin' })
+    expect(r.state.isle).toEqual({ ...ISLE0, layout: 'twin' })
     expect(r.gold ?? 0).toBe(0)
   })
   it('isleChoose 오류: 낚는 중 busy, 이미 골랐으면 already_chosen, 모르는 값 bad_layout', () => {
     expect(err(play(withPending(), { type: 'isleChoose', layout: 'twin' }, ctx()))).toBe('busy')
-    expect(err(play(fresh({ isle: { layout: 'crescent' } }), { type: 'isleChoose', layout: 'twin' }, ctx()))).toBe('already_chosen')
+    expect(err(play(fresh({ isle: { ...ISLE0, layout: 'crescent' } }), { type: 'isleChoose', layout: 'twin' }, ctx()))).toBe('already_chosen')
     expect(err(play(fresh(), { type: 'isleChoose', layout: 'zzz' }, ctx()))).toBe('bad_layout')
     expect(err(play(fresh(), { type: 'isleChoose', layout: 3 }, ctx()))).toBe('bad_layout')
   })
   it('previewData: 고르기 전엔 isle 키가 없고, 고른 뒤 섬 모양', () => {
     expect(PREVIEW_ISLE_KEY).toBe('isle')
     expect(logic.previewData?.(logic.init())).not.toHaveProperty('isle')
-    expect(logic.previewData?.(fresh({ isle: { layout: 'crescent' } }))?.isle).toBe('crescent')
+    expect(logic.previewData?.(fresh({ isle: { ...ISLE0, layout: 'crescent', cleared: 3, house: 2 } as State['isle'] }))?.isle).toBe('crescent:3:2')
   })
   it('publicView: 섬과 옷차림만, 가방·골드·도감은 없다', () => {
-    const s = fresh({ isle: { layout: 'twin' }, bag: [{ species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
+    const s = fresh({ isle: { ...ISLE0, layout: 'twin', cleared: 2, mats: { wood: 5, stone: 1, iron: 0 } }, bag: [{ species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
     const v = logic.publicView!(s) as Record<string, unknown>
-    expect(v).toEqual({ isle: { layout: 'twin' }, outfit: s.outfit })
+    expect(v).toEqual({ isle: { layout: 'twin', cleared: 2, house: 0, placed: [], deco: [] }, outfit: s.outfit })
     for (const k of ['bag', 'gold', 'dex', 'fridge', 'totalEarned']) expect(v).not.toHaveProperty(k)
   })
   it('migrate: 옛 세이브·모르는 값은 null, 저장된 모양은 유지', () => {
     expect(logic.migrate({ ...logic.init(), isle: undefined }, 21).isle).toBeNull()
-    expect(logic.migrate({ ...logic.init(), isle: { layout: 'twin' } }, 22).isle).toEqual({ layout: 'twin' })
+    expect(logic.migrate({ ...logic.init(), isle: { layout: 'twin' } }, 22).isle).toEqual({ ...ISLE0, layout: 'twin' })
     expect(logic.migrate({ ...logic.init(), isle: { layout: 'zzz' } }, 22).isle).toBeNull()
     expect(logic.migrate({ ...logic.init(), isle: 'twin' }, 22).isle).toBeNull()
   })
@@ -2397,5 +2400,194 @@ describe('내 섬 A단계(v22, 내 섬 설계 §5)', () => {
     expect(DEFAULT_AREAS).toContain('isle')
     expect(FISHING_AREAS.map((a) => a.id)).not.toContain('isle')
     expect(err(play(fresh(), { type: 'cast', area: 'isle', power: 0.5 }, ctx()))).toBeTruthy()
+  })
+})
+
+describe('내 섬 B단계 (v23, 설계 2026-11-26-my-isle-b §5.3)', () => {
+  const isle = (over: Partial<typeof ISLE0> = {}) => ({ ...ISLE0, ...over })
+  const nodes = isleNodes('crescent')
+  const tree0 = nodes.find((n) => n.zone === 0 && n.kind === 'tree')!
+  const rock0 = nodes.find((n) => n.zone === 0 && n.kind === 'rock')!
+  const iron = nodes.find((n) => n.kind === 'iron')!
+  const DAY = 86_400_000
+  it('gather: 나무는 도끼 단계만큼, 돌은 곡괭이 단계만큼, 결과는 캔 재료', () => {
+    const r = ok(play(fresh({ isle: isle({ tools: { axe: 2, pick: 1, shovel: 1 } }) }), { type: 'gather', id: tree0.id }, ctx()))
+    expect(r.state.isle!.mats).toEqual({ wood: 2, stone: 0, iron: 0 })
+    expect(r.state.isle!.gathered).toEqual({ day: kstDay(T0), ids: [tree0.id] })
+    expect(r.result).toEqual({ res: 'wood', n: 2 })
+    expect(r.gold ?? 0).toBe(0)
+    const r2 = ok(play(r.state, { type: 'gather', id: rock0.id }, ctx()))
+    expect(r2.state.isle!.mats).toEqual({ wood: 2, stone: 1, iron: 0 })
+  })
+  it('gather 오류: 섬 없음·모르는 칸·다른 섬 칸·잠긴 구역·오늘 캠·상한', () => {
+    expect(err(play(fresh(), { type: 'gather', id: tree0.id }, ctx()))).toBe('no_isle')
+    expect(err(play(fresh({ isle: isle() }), { type: 'gather', id: 'zzz' }, ctx()))).toBe('bad_node')
+    const twinNode = isleNodes('twin')[0].id
+    expect(err(play(fresh({ isle: isle() }), { type: 'gather', id: twinNode }, ctx()))).toBe('bad_node')
+    expect(err(play(fresh({ isle: isle({ cleared: iron.zone - 1 }) }), { type: 'gather', id: iron.id }, ctx()))).toBe('node_locked')
+    const once = ok(play(fresh({ isle: isle() }), { type: 'gather', id: tree0.id }, ctx())).state
+    expect(err(play(once, { type: 'gather', id: tree0.id }, ctx()))).toBe('gathered')
+    expect(err(play(fresh({ isle: isle({ mats: { wood: 999, stone: 0, iron: 0 } }) }), { type: 'gather', id: tree0.id }, ctx()))).toBe('mats_full')
+    expect(err(play(withPending({ isle: isle() }), { type: 'gather', id: tree0.id }, ctx()))).toBe('busy')
+  })
+  it('날이 바뀌면 다시 캔다(지난 날 기록은 비운다)', () => {
+    const once = ok(play(fresh({ isle: isle() }), { type: 'gather', id: tree0.id }, ctx())).state
+    const next = ok(play(once, { type: 'gather', id: tree0.id }, ctx(T0 + DAY)))
+    expect(next.state.isle!.gathered).toEqual({ day: kstDay(T0 + DAY), ids: [tree0.id] })
+    expect(next.state.isle!.mats.wood).toBe(2)
+  })
+  it('철광은 곡괭이로 철', () => {
+    const r = ok(play(fresh({ isle: isle({ cleared: iron.zone }) }), { type: 'gather', id: iron.id }, ctx()))
+    expect(r.state.isle!.mats).toEqual({ wood: 0, stone: 0, iron: 1 })
+  })
+  it('craft: 2단계 나무10·철5·4,000G, 3단계 나무20·철15·16,000G; 오류', () => {
+    const rich = isle({ mats: { wood: 100, stone: 0, iron: 100 } })
+    const r = ok(play(fresh({ gold: 4000, isle: rich }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))
+    expect(r.state.isle!.tools.axe).toBe(2)
+    expect(r.state.isle!.mats).toEqual({ wood: 90, stone: 0, iron: 95 })
+    expect(r.state.gold).toBe(0)
+    expect(err(play(fresh({ gold: 1e6, isle: rich }), { type: 'craft', tool: 'axe', tier: 3, price: 16000 }, ctx()))).toBe('bad_tier')
+    expect(err(play(fresh({ gold: 1e6, isle: rich }), { type: 'craft', tool: 'saw', tier: 2, price: 4000 }, ctx()))).toBe('bad_tool')
+    expect(err(play(fresh({ gold: 1e6, isle: rich }), { type: 'craft', tool: 'axe', tier: 2, price: 3000 }, ctx()))).toBe('price_changed')
+    expect(err(play(fresh({ gold: 3999, isle: rich }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 1e6, isle: isle() }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))).toBe('not_enough_mats')
+    expect(err(play(fresh({ gold: 1e6, isle: isle({ ...rich, tools: { axe: 3, pick: 1, shovel: 1 } }) }), { type: 'craft', tool: 'axe', tier: 4, price: 0 }, ctx()))).toBe('bad_tier')
+    expect(err(play(fresh({ gold: 1e6 }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))).toBe('no_isle')
+  })
+  it('clear: 다음 구역만, 재료·골드·도구 확인, 결과는 새 cleared', () => {
+    const r = ok(play(fresh({ gold: 5120, isle: isle({ mats: { wood: 8, stone: 6, iron: 0 } }) }), { type: 'clear', zone: 1, price: 5120 }, ctx()))
+    expect(r.state.isle!.cleared).toBe(1)
+    expect(r.state.isle!.mats).toEqual({ wood: 0, stone: 0, iron: 0 })
+    expect(r.state.gold).toBe(0)
+    const lots = { wood: 999, stone: 999, iron: 999 }
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: lots }) }), { type: 'clear', zone: 2, price: 16650 }, ctx()))).toBe('bad_zone')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: lots, cleared: 8 }) }), { type: 'clear', zone: 9, price: 0 }, ctx()))).toBe('bad_zone')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: lots, cleared: 4 }) }), { type: 'clear', zone: 5, price: 79070 }, ctx()))).toBe('need_tool')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: lots }) }), { type: 'clear', zone: 1, price: 1 }, ctx()))).toBe('price_changed')
+    expect(err(play(fresh({ gold: 5119, isle: isle({ mats: lots }) }), { type: 'clear', zone: 1, price: 5120 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 1e7, isle: isle() }), { type: 'clear', zone: 1, price: 5120 }, ctx()))).toBe('not_enough_mats')
+  })
+  it('migrate: v22 {layout}은 기본 B 상태, 저장된 값은 그대로, 깨진 값은 기본값·범위 안으로', () => {
+    expect(logic.migrate({ ...logic.init(), isle: { layout: 'twin' } }, 22).isle).toEqual(isle({ layout: 'twin' }))
+    const saved = isle({ cleared: 3, tools: { axe: 2, pick: 3, shovel: 1 }, mats: { wood: 5, stone: 6, iron: 7 }, gathered: { day: '2026-11-26', ids: [tree0.id] } })
+    expect(logic.migrate({ ...logic.init(), isle: saved }, 23).isle).toEqual(saved)
+    const broken = { layout: 'crescent', cleared: 99, tools: { axe: 9, pick: 'x' }, mats: { wood: -3, stone: 2000, iron: 1.5 }, gathered: { day: 5, ids: ['zzz', tree0.id] } }
+    expect(logic.migrate({ ...logic.init(), isle: broken }, 23).isle).toEqual(isle({ cleared: 8, tools: { axe: 3, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 999, iron: 1 }, gathered: { day: '', ids: [tree0.id] } }))
+  })
+  it('craft: 낚는 중이면 busy', () => {
+    expect(err(play(withPending({ gold: 1e6, isle: isle({ mats: { wood: 99, stone: 0, iron: 99 } }) }), { type: 'craft', tool: 'axe', tier: 2, price: 4000 }, ctx()))).toBe('busy')
+  })
+  it('기록 isle_cleared(한 구역이라도 치웠을 때만)', () => {
+    expect(logic.records!(fresh()).map((r) => r.key)).not.toContain('isle_cleared')
+    expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('isle_cleared')
+    expect(logic.records!(fresh({ isle: isle({ cleared: 4 }) })).find((r) => r.key === 'isle_cleared')).toEqual({ key: 'isle_cleared', value: 4, detail: '4/8' })
+  })
+})
+
+describe('내 섬 C단계 집 (v24, 설계 2026-11-26-my-isle-c §4.4)', () => {
+  const isle = (over: Record<string, unknown> = {}) => ({ ...ISLE0, ...over }) as NonNullable<State['isle']>
+  const rich = { wood: 999, stone: 999, iron: 999 }
+  it('build: 1단계 34,850G·나무30·돌20, 결과 house', () => {
+    const r = ok(play(fresh({ gold: 34850, isle: isle({ mats: { wood: 30, stone: 20, iron: 0 } }) }), { type: 'build', level: 1, price: 34850 }, ctx()))
+    expect(r.state.isle!.house).toBe(1)
+    expect(r.state.isle!.mats).toEqual({ wood: 0, stone: 0, iron: 0 })
+    expect(r.state.gold).toBe(0)
+  })
+  it('build 오류: 건너뛰기·최고 위·개간 조건·가격·재료·골드', () => {
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: rich }) }), { type: 'build', level: 2, price: 121350 }, ctx()))).toBe('bad_level')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: rich, house: 4, cleared: 8 }) }), { type: 'build', level: 5, price: 0 }, ctx()))).toBe('bad_level')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: rich, house: 2, cleared: 3 }) }), { type: 'build', level: 3, price: 251770 }, ctx()))).toBe('need_clear')
+    expect(err(play(fresh({ gold: 1e7, isle: isle({ mats: rich }) }), { type: 'build', level: 1, price: 1 }, ctx()))).toBe('price_changed')
+    expect(err(play(fresh({ gold: 1e7, isle: isle() }), { type: 'build', level: 1, price: 34850 }, ctx()))).toBe('not_enough_mats')
+    expect(err(play(fresh({ gold: 0, isle: isle({ mats: rich }) }), { type: 'build', level: 1, price: 34850 }, ctx()))).toBe('not_enough_gold')
+    expect(err(play(fresh({ gold: 1e7 }), { type: 'build', level: 1, price: 34850 }, ctx()))).toBe('no_isle')
+  })
+  it('makeFurn: 재료·골드 빼고 보관함 +1, 오류', () => {
+    const r = ok(play(fresh({ gold: 3000, isle: isle({ mats: rich }) }), { type: 'makeFurn', id: 'bed', price: 3000 }, ctx()))
+    expect(r.state.isle!.furniture).toEqual({ bed: 1 })
+    expect(r.state.isle!.mats).toEqual({ wood: 987, stone: 999, iron: 997 })
+    expect(err(play(fresh({ gold: 1e6, isle: isle({ mats: rich }) }), { type: 'makeFurn', id: 'sofa', price: 0 }, ctx()))).toBe('bad_furn')
+    expect(err(play(fresh({ gold: 1e6, isle: isle({ mats: rich }) }), { type: 'makeFurn', id: 'bed', price: 1 }, ctx()))).toBe('price_changed')
+    expect(err(play(fresh({ gold: 1e6, isle: isle({ mats: rich, furniture: { bed: 99 } }) }), { type: 'makeFurn', id: 'bed', price: 3000 }, ctx()))).toBe('furn_full')
+  })
+  it('place·pickUp: 보관함 ↔ 방, 규칙은 canPlace', () => {
+    const s0 = fresh({ isle: isle({ house: 1, furniture: { chair: 1 } }) })
+    const r = ok(play(s0, { type: 'place', id: 'chair', tx: 1, ty: 2 }, ctx()))
+    expect(r.state.isle!.placed).toEqual([{ id: 'chair', tx: 1, ty: 2 }])
+    expect(r.state.isle!.furniture).toEqual({})
+    expect(err(play(r.state, { type: 'place', id: 'chair', tx: 2, ty: 2 }, ctx()))).toBe('no_furn')
+    expect(err(play(s0, { type: 'place', id: 'chair', tx: 0, ty: 2 }, ctx()))).toBe('bad_spot')
+    expect(err(play(fresh({ isle: isle({ furniture: { chair: 1 } }) }), { type: 'place', id: 'chair', tx: 1, ty: 2 }, ctx()))).toBe('no_house')
+    const back = ok(play(r.state, { type: 'pickUp', tx: 1, ty: 2 }, ctx()))
+    expect(back.state.isle!.placed).toEqual([])
+    expect(back.state.isle!.furniture).toEqual({ chair: 1 })
+    expect(err(play(r.state, { type: 'pickUp', tx: 3, ty: 3 }, ctx()))).toBe('no_furn_here')
+  })
+  it('migrate: v23 섬은 집 0·가구 없음, 깨진 가구는 정리(방 밖·겹침·모르는 것 → 놓인 것은 보관함으로)', () => {
+    const v23 = { ...ISLE0, house: undefined, furniture: undefined, placed: undefined, decoBox: undefined, deco: undefined }
+    expect(logic.migrate({ ...logic.init(), isle: v23 }, 23).isle).toEqual(isle())
+    const broken = isle({ house: 1, furniture: { bed: 2, sofa: 3, chair: -1 }, placed: [{ id: 'chair', tx: 1, ty: 2 }, { id: 'lamp', tx: 1, ty: 2 }, { id: 'clock', tx: 50, ty: 50 }, { id: 'sofa', tx: 2, ty: 2 }] })
+    const m = logic.migrate({ ...logic.init(), isle: broken }, 24).isle!
+    expect(m.placed).toEqual([{ id: 'chair', tx: 1, ty: 2 }])
+    expect(m.furniture).toEqual({ bed: 2, lamp: 1, clock: 1 })
+  })
+  it('publicView·기록·미리보기에 집', () => {
+    const s = fresh({ isle: isle({ house: 2, placed: [{ id: 'bed', tx: 1, ty: 2 }], furniture: { lamp: 3 } }) })
+    expect(logic.publicView!(s)).toEqual({ isle: { layout: 'crescent', cleared: 0, house: 2, placed: [{ id: 'bed', tx: 1, ty: 2 }], deco: [] }, outfit: s.outfit })
+    expect(logic.records!(s).find((r) => r.key === 'house')).toEqual({ key: 'house', value: 2, detail: '2/4' })
+    expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('house')
+  })
+})
+
+describe('내 섬 D단계 바깥 꾸미기 (v25, 설계 2026-11-26-my-isle-d §4.4)', () => {
+  const isle = (over: Record<string, unknown> = {}) => ({ ...ISLE0, ...over }) as NonNullable<State['isle']>
+  const a = isleArrival('crescent')
+  const spot = { tx: a.tx - 2, ty: a.ty - 1 }
+  it('makeDeco: 재료·골드 빼고 보관함 +1, 오류', () => {
+    const r = ok(play(fresh({ gold: 150, isle: isle({ mats: { wood: 2, stone: 0, iron: 0 } }) }), { type: 'makeDeco', id: 'fence', price: 150 }, ctx()))
+    expect(r.state.isle!.decoBox).toEqual({ fence: 1 })
+    expect(r.state.isle!.mats.wood).toBe(0)
+    expect(r.state.gold).toBe(0)
+    expect(err(play(fresh({ gold: 1e6, isle: isle() }), { type: 'makeDeco', id: 'tree', price: 0 }, ctx()))).toBe('bad_deco')
+    expect(err(play(fresh({ gold: 1e6, isle: isle() }), { type: 'makeDeco', id: 'flowers', price: 1 }, ctx()))).toBe('price_changed')
+    expect(err(play(fresh({ gold: 1e6, isle: isle({ decoBox: { flowers: 99 } }) }), { type: 'makeDeco', id: 'flowers', price: 200 }, ctx()))).toBe('deco_full')
+  })
+  it('decorate·undecorate: 보관함 ↔ 섬, 규칙은 canDecorate', () => {
+    const s0 = fresh({ isle: isle({ decoBox: { bench: 1 } }) })
+    const r = ok(play(s0, { type: 'decorate', id: 'bench', ...spot }, ctx()))
+    expect(r.state.isle!.deco).toEqual([{ id: 'bench', ...spot }])
+    expect(r.state.isle!.decoBox).toEqual({})
+    expect(err(play(r.state, { type: 'decorate', id: 'bench', tx: spot.tx + 1, ty: spot.ty }, ctx()))).toBe('no_deco')
+    expect(err(play(s0, { type: 'decorate', id: 'bench', tx: a.tx, ty: a.ty }, ctx()))).toBe('bad_spot')
+    const back = ok(play(r.state, { type: 'undecorate', ...spot }, ctx()))
+    expect(back.state.isle!.deco).toEqual([])
+    expect(back.state.isle!.decoBox).toEqual({ bench: 1 })
+    expect(err(play(r.state, { type: 'undecorate', tx: 0, ty: 0 }, ctx()))).toBe('no_deco_here')
+    expect(err(play(fresh({ decoBox: { bench: 1 } } as never), { type: 'decorate', id: 'bench', ...spot }, ctx()))).toBe('no_isle')
+  })
+  it('migrate: 규칙 밖 꾸미기는 보관함으로, 모르는 것은 버림', () => {
+    const broken = isle({ decoBox: { fence: 2, tree: 5 }, deco: [{ id: 'bench', ...spot }, { id: 'pot', ...spot }, { id: 'lamp', tx: a.tx, ty: a.ty }, { id: 'tree', tx: 1, ty: 1 }] })
+    const m = logic.migrate({ ...logic.init(), isle: broken }, 25).isle!
+    expect(m.deco).toEqual([{ id: 'bench', ...spot }])
+    expect(m.decoBox).toEqual({ fence: 2, pot: 1, lamp: 1 })
+  })
+  it('기록 deco(꾸미기를 가진 적이 있으면 0도 기록해 치운 뒤에도 맞게)', () => {
+    expect(logic.records!(fresh({ isle: isle({ deco: [{ id: 'bench', ...spot }] }) })).find((r) => r.key === 'deco')).toEqual({ key: 'deco', value: 1 })
+    expect(logic.records!(fresh({ isle: isle({ decoBox: { bench: 1 } }) })).find((r) => r.key === 'deco')).toEqual({ key: 'deco', value: 0 })
+    expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('deco')
+  })
+  it('개간 뒤 새 땅·자원 칸을 막는 꾸미기는 보관함으로 돌린다', () => {
+    // 구역 1 칸 둘레의 땅을 울타리로 최대한 막고 개간하면, 다시 닿게 되도록 몇 개가 돌아온다
+    const zone1 = [...isleZoneTiles('crescent')].filter(([, z]) => z === 1).map(([k]) => k.split(',').map(Number))
+    const deco: { id: 'fence'; tx: number; ty: number }[] = []
+    for (const [x, y] of zone1) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (canDecorate({ layout: 'crescent', deco }, x + dx, y + dy, 'fence')) deco.push({ id: 'fence', tx: x + dx, ty: y + dy })
+    }
+    const r = ok(play(fresh({ gold: 1e6, isle: isle({ mats: { wood: 99, stone: 99, iron: 99 }, deco }) }), { type: 'clear', zone: 1, price: 5120 }, ctx()))
+    const after = r.state.isle!
+    expect(after.deco.length + (after.decoBox.fence ?? 0)).toBe(deco.length)
+    const m = isleMap('crescent', 1, 0, after.deco)
+    const reach = reachableTiles(m, [isleArrival('crescent')], ALL_AREAS_OPEN)
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (isWalkable(m, x, y, ALL_AREAS_OPEN)) expect(reach.has(`${x},${y}`), `${x},${y}`).toBe(true)
   })
 })

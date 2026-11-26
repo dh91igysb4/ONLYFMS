@@ -8,6 +8,13 @@ import {
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId, SHOES, type ShoeTier } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
+import { canDecorate, isleNodes } from './isle.ts'
+import { DECOS, DECO_MAX, isDecoId, type DecoId, type DecoPlaced } from './deco.ts'
+import { HOUSE_MAX, ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
+import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } from './home.ts'
+/** 가구 종류마다 보관함 최대 개수 */
+const FURN_CAP = 99
+import type { NodeKind } from './map.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -231,7 +238,7 @@ export type State = {
   /** 마을회관 냉장고(보관만, FRIDGE_SIZE칸, v18). 잠금 표시는 그대로 둔다 */
   fridge: Fish[]
   /** 내 섬(v22): 고른 섬 모양. 처음 배를 타기 전엔 null */
-  isle: { layout: IsleLayoutId } | null
+  isle: IsleState | null
   pending: Pending | null
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
@@ -261,11 +268,50 @@ export type Action =
   | { type: 'wear'; slot: string; id: string }
   // 내 섬(v22): 섬 모양 고르기(한 번만, 무료)
   | { type: 'isleChoose'; layout: string }
+  // 내 섬 B(v23): 자원 칸 캐기(하루 한 번), 도구 올리기, 다음 구역 개간
+  | { type: 'gather'; id: string }
+  | { type: 'craft'; tool: string; tier: number; price: number }
+  | { type: 'clear'; zone: number; price: number }
+  // 내 섬 C(v24): 집 짓기, 가구 만들기·놓기·치우기
+  | { type: 'build'; level: number; price: number }
+  | { type: 'makeFurn'; id: string; price: number }
+  | { type: 'place'; id: string; tx: number; ty: number }
+  | { type: 'pickUp'; tx: number; ty: number }
+  // 내 섬 D(v25): 바깥 꾸미기 만들기·놓기·치우기
+  | { type: 'makeDeco'; id: string; price: number }
+  | { type: 'decorate'; id: string; tx: number; ty: number }
+  | { type: 'undecorate'; tx: number; ty: number }
 // pending의 어종·크기는 `hook` 뒤에만 내보낸다. 다시 던져 어종을 고르는 것을 막는다.
 // buffs는 v11 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 빈 목록으로 본다.
 // gold는 지갑 잔액(ctx.gold). v13까지는 세이브의 골드였고 화면은 그대로 view.gold를 읽는다.
 // sold는 v15 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 0마리로 본다.
 // shoesTier는 v20, isle은 v22 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 기본 장화(1)·섬 없음(null)으로 본다.
+/** 내 섬 상태(v22 A: layout, v23 B: 개간·도구·재료·오늘 캔 칸) */
+export type IsleState = {
+  layout: IsleLayoutId
+  /** 치운 구역 수 0..ISLE_ZONES(순서대로) */
+  cleared: number
+  /** 도구 단계 1..TOOL_MAX(처음 1) */
+  tools: Record<ToolId, number>
+  /** 재료 0..MAT_CAP. 팔 수 없다 */
+  mats: Mats
+  /** 오늘(KST) 캔 자원 칸 id */
+  gathered: { day: string; ids: string[] }
+  /** 집 단계 0..HOUSE_MAX(v24, 0 텐트) */
+  house: number
+  /** 만들고 놓지 않은 가구 개수(0 없는 키는 지운다) */
+  furniture: Partial<Record<FurnId, number>>
+  /** 집 안 놓인 가구 */
+  placed: Placed[]
+  /** 만들고 놓지 않은 바깥 꾸미기 개수(v25) */
+  decoBox: Partial<Record<DecoId, number>>
+  /** 섬에 놓인 바깥 꾸미기 */
+  deco: DecoPlaced[]
+}
+export const newIsle = (layout: IsleLayoutId): IsleState => ({
+  layout, cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] },
+  house: 0, furniture: {}, placed: [], decoBox: {}, deco: [],
+})
 export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -742,10 +788,72 @@ function migrate(raw: unknown, fromVersion: number): State {
     sold: parseSold(raw.sold),
     fridge,
     // v21 이하에는 섬이 없다. 모르는 모양도 null(다시 고른다)
-    isle: isObj(raw.isle) && ISLE_LAYOUTS.some((l) => l.id === (raw.isle as Record<string, unknown>).layout)
-      ? { layout: (raw.isle as Record<string, unknown>).layout as IsleLayoutId }
-      : null,
+    isle: migrateIsle(raw.isle),
     pending: migratePending(raw.pending, fromVersion),
+  }
+}
+
+/**
+ * 놓인 꾸미기를 지금 섬 상태 기준으로 순서대로 다시 놓아 본다(canDecorate). 안 되는 것은 보관함으로(상한 없이 — 잃지 않게).
+ * migrate와 개간(clear) 뒤에 쓴다: 개간으로 새로 생긴 땅·자원 칸을 막는 꾸미기가 남지 않게.
+ */
+function replayDeco(shape: { layout: IsleLayoutId; cleared: number; house: number }, list: readonly DecoPlaced[], box: Partial<Record<DecoId, number>>) {
+  const decoBox = { ...box }
+  const deco: DecoPlaced[] = []
+  for (const d of list) {
+    if (deco.length < DECO_MAX && canDecorate({ ...shape, deco }, d.tx, d.ty, d.id)) deco.push({ id: d.id, tx: d.tx, ty: d.ty })
+    else decoBox[d.id] = (decoBox[d.id] ?? 0) + 1
+  }
+  return { deco, decoBox }
+}
+
+/** 내 섬: v21 이하에는 없다(null), v22는 {layout}만(B 기본값), 모르는 모양은 null. 깨진 값은 기본값·범위 안으로 */
+function migrateIsle(raw: unknown): IsleState | null {
+  if (!isObj(raw) || !ISLE_LAYOUTS.some((l) => l.id === raw.layout)) return null
+  const base = newIsle(raw.layout as IsleLayoutId)
+  const int = (v: unknown, lo: number, hi: number, d: number) => (isNum(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : d)
+  const t = isObj(raw.tools) ? raw.tools : {}
+  const m = isObj(raw.mats) ? raw.mats : {}
+  const g = isObj(raw.gathered) ? raw.gathered : {}
+  const known = new Set(isleNodes(base.layout).map((n) => n.id))
+  // 집(v24): 단계, 보관함(0~99, 모르는 가구 버림), 놓인 가구(방 안·겹침 없이 canPlace 순서대로, 안 되는 것은 보관함으로)
+  const house = int(raw.house, 0, HOUSE_MAX, 0)
+  const furniture: Partial<Record<FurnId, number>> = {}
+  const addFurn = (id: FurnId, n: number) => {
+    const v = Math.min(FURN_CAP, (furniture[id] ?? 0) + n)
+    if (v > 0) furniture[id] = v
+  }
+  if (isObj(raw.furniture)) for (const [id, n] of Object.entries(raw.furniture)) if (isFurnId(id)) addFurn(id, int(n, 0, FURN_CAP, 0))
+  const placed: Placed[] = []
+  if (Array.isArray(raw.placed)) {
+    for (const p of raw.placed) {
+      if (!isObj(p) || !isFurnId(p.id)) continue
+      if (placed.length < ROOM_MAX && isNum(p.tx) && isNum(p.ty) && canPlace(house, placed, p.tx, p.ty)) placed.push({ id: p.id, tx: p.tx, ty: p.ty })
+      else addFurn(p.id, 1)
+    }
+  }
+  const cleared = int(raw.cleared, 0, ISLE_ZONES, 0)
+  // 바깥 꾸미기(v25): 보관함, 놓인 것(지금 섬 모양·개간·집 기준 canDecorate 순서대로, 안 되는 것은 보관함으로)
+  const box: Partial<Record<DecoId, number>> = {}
+  if (isObj(raw.decoBox)) for (const [id, n] of Object.entries(raw.decoBox)) if (isDecoId(id) && int(n, 0, FURN_CAP, 0) > 0) box[id] = int(n, 0, FURN_CAP, 0)
+  const listed: DecoPlaced[] = Array.isArray(raw.deco)
+    ? raw.deco.filter((d): d is DecoPlaced => isObj(d) && isDecoId(d.id) && Number.isInteger(d.tx) && Number.isInteger(d.ty))
+    : []
+  const { deco, decoBox } = replayDeco({ layout: base.layout, cleared, house }, listed, box)
+  return {
+    layout: base.layout,
+    cleared,
+    tools: { axe: int(t.axe, 1, TOOL_MAX, 1), pick: int(t.pick, 1, TOOL_MAX, 1), shovel: int(t.shovel, 1, TOOL_MAX, 1) },
+    mats: { wood: int(m.wood, 0, MAT_CAP, 0), stone: int(m.stone, 0, MAT_CAP, 0), iron: int(m.iron, 0, MAT_CAP, 0) },
+    gathered: {
+      day: typeof g.day === 'string' && DAY_RE.test(g.day) ? g.day : '',
+      ids: Array.isArray(g.ids) ? [...new Set(g.ids.filter((id): id is string => typeof id === 'string' && known.has(id)))] : [],
+    },
+    house,
+    furniture,
+    placed,
+    decoBox,
+    deco,
   }
 }
 
@@ -800,6 +908,11 @@ function records(state: State): WorldRecord[] {
     biggest,
     { key: 'dex', value: found, detail: `${found}/${SPECIES.length}` },
     { key: 'challenges', value: done, detail: `${done}/${CHALLENGES.length}` },
+    // 0구역은 기록하지 않는다(섬만 고른 사람이 명예의 전당 0구역 줄에 몰리지 않게)
+    // 꾸미기를 하나라도 가진 적이 있으면 0도 기록한다(모두 치우면 기록이 줄어야 해서)
+    ...(state.isle && (state.isle.deco.length > 0 || Object.keys(state.isle.decoBox).length > 0) ? [{ key: 'deco', value: state.isle.deco.length }] : []),
+    ...(state.isle && state.isle.house > 0 ? [{ key: 'house', value: state.isle.house, detail: `${state.isle.house}/${HOUSE_MAX}` }] : []),
+    ...(state.isle && state.isle.cleared > 0 ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
   ]
 }
 
@@ -822,7 +935,10 @@ export const logic: WorldLogic<State, Action, View> = {
   // 20: 신발(shoesTier·buyShoes). 옛 세이브는 기본 장화(설계 2026-11-26-fishing-shoes-design.md)
   // 21: 여러 마리 버리기(discardMany). 세이브 형식은 20과 같다(설계 2026-11-26-fishing-discard-many-design.md)
   // 22: 내 섬 A단계(isle 지역, 세이브 isle, isleChoose, publicView). 옛 세이브는 isle null(설계 2026-11-25-my-island-design.md)
-  version: 22,
+  // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
+  // 24: 내 섬 C단계(집: build·makeFurn·place·pickUp, isle에 house·furniture·placed, 지역 home). v23 섬은 집 0(설계 2026-11-26-my-isle-c-design.md)
+  // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
+  version: 25,
   wallet: true,
   init,
   migrate,
@@ -839,10 +955,15 @@ export const logic: WorldLogic<State, Action, View> = {
   avatar: (state) => JSON.stringify(state.outfit),
   previewData: (state) => ({
     [PREVIEW_AREAS_KEY]: state.areas.join(','),
-    ...(state.isle ? { [PREVIEW_ISLE_KEY]: state.isle.layout } : {}),
+    // 섬 모양:치운 구역 수(v23). 옛 값은 모양만이고 화면은 0으로 읽는다
+    ...(state.isle ? { [PREVIEW_ISLE_KEY]: `${state.isle.layout}:${state.isle.cleared}:${state.isle.house}` } : {}),
   }),
   // 남의 섬 구경(world visit): 섬 모양과 옷차림만
-  publicView: (state) => ({ isle: state.isle, outfit: state.outfit }),
+  // 재료·도구·오늘 캔 칸은 남에게 보이지 않는다
+  publicView: (state) => ({
+    isle: state.isle && { layout: state.isle.layout, cleared: state.isle.cleared, house: state.isle.house, placed: state.isle.placed, deco: state.isle.deco },
+    outfit: state.outfit,
+  }),
   freeBonus,
 }
 
@@ -856,7 +977,165 @@ function isleChoose(state: State, a: Record<string, unknown>): Out {
   if (state.isle) return { error: 'already_chosen' }
   const layout = ISLE_LAYOUTS.find((l) => l.id === a.layout)
   if (!layout) return { error: 'bad_layout' }
-  return { state: { ...state, isle: { layout: layout.id } } }
+  return { state: { ...state, isle: newIsle(layout.id) } }
+}
+
+const MAT_OF: Readonly<Record<NodeKind, keyof Mats>> = { tree: 'wood', rock: 'stone', iron: 'iron' }
+const hasMats = (have: Mats, need: Mats) => have.wood >= need.wood && have.stone >= need.stone && have.iron >= need.iron
+const minusMats = (have: Mats, need: Mats): Mats => ({ wood: have.wood - need.wood, stone: have.stone - need.stone, iron: have.iron - need.iron })
+
+/** 자원 칸 캐기: 오늘 처음이면 도구 단계만큼 재료(나무 → 도끼, 돌·철 → 곡괭이) */
+function gather(state: State, a: Record<string, unknown>, now: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const node = isleNodes(isle.layout).find((n) => n.id === a.id)
+  if (!node) return { error: 'bad_node' }
+  if (node.zone > isle.cleared) return { error: 'node_locked' }
+  const day = kstDay(now)
+  const ids = isle.gathered.day === day ? isle.gathered.ids : []
+  if (ids.includes(node.id)) return { error: 'gathered' }
+  const res = MAT_OF[node.kind]
+  const n = node.kind === 'tree' ? isle.tools.axe : isle.tools.pick
+  if (isle.mats[res] + n > MAT_CAP) return { error: 'mats_full' }
+  return {
+    state: { ...state, isle: { ...isle, mats: { ...isle.mats, [res]: isle.mats[res] + n }, gathered: { day, ids: [...ids, node.id] } } },
+    result: { res, n },
+  }
+}
+
+/** 작업대에서 도구를 한 단계 올린다 */
+function craft(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!TOOL_IDS.includes(a.tool as ToolId)) return { error: 'bad_tool' }
+  const tool = a.tool as ToolId
+  if (!Number.isInteger(a.tier) || a.tier !== isle.tools[tool] + 1) return { error: 'bad_tier' }
+  const cost = toolCost(a.tier as number)
+  if (!cost) return { error: 'bad_tier' }
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, isle: { ...isle, tools: { ...isle.tools, [tool]: a.tier as number }, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold }
+}
+
+/** 다음 구역 개간 */
+function clearZone(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!Number.isInteger(a.zone) || a.zone !== isle.cleared + 1 || isle.cleared >= ISLE_ZONES) return { error: 'bad_zone' }
+  const k = a.zone as number
+  const need = zoneNeeds(k)
+  if (TOOL_IDS.some((t) => isle.tools[t] < need[t])) return { error: 'need_tool' }
+  const cost = clearCost(k)
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  // 새로 드러난 땅·자원 칸을 막는 꾸미기는 보관함으로(D)
+  const { deco, decoBox } = replayDeco({ layout: isle.layout, cleared: k, house: isle.house }, isle.deco, isle.decoBox)
+  return { state: { ...state, isle: { ...isle, cleared: k, mats: minusMats(isle.mats, cost), deco, decoBox } }, gold: -cost.gold, result: { cleared: k } }
+}
+
+/** 집을 한 단계 올린다 */
+function build(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!Number.isInteger(a.level) || a.level !== isle.house + 1 || isle.house >= HOUSE_MAX) return { error: 'bad_level' }
+  const n = a.level as number
+  if (isle.cleared < houseNeedsCleared(n)) return { error: 'need_clear' }
+  const cost = houseCost(n)
+  if (a.price !== cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, cost)) return { error: 'not_enough_mats' }
+  if (gold < cost.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, isle: { ...isle, house: n, mats: minusMats(isle.mats, cost) } }, gold: -cost.gold, result: { house: n } }
+}
+
+/** 가구 하나를 만들어 보관함에 */
+function makeFurn(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const f = FURNITURE.find((x) => x.id === a.id)
+  if (!f) return { error: 'bad_furn' }
+  if ((isle.furniture[f.id] ?? 0) >= FURN_CAP) return { error: 'furn_full' }
+  if (a.price !== f.cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, f.cost)) return { error: 'not_enough_mats' }
+  if (gold < f.cost.gold) return { error: 'not_enough_gold' }
+  return {
+    state: { ...state, isle: { ...isle, mats: minusMats(isle.mats, f.cost), furniture: { ...isle.furniture, [f.id]: (isle.furniture[f.id] ?? 0) + 1 } } },
+    gold: -f.cost.gold,
+  }
+}
+
+/** 보관함 가구를 집 안 칸에 놓는다 */
+function placeFurn(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (isle.house < 1) return { error: 'no_house' }
+  if (!isFurnId(a.id)) return { error: 'bad_furn' }
+  const id = a.id
+  if ((isle.furniture[id] ?? 0) < 1) return { error: 'no_furn' }
+  if (isle.placed.length >= ROOM_MAX) return { error: 'room_full' }
+  if (!Number.isInteger(a.tx) || !Number.isInteger(a.ty) || !canPlace(isle.house, isle.placed, a.tx as number, a.ty as number)) return { error: 'bad_spot' }
+  const furniture = { ...isle.furniture, [id]: (isle.furniture[id] ?? 0) - 1 }
+  if (furniture[id] === 0) delete furniture[id]
+  return { state: { ...state, isle: { ...isle, furniture, placed: [...isle.placed, { id, tx: a.tx as number, ty: a.ty as number }] } } }
+}
+
+/** 집 안 칸의 가구를 보관함으로 */
+function pickUp(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const i = isle.placed.findIndex((p) => p.tx === a.tx && p.ty === a.ty)
+  if (i < 0) return { error: 'no_furn_here' }
+  const id = isle.placed[i].id
+  if ((isle.furniture[id] ?? 0) >= FURN_CAP) return { error: 'furn_full' }
+  return { state: { ...state, isle: { ...isle, placed: isle.placed.filter((_, j) => j !== i), furniture: { ...isle.furniture, [id]: (isle.furniture[id] ?? 0) + 1 } } } }
+}
+
+/** 바깥 꾸미기 하나를 만들어 보관함에 */
+function makeDeco(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (state.pending) return { error: 'busy' }
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const d = DECOS.find((x) => x.id === a.id)
+  if (!d) return { error: 'bad_deco' }
+  if ((isle.decoBox[d.id] ?? 0) >= FURN_CAP) return { error: 'deco_full' }
+  if (a.price !== d.cost.gold) return { error: 'price_changed' }
+  if (!hasMats(isle.mats, d.cost)) return { error: 'not_enough_mats' }
+  if (gold < d.cost.gold) return { error: 'not_enough_gold' }
+  return {
+    state: { ...state, isle: { ...isle, mats: minusMats(isle.mats, d.cost), decoBox: { ...isle.decoBox, [d.id]: (isle.decoBox[d.id] ?? 0) + 1 } } },
+    gold: -d.cost.gold,
+  }
+}
+
+/** 보관함 꾸미기를 섬 칸에 놓는다 */
+function decorate(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  if (!isDecoId(a.id)) return { error: 'bad_deco' }
+  const id = a.id
+  if ((isle.decoBox[id] ?? 0) < 1) return { error: 'no_deco' }
+  if (isle.deco.length >= DECO_MAX) return { error: 'isle_full' }
+  if (!Number.isInteger(a.tx) || !Number.isInteger(a.ty) || !canDecorate(isle, a.tx as number, a.ty as number, id)) return { error: 'bad_spot' }
+  const decoBox = { ...isle.decoBox, [id]: (isle.decoBox[id] ?? 0) - 1 }
+  if (decoBox[id] === 0) delete decoBox[id]
+  return { state: { ...state, isle: { ...isle, decoBox, deco: [...isle.deco, { id, tx: a.tx as number, ty: a.ty as number }] } } }
+}
+
+/** 섬 칸의 꾸미기를 보관함으로 */
+function undecorate(state: State, a: Record<string, unknown>): Out {
+  const isle = state.isle
+  if (!isle) return { error: 'no_isle' }
+  const i = isle.deco.findIndex((d) => d.tx === a.tx && d.ty === a.ty)
+  if (i < 0) return { error: 'no_deco_here' }
+  const id = isle.deco[i].id
+  if ((isle.decoBox[id] ?? 0) >= FURN_CAP) return { error: 'deco_full' }
+  return { state: { ...state, isle: { ...isle, deco: isle.deco.filter((_, j) => j !== i), decoBox: { ...isle.decoBox, [id]: (isle.decoBox[id] ?? 0) + 1 } } } }
 }
 
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
@@ -900,6 +1179,26 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return wear(state, action)
     case 'isleChoose':
       return isleChoose(state, action)
+    case 'gather':
+      return gather(state, action, ctx.now)
+    case 'craft':
+      return craft(state, action, ctx.gold)
+    case 'clear':
+      return clearZone(state, action, ctx.gold)
+    case 'build':
+      return build(state, action, ctx.gold)
+    case 'makeFurn':
+      return makeFurn(state, action, ctx.gold)
+    case 'place':
+      return placeFurn(state, action)
+    case 'pickUp':
+      return pickUp(state, action)
+    case 'makeDeco':
+      return makeDeco(state, action, ctx.gold)
+    case 'decorate':
+      return decorate(state, action)
+    case 'undecorate':
+      return undecorate(state, action)
     default:
       return { error: 'bad_action' }
   }

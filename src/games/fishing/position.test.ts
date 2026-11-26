@@ -7,7 +7,7 @@ import { RIVER } from './maps/river.ts'
 import { LAKE } from './maps/lake.ts'
 import { FOREST } from './maps/forest.ts'
 import { ISLAND } from './maps/island.ts'
-import { isleArrival } from './isle.ts'
+import { isleArrival, isleZoneTiles } from './isle.ts'
 
 const SPAWN = VILLAGE.spawn
 const PIER_END = pierEnd(VILLAGE)!
@@ -222,11 +222,18 @@ describe('내 섬 위치(내 섬 설계 §5.5)', () => {
     expect(loadPosition('u1')).toEqual(onIsle)
   })
   test('섬 모양이 있으면 걷는 칸 그대로, 없으면 마을 시작', () => {
-    expect(startPosition(onIsle, opened, 'twin')).toEqual(onIsle)
+    expect(startPosition(onIsle, opened, { layout: 'twin' })).toEqual(onIsle)
     expect(startPosition(onIsle, opened)).toEqual(AT_SPAWN)
     expect(startPosition(onIsle, opened, null)).toEqual(AT_SPAWN)
   })
+  test('개간한 칸(구역 1)에 저장된 위치: 치운 수를 알면 그대로, 모르면(0) 마을 시작', () => {
+    const [k] = [...isleZoneTiles('twin')].find(([, z]) => z === 1)!
+    const [x, y] = k.split(',').map(Number)
+    const cleared = { area: 'isle' as const, pos: center(x, y), facing: 'up' as const }
+    expect(startPosition(cleared, opened, { layout: 'twin', cleared: 1 })).toEqual(cleared)
+    expect(startPosition(cleared, opened, { layout: 'twin' })).toEqual(AT_SPAWN)
+  })
   test('섬의 막힌 칸(바다)·닿지 못하는 칸은 마을 시작', () => {
-    expect(startPosition({ ...onIsle, pos: center(0, 0) }, opened, 'twin')).toEqual(AT_SPAWN)
+    expect(startPosition({ ...onIsle, pos: center(0, 0) }, opened, { layout: 'twin' })).toEqual(AT_SPAWN)
   })
 })

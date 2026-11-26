@@ -4,7 +4,7 @@ import { inHours, tideAt, type Conditions, type Season, type Weather } from './c
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
-export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck' | 'hall' | 'isle'
+export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck' | 'hall' | 'isle' | 'home'
 /** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
@@ -62,13 +62,15 @@ export const AREAS: readonly AreaDef[] = [
   { id: 'hall', name: '마을회관', spots: [] },
   // 내 섬(내 섬 설계 §5): 배로 가는 개인 섬. A단계에는 낚시터가 없다
   { id: 'isle', name: '내 섬', spots: [] },
+  // 내 섬 집 안(C단계): 섬의 집 문으로 들어간다
+  { id: 'home', name: '집', spots: [] },
 ]
 /** 마을회관 냉장고: 1인당 보관 칸(고정, 마을회관 설계 §5) */
 export const FRIDGE_SIZE = 15
 
 /** 낚시 자리가 있는 지역(물고기 목록·도전과제·경제 계산 대상). 마을회관처럼 자리가 빈 지역은 빠진다 */
 export const FISHING_AREAS: readonly AreaDef[] = AREAS.filter((a) => a.spots.length > 0)
-export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest', 'hall', 'isle']
+export const DEFAULT_AREAS: readonly AreaId[] = ['village', 'river', 'forest', 'hall', 'isle', 'home']
 /** 내 섬 모양(내 섬 설계 §5.2). 처음 배를 탈 때 하나를 고른다 */
 export type IsleLayoutId = 'crescent' | 'twin'
 export const ISLE_LAYOUTS: readonly { id: IsleLayoutId; name: string }[] = [

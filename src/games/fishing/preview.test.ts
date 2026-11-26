@@ -100,6 +100,12 @@ describe('내 섬 미리보기(내 섬 설계 §5.5)', () => {
     expect(previewState(onIsle, []).isle).toBeNull()
     expect(previewState(onIsle, [{ key: 'isle', detail: 'zzz' }]).area).toBe('village')
   })
+  test('기록 isle 값 "모양:치운 구역"(v23)을 읽고, 옛 값(모양만)은 0', () => {
+    expect(previewState(onIsle, [{ key: 'isle', detail: 'crescent:3' }])).toMatchObject({ isle: 'crescent', isleCleared: 3 })
+    expect(previewState(onIsle, [{ key: 'isle', detail: 'crescent' }])).toMatchObject({ isle: 'crescent', isleCleared: 0 })
+    expect(previewState(onIsle, [{ key: 'isle', detail: 'crescent:99' }]).isleCleared).toBe(8)
+    expect(previewState(onIsle, [{ key: 'isle', detail: 'crescent:x' }]).isleCleared).toBe(0)
+  })
   test('섬에 있는 친구 요약: 아는 주인은 "{아이디}의 섬", 모르면 "누군가의 섬", 내 섬이면 "내 섬"', () => {
     const me = '00000000-0000-0000-0000-0000000000aa'
     const mj = '00000000-0000-0000-0000-0000000000bb'

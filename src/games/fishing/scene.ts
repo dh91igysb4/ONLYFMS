@@ -469,6 +469,18 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     drawIceRim(ctx, g, tx, ty)
     return
   }
+  // 집 안(배경 그림이 없는 실내): 나무 바닥·벽
+  if ((kind === 'floor' || kind === 'wall') && !g.map.backdrop) {
+    drawSprite(ctx, kind === 'floor' ? 'home-floor' : 'home-wall', x, y, 1)
+    if (kind === 'wall') {
+      const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)
+      if (prop) {
+        drawSprite(ctx, 'home-floor', x, y, 1)
+        drawSprite(ctx, prop.sprite, x, y, 1)
+      }
+    }
+    return
+  }
   if (kind === 'path') drawSprite(ctx, 'tile-path', x, y, 1)
   else if (kind === 'flower') drawSprite(ctx, 'tile-flower', x, y, 1)
   else if (kind === 'cliff') drawSprite(ctx, 'tile-cliff', x, y, 1)
@@ -503,7 +515,14 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
     else drawSprite(ctx, ground === 'snow' ? 'tile-rock-snow' : 'tile-rock', x, y, 1)
-  } else if (kind === 'fence') drawFence(ctx, g, tx, ty)
+    // 내 섬 철광: 바위 위에 철 무늬
+    if (g.map.nodes.some((n) => n.kind === 'iron' && n.tx === tx && n.ty === ty)) drawSprite(ctx, 'iron-ore', x, y, 1)
+  } else if (kind === 'bench') drawSprite(ctx, 'workbench', x, y, 1)
+  else if (kind === 'deco') {
+    const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)
+    if (prop) drawSprite(ctx, prop.sprite, x, y, 1)
+  }
+  else if (kind === 'fence') drawFence(ctx, g, tx, ty)
   else if (kind === 'pier') drawSprite(ctx, 'pier-plank', x, y, 1)
   else if (kind === 'bridge') drawSprite(ctx, 'bridge-plank', x, y, 1)
   else if (kind === 'dock') drawSprite(ctx, 'dock-plank', x, y, 1)
