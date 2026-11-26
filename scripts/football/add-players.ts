@@ -5,13 +5,13 @@
 // 위키데이터에서 그 선수들의 정보·경력·국가대표·수상·별칭·Transfermarkt ID만 받는다. 기존 선수 줄은 건드리지 않는다.
 // 경력의 팀이 teams.csv에 없으면 그 구간은 뺀다(전체 수집 때 팀까지 받는다). 인지도는 기존 선수의 지금 위키 문서 수 분포에서의 백분위.
 // 날짜가 없거나 빠진 경력은 manual/spells.csv로 채운다. 다음 순서: football:seasons → football:honours → ttt:generate.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { mergeRows, popularityAgainst } from './addPlayers.ts'
 import { checkDataset, FILE_NAMES, FILES, type Dataset, type FileName } from './schema.ts'
 import { batched, log, type Cache } from './wdqs.ts'
 import {
-  applyNamesKo, buildAliases, buildAwards, buildCaps, buildPlayers, buildSpells, parseCsv, qAliases, qAwards, qOccupation, qPlayerDetails, qSpells, toCsv,
+  applyNamesEn, applyNamesKo, buildAliases, buildAwards, buildCaps, buildPlayers, buildSpells, parseCsv, qAliases, qAwards, qOccupation, qPlayerDetails, qSpells, toCsv,
   type Row, type Team,
 } from './wikidata.ts'
 
@@ -51,6 +51,7 @@ const baseLinks = (await batched('기존 선수 위키 문서 수', [...known], 
 const pop = popularityAgainst(baseLinks, new Map([...built.links].filter(([id]) => keep.has(id))))
 for (const p of added) p.popularity = String(pop.get(p.id) ?? 0)
 applyNamesKo(added, read('manual/names_ko.csv'))
+applyNamesEn(added, existsSync(file('manual/names_en.csv')) ? read('manual/names_en.csv') : [])
 
 const awards = buildAwards(await batched('수상', ids, 200, qAwards, cache)).filter((h) => keep.has(h.player_id))
 const aliases = buildAliases(added, await batched('별칭', ids, 200, qAliases, cache)).filter((x) => keep.has(x.entity_id))

@@ -304,7 +304,7 @@ Q10723787,club,,Ystads IF FF,,Q34,,1908,false
 Q107301197,club,,ES Cannet Rocheville,,Q142,,1968,false
 Q107301602,club,,Chaston FS,,Q29,,1978,false
 Q107324446,club,샌디에고 웨이브 FC,San Diego Wave FC,,Q30,,2021,false
-Q107337028,club,,Al-Ittifaq F. C.,,Q878,,,false
+Q107337028,club,알이티파크,Al-Ittifaq F. C.,,Q878,,,false
 Q107366003,club,,Bourges Foot 18,,Q142,,2021,false
 Q1074980,club,올림포,Club Olimpo,,Q414,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1910,false
 Q10751860,club,하노이 FC,Sài Gòn F.C.,,Q881,,2011,false
@@ -314,7 +314,7 @@ Q107524422,club,,VTJ Karlovy Vary,,Q33946,,,false
 Q107571098,club,,Rajasthan United FC,,Q668,,,false
 Q107575315,club,,FC Unirea Constanța,,Q218,,2016,false
 Q1076147,club,충칭 량장 징지,Chongqing Liangjiang Athletic F.C.,,Q148,,1994,false
-Q107630644,club,,FC Rustavi,,Q230,,2015,false
+Q107630644,club,FC 루스타비,FC Rustavi,,Q230,,2015,false
 Q107818,club,FC 에네르기 콧부스,FC Energie Cottbus,,Q183,,1966,false
 Q107856246,club,,Orillamar SD,,Q29,,,false
 Q107860598,club,,SG Sandbach,,Q183,,1946,false
@@ -373,6 +373,7 @@ Q1091208,club,,Pol. Monterotondo Lupa,,Q38,,1935,false
 Q1091462,club,,UD Alzira,,Q29,,1922,false
 Q1091780,club,,Czarni Żagań,,Q36,,1957,false
 Q1092232,club,,Cincinnati Kings,,Q30,,2005,false
+Q109237284,club,,Kafue Celtic F.C.,,Q953,,,false
 Q109266159,club,,Kanchanaburi F.C.,,Q869,,,false
 Q109280289,club,,Binga FC,,Q912,,2009,false
 Q109314165,club,,Tigresses sports association,,Q790,,,false
@@ -419,7 +420,7 @@ Q1103168,club,클루브 티후아나,Club Tijuana,,Q96,,2007,false
 Q1103684,club,에베르톤 데 비냐델마르,Everton de Viña del Mar,,Q298,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1909,false
 Q11040351,club,,Araz PFK,,Q227,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1967,false
 Q110461931,club,,2021–22 F.C. Turris 1944 A.S.D. season,,Q38,,,false
-Q1104682,club,,Cobh Ramblers F.C.,,Q27,,1922,false
+Q1104682,club,코브 램블러스 FC,Cobh Ramblers F.C.,,Q27,,1922,false
 Q11047010,club,,Taiyuan Zhongyou Jiayi F.C.,,Q148,,2011,false
 Q110588701,club,,Urduliz FT,,Q29,,,false
 Q110612870,club,,PE Sant Jordi,,Q29,,,false
@@ -480,7 +481,7 @@ Q1128631,club,리즈 유나이티드 FC,Leeds United F.C.,,Q21,"[{""hex"":""#000
 Q112864,club,,North East Stars,,Q754,,2001,false
 Q1129059,club,우니온 에스파뇰라,Unión Española,,Q298,,1897,false
 Q1129387,club,KF 슈켄디야,FK Shkëndija,,Q221,,1979,false
-Q1129531,club,,Levallois SC,,Q142,,1950,false
+Q1129531,club,르발루아 SC,Levallois SC,,Q142,,1950,false
 Q1129650,club,KF 아폴로니아 피에르,FK Apolonia,,Q222,,1925,false
 Q113000,club,KV 메헬렌,KV Mechelen,,Q31,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1904,false
 Q113009,club,,Defence Force F.C.,,Q754,,1974,false
@@ -835,7 +836,7 @@ Q12302538,club,,Avedøre IF,,Q35,,,false
 Q12308,club,헤레스 CD,Xerez C.D.,,Q29,,1947,false
 Q12310884,club,,FC Sydvest 05,,Q35,,2005,false
 Q12313639,club,,Gentofte-Vangede Idrætsforening,,Q35,,1921,false
-Q12313977,club,,Gladsaxe-Hero,,Q35,,1979,false
+Q12313977,club,글라드삭세-헤로,Gladsaxe-Hero,,Q35,,1979,false
 Q1231804,club,아메드 SFK,Amed S.F.K.,,Q43,,1990,false
 Q12318089,club,,IF Skjold Birkerød,,Q35,,1917,false
 Q123201041,club,,Angered MBIK,,Q34,,1926,false
@@ -843,7 +844,7 @@ Q123274993,club,,Ambérieu FC,,Q142,,1987,false
 Q123283162,club,,A.S. Anagennisi Karditsas (football),,Q41,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1904,false
 Q123327446,club,,CS Amphion-Publier,,Q142,,1935,false
 Q123344481,club,,Young Survivors,,Q1014,,1980,false
-Q123344580,club,,Bong Range United,,Q1014,,,false
+Q123344580,club,봉 레인지 유나이티드,Bong Range United,,Q1014,,,false
 Q123376316,club,,Yunnan Yukun F.C.,,Q148,,2021,false
 Q12341291,club,,Vorup Frederiksberg Boldklub,,Q35,,1930,false
 Q123421553,club,,Syrianska Eskilstuna IF,,Q34,,2003,false
@@ -949,7 +950,7 @@ Q1273869,club,,TuS Ennepetal,,Q183,,1911,false
 Q127388633,club,,Türkspor Augsburg,,Q183,,,false
 Q1274277,club,,Esporte Clube Pinheiros,,Q155,,1914,false
 Q1274296,club,,Esporte Clube Santo André,,Q155,,1967,false
-Q1274317,club,,NK Marsonia,,Q224,,1909,false
+Q1274317,club,NK 마르소니아,NK Marsonia,,Q224,,1909,false
 Q1274488,club,,Skovshoved IF,,Q35,,1909,false
 Q1275867,club,,ESA Brive,,Q142,,1920,false
 Q12760448,club,,FK Vodojaža Grošnica,,Q403,,,false
@@ -1016,7 +1017,7 @@ Q1290348,club,,Soproni VSE,,Q28,,1921,false
 Q1290413,club,,Soroksár SC,,Q28,,1905,false
 Q129094029,club,,ED Val Miñor,,,,,false
 Q1291169,club,,Kiskőrösi FC,,Q28,,1910,false
-Q1293144,club,,SC Eendracht Aalst,,Q31,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1919,false
+Q1293144,club,SC 에인드라흐트 알스트,SC Eendracht Aalst,,Q31,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1919,false
 Q129411693,club,,Reggina 1914 2024-2025,,Q38,,,false
 Q1294346,club,,Bridge F.C.,,Q1033,,1975,false
 Q129437123,club,,SCDR Galicia de Caranza,,Q29,,1927,false
@@ -1056,7 +1057,7 @@ Q1309505,club,,Eintracht Wald-Michelbach,,Q183,,1956,false
 Q131209,club,FK 아우스트리아 빈,FK Austria Wien,,Q40,"[{""hex"":""#800080"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1911,false
 Q131215,club,SK 라피트 빈,SK Rapid Wien,,Q40,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1899,false
 Q131378,club,APOEL FC,APOEL F.C.,,Q229,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1926,false
-Q131384708,club,,Atlético Dallas,,Q30,,2024,false
+Q131384708,club,아틀레티코 댈러스,Atlético Dallas,,Q30,,2024,false
 Q131459704,club,,HERA United,,Q55,,2024,false
 Q131499,club,SL 벤피카,S.L. Benfica,,Q45,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1904,false
 Q131540818,club,,Lentigione Calcio,,Q38,,1948,false
@@ -1197,7 +1198,7 @@ Q13576846,club,,Delfines F.C.,,Q96,,2012,false
 Q1358297,club,페르시바 발릭파판,Persiba Balikpapan,,Q252,,1950,false
 Q1359085,club,,FF Norden 02,,Q32,,2002,false
 Q1359089,club,로체스터 라이노스,Rochester Rhinos,,Q30,,1996,false
-Q1359341,club,,Kjøbenhavns Boldklub,,Q35,,1876,false
+Q1359341,club,키벤하운스 볼드클룹,Kjøbenhavns Boldklub,,Q35,,1876,false
 Q136000312,club,,AS Attignat,,Q142,,1982,false
 Q136056,club,,ZESCO United F.C.,,Q953,,1974,false
 Q136089,club,,ZFC Meuselwitz,,Q183,,1948,false
@@ -1253,7 +1254,7 @@ Q1386794,club,,FCM Târgoviște,,Q218,,1950,false
 Q1386811,club,,FC 07 Albstadt,,Q183,,1907,false
 Q1386820,club,,FC Affing,,Q183,,1949,false
 Q1386835,club,,1. FC Amberg,,Q183,,1921,false
-Q1386850,club,,F.C. Alverca,,Q45,,1939,false
+Q1386850,club,FC 알베르카,F.C. Alverca,,Q45,,1939,false
 Q1386854,club,FC 안도라,FC Andorra,,Q228,"[{""hex"":""#0000FF"",""share"":0.333},{""hex"":""#FF0000"",""share"":0.333},{""hex"":""#FFFF00"",""share"":0.333}]",1942,false
 Q1386860,club,,Angoulême Charente FC,,Q142,,1920,false
 Q1386869,club,FC 아로카,F.C. Arouca,,Q45,"[{""hex"":""#FFFF00"",""share"":1}]",1951,false
@@ -1483,7 +1484,7 @@ Q142005,club,FC 한자 로스토크,F.C. Hansa Rostock,,Q183,,1965,false
 Q1420074,club,,HNK Brotnjo Čitluk,,Q225,,1955,false
 Q1421829,club,인스티투토 아틀레티코 센트랄 코르도바,Instituto Atlético Central Córdoba,,Q414,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1918,false
 Q1422,club,유벤투스 FC,Juventus FC,,Q38,"[{""hex"":""#000000"",""share"":0.333},{""hex"":""#FFC0DB"",""share"":0.333},{""hex"":""#FFFFFF"",""share"":0.333}]",1897,false
-Q1422177,club,,Paulista Futebol Clube,,Q155,,1909,false
+Q1422177,club,파울리스타 FC,Paulista Futebol Clube,,Q155,,1909,false
 Q1422579,club,,SV Heidingsfeld,,Q183,,1919,false
 Q1422750,club,,Skellefteå AIK,,Q34,,1921,false
 Q1423013,club,,Radebeuler BC 08,,Q183,,1998,false
@@ -1508,7 +1509,7 @@ Q14294770,club,,SV TOP,,Q55,,1928,false
 Q1429791,club,,SV Esternberg,,Q40,,1952,false
 Q1430423,club,,TSV Reinbek,,Q183,,1892,false
 Q1431325,club,,Freier TuS Regensburg,,Q183,,1911,false
-Q1431996,club,,Quimper Kerfeunteun F.C.,,Q142,,1905,false
+Q1431996,club,캥페르 케르푼퇸 FC,Quimper Kerfeunteun F.C.,,Q142,,1905,false
 Q1434649,club,,Løv-Ham Fotball,,Q20,,1999,false
 Q1435094,club,,SC Eintracht Schkeuditz,,Q183,,1945,false
 Q1435421,club,,Foligno Calcio,,Q38,,1928,false
@@ -1653,7 +1654,7 @@ Q1512577,club,,Stattena IF,,Q34,,1922,false
 Q15126756,club,,SV Adler Osterfeld,,Q183,,1922,false
 Q15126760,club,,SV Oberachern,,Q183,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1928,false
 Q15126761,club,,SV Pullach,,Q183,,1946,false
-Q1512790,club,,US Fiorenzuola 1922,,Q38,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",1922,false
+Q1512790,club,US 피오렌출라,US Fiorenzuola 1922,,Q38,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",1922,false
 Q1512917,club,,Kano Pillars F.C.,,Q1033,,1990,false
 Q1512943,club,,Shooting Stars SC,,Q1033,,1950,false
 Q1513003,club,,Hapoel Acre F.C.,,Q801,,1946,false
@@ -1669,7 +1670,7 @@ Q1514387,club,심바 SC,Simba Sports Club,,Q924,,1936,false
 Q1514695,club,,Konkola Blades F.C.,,Q953,,1956,false
 Q1514915,club,,SC Fives,,Q142,,1901,false
 Q1515369,club,,Besançon R.C.,,Q142,,1904,false
-Q1515410,club,,PFC Pirin Blagoevgrad,,Q219,,1928,false
+Q1515410,club,PFC 피린 블라고에브그라드,PFC Pirin Blagoevgrad,,Q219,,1928,false
 Q1515533,club,,Pelikan Łowicz,,Q36,,1945,false
 Q15156379,club,,Eintracht Recklinghausen,,Q183,,1972,false
 Q1516001,club,,Hombrucher FV 09,,Q183,,1909,false
@@ -2229,15 +2230,17 @@ Q16844147,club,,Toronto Lady Lynx,,Q16,,2005,false
 Q16844187,club,,Maccabi Hadera F.C.,,Q801,,1918,false
 Q16844342,club,,CD Madridejos,,Q29,,1968,false
 Q16844365,club,,Maidstone United F.C. (1987),,Q145,,1897,false
+Q16844375,club,,Majestic FC,,Q965,,,false
 Q16844605,club,,Manila Jeepney F.C.,,Q928,,2013,false
 Q16844632,club,,A.C. Marano A.S.D.,,Q38,,1951,false
 Q16844756,club,,S.S. Matelica Calcio,,Q38,,1921,false
 Q16844931,club,인터 마이애미 CF,Inter Miami CF,,Q30,"[{""hex"":""#FFC0DB"",""share"":1}]",2018,false
-Q16844935,club,,Miami United FC,,Q30,,2012,false
+Q16844935,club,마이애미 유나이티드 FC,Miami United FC,,Q30,,2012,false
 Q16845083,club,밍추안 대학교 FC,Ming Chuan University FC,,Q865,,,false
 Q16845117,club,,Missouri State Bears soccer,,Q30,,,false
 Q16845331,club,,MŠK - Thermál Veľký Meder,,Q214,,1928,false
 Q16845355,club,뭄바이 시티 FC,Mumbai City FC,,Q668,,2014,false
+Q16845511,club,,NAPSA Stars F.C.,,Q953,,,false
 Q16845817,club,,Nevada Wonders,,Q30,,2003,false
 Q16845909,club,,New York Centaurs,,Q30,,1994,false
 Q16846085,club,,Newtongrange Star F.C.,,Q145,,1890,false
@@ -2412,7 +2415,7 @@ Q175309,national,카메룬 축구 국가대표팀,Cameroon men's national footba
 Q175315,national,뉴질랜드 축구 국가대표팀,New Zealand men's national football team,,Q664,,,false
 Q1753193,club,,R.A.A. Louviéroise,,Q31,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1913,false
 Q1753870,club,,S.R. Colmar,,Q142,"[{""hex"":""#00FF00"",""share"":1}]",1919,false
-Q1754163,club,,S.C. Salgueiros,,Q45,,1911,false
+Q1754163,club,SC 살게이루스,S.C. Salgueiros,,Q45,,1911,false
 Q1754198,club,,Lørenskog IF,,Q20,,1929,false
 Q1754352,club,,SC Kundl,,Q40,,,false
 Q1754506,club,,Santa Tecla F.C.,,Q792,,2007,false
@@ -2423,7 +2426,7 @@ Q175687,club,FC 드니프로,FC Dnipro,,Q212,,1918,false
 Q1757023,club,,SO Romorantin,,Q142,,1930,false
 Q1757369,club,,Yimpaş Yozgatspor,,Q43,,1959,false
 Q175764,club,,Umeå FC,,Q34,,1987,false
-Q1757655,club,,Olympique Alès,,Q142,,1923,false
+Q1757655,club,올랭피크 알레스,Olympique Alès,,Q142,,1923,false
 Q17591630,club,,SV Schüren,,Q183,,1910,false
 Q17594408,club,첸나이 FC,Chennaiyin FC,,Q668,,2014,false
 Q1759571,club,티슈린 SC,Tishreen SC,,Q858,,1947,false
@@ -2608,7 +2611,7 @@ Q18207291,club,피라미즈 FC,Pyramids FC,,Q79,,2008,false
 Q1821139,club,,AS Gabès,,Q948,,1978,false
 Q18214766,club,,FC Fleury 91,,Q142,,1991,false
 Q1822204,club,,AS Douanes,,Q1041,,1980,false
-Q1822470,club,,Leça F.C.,,Q45,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1912,false
+Q1822470,club,레사 FC,Leça F.C.,,Q45,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1912,false
 Q18232,club,KAA 헨트,KAA Gent,,Q31,"[{""hex"":""#007FFF"",""share"":0.5},{""hex"":""#F0FFFF"",""share"":0.5}]",1964,false
 Q1823402,club,,Lichtenrader BC 25,,Q183,,1925,false
 Q1824574,club,,Liga Muçulmana de Maputo,,Q1029,,1990,false
@@ -3330,7 +3333,7 @@ Q2035765,club,,P.A.S. Korinthos,,Q41,"[{""hex"":""#000000"",""share"":0.333},{""
 Q2036012,club,,FC Spartak Sumy,,Q212,,1999,false
 Q2036308,club,,FC Krasyliv,,Q212,,2000,false
 Q2036327,club,,FC Krystal Kherson,,Q212,,1961,false
-Q2036646,club,,Råå IF,,Q34,,1921,false
+Q2036646,club,로 IF,Råå IF,,Q34,,1921,false
 Q2036903,club,FC 폴리샤 지토미르,FC Polissya Zhytomyr,,Q212,,1959,false
 Q2037,club,AC 키에보베로나,AC ChievoVerona,,Q38,,1929,false
 Q2038093,club,,FC Shakhtar-2 Donetsk,,Q212,,1992,false
@@ -3365,7 +3368,7 @@ Q20473364,club,,Gençlerbirliği Sports Club,,Q43,,,false
 Q2047845,club,,Ashington A.F.C.,,Q145,,1883,false
 Q204881,club,말뫼 FF,Malmö FF,,Q34,,1910,false
 Q20488587,club,,CD Llosetense,,Q29,,1944,false
-Q204888,club,PAOK FC,PAOK FC,,Q41,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1926,false
+Q204888,club,PAOK,PAOK FC,,Q41,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1926,false
 Q2049272,club,,R.C.S. Verviétois,,Q31,,1896,false
 Q2049635,club,홍콩 레인저스 FC,Hong Kong Rangers FC,,Q148,,1958,false
 Q2050646,club,,FK Cementarnica 55,,Q221,,1955,false
@@ -3672,6 +3675,7 @@ Q2168942,club,,Fyllingen Fotball,,Q20,,1946,false
 Q2170184,club,,Diplomates Football Club du 8ème Arrondissement,,Q929,,1987,false
 Q217233,club,스타벡 IF,Stabæk Fotball,,Q20,"[{""hex"":""#0000FF"",""share"":0.25},{""hex"":""#007FFF"",""share"":0.25},{""hex"":""#77B5FE"",""share"":0.25},{""hex"":""#B2FFFF"",""share"":0.25}]",1995,false
 Q2172524,club,,KSK De Jeugd Lovendegem,,Q31,,1945,false
+Q217363,club,4.25체육단,April 25 Sports Club,,Q423,,1949,false
 Q217601,club,,Drøbak-Frogn IL,,Q20,,1918,false
 Q2176062,club,,A.C. Bellaria Igea Marina,,Q38,,1912,false
 Q217607,club,,Åsane Fotball,,Q20,,1997,false
@@ -3893,7 +3897,7 @@ Q2247035,club,,Sparta Linkeroever FC,,Q31,,,false
 Q2247835,club,,Castelnau Le Crès FC,,Q142,,1995,false
 Q2249141,club,,F.C.D. Pro Vasto,,Q38,,1902,false
 Q2251004,club,,Roda '46,,Q55,,1946,false
-Q2251415,club,,Marsala Football Club,,Q38,,1912,false
+Q2251415,club,마르살라 FC,Marsala Football Club,,Q38,,1912,false
 Q2251522,club,,SBK Drafn,,Q20,,1910,false
 Q2253360,club,,Andorra CF,,Q29,,1957,false
 Q2253369,club,,SV Schwarz-Rot Neustadt,,Q183,,1922,false
@@ -4041,7 +4045,7 @@ Q2325889,club,,SO Merlebach,,Q142,,1927,false
 Q2325919,club,,Stade raphaëlois,,Q142,,1905,false
 Q232731,national,카타르 축구 국가대표팀,Qatar men's national football team,,Q846,,,false
 Q2328394,club,,Doğan Türk Birliği,,Q23681,"[{""hex"":""#FFFF00"",""share"":1}]",1938,false
-Q2329137,club,,União São João E.C.,,Q155,,1981,false
+Q2329137,club,우니앙 상주앙 EC,União São João E.C.,,Q155,,1981,false
 Q2329203,club,,Stal Rzeszów,,Q36,,1944,false
 Q2329903,club,,CA Spora Luxembourg,,Q32,,1923,false
 Q2332097,club,,CF Sporting Mahonés,,Q29,,1974,false
@@ -4058,7 +4062,7 @@ Q2338230,club,,FK Crvenka,,Q403,,1919,false
 Q2338256,club,,Hakoah Sydney City East FC,,Q408,,1939,false
 Q2338486,club,,Olympique Lillois,,Q142,,1902,false
 Q2339638,club,,FC Hilversum,,Q55,,1906,false
-Q2340450,club,,FC Hebros,,Q219,,1921,false
+Q2340450,club,FC 헤브로스,FC Hebros,,Q219,,1921,false
 Q2340967,club,,Durham City A.F.C.,,Q145,,1918,false
 Q2341011,club,,Associação Atlética Portuguesa,,Q155,,1924,false
 Q2341495,club,,UD Poblense,,Q29,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",1935,false
@@ -4252,7 +4256,7 @@ Q24262424,club,,Scarborough SC,,Q16,,2014,false
 Q2426277,club,,Panthère du Ndé,,Q1009,,1951,false
 Q24264243,club,바양카라 FC,Bhayangkara F.C.,,Q252,,2015,false
 Q2426652,club,,Orvietana Calcio,,Q38,,1910,false
-Q2426819,club,,Atlético Morelia,,Q43,,2005,false
+Q2426819,club,BB 에르주룸스포르,Erzurumspor F.K.,,Q43,,2005,false
 Q242845,national,우간다 축구 국가대표팀,Uganda men's national football team,,Q1036,,,false
 Q2429197,club,,Roda JC,,Q55,,2008,false
 Q2431729,club,,Tidaholms,,Q34,,1902,false
@@ -4563,7 +4567,7 @@ Q2571785,club,,AD Universidad de Oviedo,,Q29,,1961,false
 Q257369,club,CS 그레벤마허,CS Grevenmacher,,Q32,,1909,false
 Q257411,national,에티오피아 축구 국가대표팀,Ethiopia men's national football team,,Q115,,,false
 Q2574376,club,,Panamá Viejo F.C.,,Q804,,1978,false
-Q2574668,club,,Mighty Barrolle,,Q1014,,1964,false
+Q2574668,club,마이티 배롤,Mighty Barrolle,,Q1014,,1964,false
 Q2575120,club,,Sportclub N.E.C.,,Q55,,,false
 Q2575756,club,선샤인 스타스 FC,Sunshine Stars F.C.,,Q1033,,1995,false
 Q2576626,club,,Gazelle FC,,Q657,"[{""hex"":""#FFFFFF"",""share"":1}]",1972,false
@@ -4647,6 +4651,7 @@ Q2610953,club,,Ton Pentre F.C.,,Q145,,1935,false
 Q2611377,club,,SD Laredo,,Q29,,1927,false
 Q2611378,club,,Fortuna Vlaardingen,,Q55,,1904,false
 Q261142,club,디나모 리가,Dinamo Riga,,Q211,,2008,false
+Q2612802,club,,Mosul FC,,Q796,,1957,false
 Q2613806,club,,A.F.C. Sudbury,,Q145,,1999,false
 Q2613971,club,알타아원,Al-Taawon FC,,Q851,,1956,false
 Q2614598,club,,FK Mačva Šabac,,Q403,,1919,false
@@ -5006,7 +5011,7 @@ Q281780,club,,FC Maxline Viciebsk,,Q184,,2021,false
 Q281861,club,,FC Dinamo-Juni Minsk,,Q184,,1993,false
 Q281878,club,FC 슬루츠크,FC Slutsk-2024,,Q184,,1998,false
 Q2818907,club,,A.S.D. Elpidiense Cascinare,,Q38,,1930,false
-Q2819082,club,,AC Semassi F.C.,,Q945,,1978,false
+Q2819082,club,AC 세마시,AC Semassi F.C.,,Q945,,1978,false
 Q2819113,club,,AD Ceuta,,,,,false
 Q2819143,club,AEK,A.E.K.,,Q41,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1924,false
 Q2819319,club,,Proodeftiki Neolaia F.C.,,Q41,"[{""hex"":""#DC143C"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1927,false
@@ -5267,7 +5272,7 @@ Q290781,club,AD 알메리아,AD Almería,,Q29,,1971,false
 Q290806,club,,Asociación Deportiva Carmelita,,Q800,,1936,false
 Q290841,club,AD 세우타,AD Ceuta,,Q29,,1996,false
 Q290854,club,,AD Os Limianos,,Q45,,1953,false
-Q290860,club,,AD Fafe,,Q45,,1958,false
+Q290860,club,AD 파페,AD Fafe,,Q45,,1958,false
 Q290865,club,AD 이시드로 메타판,A.D. Isidro Metapán,,Q792,,2000,false
 Q2908679,club,,Maccabi Ironi Kiryat Ata F.C.,,Q801,,1969,false
 Q290878,club,,Municipal Pérez Zeledón,,Q800,,1962,false
@@ -5321,7 +5326,7 @@ Q292231,club,로데스 AF,Rodez AF,,Q142,"[{""hex"":""#FF0000"",""share"":0.5},{
 Q2925138,club,,K.V.K. Ninove,,Q31,,,false
 Q292618,club,AGOVV 아펠도른,AGOVV Apeldoorn,,Q55,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1913,false
 Q2927209,club,,Bryntirion Athletic F.C.,,Q145,,1956,false
-Q2927344,club,,Invincible Eleven,,Q1014,,1943,false
+Q2927344,club,인빈서블 일레븐,Invincible Eleven,,Q1014,,1943,false
 Q2927988,club,,Fresno State Bulldogs,,Q30,,,false
 Q2928157,club,,Vipers SC,,Q1036,,1969,false
 Q2928709,club,,Bush Bucks F.C.,,Q258,,1957,false
@@ -5544,7 +5549,7 @@ Q302981,club,,KFC Herentals,,Q31,,1917,false
 Q3030038,club,,SC Vianense,,Q45,,1898,false
 Q3030204,club,,Imortal DC,,Q45,,1920,false
 Q3030826,club,,Police F.C.,,Q754,,1975,false
-Q30309373,club,,Səbail FK,,Q227,"[{""hex"":""#000000"",""share"":0.333},{""hex"":""#FF0000"",""share"":0.333},{""hex"":""#FFFFFF"",""share"":0.333}]",2016,false
+Q30309373,club,세바일 FK,Səbail FK,,Q227,"[{""hex"":""#000000"",""share"":0.333},{""hex"":""#FF0000"",""share"":0.333},{""hex"":""#FFFFFF"",""share"":0.333}]",2016,false
 Q303121,club,예니 말라티아스포르,Yeni Malatyaspor,,Q43,,1986,false
 Q3031591,club,,US Robert,,Q142,,1937,false
 Q3031940,club,,A.P.O. Thermaikos Thermis,,Q41,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1949,false
@@ -5707,7 +5712,7 @@ Q3105024,club,,A.C. Giacomense,,Q38,,1967,false
 Q3105369,club,,Gibraltar United F.C.,,Q1410,,1943,false
 Q310608,club,SC 포르투나 쾰른,SC Fortuna Köln,,Q183,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1948,false
 Q310621,club,SV 베헨 비스바덴,SV Wehen Wiesbaden,,Q183,,1926,false
-Q3106294,club,,Högaborgs BK,,Q34,,1927,false
+Q3106294,club,회가보리 BK,Högaborgs BK,,Q34,,1927,false
 Q3106835,club,,Leeds United L.F.C.,,Q145,,1989,false
 Q3106966,club,레알 SC,Real Sport Clube,,Q45,,1951,false
 Q310713,club,알나즈마,Al-Najma,,Q398,,1943,false
@@ -6490,7 +6495,7 @@ Q3626880,club,,Associazione Sportiva Dilettantistica Ilvamaddalena,,Q38,,1903,fa
 Q3626881,club,,A.S.D. Itala San Marco Gradisca,,Q38,,1919,false
 Q3626882,club,,A.S.D. Sicula Leonzio,,Q38,,1909,false
 Q3626883,club,,A.S.D. Lanciotto Campi Bisenzio,,Q38,,2005,false
-Q3626885,club,,A.S. Lodigiani,,Q38,,1972,false
+Q3626885,club,AS 로디자니,A.S. Lodigiani,,Q38,,1972,false
 Q3626886,club,,Associazione Sportiva Dilettantistica Liberty Bari 1909,,Q38,,1909,false
 Q3626889,club,,A.S.D. Narnese Calcio,,Q38,,1926,false
 Q3626891,club,,A.S.D. Nardò Calcio,,Q38,,1925,false
@@ -6829,7 +6834,7 @@ Q3958194,club,,Persiraja Banda Aceh,,Q252,,1957,false
 Q39604,club,,S.S. Maceratese 1922,,Q38,,1922,false
 Q3963253,club,,SD Balmaseda FC,,Q29,,1914,false
 Q3963304,club,,Società Calcio Albanova,,Q38,,1964,false
-Q3963306,club,,Società Calcio Leffe,,Q38,,1938,false
+Q3963306,club,SC 레페,Società Calcio Leffe,,Q38,,1938,false
 Q3963362,club,,Società Ginnastica Roma,,Q38,,,false
 Q3963479,club,,Società Sportiva Calcio Campania,,Q38,,1975,false
 Q3963549,club,,Società Sportiva Casalecchio 1921,,Q38,,1921,false
@@ -6966,6 +6971,7 @@ Q41478744,club,,KFC Winterslag,,Q31,,1923,false
 Q4151222,club,,Guangzhou Matsunichi F.C.,,Q148,,1990,false
 Q4152511,club,구루피 EC,Gurupi Esporte Clube,,Q155,,1988,false
 Q4155223,club,BFC 다우가프필스,BFC Daugavpils,,Q211,,2009,false
+Q4161802,club,,FC Dynamo-2 Moscow,,Q159,,1986,false
 Q4161842,club,,FC Dynamo Voronezh,,Q159,,1925,false
 Q41634649,club,,Breiðablik men's football,,Q189,,1950,false
 Q4165717,club,,Sahel SC,,Q817,,1967,false
@@ -6993,6 +6999,7 @@ Q420609,club,,FC Megasport,,Q232,,2005,false
 Q4206977,club,,FC Kavkazkabel Prokhladny,,Q159,,1990,false
 Q420755,club,,A.P.O. Akratitos Ano Liosia,,Q41,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1963,false
 Q421009,club,탬파베이 뮤터니,Tampa Bay Mutiny,,Q30,,1995,false
+Q4210385,club,,FC Kaluga,,Q159,,2009,false
 Q421059,club,,Akropolis IF,,Q34,,1968,false
 Q4210742,club,카마타마레 사누키,Kamatamare Sanuki,,Q17,,1956,false
 Q4211529,club,,Cametá Sport Club,,Q155,,2007,false
@@ -7072,7 +7079,7 @@ Q43310,national,독일 축구 국가대표팀,Germany men's national association
 Q433230,club,판트라키코스 FC,A.P.S. Panthrakikos,,Q41,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1964,false
 Q433237,club,,APEP F.C.,,Q229,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1979,false
 Q4332436,club,,FC Oka,,Q159,,1923,false
-Q433529,club,,Atletico Roma F.C.,,Q38,,2004,false
+Q433529,club,아틀레티코 로마 FC,Atletico Roma F.C.,,Q38,,2004,false
 Q433541,club,죄네스 에슈,Jeunesse Esch,,Q32,,1907,false
 Q43375974,club,볼로스 FC,Volos N.F.C.,,Q41,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",2017,false
 Q434260,club,,Estudiantes de Altamira,,Q96,,2001,false
@@ -8838,7 +8845,7 @@ Q5642525,club,,Halkyn United F.C.,,Q145,,1945,false
 Q5642627,club,,Hall Road Rangers F.C.,,Q145,,1959,false
 Q564352,club,하얼빈 이텅,Harbin Yiteng F.C.,,Q148,,1994,false
 Q5643567,club,,Halstead Town F.C.,,Q145,,1879,false
-Q5644660,club,,Brandsen,,Q414,,1942,false
+Q5644660,club,브란센,Brandsen,,Q414,,1942,false
 Q564497,club,,Annan Athletic F.C.,,Q145,,1942,false
 Q5645162,club,,Hamilton Steelers,,Q16,,1981,false
 Q5645173,club,,Hamilton Thunder,,Q16,,2001,false
@@ -8955,7 +8962,7 @@ Q5775025,club,,CF San Rafael,,Q29,,1968,false
 Q5775768,club,,Cosenza Calcio 1914,,Q38,,1914,false
 Q578104,club,,Royal Daring Club Molenbeek,,Q31,"[{""hex"":""#000000"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",1895,false
 Q578491,club,아산테 코토코 FC,Asante Kotoko F.C.,,Q117,,1935,false
-Q578721,club,,Coronel Bolognesi,,Q419,,1929,false
+Q578721,club,코로넬 볼로녜시,Coronel Bolognesi,,Q419,,1929,false
 Q579003,club,,Etoile Olympique de la Goulette et Kram,,Q948,,1950,false
 Q5794,club,에버턴 FC,Everton F.C.,,Q21,"[{""hex"":""#002366"",""share"":1}]",1878,false
 Q579453,club,,JFK Olimps,,Q211,,2005,false
@@ -9076,7 +9083,7 @@ Q596456,club,,FK Napredok,,Q221,,1928,false
 Q5964743,club,,Höörs IS,,Q34,,1928,false
 Q596650,club,,Oryx Douala,,Q1009,,1927,false
 Q5969262,club,,IB Khémis El Khechna,,Q262,,1932,false
-Q5969828,club,,Gimnasia de la plata,,Q739,,1993,false
+Q5969828,club,힘나시아 라플라타,Gimnasia de la plata,,Q739,,1993,false
 Q5970727,club,,IFK Haninge/Brandbergen,,Q34,,,false
 Q5970741,club,,IFK Lidingö FK,,Q34,,1932,false
 Q5970755,club,,IFK Mariestad,,Q34,,1985,false
@@ -9219,7 +9226,7 @@ Q60762002,club,ATK 모훈 바간 FC,Mohun Bagan Super Giant,,Q668,"[{""hex"":""#
 Q60775496,club,,FC Anahuac,,Q30,,,false
 Q60785074,club,,UC Irvine Anteaters men's soccer,,Q30,,,false
 Q60785845,club,,Taizhou Yuanda F.C.,,Q148,,2017,false
-Q60785879,club,,A.S. Excelsior,,Q142,,1940,false
+Q60785879,club,AS 엑셀시오르,A.S. Excelsior,,Q142,,1940,false
 Q60785926,club,,CDJ Tamarite,,Q29,,1961,false
 Q607939,club,올랜도 파이러츠 FC,Orlando Pirates F.C.,,Q258,,1937,false
 Q6080023,club,,Vanspor,,Q43,,1974,false
@@ -9833,6 +9840,7 @@ Q6748249,club,,Mandurah City FC,,Q408,,1970,false
 Q674867,club,,Moyola Park F.C.,,Q145,,1880,false
 Q674903,club,버뮤다 호그스,Bermuda Hogges,,Q30,,2006,false
 Q6750620,club,,Manly United FC,,Q408,,2004,false
+Q6753181,club,마누레와 AFC,Manurewa AFC,,Q664,,1929,false
 Q6753426,club,,Manzanares CF,,Q29,,1949,false
 Q6754417,club,,Racing Cartagena Mar Menor FC,,Q29,,2007,false
 Q676088,club,,Sportivo Italiano,,Q414,,1955,false
@@ -9878,7 +9886,7 @@ Q687178,club,FK 메탈라츠 고르니밀라노바츠,FK Metalac Gornji Milanova
 Q687297,club,,Ontinyent CF,,Q29,,1947,false
 Q687381,club,,Picadero JC,,Q29,,1951,false
 Q6875820,club,,Mislata CF,,Q29,,1931,false
-Q687712,club,,Villa Nova Atlético Clube,,Q155,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1908,false
+Q687712,club,빌라 노바 AC,Villa Nova Atlético Clube,,Q155,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1908,false
 Q6878716,club,코르 파칸 클럽,Khor Fakkan Club,,Q878,,1981,false
 Q6878961,club,,Mississauga Eagles FC,,Q16,,2010,false
 Q6881503,club,,Mitchelton Football Club,,Q408,,1920,false
@@ -9924,7 +9932,7 @@ Q692755,club,SG 소넨호프 그로샤스파흐,SG Sonnenhof Großaspach,,Q183,,
 Q692856,club,쇼난 벨마레,Shonan Bellmare,,Q17,,1968,false
 Q6930388,club,,Mt Gravatt Hawks Soccer Club,,Q408,,1960,false
 Q693092,club,,Racing FC Union Luxembourg,,Q32,,2005,false
-Q693297,club,,Kabuscorp S.C.,,Q916,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1994,false
+Q693297,club,카부스코르프 SC,Kabuscorp S.C.,,Q916,"[{""hex"":""#FF0000"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1994,false
 Q6933266,club,,Muirkirk F.C.,,Q145,,1937,false
 Q693371,club,,Eisenhüttenstädter FC Stahl,,Q183,,1950,false
 Q693383,club,,FC Mecklenburg Schwerin,,Q183,,2013,false
@@ -10122,7 +10130,7 @@ Q7155363,club,,Paulsgrove F.C.,,Q145,,1987,false
 Q7155379,club,,Paulton Rovers F.C.,,Q145,,1881,false
 Q7156,club,FC 바르셀로나,FC Barcelona,,Q29,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FF0000"",""share"":0.5}]",1899,false
 Q7157592,club,,Peacehaven & Telscombe F.C.,,Q145,,1923,false
-Q7159367,club,,Pedrabranca Futebol Clube,,Q155,,2001,false
+Q7159367,club,페드라브랑카 FC,Pedrabranca Futebol Clube,,Q155,,2001,false
 Q7160082,club,,Pedrouços A.C.,,Q45,,1929,false
 Q7162866,club,,Penicuik Athletic F.C.,,Q145,,1888,false
 Q7162955,club,,Peninsula Power Football Club,,Q408,,2000,false
@@ -10548,6 +10556,7 @@ Q7572132,club,SpVgg 05 오버라드,SpVgg 05 Oberrad,,Q183,,1905,false
 Q757253,club,FC 우라르투,FC Urartu,,Q399,"[{""hex"":""#800080"",""share"":0.5},{""hex"":""#FFA500"",""share"":0.5}]",1992,false
 Q75729,club,스포르팅 CP,Sporting CP,,Q45,"[{""hex"":""#00FF00"",""share"":0.5},{""hex"":""#FFFFFF"",""share"":0.5}]",1906,false
 Q757320,club,아스테라스 트리폴리스 FC,Asteras Tripoli F.C.,,Q41,"[{""hex"":""#0000FF"",""share"":0.5},{""hex"":""#FFFF00"",""share"":0.5}]",1931,false
+Q7573826,club,,Sparta Brodnica,,Q36,,1913,false
 Q7573940,club,,Spartans F.C.,,Q145,,1951,false
 Q7573944,club,,Spartans W.F.C.,,Q145,,1985,false
 Q757404,club,,Atlántida Sport Club,,Q733,,1906,false
@@ -10831,7 +10840,7 @@ Q7902563,club,,Utalii F.C.,,Q114,,,false
 Q7903261,club,우트시크텐스 BK,Utsiktens BK,,Q34,,1935,false
 Q7904018,club,,Uxbridge F.C.,,Q145,,1871,false
 Q7906648,club,,VCU Rams,,Q30,,,false
-Q7907662,club,,VV Noordwijk,,Q55,,1933,false
+Q7907662,club,VV 노르트베이크,VV Noordwijk,,Q55,,1933,false
 Q7907805,club,,Vaal Professionals F.C.,,Q258,,1970,false
 Q790969,club,,Avignon Foot 84,,Q142,,1931,false
 Q7910660,club,발렌시아 CF 페메니노,Valencia Féminas CF,,Q29,,2009,false
@@ -10846,6 +10855,7 @@ Q7917090,club,,Vataniakos Katerini F.C.,,Q41,"[{""hex"":""#00FF00"",""share"":0.
 Q7918272,club,,Mynavi Sendai Ladies,,Q17,,2012,false
 Q7920761,club,,Vera Cruz Futebol Clube,,Q155,,1960,false
 Q7926774,club,빅토리아 하이랜더스,Victoria Highlanders,,Q16,,2008,false
+Q7926820,club,,Victoria Koronowo,,Q36,,1971,false
 Q7927130,club,,Victoria Vistas,,Q16,,1989,false
 Q7928260,club,,Vieira S.C.,,Q45,,1965,false
 Q7928878,club,,Viggbyholms IK,,Q34,,1930,false
@@ -10988,7 +10998,7 @@ Q812713,club,알웨흐다,Al Wehda FC,,Q851,,1916,false
 Q812716,club,쿠웨이트 SC,Kuwait SC,,Q817,,1960,false
 Q812719,club,알사일리야 SC,Al-Sailiya Sports Club,,Q846,,1995,false
 Q812720,club,알아인 FC,Al Ain FC,,Q878,,1968,false
-Q812723,club,알나스르 SC,Alshariqa,,Q878,,1945,false
+Q812723,club,알나스르 SC,Al-Nasr SC,,Q878,,1945,false
 Q812732,club,알카디시야 쿠웨이트,Qadsia SC,,Q817,,1960,false
 Q812738,club,알네즈메,Nejmeh SC,,Q822,,1945,false
 Q812740,club,,Al-Shaab CSC,,Q878,,1974,false
@@ -11087,7 +11097,7 @@ Q833050,club,HNK 시베니크,HNK Šibenik,,Q224,,1932,false
 Q833319,club,,Alemannia Haibach,,Q183,,1919,false
 Q833337,club,,SV Grün-Weiß Lübben,,Q183,,1991,false
 Q833887,club,,Boldklubben 1908,,Q35,,1908,false
-Q8343694,club,,Centro Recreativo Porongos Fútbol Club,,Q77,,1910,false
+Q8343694,club,CR 포롱고스,Centro Recreativo Porongos Fútbol Club,,Q77,,1910,false
 Q834372,club,,Gelb-Weiß Görlitz,,Q183,,1909,false
 Q834555,club,,FC Dnepr Mogilev,,Q184,,1960,false
 Q83459,national,브라질 축구 국가대표팀,Brazil men's national football team,,Q155,,,false
@@ -11144,7 +11154,7 @@ Q841935,club,,Nordvest FC,,Q35,,2008,false
 Q842134,club,FC 스포르툴 스투덴체스크 부쿠레슈티,FC Sportul Studențesc București,,Q218,,1916,false
 Q8428,club,칼초 파도바,Calcio Padova,,Q38,,1910,false
 Q843089,club,,FC Hjørring,,Q35,,2006,false
-Q843097,club,,Hvidovre IF,,Q35,,1925,false
+Q843097,club,흐비도우레 IF,Hvidovre IF,,Q35,,1925,false
 Q843129,club,FC 스파르타키 츠힌발리,FC Tskhinvali,,Q230,,1936,false
 Q843210,club,FK 나프레다크 크루셰바츠,FK Napredak Kruševac,,Q403,,1946,false
 Q843396,club,라싱 페롤,Racing Club de Ferrol,,Q29,,1919,false
@@ -11466,7 +11476,7 @@ Q915883,club,,Tokatspor,,Q43,,1969,false
 Q9159112,club,,North Leigh F.C.,,Q145,,1908,false
 Q915999,club,,FK Baník Ratíškovice,,Q213,,1930,false
 Q9160183,club,,Keith F.C.,,Q145,,1910,false
-Q916068,club,,Orange County Blue Star,,Q30,,1997,false
+Q916068,club,오렌지 카운티 블루 스타,Orange County Blue Star,,Q30,,1997,false
 Q9160913,club,NK 오파티야,NK Opatija,,Q224,,1911,false
 Q9161358,club,,Astra Krotoszyn,,Q36,,1929,false
 Q916199,club,OH 뢰번,Oud-Heverlee Leuven,,Q31,,1957,false

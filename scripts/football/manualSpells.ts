@@ -70,7 +70,8 @@ export function applyManualSpells(
 
     // fix·delete: 기존 경력을 source_ref로 찾는다. 다른 선수의 경력을 건드리지 않게 선수 접두를 확인한다
     if (!ref) return bad(`${action}에는 source_ref가 필요 (spells.csv의 값)`)
-    if (!ref.startsWith(`${player}-`) && !ref.startsWith(`manual:${player}:`)) return bad(`source_ref ${ref}가 player_id ${player}의 경력이 아님`)
+    // 위키데이터 진술 ID는 선수 QID를 소문자(q123-…)로 시작하기도 한다
+    if (!ref.toUpperCase().startsWith(`${player}-`) && !ref.startsWith(`manual:${player}:`)) return bad(`source_ref ${ref}가 player_id ${player}의 경력이 아님`)
     const cur = byRef.get(ref)
     if (action === 'delete') {
       if (!v('note')) return bad('delete에는 사유 note가 필요')

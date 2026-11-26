@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { HISTORY_FROM, LEAGUES, type League } from './leagues.ts'
 import { checkDataset, CORE_FILE_NAMES, FILE_NAMES, FILES, sortRows, type CoreFileName, type Dataset } from './schema.ts'
 import {
-  applyLeagueNations, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
+  applyLeagueNations, applyNamesEn, applyNamesKo, buildAliases, buildAwards, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams,
   competitionEras, competitionList, competitionWindows, coverage, currentSeason, historyStarts, leaguesFor, progressLine, seasonChunks, mergeLegends, mergeTeamComps, parseCsv, qAliases, qAwards, qLeagueClubs, qNations, qOccupation, qPlayerDetails,
   qPlayersAtTeams, qSeasons, qSpells, qTeams, teamStarts, toCsv, type Row, type Team, type TeamCompetition, type Window,
 } from './wikidata.ts'
@@ -135,7 +135,9 @@ async function main() {
 
   // 4. 선수의 전체 경력과 그 경력에 나오는 팀
   const spellRows = await batched('경력', playerIds, 100, qSpells, o.cache)
-  const teamIds = [...new Set([...spellRows.map((r) => r.team), ...seedTeams, ...seasons.honours.map((h) => h.team_id)])]
+  // 직접 입력(manual/spells.csv add)에만 나오는 클럽도 팀 정보를 받는다
+  const manualTeams = readManual(o.input, 'spells.csv').filter((r) => r.action === 'add' && /^Q\d+$/.test(r.team_id)).map((r) => r.team_id)
+  const teamIds = [...new Set([...spellRows.map((r) => r.team), ...seedTeams, ...seasons.honours.map((h) => h.team_id), ...manualTeams])]
   const teams = buildTeams(await batched('팀', teamIds, 150, qTeams, o.cache))
   applyLeagueNations(teams, teamComps, o.leagues)
   const teamMap = new Map<string, Team>(teams.map((t) => [t.id, t]))
@@ -167,6 +169,9 @@ async function main() {
   // 7. 직접 입력한 한글 이름, 검색용 별칭
   const namesKo = readManual(o.input, 'names_ko.csv')
   const fixed = applyNamesKo(players, namesKo) + applyNamesKo(keptTeams, namesKo) + applyNamesKo(nations, namesKo)
+  // 직접 입력한 영문 이름(위키데이터 영문 라벨이 망가졌을 때)
+  const namesEn = readManual(o.input, 'names_en.csv')
+  const fixedEn = applyNamesEn(players, namesEn) + applyNamesEn(keptTeams, namesEn) + applyNamesEn(nations, namesEn)
   // 질의는 처음 목록 그대로(캐시 재사용), 뺀 선수의 별칭은 결과에서 거른다
   const keptIds0 = new Set(keptTeams.map((t) => t.id))
   const aliases = buildAliases([...players, ...keptTeams], await batched('별칭', [...playerIds, ...keptTeams.map((t) => t.id)], 200, qAliases, o.cache)).filter((x) => keptPlayers.has(x.entity_id) || keptIds0.has(x.entity_id))
@@ -204,7 +209,7 @@ async function main() {
   const noPos = players.filter((p) => !p.position).length
   log(`\n완료: ${o.out}/`)
   log(`  선수 ${players.length}명 (한글 이름 없음 ${noKo}, 포지션 없음 ${noPos}), 팀 ${keptTeams.length}개, 국가 ${nations.length}개`)
-  log(`  경력 ${spells.length}, 국가대표 ${caps.length}, 수상·우승 ${honours.length}, 별칭 ${aliases.length}, 직접 입력 한글 이름 적용 ${fixed}`)
+  log(`  경력 ${spells.length}, 국가대표 ${caps.length}, 수상·우승 ${honours.length}, 별칭 ${aliases.length}, 직접 입력 한글 이름 적용 ${fixed}, 영문 이름 적용 ${fixedEn}`)
   if (problems.length) {
     log(`\nCSV 검사 오류 ${problems.length}개 (앞 30개). 수집기 버그는 scripts/football/, 데이터 문제는 manual/로 고친다:`)
     for (const m of problems.slice(0, 30)) log(`  ${m}`)
