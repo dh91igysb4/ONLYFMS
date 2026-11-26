@@ -8,7 +8,6 @@ award:Q3296848,award,프리메이라리가 득점왕,Bola de Prata,Q3296848
 award:Q461306,award,세리에 A 득점왕,Capocannoniere,Q461306
 award:Q729513,award,라리가 득점왕,Pichichi Trophy,Q729513
 award:Q794775,award,PL 득점왕,PL Golden Boot,Q794775
-award:x-belgian-top-scorer,award,벨기에 프로리그 득점왕,Belgian Pro League top scorer,x-belgian-top-scorer
 award:x-bundesliga-top-scorer,award,분데스리가 득점왕,Bundesliga top scorer,x-bundesliga-top-scorer
 award:x-england-top-flight-top-scorer,award,잉글랜드 1부 득점왕,English top-flight top scorer,x-england-top-flight-top-scorer
 award:x-eredivisie-top-scorer,award,에레디비시 득점왕,Eredivisie top scorer,x-eredivisie-top-scorer
@@ -49,7 +48,6 @@ club:Q15786,club,뉘른베르크,1. FC Nürnberg,Q15786
 club:Q15789,club,바이에른 뮌헨,FC Bayern Munich,Q15789
 club:Q172567,club,베식타시,Beşiktaş J.K.,Q172567
 club:Q180305,club,AS 모나코 FC,AS Monaco,Q180305
-club:Q18232,club,헨트,KAA Gent,Q18232
 club:Q18656,club,맨체스터 유나이티드,Manchester United,Q18656
 club:Q18661,club,미들즈브러,Middlesbrough,Q18661
 club:Q18708,club,풀럼,Fulham,Q18708
@@ -60,20 +58,16 @@ club:Q18732,club,사우샘프턴,Southampton,Q18732
 club:Q18739,club,선덜랜드,Sunderland,Q18739
 club:Q18741,club,토트넘 홋스퍼,Tottenham Hotspur,Q18741
 club:Q18747,club,웨스트햄 유나이티드,West Ham United,Q18747
-club:Q187528,club,안데를레흐트,R.S.C. Anderlecht,Q187528
 club:Q1886,club,아탈란타,Atalanta BC,Q1886
 club:Q1893,club,볼로냐,Bologna F.C. 1909,Q1893
 club:Q1900,club,칼리아리 칼초,Cagliari Calcio,Q1900
-club:Q190916,club,클뤼프 브뤼허,Club Brugge K.V.,Q190916
 club:Q19446,club,블랙번 로버스,Blackburn Rovers,Q19446
 club:Q19467,club,크리스털 팰리스,Crystal Palace,Q19467
 club:Q19481,club,레스터 시티,Leicester City,Q19481
 club:Q19516,club,릴,Lille OSC,Q19516
-club:Q19603,club,트벤터,FC Twente,Q19603
 club:Q2037,club,키에보베로나,AC ChievoVerona,Q2037
 club:Q2052,club,피오렌티나,ACF Fiorentina,Q2052
 club:Q2074,club,제노아,Genoa CFC,Q2074
-club:Q216032,club,헹크,K.R.C. Genk,Q216032
 club:Q223620,club,데포르티보 알라베스,Deportivo Alavés,Q223620
 club:Q22707,club,1899 호펜하임,TSG 1899 Hoffenheim,Q22707
 club:Q2609,club,라치오,SS Lazio,Q2609
@@ -98,7 +92,6 @@ club:Q6601875,club,페네르바흐체,Fenerbahçe Istanbul,Q6601875
 club:Q6703,club,엠폴리,Empoli,Q6703
 club:Q704,club,올랭피크 리오네,OL,Q704
 club:Q7156,club,바르셀로나,FC Barcelona,Q7156
-club:Q732002,club,로열 앤트워프,Royal Antwerp,Q732002
 club:Q75729,club,스포르팅 CP,Sporting CP,Q75729
 club:Q81888,club,아약스,AFC Ajax,Q81888
 club:Q8466,club,카이저슬라우테른,1. FC Kaiserslautern,Q8466
@@ -127,7 +120,6 @@ league:Q13394,league,리그 1,Ligue 1,Q13394
 league:Q15804,league,세리에 A,Serie A,Q15804
 league:Q167541,league,에레디비시,Eredivisie,Q167541
 league:Q182994,league,프리메이라리가,Primeira Liga,Q182994
-league:Q216022,league,벨기에 프로리그,Belgian Pro League,Q216022
 league:Q324867,league,라리가,LaLiga,Q324867
 league:Q485568,league,쉬페르리그,Süper Lig,Q485568
 league:Q82595,league,분데스리가,Bundesliga,Q82595
@@ -565,8 +557,6 @@ title:Q18760:1,title,UEL 우승,UEL winner,Q18760
 title:Q193041:1,title,AFC 챔스 우승,AFC CL winner,Q193041
 title:Q19317:1,title,월드컵 우승,World Cup winner,Q19317
 title:Q212412:1,title,쿠프 드 프랑스 우승,Coupe de France winner,Q212412
-title:Q216022:1,title,벨기에 프로리그 우승,Belgian Pro League winner,Q216022
-title:Q216022:3,title,벨기에 프로리그 3회 이상 우승,Belgian Pro League 3+ titles,Q216022
 title:Q216858:1,title,KNVB 베이커 우승,KNVB Cup winner,Q216858
 title:Q260858:1,title,유로 우승,Euro winner,Q260858
 title:Q29224:1,title,타사 드 포르투갈 우승,Taça de Portugal winner,Q29224
@@ -576,7 +566,6 @@ title:Q40241:1,title,컵위너스컵 우승,UEFA Cup Winners' Cup winner,Q40241
 title:Q483794:1,title,코파 델 레이 우승,Copa del Rey winner,Q483794
 title:Q485568:1,title,쉬페르리그 우승,Süper Lig winner,Q485568
 title:Q485568:3,title,쉬페르리그 3회 이상 우승,Süper Lig 3+ titles,Q485568
-title:Q736856:1,title,벨기에 컵 우승,Belgian Cup winner,Q736856
 title:Q752145:1,title,튀르키예 컵 우승,Turkish Cup winner,Q752145
 title:Q82595:1,title,분데스리가 우승,Bundesliga winner,Q82595
 title:Q82595:3,title,분데스리가 3회 이상 우승,Bundesliga 3+ titles,Q82595
