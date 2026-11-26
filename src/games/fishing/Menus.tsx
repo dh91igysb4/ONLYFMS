@@ -1,6 +1,6 @@
 // 낚시 메뉴(가방·상점·도감·지역 해금·도전과제·순간이동기). 값과 규칙은 서버 view를 그대로 보여 주고, 행동은 콜백으로만 올린다.
 import { useEffect, useState } from 'react'
-import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, SHOES, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
+import { AREAS, areaHasSpecies, BAGS, bagSize, BUFFS, CHALLENGES, RODS, rodAtLeast, RARITY_NAMES, SHOES, SPECIES, TACKLES, tackleSlots, UNLOCKS, type AreaId, type BuffId, type Species, type TackleId } from './data.ts'
 import { SEASON_NAMES } from './clock.ts'
 import { discardFee, freeBonus, sellPrice, sellRatePct, soldToday, teleporterOpen, type DiscardAt, type View } from './logic.ts'
 import { teleportFee } from './teleport.ts'
@@ -617,7 +617,7 @@ export function DexPanel({ view, currentArea }: { view: View; currentArea?: Area
                       <RarityBadge s={s} />
                     </strong>
                     <span className="muted">
-                      {entry.count}마리 · 최대 {entry.maxCm}cm
+                      {RARITY_NAMES[s.rarity]} · {entry.count}마리 · 최대 {entry.maxCm}cm
                     </span>
                     <span className="muted">{conditionLabel(s)}</span>
                     {s.legend && <span className="muted">세이브당 한 마리 · 잡았어요</span>}

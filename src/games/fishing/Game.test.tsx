@@ -531,6 +531,13 @@ describe('fishing Game', () => {
     expect(screen.queryByRole('button', { name: '구매' })).not.toBeInTheDocument()
   })
 
+  test('도감: 잡은 일반 어종 칸에 등급 이름이 수·최대 길이 앞에 붙는다', async () => {
+    await mount(makeView({ dex: { anchovy: { count: 3, maxCm: 14 } } }))
+    fireEvent.click(screen.getByRole('button', { name: '도감' }))
+    const dex = screen.getByRole('region', { name: '도감' })
+    expect(within(dex).getByText('흔함 · 3마리 · 최대 14cm')).toBeInTheDocument()
+  })
+
   test('dex shows silhouettes for undiscovered species and names for discovered', async () => {
     await mount(makeView({ dex: { anchovy: { count: 3, maxCm: 14 } } }))
     fireEvent.click(screen.getByRole('button', { name: '도감' }))
