@@ -72,6 +72,12 @@
 4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 약 25일, 21~31일, 설계 `2026-11-25-fishing-species-expansion-design.md`)를 다시 잰다: `src/games/fishing/econSim.ts`가 판매 마릿수 감쇠(`data.ts` `SELL_DECAY`)로 재고, `fishing/gold.test.ts`의 기록 값·날짜 검사가 통과해야 한다. 낚시 수입(`world`)은 사이트 하루 상한을 받지 않는다(상한은 미니게임 `free`만).
 5. 골드는 지갑에 있다(logic.version 14부터, `wallet: true`). 새 골드 행동은 `ctx.gold`로 검사하고 `apply`의 `gold`로 증감을 돌려준다. 세이브(`State`)에 골드를 두지 않는다. `world`를 v14 아래로 되돌리지 않는다(`docs/deploy-checklist.md` "지갑 켜기").
 
+## 커리어 퀴즈 데이터 갱신 (`career-quiz`)
+1. 문제 명단은 `data/football/manual/career_quiz.csv`(`player_id,tier,name`). 1군만 남기는 규칙의 예외는 `manual/career_quiz_first_teams.csv`·`career_quiz_reserve_teams.csv`·`career_quiz_hide.csv`. 클럽 짧은 영문 이름 직접 지정은 `career_quiz_club_names.csv`.
+2. `npm run football:career-quiz` → `src/games/career-quiz/data.ts` 재생성 (직접 고치지 않는다). 1군 경력이 없거나 경력이 같은 다른 선수(인지도 50 이상)가 있으면 실패한다.
+3. 출제 풀이 바뀌므로 `logic.version`을 올리고 `play` 함수를 다시 배포한다 (후알야와 같다).
+4. 답 검색은 DB `football_search`라서, `data/football/`이 바뀌면 운영 DB에 `npm run football:load`도 한다. 설계 `docs/superpowers/specs/2026-11-25-career-quiz-design.md`
+
 ## 로직 버전 규칙
 - 버전은 `src/games/<game-id>/logic.ts`의 `logic.version`이다 (manifest 아님). 설계 §4.5 기준.
 - 판정·채점·문제 선택 결과가 달라지는 변경은 `logic.version`을 올린다. 불확실하면 올린다.

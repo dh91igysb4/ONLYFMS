@@ -21,7 +21,8 @@
     "football:gaps": "node scripts/football/find-gaps.ts",
     "football:add-players": "node scripts/football/add-players.ts",
     "ttt:generate": "node scripts/tiki-taka-toe/generate.ts",
-    "ttt:load": "bash scripts/tiki-taka-toe/load.sh"
+    "ttt:load": "bash scripts/tiki-taka-toe/load.sh",
+    "football:career-quiz": "node scripts/football/build-career-quiz.ts"
   },
   "dependencies": {
     "@fontsource/exo-2": "^5.3.0",

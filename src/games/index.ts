@@ -15,6 +15,8 @@ import { manifest as fishingManifest } from './fishing/manifest.ts'
 import { logic as fishingLogic } from './fishing/logic.ts'
 import { manifest as neonRiderManifest } from './neon-rider/manifest.ts'
 import { logic as neonRiderLogic } from './neon-rider/logic.ts'
+import { manifest as careerQuizManifest } from './career-quiz/manifest.ts'
+import { logic as careerQuizLogic } from './career-quiz/logic.ts'
 
 /** 게임 등록부. 새 게임은 여기에 한 줄 추가한다. */
 export const games: GameModule[] = [
@@ -23,6 +25,7 @@ export const games: GameModule[] = [
   { manifest: ballRunManifest, logic: ballRunLogic },
   { manifest: sneakExamManifest, logic: sneakExamLogic },
   { manifest: neonRiderManifest, logic: neonRiderLogic },
+  { manifest: careerQuizManifest, logic: careerQuizLogic },
 ]
 
 export function getGame(id: string): GameModule | undefined {
