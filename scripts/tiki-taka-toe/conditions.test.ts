@@ -256,8 +256,18 @@ describe('buildConditions', () => {
   })
   test('club_pool_real_data', () => {
     const pool = parseCsv(readFileSync(join(import.meta.dirname, '..', '..', 'data', 'tiki-taka-toe', 'manual', 'clubs.csv'), 'utf8'))
-    expect(pool.length).toBe(126)
-    expect(pool.filter((r) => r.eur === '1').length).toBe(49)
+    expect(pool.length).toBe(116)
+    expect(pool.filter((r) => r.eur === '1').length).toBe(43)
+    expect(pool.some((r) => r.nation_id === 'Q31')).toBe(false) // 벨기에 클럽 없음 (2026-11-26 사용자 결정)
+  })
+  test('belgian_league_conditions_have_no_theme', () => {
+    // 벨기에 리그·리그 우승·컵·득점왕·클럽은 어느 테마에도 나오지 않는다(국적 벨기에는 그대로, 2026-11-26 사용자 결정)
+    const r = buildConditions(readFootballData(REAL))
+    const ids = new Set(r.conditions.map((c) => c.id))
+    expect([...ids].filter((id) => /Q216022|Q736856|x-belgian-top-scorer/.test(id))).toEqual([])
+    expect(ids.has('club:Q187528')).toBe(false) // 안데를레흐트
+    expect(ids.has('club:Q19603')).toBe(false) // 트벤터
+    expect(ids.has('nation:Q31')).toBe(true)
   })
   test('empty_sets_are_dropped_and_ids_unique', () => {
     const r = buildConditions(data())

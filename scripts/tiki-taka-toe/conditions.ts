@@ -53,6 +53,8 @@ export const FROM = 1987
 export const TEAMMATE_MIN_POPULARITY = 80
 export const TEAMMATE_ANCHORS = 150
 
+/** 테마에서 뺀 리그 나라(벨기에) */
+const NO_THEME_NATIONS = new Set(['Q31'])
 /** 대상 유럽 9개 리그 나라 → 테마. eur만 있는 나라는 [] */
 const TARGET_NATIONS: Record<string, Theme[]> = {
   Q21: ['eng'], Q29: ['esp'], Q38: ['ita'], Q183: ['ger'], Q142: [], Q55: [], Q45: [], Q43: [], Q31: [],
@@ -176,7 +178,8 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
   const catalog = new Map(d.honour_catalog.map((c) => [c.id, c]))
   const ALL = [...THEMES]
   const shortKo = new Map((d.short_names ?? []).map((r) => [r.player_id, r.short_ko]))
-  const themesOfNation = (n: string): Theme[] => (n in TARGET_NATIONS ? sortThemes([...TARGET_NATIONS[n], 'eur']) : [])
+  // 벨기에 리그 쪽 조건(리그·리그 우승·컵·득점왕·클럽)은 어느 테마에도 내지 않는다 (2026-11-26 사용자 결정). 국적 조건은 그대로.
+  const themesOfNation = (n: string): Theme[] => (n in TARGET_NATIONS && !NO_THEME_NATIONS.has(n) ? sortThemes([...TARGET_NATIONS[n], 'eur']) : [])
 
   // ---- 1부 시기: 대회 → [from, to, nation] (대상 나라만)
   const tier1 = new Map<string, { from: number; to: number; nation: string }[]>()
