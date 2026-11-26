@@ -43,7 +43,7 @@ describe('buildHallOfFame', () => {
 
   it('사이트: 자유 플레이 게임(등록부 순서) 다음 대전', () => {
     expect(hof.site.map((b) => b.gameId)).toEqual(['who-are-ya', 'toothbrush', 'ball-run', 'sneak-exam', 'neon-rider', 'yacht', 'tiki-taka-toe'])
-    expect(hof.site.map((b) => b.group)).toEqual(['free', 'free', 'free', 'free', 'free', 'duel'])
+    expect(hof.site.map((b) => b.group)).toEqual(['free', 'free', 'free', 'free', 'free', 'duel', 'duel'])
   })
 
   it('점수 게임은 best 행·최고 점수, 맞히기 게임은 wins 행·맞힌 수, 대전은 레이팅', () => {
