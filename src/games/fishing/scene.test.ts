@@ -1577,3 +1577,66 @@ describe('친구 캐릭터(others)', () => {
     expect(shadowA).toBeLessThan(meA.at)
   })
 })
+
+describe('부드러운 물가 그리기', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
+  })
+  const LAKE_ROWS = [',,,,,,,,,,', ',,,,,,,,,,', ',,..~~..,,', ',.~~~~~~.,', ',.~~~~~~.,', ',.~~~~~~.,', ',,..~~..,,', ',,,,,,,,,,', ',,,,,,,,,,', ',,,,,,,,,,']
+  const lake = defineMap('village', LAKE_ROWS, { spots: { water: 'shore' } })
+  const drawLake = () => {
+    const size = { w: 195, h: 280 }
+    const p = player(tileCentre(1, 8))
+    const cam = cameraFor(lake, p.pos, size)
+    const ctx = new RecordingCtx()
+    drawWorld(asCtx(ctx), { ...scene('idle', p, size), map: lake, camera: cam }, size)
+    return { ctx, cam }
+  }
+  const pixel = (name: string, i: number, j: number) => realSprites.SPRITES[name].palette[realSprites.SPRITES[name].rows[j][i]]
+
+  test('물가 칸은 픽셀 띠로 그리고 직선 젖은 띠는 그리지 않는다', () => {
+    const { ctx } = drawLake()
+    const colors = new Set(ctx.rects.map((r) => r.color))
+    expect(colors.has('#c7a96e')).toBe(true) // 젖은 띠(sandWet)
+    expect(colors.has(pixel('tile-sand', 3, 3)) || colors.has(pixel('tile-sand', 8, 8))).toBe(true)
+    expect(ctx.rects.some((r) => r.color === '#c7a96e' && ((r.w === TILE && r.h === 2) || (r.w === 2 && r.h === TILE)))).toBe(false)
+  })
+
+  test('물가에서 먼 칸은 지금 그림 그대로', () => {
+    const { ctx, cam } = drawLake()
+    const at = ctx.sprites.filter((s) => s.x === 5 * 16 - cam.x && s.y === 9 * 16 - cam.y).map((s) => s.name)
+    expect(at).toContainEqual(expect.stringMatching(/^tile-grass/))
+    const sand = new Set(['#c7a96e', ...Object.values(realSprites.SPRITES['tile-sand'].palette)])
+    const inTile = ctx.rects.filter((r) => r.x >= 5 * 16 - cam.x && r.x < 6 * 16 - cam.x && r.y >= 9 * 16 - cam.y && r.y < 10 * 16 - cam.y)
+    expect(inTile.filter((r) => sand.has(r.color))).toEqual([])
+  })
+
+  test('그린 색과 걷기 판정이 같다', async () => {
+    const { shoreBands, shoreField, footprintAt, shoreClassAt } = await import('./shore.ts')
+    const { pointBlocked } = await import('./walk.ts')
+    const { MAPS } = await import('./maps/index.ts')
+    const { ALL_AREAS_OPEN, isWalkable } = await import('./map.ts')
+    let seed = 99
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const bad: string[] = []
+    for (const map of Object.values(MAPS)) {
+      if (!map) continue
+      const f = shoreField(map, 'high')
+      const tiles: [number, number, Float32Array][] = []
+      for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
+        const b = shoreBands(f, tx, ty)
+        if (!b || footprintAt(f, tx, ty)) continue
+        if (shoreClassAt(f, tx, ty) === 'land' && !isWalkable(map, tx, ty, ALL_AREAS_OPEN)) continue
+        tiles.push([tx, ty, b])
+      }
+      for (let n = 0; n < 2000 && tiles.length; n++) {
+        const [tx, ty, b] = tiles[Math.floor(rnd() * tiles.length)]
+        const i = Math.floor(rnd() * 16)
+        const j = Math.floor(rnd() * 16)
+        const drawnWater = b[j * 16 + i] >= 0.5
+        if (drawnWater !== pointBlocked(map, tx * 16 + i + 0.5, ty * 16 + j + 0.5, ALL_AREAS_OPEN)) bad.push(`${map.id} (${tx},${ty}) px ${i},${j}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+})

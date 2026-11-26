@@ -10,10 +10,10 @@ import type { Tide } from './clock.ts'
 export const SHORE_LINE = 0.5
 /** 걷기 경계(이 값 이상이면 막힘). 0.52까지만 올린다 */
 export const SHORE_BLOCK = 0.5
-/** 이 값 이상은 물 그림 */
-export const WET_BAND = 0.56
-/** 젖은 띠 가운데 물가 쪽(거품) */
-export const FOAM_BAND = 0.53
+/** 이 값 이상은 물 그림(물가선에서 물 쪽으로 약 3px) */
+export const WET_BAND = 0.63
+/** 젖은 띠: 물가선~FOAM_BAND는 젖은 모래(약 2px), FOAM_BAND~WET_BAND는 거품(약 1px) — 옛 직선 물가 띠와 같은 순서·두께 */
+export const FOAM_BAND = 0.585
 /** 이 값 이상 물가선 미만은 모래 띠 */
 export const SAND_BAND = 0.16
 /** 물 칸 가운데 이 거리(px) 안은 물을 지킨다(1칸 연못) */
