@@ -42,6 +42,14 @@ describe('직접 입력 경력', () => {
     expect(applyManualSpells(base, [row({ ...m[0], note: '' })]).problems).toEqual([expect.stringMatching(/^manual\/spells:2: delete에는 사유/)])
   })
 
+  it('delete: 소문자 q로 시작하는 위키데이터 진술 ID도 그 선수의 경력으로 본다', () => {
+    const low: Spell[] = [{ ...base[0], source_ref: 'q1-ccc' }]
+    const r = applyManualSpells(low, [row({ action: 'delete', player_id: 'Q1', source_ref: 'q1-ccc', note: '틀린 경력' })])
+    expect(r.problems).toEqual([])
+    expect(r.spells).toEqual([])
+    expect(applyManualSpells(low, [row({ action: 'delete', player_id: 'Q2', source_ref: 'q1-ccc', note: '틀린 경력' })]).problems).toHaveLength(1)
+  })
+
   it('잘못된 줄은 건너뛰고 줄 번호와 함께 알린다', () => {
     const r = applyManualSpells(base, [
       row({ action: 'fix', player_id: 'Q1', source_ref: 'Q1-aaa', end_date: '2017' }),

@@ -553,6 +553,20 @@ export function applyNamesKo<T extends { id: string; name_ko: string }>(items: T
   return n
 }
 
+/**
+ * manual/names_en.csv (entity_id,name_en)로 영문 이름을 덮어쓴다. 위키데이터 영문 라벨이 망가졌을 때
+ * (예: 'Ayumu Seko 67', 'Han Kwang-song.') 쓴다. 다시 수집해도 손본 이름이 지워지지 않게
+ */
+export function applyNamesEn<T extends { id: string; name_en: string }>(items: T[], manual: readonly Row[]): number {
+  const m = new Map(manual.filter((r) => r.entity_id && r.name_en?.trim()).map((r) => [r.entity_id, r.name_en.trim()]))
+  let n = 0
+  for (const it of items) {
+    const en = m.get(it.id)
+    if (en && en !== it.name_en) { it.name_en = en; n++ }
+  }
+  return n
+}
+
 /** 시즌 참가팀: 위키데이터 + manual/team_competitions.csv 합집합 */
 export function mergeTeamComps(a: readonly TeamCompetition[], manual: readonly Row[]): TeamCompetition[] {
   const m = new Map<string, TeamCompetition>()

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { LEAGUES } from './leagues.ts'
 import {
-  applyLeagueNations, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
+  applyLeagueNations, applyNamesEn, applyNamesKo, buildAliases, buildCaps, buildNations, buildPlayers, buildSeasons, buildSpells, buildTeams, coverage, currentSeason, dateOf,
   flat, footOf, isYouthOrReserve, mergeLegends, qLeagueClubs, mergeTeamComps, parseCsv, pickNation, popularity, positionOf, qOccupation, qPlayersAtTeams, qSeasons,
   seasonWindows, competitionWindows, competitionList, competitionEras, teamsAt, historyStarts, seasonChunks, leaguesFor, progressLine, teamKind, teamStarts, toCsv, countOf, foundedOf, nameEnOf, qAliases, qPlayerDetails, qTeams, type Row, type Team,
 } from './wikidata.ts'
@@ -162,6 +162,12 @@ test('seasons_manual_merge_and_coverage', () => {
   const [cov] = coverage(merged, [{ ...PL, seasons: 3 }], seasonWindows([{ ...PL, seasons: 3 }], 2018))
   expect(cov.from).toBe(2016)
   expect(cov.counts).toEqual([2, 1, 0])
+})
+
+test('applyNamesEn_overrides_and_counts', () => {
+  const items = [{ id: 'Q1', name_en: 'Ayumu Seko 67' }, { id: 'Q2', name_en: 'Son Heung-min' }, { id: 'Q3', name_en: 'X' }]
+  expect(applyNamesEn(items, [{ entity_id: 'Q1', name_en: ' Ayumu Seko ' }, { entity_id: 'Q2', name_en: 'Son Heung-min' }, { entity_id: 'Q3', name_en: ' ' }])).toBe(1)
+  expect(items.map((x) => x.name_en)).toEqual(['Ayumu Seko', 'Son Heung-min', 'X'])
 })
 
 test('applyNamesKo_overrides_and_counts', () => {

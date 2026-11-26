@@ -11,7 +11,7 @@
 | `nations.csv` | 국가, 국기 코드 | 위키데이터 |
 | `teams.csv` | 클럽·성인 국가대표팀 (유스·2군·여자 팀 제외) | 위키데이터 |
 | `team_competitions.csv` | 시즌별 리그 참가팀 | 위키데이터 + openfootball + `manual/team_competitions.csv` |
-| `players.csv` | 선수 | 위키데이터 (+ `manual/names_ko.csv`) |
+| `players.csv` | 선수 | 위키데이터 (+ `manual/names_ko.csv`, `manual/names_en.csv`) |
 | `aliases.csv` | 검색용 이름(한/영) | 위키데이터 |
 | `external_ids.csv` | 다른 출처 ID (지금은 Transfermarkt ID만, 위키데이터 P2446) | 위키데이터 |
 | `spells.csv` | 클럽 경력 | 위키데이터 (+ `manual/spells.csv`) |
@@ -146,6 +146,8 @@ npm run football:honours -- --no-cache                # 캐시(.cache/honours/) 
 다시 수집해도 지워지지 않는다. 수집 때마다 위키데이터 값 위에 덮어쓴다.
 
 - `names_ko.csv` (`entity_id,name_ko`): 선수·팀·국가 한글 표시 이름. 위키데이터에 없거나 표기가 마음에 안 들 때.
+- `names_en.csv` (`entity_id,name_en,note`): 선수·팀·국가 영문 이름. 위키데이터 영문 라벨이 망가졌을 때만(예: 이름 뒤에 숫자·마침표가 붙음, 다른 클럽 이름으로 바뀜). 위키데이터를 고칠 수 있으면 그쪽이 먼저다. `football:fetch`·`football:add-players`가 반영한다.
+- `manual/spells.csv`에서 add 줄을 지우거나 바꾸면 `football:seasons`는 옛 `manual:` 줄을 `spells.csv`에서 지우지 않는다. 그 줄은 직접 지우거나 `football:fetch`로 다시 만든다.
 - `team_competitions.csv` (`team_id,competition_id,season`): 위키데이터에 빠진 시즌 참가팀. `team_id`는 위키데이터 QID, `season`은 시작 연도.
 - `legends.csv` (`player_id,note`): 수집 범위(최근 시즌) 밖이지만 넣을 레전드 선수의 위키데이터 QID와 메모(예: `Q1487,티에리 앙리`). 전체 경력까지 함께 받는다. 축구 선수가 아니거나 QID 형식이 아니면 경고하고 뺀다. 레전드의 옛 시즌 리그 참가 기록은 수집 창 밖이라 생기지 않는다.
 - `ballon_dor_nominees.csv` (`name,nation_ko,years,best_rank,player_id`): 레전드 원본. 발롱도르 후보 2000~2025년 전원 + 1990~1999년 연도별 상위 5위(381명). `npm run football:legends`가 이름을 위키데이터 ID로 바꿔 `legends.csv`에 `[발롱도르]` 줄로 넣고, 판정을 `ballon_dor_resolved.csv`에 쓴다. 확인 필요·못 찾음은 이 파일의 `player_id` 칸에 ID를 적고 다시 돌린다.
