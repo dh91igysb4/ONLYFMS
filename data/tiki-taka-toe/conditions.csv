@@ -17,9 +17,6 @@ award:x-super-lig-top-scorer,award,쉬페르리그 득점왕,Süper Lig top scor
 award:x-wc-golden-boot,award,월드컵 골든부트,FIFA World Cup Golden Boot,x-wc-golden-boot
 club:Q101859,club,볼프스부르크,VfL Wolfsburg,Q101859
 club:Q101959,club,보루시아 묀헨글라트바흐,Borussia Mönchengladbach,Q101959
-club:Q1023163,club,Clube Desportivo das Aves,Clube Desportivo das Aves,Q1023163
-club:Q1023227,club,톤델라,CD Tondela,Q1023227
-club:Q1023233,club,C.D. Trofense,C.D. Trofense,Q1023233
 club:Q102720,club,헤르타 베를린,Hertha BSC,Q102720
 club:Q10286,club,오사수나,Club Atlético Osasuna,Q10286
 club:Q10300,club,라요 바예카노,Rayo Vallecano,Q10300
@@ -27,452 +24,98 @@ club:Q10308,club,레알 사라고사,Real Zaragoza,Q10308
 club:Q10315,club,레알 소시에다드,Real Sociedad,Q10315
 club:Q10319,club,레알 바야돌리드,Real Valladolid,Q10319
 club:Q10329,club,세비야,Sevilla,Q10329
-club:Q1033045,club,K.F.C. Verbroedering Geel,K.F.C. Verbroedering Geel,Q1033045
 club:Q10333,club,발렌시아,Valencia,Q10333
-club:Q10407,club,알메리아,Unión Deportiva Almería,Q10407
-club:Q1045811,club,도르드레흐트,FC Dordrecht,Q1045811
-club:Q1046440,club,카사 피아,Casa Pia A.C.,Q1046440
 club:Q104761,club,바이어 04 레버쿠젠,Bayer 04 Leverkusen,Q104761
 club:Q104770,club,쾰른,1. FC Köln,Q104770
-club:Q10499,club,코르도바,Córdoba,Q10499
-club:Q1050331,club,브뤼셀,Football Club Molenbeek Brussels Strombeek,Q1050331
-club:Q1051013,club,파리 FC,Paris FC,Q1051013
-club:Q10512,club,엘체,Elche,Q10512
 club:Q105254,club,마인츠 05,1. FSV Mainz 05,Q105254
-club:Q1053450,club,로센달,RBC Roosendaal,Q1053450
-club:Q1053917,club,루셀라레,K.S.V. Roeselare,Q1053917
-club:Q1056987,club,스포르팅 툴롱 바르,Sporting Toulon Var,Q1056987
-club:Q105844,club,아르미니아 빌레펠트,Arminia Bielefeld,Q105844
-club:Q105853,club,카를스루에,Karlsruher SC,Q105853
 club:Q105861,club,보훔,VfL Bochum,Q105861
-club:Q1061627,club,에먼,FC Emmen,Q1061627
 club:Q106394,club,프라이부르크,SC Freiburg,Q106394
-club:Q1065328,club,덴더르,F.C. Verbroedering Dender Eendracht Hekelgem,Q1065328
-club:Q1071713,club,텔스타,SC Telstar,Q1071713
-club:Q107818,club,에네르기 콧부스,FC Energie Cottbus,Q107818
-club:Q1110567,club,하타이스포르,Hatayspor,Q1110567
-club:Q1120838,club,칼초 코모,Como 1907,Q1120838
-club:Q1127498,club,엘라즈스포르,Elazığspor,Q1127498
 club:Q1128631,club,리즈 유나이티드,Leeds United,Q1128631
-club:Q113000,club,메헬렌,KV Mechelen,Q113000
 club:Q1130849,club,리버풀,Liverpool,Q1130849
-club:Q1132418,club,마르티그,FC Martigues,Q1132418
-club:Q118919,club,에위프스포르,Eyüpspor,Q118919
 club:Q11938,club,에인트호번,PSV Eindhoven,Q11938
-club:Q11945,club,지로나,Girona,Q11945
-club:Q11961,club,헤라클레스 알멜로,Heracles Almelo,Q11961
-club:Q11963,club,에르쿨레스,Hércules,Q11963
-club:Q11971,club,우에스카,Sociedad Deportiva Huesca,Q11971
-club:Q11979,club,라스팔마스,UD Las Palmas,Q11979
-club:Q120775987,club,AVS Futebol SAD,AVS Futebol SAD,Q120775987
-club:Q12158,club,누만시아,Club Deportivo Numancia de Soria,Q12158
-club:Q12230,club,레알 무르시아,Real Murcia,Q12230
 club:Q12236,club,라싱 산탄데르,Racing de Santander,Q12236
-club:Q12249,club,레크레아티보 우엘바,Recreativo de Huelva,Q12249
-club:Q12260,club,사바델,Centre d'Esports Sabadell Futbol Club,Q12260
 club:Q12278,club,스포르팅 히혼,Sporting de Gijón,Q12278
 club:Q12297,club,비야레알,Villarreal,Q12297
-club:Q12308,club,헤레스,Xerez C.D.,Q12308
-club:Q1231804,club,아메드,Amed S.F.K.,Q1231804
-club:Q126334,club,스트라스부르,RC Strasbourg Alsace,Q126334
-club:Q128148,club,마니사스포르,Manisaspor,Q128148
 club:Q128446,club,포르투,FC Porto,Q128446
-club:Q1293144,club,SC Eendracht Aalst,SC Eendracht Aalst,Q1293144
 club:Q131499,club,벤피카,S.L. Benfica,Q131499
-club:Q131603,club,1860 뮌헨,TSV 1860 München,Q131603
 club:Q132885,club,올랭피크 드 마르세유,Olympique de Marseille,Q132885
-club:Q13385,club,SPAL,Ars et Labor Ferrara Calcio,Q13385
 club:Q13391,club,레체,US Lecce,Q13391
 club:Q134241,club,페예노르트,Feyenoord Rotterdam,Q134241
-club:Q1346314,club,모레이렌스,Moreirense,Q1346314
-club:Q1347229,club,리에주,R.F.C. de Liège,Q1347229
-club:Q1347349,club,Pendikspor,Pendikspor,Q1347349
-club:Q1366316,club,Erzurumspor,Erzurumspor,Q1366316
-club:Q1368064,club,Malatyaspor,Malatyaspor,Q1368064
-club:Q1369461,club,사카리아스포르,Sakaryaspor,Q1369461
-club:Q137499,club,08 홈부르크,FC 08 Homburg,Q137499
-club:Q138230,club,카슴파샤,Kasımpaşa S.K.,Q138230
-club:Q138248,club,신트트라위던,Sint-Truidense V.V.,Q138248
-club:Q1386850,club,F.C. Alverca,F.C. Alverca,Q1386850
-club:Q1386869,club,아로카,F.C. Arouca,Q1386869
-club:Q1387105,club,파말리캉,FC Famalicão,Q1387105
-club:Q1387110,club,F.C. Felgueiras,F.C. Felgueiras,Q1387110
-club:Q1387471,club,페나피엘,F.C. Penafiel,Q1387471
-club:Q1387855,club,비젤라,F.C. Vizela,Q1387855
-club:Q139399,club,포자 칼초,Calcio Foggia 1920,Q139399
-club:Q1398111,club,파티흐 카라귐뤼크,Fatih Karagümrük S.K.,Q1398111
-club:Q141931,club,디나모 드레스덴,Dynamo Dresden,Q141931
-club:Q141971,club,우니온 베를린,1. FC Union Berlin,Q141971
-club:Q142005,club,한자 로스토크,F.C. Hansa Rostock,Q142005
 club:Q1422,club,유벤투스,Juventus,Q1422
-club:Q1423118,club,괴즈테페,Göztepe S.K.,Q1423118
-club:Q1423718,club,오이펜,K.A.S. Eupen,Q1423718
-club:Q1429473,club,바르징,Varzim S.C.,Q1429473
-club:Q14551982,club,울름,SSV Ulm 1846 Fußball,Q14551982
 club:Q1457,club,삼프도리아,U.C. Sampdoria,Q1457
-club:Q151747,club,포르투나 뒤셀도르프,Fortuna Düsseldorf,Q151747
-club:Q153535,club,알레마니아 아헨,Alemannia Aachen,Q153535
-club:Q153539,club,그로이터 퓌르트,SpVgg Greuther Fürth,Q153539
-club:Q154053,club,아인트라흐트 브라운슈바이크,Eintracht Braunschweig,Q154053
-club:Q154293,club,뒤스부르크,MSV Duisburg,Q154293
 club:Q1543,club,밀란,AC Milan,Q1543
-club:Q1543501,club,Giresunspor,Giresunspor,Q1543501
-club:Q157463,club,자르브뤼켄,1. FC Saarbrücken,Q157463
-club:Q157464,club,위르딩겐 05,KFC Uerdingen 05,Q157464
 club:Q15755,club,아우크스부르크,FC Augsburg,Q15755
-club:Q157828,club,홀슈타인 킬,Holstein Kiel,Q157828
 club:Q15786,club,뉘른베르크,1. FC Nürnberg,Q15786
 club:Q15789,club,바이에른 뮌헨,FC Bayern Munich,Q15789
-club:Q158121,club,운터하힝,SpVgg Unterhaching,Q158121
-club:Q1584904,club,Siirtspor,Siirtspor,Q1584904
-club:Q160532,club,파더보른 07,SC Paderborn 07,Q160532
-club:Q162251,club,하이덴하임,1. FC Heidenheim 1846,Q162251
-club:Q162317,club,로코모티프 라이프치히,1. FC Lokomotive Leipzig,Q162317
-club:Q16344,club,페루자 칼초,A.C. Perugia Calcio,Q16344
-club:Q1636012,club,Petrol Ofisi Spor,Petrol Ofisi Spor,Q1636012
-club:Q1636019,club,알라니아스포르,Alanyaspor,Q1636019
-club:Q1668203,club,Lommel SK,Lommel SK,Q1668203
-club:Q1668605,club,Kahramanmaraşspor,Kahramanmaraşspor,Q1668605
-club:Q1669847,club,K.F.C. Lommel S.K.,K.F.C. Lommel S.K.,Q1669847
-club:Q170105,club,슈투트가르터 키커스,Stuttgarter Kickers,Q170105
-club:Q170117,club,잉골슈타트 04,FC Ingolstadt 04,Q170117
-club:Q170134,club,발트호프 만하임,SV Waldhof Mannheim,Q170134
-club:Q172476,club,지롱댕 드 보르도,FC Girondins de Bordeaux,Q172476
 club:Q172567,club,베식타시,Beşiktaş J.K.,Q172567
-club:Q1753193,club,R.A.A. Louviéroise,R.A.A. Louviéroise,Q1753193
-club:Q1754163,club,S.C. Salgueiros,S.C. Salgueiros,Q1754163
-club:Q1757369,club,Yimpaş Yozgatspor,Yimpaş Yozgatspor,Q1757369
-club:Q1762119,club,우니앙,C.F. União,Q1762119
-club:Q176795,club,카르시야카,Karşıyaka S.K.,Q176795
-club:Q178180,club,오르두스포르,Orduspor,Q178180
-club:Q179930,club,Dardanel Spor A.Ş.,Dardanel Spor A.Ş.,Q179930
 club:Q180305,club,AS 모나코 FC,AS Monaco,Q180305
-club:Q1822470,club,Leça,Leça,Q1822470
 club:Q18232,club,헨트,KAA Gent,Q18232
-club:Q182876,club,오세르,AJ Auxerre,Q182876
-club:Q185163,club,니스,OGC Nice,Q185163
-club:Q18520,club,루턴 타운,Luton Town,Q18520
-club:Q1853273,club,S.C.U. Torreense,S.C.U. Torreense,Q1853273
 club:Q18656,club,맨체스터 유나이티드,Manchester United,Q18656
-club:Q18659,club,스완지 시티,Swansea City,Q18659
 club:Q18661,club,미들즈브러,Middlesbrough,Q18661
-club:Q18662,club,카디프 시티,Cardiff City,Q18662
 club:Q18708,club,풀럼,Fulham,Q18708
 club:Q18711,club,아스톤 빌라,Aston Villa,Q18711
 club:Q18716,club,뉴캐슬 유나이티드,Newcastle United,Q18716
 club:Q18721,club,노리치 시티,Norwich City,Q18721
-club:Q18723,club,퀸즈 파크 레인저스,Queens Park Rangers,Q18723
-club:Q18729,club,레딩,Reading,Q18729
 club:Q18732,club,사우샘프턴,Southampton,Q18732
-club:Q18736,club,스토크 시티,Stoke City,Q18736
 club:Q18739,club,선덜랜드,Sunderland,Q18739
 club:Q18741,club,토트넘 홋스퍼,Tottenham Hotspur,Q18741
-club:Q18744,club,웨스트브로미치 앨비언,West Bromwich Albion,Q18744
 club:Q18747,club,웨스트햄 유나이티드,West Ham United,Q18747
-club:Q18750,club,위건 애슬레틱,Wigan Athletic,Q18750
 club:Q187528,club,안데를레흐트,R.S.C. Anderlecht,Q187528
 club:Q1886,club,아탈란타,Atalanta BC,Q1886
-club:Q1891367,club,코빌량,S.C. Covilhã,Q1891367
 club:Q1893,club,볼로냐,Bologna F.C. 1909,Q1893
 club:Q1900,club,칼리아리 칼초,Cagliari Calcio,Q1900
-club:Q190561,club,스탕다르 리에주,Standard Liège,Q190561
 club:Q190916,club,클뤼프 브뤼허,Club Brugge K.V.,Q190916
-club:Q191264,club,알크마르,AZ Alkmaar,Q191264
-club:Q191843,club,랑스,R.C. Lens,Q191843
-club:Q192071,club,낭트,FC Nantes,Q192071
-club:Q192641,club,트라브존스포르,Trabzonspor,Q192641
-club:Q1933473,club,Sarıyer G.K.,Sarıyer G.K.,Q1933473
-club:Q193377,club,캉,Stade Malherbe Caen,Q193377
-club:Q1936034,club,S.C. Espinho,S.C. Espinho,Q1936034
-club:Q19442,club,반즐리,Barnsley,Q19442
-club:Q19444,club,버밍엄 시티,Birmingham City,Q19444
 club:Q19446,club,블랙번 로버스,Blackburn Rovers,Q19446
-club:Q19449,club,블랙풀,Blackpool,Q19449
-club:Q19451,club,볼턴 원더러스,Bolton Wanderers,Q19451
-club:Q19453,club,브라이턴 앤 호브 앨비언,Brighton & Hove Albion,Q19453
-club:Q19458,club,번리,Burnley,Q19458
-club:Q19462,club,찰턴 애슬레틱,Charlton Athletic,Q19462
 club:Q19467,club,크리스털 팰리스,Crystal Palace,Q19467
-club:Q19470,club,더비 카운티,Derby County,Q19470
-club:Q19473,club,허더즈필드 타운,Huddersfield Town,Q19473
-club:Q19477,club,헐 시티,Hull City,Q19477
 club:Q19481,club,레스터 시티,Leicester City,Q19481
-club:Q19482,club,윔블던,WIM,Q19482
-club:Q19487,club,밀월,Millwall,Q19487
-club:Q19490,club,노팅엄 포리스트,NFO,Q19490
-club:Q19498,club,셰필드 웬즈데이,SHW,Q19498
-club:Q19500,club,울버햄프턴 원더러스,Wolverhampton Wanderers,Q19500
-club:Q19509,club,스타드 렌,Stade Rennais,Q19509
-club:Q19512,club,소쇼 몽벨리아르,FC Sochaux-Montbéliard,Q19512
-club:Q19513,club,몽펠리에,Montpellier Hérault Sport Club,Q19513
 club:Q19516,club,릴,Lille OSC,Q19516
-club:Q19518,club,툴루즈,Toulouse,Q19518
-club:Q19521,club,생테티엔,AS Saint-Étienne,Q19521
-club:Q19523,club,낭시,A.S. Nancy-Lorraine,Q19523
-club:Q19568,club,본머스,AFC Bournemouth,Q19568
-club:Q19571,club,브렌트퍼드,Brentford,Q19571
-club:Q19580,club,코번트리 시티,COV,Q19580
-club:Q19585,club,샤를루아,Royal Charleroi S.C.,Q19585
-club:Q19598,club,노츠 카운티,Notts County,Q19598
-club:Q19601,club,올덤 애슬레틱,Oldham Athletic,Q19601
 club:Q19603,club,트벤터,FC Twente,Q19603
-club:Q19604,club,포츠머스,Portsmouth,Q19604
-club:Q19607,club,셰필드 유나이티드,Sheffield United,Q19607
-club:Q19613395,club,Çorum FK,Çorum FK,Q19613395
-club:Q196160,club,로얄 위니옹 생질루아즈,Royale Union Saint-Gilloise,Q196160
-club:Q19634,club,스윈던 타운,Swindon Town,Q19634
-club:Q197093,club,Zeytinburnuspor,Zeytinburnuspor,Q197093
-club:Q200321,club,헤이렌베인,SC Heerenveen,Q200321
-club:Q2018,club,칼초 카타니아,Catania,Q2018
-club:Q203573,club,부르사스포르,Bursaspor,Q203573
 club:Q2037,club,키에보베로나,AC ChievoVerona,Q2037
-club:Q20472948,club,Bodrum FK,Bodrum FK,Q20472948
-club:Q20473364,club,Gençlerbirliği Sports Club,Gençlerbirliği Sports Club,Q20473364
 club:Q2052,club,피오렌티나,ACF Fiorentina,Q2052
 club:Q2074,club,제노아,Genoa CFC,Q2074
-club:Q208228,club,스타드 드 랭스,Stade de Reims,Q208228
-club:Q208399,club,바스티아,SC Bastia,Q208399
-club:Q208585,club,비토리아 FC,Vitória F.C.,Q208585
-club:Q209509,club,그르노블 푸트 38,Grenoble Foot 38,Q209509
-club:Q20979061,club,RWDM,RWDM,Q20979061
-club:Q209895,club,스파르타 로테르담,Sparta Rotterdam,Q209895
-club:Q210864,club,르망,Le Mans,Q210864
-club:Q211401,club,레이리아,U.D. Leiria,Q211401
-club:Q212269,club,발랑시엔,Valenciennes,Q212269
 club:Q216032,club,헹크,K.R.C. Genk,Q216032
-club:Q216459,club,나시오날,C.D. Nacional,Q216459
-club:Q216503,club,마리티무,C.S. Marítimo,Q216503
-club:Q216510,club,벨레넨스스,C.F. Os Belenenses,Q216510
-club:Q216661,club,테네리페,C.D. Tenerife,Q216661
-club:Q218372,club,스타드 브레스트 29,Stade Brestois 29,Q218372
-club:Q219233,club,피테서,SBV Vitesse,Q219233
-club:Q2195773,club,로얄 엑셀 무스크롱,Royal Excel Mouscron,Q2195773
-club:Q219703,club,보아비스타,Boavista,Q219703
-club:Q219935,club,Zonguldak Kömürspor,Zonguldak Kömürspor,Q219935
-club:Q221525,club,메스,FC Metz,Q221525
-club:Q221927,club,더 흐라프스합,GRA,Q221927
-club:Q221940,club,로케런,K.S.C. Lokeren Oost-Vlaanderen,Q221940
-club:Q222837,club,아를 아비뇽,AC Arles,Q222837
-club:Q223450,club,비토리아 SC,Vitória S.C.,Q223450
 club:Q223620,club,데포르티보 알라베스,Deportivo Alavés,Q223620
-club:Q2268833,club,K Beerschot VA,K Beerschot VA,Q2268833
 club:Q22707,club,1899 호펜하임,TSG 1899 Hoffenheim,Q22707
-club:Q2312558,club,Racing White Daring Molenbeek,Racing White Daring Molenbeek,Q2312558
-club:Q2410944,club,아카데미코 드 비제우,Académico de Viseu,Q2410944
-club:Q2426819,club,Atlético Morelia,Atlético Morelia,Q2426819
-club:Q243235,club,아카데미카 드 코임브라,Associação Académica de Coimbra – O.A.F.,Q243235
-club:Q24680,club,위트레흐트,UTR,Q24680
-club:Q24689,club,펜로,VVV,Q24689
-club:Q24699,club,발베이크,RKC Waalwijk,Q24699
-club:Q24711,club,흐로닝언,FC Groningen,Q24711
-club:Q24719,club,로다,RJC,Q24719
-club:Q24904,club,덴하흐,ADO Den Haag,Q24904
-club:Q257984,club,힘나스틱 데 타라고나,Gimnàstic de Tarragona,Q257984
-club:Q2592492,club,K. Boom,K. Boom,Q2592492
 club:Q2609,club,라치오,SS Lazio,Q2609
 club:Q2641,club,나폴리,SSC Napoli,Q2641
-club:Q2658098,club,Schiedamse Voetbal Vereniging,Schiedamse Voetbal Vereniging,Q2658098
-club:Q2674,club,팔레르모,Palermo,Q2674
-club:Q2687689,club,R. Jet Wavre,R. Jet Wavre,Q2687689
-club:Q269151,club,즈볼러,PEC Zwolle,Q269151
 club:Q2693,club,파르마,Parma Calcio 1913,Q2693
-club:Q2694024,club,K.R.C. Zuid-West-Vlaanderen,K.R.C. Zuid-West-Vlaanderen,Q2694024
-club:Q270051,club,아작시오,A.C. Ajaccio,Q270051
-club:Q2710,club,페스카라 칼초,Delfino Pescara 1936,Q2710
-club:Q2714,club,왓퍼드,Watford,Q2714
-club:Q271574,club,레알 오비에도,Real Oviedo,Q271574
-club:Q272712,club,차이쿠르 리제스포르,Çaykur Rizespor,Q272712
 club:Q2739,club,로마,AS Roma,Q2739
-club:Q2756,club,시에나,Siena,Q2756
 club:Q2768,club,토리노,Torino,Q2768
 club:Q2798,club,우디네세 칼초,Udinese Calcio,Q2798
-club:Q285722,club,가지안테프스포르,Gaziantepspor,Q285722
-club:Q289482,club,몬차 브리안차,AC Monza,Q289482
-club:Q289613,club,피사,Pisa SC,Q289613
-club:Q289707,club,레자나,A.C. Reggiana 1919,Q289707
-club:Q290860,club,AD Fafe,AD Fafe,Q290860
-club:Q291297,club,카이세리 에르지예스포르,Kayseri Erciyesspor,Q291297
-club:Q291937,club,튀비즈,Royale Union Tubize-Braine,Q291937
-club:Q29390,club,메시나,A.C.R. Messina,Q29390
-club:Q2955908,club,F.C. Tirsense,F.C. Tirsense,Q2955908
-club:Q298217,club,아벨리노,U.S. Avellino 1912,Q298217
-club:Q298267,club,칸,AS Cannes,Q298267
-club:Q301332,club,카르데미르 카라뷔크스포르,Kardemir Karabükspor,Q301332
-club:Q303121,club,예니 말라티아스포르,Yeni Malatyaspor,Q303121
-club:Q309400,club,불로뉴,US Boulogne,Q309400
-club:Q318348,club,네이메헌,N.E.C.,Q318348
 club:Q32494,club,샬케 04,Schalke 04,Q32494
-club:Q328658,club,르아브르,LHV,Q328658
-club:Q332642,club,브레다,NAC,Q332642
-club:Q332664,club,빌럼 틸뷔르흐,Willem II,Q332664
-club:Q333838,club,에비앙 토농 가야르,Evian Thonon Gaillard,Q333838
-club:Q3347784,club,O Elvas C.A.D.,O Elvas C.A.D.,Q3347784
 club:Q33748,club,하노버 96,Hannover 96,Q33748
-club:Q340133,club,하제테페,Hacettepe S.K.,Q340133
-club:Q344328,club,이스탄불스포르,İstanbulspor A.Ş.,Q344328
-club:Q352251,club,아다나 데미르스포르,Adana Demirspor,Q352251
-club:Q352270,club,아다나스포르,Adanaspor,Q352270
-club:Q364698,club,세르클러 브뤼허,Cercle Brugge K.S.V.,Q364698
-club:Q370206,club,오스텐더,KV Oostende,Q370206
-club:Q370712,club,엑셀시오르,Excelsior Rotterdam,Q370712
-club:Q371136,club,파수스드페헤이라,F.C. Paços de Ferreira,Q371136
-club:Q372599,club,시바스스포르,Sivasspor,Q372599
-club:Q376635,club,쥘터 바레험,S.V. Zulte Waregem,Q376635
 club:Q38245,club,아인트라흐트 프랑크푸르트,Eintracht Frankfurt,Q38245
 club:Q41420,club,보루시아 도르트문트,Borussia Dortmund,Q41420
-club:Q417685,club,아크히사르 벨레디예스포르,Akhisar Belediyespor,Q417685
-club:Q424646,club,Akçaabat Sebatspor,Akçaabat Sebatspor,Q424646
-club:Q4285478,club,Çamlıdere Şekerspor,Çamlıdere Şekerspor,Q4285478
-club:Q430107,club,삼순스포르,Samsunspor,Q430107
-club:Q434929,club,알타이,Altay S.K.,Q434929
-club:Q43710,club,안탈리아스포르,Antalyaspor,Q43710
 club:Q4512,club,슈투트가르트,VfB Stuttgart,Q4512
-club:Q459148,club,갱강,En Avant de Guingamp,Q459148
-club:Q459794,club,피아첸차 칼초,Piacenza Calcio,Q459794
-club:Q460448,club,카디스,Cádiz Club de Fútbol,Q460448
-club:Q479351,club,다름슈타트 98,SV Darmstadt 98,Q479351
 club:Q483020,club,파리 생제르맹,Paris Saint-Germain,Q483020
-club:Q48879,club,브래드퍼드 시티,Bradford City,Q48879
-club:Q48911,club,로리앙,F.C. Lorient,Q48911
-club:Q48946,club,옥스퍼드 유나이티드,Oxford United,Q48946
-club:Q490586,club,몽스,R.A.E.C. Mons,Q490586
-club:Q492826,club,앙카라귀쥐,MKE Ankaragücü,Q492826
 club:Q495299,club,갈라타사라이,Galatasaray S.K.,Q495299
-club:Q501245,club,우니오네 베네치아,Venezia,Q501245
-club:Q501693,club,트루아,ES Troyes AC,Q501693
-club:Q503317,club,디종,Dijon FCO,Q503317
 club:Q50602,club,맨체스터 시티,Manchester City,Q50602
-club:Q508322,club,괴뇽,FC Gueugnon,Q508322
-club:Q509170,club,바슬란트-베베런,WAA,Q509170
-club:Q513237,club,코자엘리스포르,Kocaelispor,Q513237
-club:Q513840,club,콘야스포르,Konyaspor,Q513840
 club:Q51974,club,함부르거,Hamburger SV,Q51974
 club:Q51976,club,베르더 브레멘,SV Werder Bremen,Q51976
-club:Q520207,club,Diyarbakırspor,Diyarbakırspor,Q520207
-club:Q524378,club,바텐샤이트 09,SG Wattenscheid 09,Q524378
-club:Q536651,club,RAAL La Louvière,RAAL La Louvière,Q536651
-club:Q543467,club,샤베스,G.D. Chaves,Q543467
-club:Q556570,club,앙카라스포르,Ankaraspor,Q556570
-club:Q56542463,club,비첸차 비르투스,LR Vicenza,Q56542463
-club:Q576285,club,알바세테 발롬피에,Albacete Balompié,Q576285
 club:Q5794,club,에버턴,Everton,Q5794
-club:Q587509,club,베를링언-호이스든-졸더,K. Beringen-Heusden-Zolder,Q587509
-club:Q598083,club,KRC Mechelen,KRC Mechelen,Q598083
-club:Q6062228,club,Ümraniyespor,Ümraniyespor,Q6062228
-club:Q6080023,club,Vanspor,Vanspor,Q6080023
-club:Q608122,club,카이세리스포르,Kayserispor,Q608122
-club:Q608988,club,스당 아르덴,CS Sedan Ardennes,Q608988
-club:Q610621,club,카르피,A.C. Carpi,Q610621
-club:Q618620,club,코르트레이크,K.V. Kortrijk,Q618620
-club:Q621120,club,포르티모넨스,Portimonense S.C.,Q621120
-club:Q621259,club,올랴넨스,S.C. Olhanense,Q621259
-club:Q622432,club,히우 아브,Rio Ave,Q622432
-club:Q623730,club,레이숑이스,Leixões S.C.,Q623730
-club:Q626917,club,샤무아 니오르,Chamois Niortais,Q626917
-club:Q627334,club,가젤레크 아작시오,Gazélec Ajaccio,Q627334
-club:Q630227,club,S.C. Campomaiorense,S.C. Campomaiorense,Q630227
-club:Q630348,club,부자스포르,Bucaspor,Q630348
 club:Q631,club,인테르나치오날레 밀라노,Inter,Q631
-club:Q634829,club,이스토릴 프라이아,G.D. Estoril Praia,Q634829
-club:Q640726,club,뮐루즈,FC Mulhouse,Q640726
-club:Q641373,club,겐칠레르빌리이,Gençlerbirliği S.K.,Q641373
-club:Q643107,club,데니즐리스포르,Denizlispor,Q643107
-club:Q646079,club,베이르스홋,Beerschot A.C.,Q646079
-club:Q6463,club,장크트파울리,FC St. Pauli,Q6463
-club:Q648382,club,페인담,SC Veendam,Q648382
-club:Q652516,club,베네벤토 칼초,Benevento Calcio,Q652516
-club:Q653119,club,알메러 시티,ALM,Q653119
-club:Q657865,club,로그로녜스,CD Logroñés,Q657865
 club:Q6601875,club,페네르바흐체,Fenerbahçe Istanbul,Q6601875
-club:Q6630,club,아스콜리 칼초,Ascoli Calcio 1898,Q6630
-club:Q6641,club,바리,SSC Bari,Q6641
-club:Q6651,club,브레시아 칼초,Brescia Calcio,Q6651
-club:Q6664,club,체세나,AC Cesena,Q6664
-club:Q6690,club,크로토네,F.C. Crotone,Q6690
 club:Q6703,club,엠폴리,Empoli,Q6703
-club:Q671042,club,페이렌스,C.D. Feirense,Q671042
-club:Q6767,club,리보르노 칼초,US Livorno 1915,Q6767
-club:Q685182,club,K. Beerschot V.A.C.,K. Beerschot V.A.C.,Q685182
-club:Q688300,club,베이라마르,S.C. Beira-Mar,Q688300
-club:Q692691,club,엘페르스베르크,SV Elversberg,Q692691
-club:Q697353,club,살라망카,UD Salamanca,Q697353
-club:Q702455,club,라이프치히,RB Leipzig,Q702455
 club:Q704,club,올랭피크 리오네,OL,Q704
 club:Q7156,club,바르셀로나,FC Barcelona,Q7156
-club:Q725018,club,리르서,Lierse S.K.,Q725018
-club:Q730809,club,님 올랭피크,Nîmes Olympique,Q730809
 club:Q732002,club,로열 앤트워프,Royal Antwerp,Q732002
-club:Q732742,club,엑스트레마두라,CF Extremadura,Q732742
-club:Q738060,club,폴렌담,VOL,Q738060
-club:Q740637,club,산타클라라,C.D. Santa Clara,Q740637
-club:Q743557,club,카스테욘,CD Castellón,Q743557
-club:Q744353,club,파렌스,S.C. Farense,Q744353
-club:Q748445,club,에스키셰히르스포르,Eskişehirspor,Q748445
-club:Q749589,club,고 어헤드 이글스,GAE,Q749589
-club:Q75684,club,브라가,S.C. Braga,Q75684
 club:Q75729,club,스포르팅 CP,Sporting CP,Q75729
-club:Q759482,club,크레모네세,US Cremonese,Q759482
-club:Q760736,club,스타드 라발,Stade Lavallois,Q760736
-club:Q770740,club,에이바르,SD Eibar,Q770740
-club:Q792916,club,Aydınspor 1923,Aydınspor 1923,Q792916
-club:Q797530,club,이스트르,FC Istres,Q797530
-club:Q804557,club,Bakırköyspor,Bakırköyspor,Q804557
-club:Q805909,club,발리케시르스포르,Balıkesirspor,Q805909
 club:Q81888,club,아약스,AFC Ajax,Q81888
-club:Q824850,club,가지안테프,Gaziantep F.K.,Q824850
-club:Q837218,club,예이다,UE Lleida,Q837218
-club:Q838134,club,에스트렐라 다 아마도라,C.F. Estrela da Amadora,Q838134
-club:Q8408,club,모데나,Modena,Q8408
-club:Q8416,club,노바라 칼초,Novara Calcio,Q8416
-club:Q8428,club,칼초 파도바,Calcio Padova,Q8428
-club:Q845043,club,프로시노네 칼초,Frosinone Calcio,Q845043
-club:Q845067,club,샤토루,LB Châteauroux,Q845067
-club:Q845137,club,앙제,Angers SCO,Q845137
-club:Q846008,club,아소시아상 나발 1º 드 마이우,Associação Naval 1º de Maio,Q846008
 club:Q8466,club,카이저슬라우테른,1. FC Kaiserslautern,Q8466
-club:Q847587,club,살레르니타나,U.S. Salernitana 1919,Q847587
-club:Q8476,club,레지나 칼초,AS Reggina 1914,Q8476
-club:Q849139,club,베베런,K.S.K. Beveren,Q849139
-club:Q849544,club,베스테를로,K.V.C. Westerlo,Q849544
-club:Q852079,club,부르고스,Burgos,Q852079
-club:Q854141,club,하를럼,HFC Haarlem,Q854141
-club:Q854167,club,포르튀나 시타르트,Fortuna Sittard,Q854167
-club:Q856119,club,레가네스,CD Leganés,Q856119
-club:Q856416,club,메리다,CP Mérida,Q856416
-club:Q857938,club,이스탄불 바샥셰히르,İstanbul Başakşehir F.K.,Q857938
-club:Q8603,club,사수올로 칼초,US Sassuolo Calcio,Q8603
-club:Q8615,club,스페치아 칼초,Spezia Calcio,Q8615
 club:Q8639,club,엘라스 베로나,Hellas Verona,Q8639
-club:Q865735,club,무스크롱,Royal Excelsior Mouscron,Q865735
-club:Q866884,club,아미앵,Amiens SC,Q866884
 club:Q8682,club,레알 마드리드,Real Madrid Club de Fútbol,Q8682
 club:Q8687,club,아틀레틱 빌바오,Athletic Club,Q8687
 club:Q8701,club,아틀레티코 마드리드,Atlético Madrid,Q8701
-club:Q870182,club,클레르몽 푸트,Clermont Foot 63,Q870182
 club:Q8723,club,레알 베티스,Real Betis Balompié,Q8723
 club:Q8749,club,셀타 비고,RC Celta de Vigo,Q8749
-club:Q875120,club,캄뷔르,SC Cambuur,Q875120
-club:Q875169,club,덴보스,DBO,Q875169
 club:Q8760,club,데포르티보 라코루냐,Deportivo de A Coruña,Q8760
-club:Q876568,club,마스트리흐트,MVV,Q876568
 club:Q8780,club,에스파뇰,RCD Espanyol de Barcelona,Q8780
 club:Q8806,club,헤타페,Getafe,Q8806
-club:Q8812,club,그라나다,Granada,Q8812
 club:Q8823,club,레반테,Levante UD,Q8823
 club:Q8835,club,마요르카,RCD Mallorca,Q8835
 club:Q8857,club,말라가,Málaga,Q8857
-club:Q891679,club,Boluspor,Boluspor,Q891679
-club:Q916199,club,뢰번,Oud-Heverlee Leuven,Q916199
-club:Q925973,club,RFC Seraing,RFC Seraing,Q925973
-club:Q926438,club,질 비센트,Gil Vicente,Q926438
-club:Q929360,club,메르신 이드마니우르두,Mersin İdmanyurdu,Q929360
-club:Q929753,club,콤포스텔라,Sociedad Deportiva Compostela,Q929753
-club:Q961309,club,K.S.V. Waregem,K.S.V. Waregem,Q961309
 club:Q9616,club,첼시,Chelsea,Q9616
 club:Q9617,club,아스널,Arsenal,Q9617
-club:Q9653,club,입스위치 타운,IPS,Q9653
-club:Q967104,club,R.F.C. Seraing,R.F.C. Seraing,Q967104
-club:Q982889,club,라싱 클럽 드 프랑스,Racing Club de France Football,Q982889
 continent:africa,continent,아프리카,Africa,africa
 continent:asia,continent,아시아,Asia,asia
 continent:europe,continent,유럽,Europe,europe

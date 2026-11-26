@@ -37,6 +37,8 @@ export type FootballData = {
   honour_catalog: Row[]; manager_spells: Row[]; nation_continents: Row[]
   /** data/tiki-taka-toe/manual/short_names.csv (player_id,short_ko): 팀 동료·감독 머리칸 이름. 성 규칙보다 먼저 쓴다 */
   short_names?: Row[]
+  /** data/tiki-taka-toe/manual/clubs.csv (team_id,…,eur): 클럽 명단. 있으면 명단 클럽만 클럽 조건이 되고, eur=1인 클럽만 유럽 전체 테마에 나온다 */
+  club_pool?: Row[]
 }
 
 export const CONTINENTS = ['europe', 'south_america', 'north_america', 'africa', 'asia', 'oceania'] as const
@@ -136,7 +138,7 @@ function readCsv(file: string): Row[] {
 }
 
 /** dir: 축구 CSV 폴더. shortNames: 머리칸 짧은 이름 표(기본 dir/../tiki-taka-toe/manual/short_names.csv, 없으면 빈 표) */
-export function readFootballData(dir: string, shortNames = join(dir, '..', 'tiki-taka-toe', 'manual', 'short_names.csv')): FootballData {
+export function readFootballData(dir: string, shortNames = join(dir, '..', 'tiki-taka-toe', 'manual', 'short_names.csv'), clubPool = join(dir, '..', 'tiki-taka-toe', 'manual', 'clubs.csv')): FootballData {
   const f = (name: string) => readCsv(join(dir, `${name}.csv`))
   const honour_catalog = f('honour_catalog')
   return {
@@ -145,6 +147,7 @@ export function readFootballData(dir: string, shortNames = join(dir, '..', 'tiki
     honours: mergeHonours(f('honours'), f('honours_extra'), honour_catalog), honour_catalog,
     manager_spells: f('manager_spells'), nation_continents: readCsv(join(dir, 'manual', 'nation_continents.csv')),
     short_names: existsSync(shortNames) ? readCsv(shortNames) : [],
+    club_pool: existsSync(clubPool) ? readCsv(clubPool) : undefined,
   }
 }
 
@@ -213,6 +216,14 @@ export function buildConditions(d: FootballData, opts: { teammateAnchors?: numbe
   }
   const atClub = new Map<string, Set<string>>()
   for (const m of mems) add(atClub, m.team_id, m.player_id)
+  // 클럽 명단이 있으면: 명단 밖 클럽은 빼고, 유럽 전체(eur)는 eur=1 클럽만 (2026-11-26 사용자 결정 — 클럽이 너무 어렵다)
+  if (d.club_pool) {
+    const pool = new Map(d.club_pool.map((r) => [r.team_id, r.eur === '1']))
+    for (const [team, th] of clubThemes) {
+      if (!pool.has(team)) clubThemes.delete(team)
+      else if (!pool.get(team)) th.delete('eur')
+    }
+  }
   const clubList = [...clubThemes].filter(([team]) => atClub.has(team)).sort((a, b) => cmp(a[0], b[0]))
   const ko = clubLabels(new Map(clubList.map(([team]) => { const t = teams.get(team)!; return [team, t.name_ko || t.short_name || t.name_en] })), new Set(d.nations.map((n) => n.name_ko)))
   const en = clubLabels(new Map(clubList.map(([team]) => { const t = teams.get(team)!; return [team, t.short_name || t.name_en] })), new Set(d.nations.map((n) => n.name_en)))

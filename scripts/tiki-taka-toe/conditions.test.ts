@@ -243,6 +243,22 @@ describe('buildConditions', () => {
     expect(themes('nation:Q155')).toEqual(['eng', 'esp', 'ita', 'ger', 'eur'])
   })
 
+  test('club_pool_limits_themes', () => {
+    // 클럽 명단(data/tiki-taka-toe/manual/clubs.csv): 명단에 있는 클럽만, eur는 eur=1인 클럽만
+    const d = data({
+      season_memberships: ms('P2,1995,CJ', 'P3,1995,CA', 'P4,1995,CX'),
+      club_pool: [{ team_id: 'CJ', eur: '1' }, { team_id: 'CA', eur: '0' }],
+    })
+    const themes = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.themes
+    expect(themes('club:CJ')).toEqual(['ita', 'eur'])
+    expect(themes('club:CA')).toEqual(['eng'])
+    expect(themes('club:CX')).toBeUndefined()
+  })
+  test('club_pool_real_data', () => {
+    const pool = parseCsv(readFileSync(join(import.meta.dirname, '..', '..', 'data', 'tiki-taka-toe', 'manual', 'clubs.csv'), 'utf8'))
+    expect(pool.length).toBe(126)
+    expect(pool.filter((r) => r.eur === '1').length).toBe(49)
+  })
   test('empty_sets_are_dropped_and_ids_unique', () => {
     const r = buildConditions(data())
     const ids = r.conditions.map((c) => c.id)
