@@ -16,8 +16,12 @@ export const WET_BAND = 0.56
 export const FOAM_BAND = 0.53
 /** 이 값 이상 물가선 미만은 모래 띠 */
 export const SAND_BAND = 0.16
-/** 칸 가운데 이 거리(px) 안은 제 종류를 지킨다(1칸 섬·연못) */
+/** 물 칸 가운데 이 거리(px) 안은 물을 지킨다(1칸 연못) */
 const CORE_R = 5
+/** 땅 칸 가운데 이 반폭·반높이(px) 사각형 안은 땅을 지킨다: 발 사각형(10×6)이 칸 가운데에 늘 설 수 있게 */
+const LAND_CORE_HALF = { w: 6, h: 4 }
+/** 심지 밖으로 1px마다 풀리는 양 */
+const CORE_RAMP = 0.1
 const LAND_CORE_MAX = 0.45
 const WATER_CORE_MIN = 0.55
 
@@ -122,9 +126,16 @@ export function wetness(f: ShoreField, x: number, y: number): number {
   if (ctx === 'water' || ctx === 'land') {
     const tx = Math.floor(x / TILE)
     const ty = Math.floor(y / TILE)
-    const dx = x - (tx * TILE + TILE / 2)
-    const dy = y - (ty * TILE + TILE / 2)
-    if (dx * dx + dy * dy <= CORE_R * CORE_R) s = ctx === 'land' ? Math.min(s, LAND_CORE_MAX) : Math.max(s, WATER_CORE_MIN)
+    const dx = Math.abs(x - (tx * TILE + TILE / 2))
+    const dy = Math.abs(y - (ty * TILE + TILE / 2))
+    if (ctx === 'land') {
+      // 땅 심지: 발 사각형이 칸 가운데에 들어가는 사각형 안은 늘 땅, 밖으로 CORE_RAMP씩 풀린다(모서리가 각지지 않게)
+      const ox = Math.max(0, dx - LAND_CORE_HALF.w)
+      const oy = Math.max(0, dy - LAND_CORE_HALF.h)
+      s = Math.min(s, LAND_CORE_MAX + Math.hypot(ox, oy) * CORE_RAMP)
+    } else {
+      s = Math.max(s, WATER_CORE_MIN - Math.max(0, Math.hypot(dx, dy) - CORE_R) * CORE_RAMP)
+    }
   }
   return s
 }
