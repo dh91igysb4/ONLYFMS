@@ -1,7 +1,7 @@
 // 부드러운 물가: 칸 데이터에서 매끄러운 '물 정도' 값과 물체 발밑 사각형을 계산한다. 순수 모듈(DOM 없음).
 // 걷기(walk.ts)·그리기(scene.ts)·시험이 같은 값을 쓴다 — 그린 물가선(0.5)이 곧 걷기 경계다.
 // 서버 번들(map.ts)은 이 모듈을 import하지 않는다.
-import { tileAt, TILE, type MapDef, type Rect, type TileKind } from './map.ts'
+import { ALL_AREAS_OPEN, STATIC_DYNAMIC, isWalkable, tileAt, TILE, type MapDef, type Rect, type TileKind } from './map.ts'
 import { computeGround, type Ground } from './ground.ts'
 import { SPRITES } from './sprites.ts'
 import type { Tide } from './clock.ts'
@@ -38,6 +38,12 @@ export type ShoreField = {
   cls: readonly ShoreClass[]
   /** 칸 값: 물 1, 그 밖 0(walkwet은 점이 든 칸에 따라 정하므로 0으로 둔다) */
   val: Float32Array
+  /** 1이면 점이 든 칸에 따라 값을 정하는 칸: walkwet(부두 등)과 땅이 없는 고정 칸(절벽·동굴 벽 — 물은 물대로, 땅은 땅대로 붙는다) */
+  ctx: Uint8Array
+  /** footprintAt 캐시(칸 번호 → 사각형) */
+  fp: Map<number, Rect | null>
+  /** shoreBands 캐시(칸 번호 → 픽셀 값) */
+  bands: Map<number, Float32Array | null>
 }
 
 const WALKWET: ReadonlySet<TileKind> = new Set<TileKind>(['pier', 'bridge', 'dock', 'boardwalk', 'deck'])
@@ -66,18 +72,20 @@ export function shoreField(map: MapDef, tide: Tide): ShoreField {
   const ground = computeGround(map, t)
   const cls: ShoreClass[] = []
   const val = new Float32Array(map.w * map.h)
+  const ctxv = new Uint8Array(map.w * map.h)
   for (let ty = 0; ty < map.h; ty++) {
     for (let tx = 0; tx < map.w; tx++) {
       const i = ty * map.w + tx
       const kind = tileAt(map, tx, ty)!
       const g = ground[i]
       val[i] = g === 'water' && !WALKWET.has(kind) ? 1 : 0
+      if (WALKWET.has(kind) || (g === null && !nearTide(map, tx, ty))) ctxv[i] = 1
       if (FIXED_KINDS.has(kind) || nearTide(map, tx, ty) || g === null) cls.push('fixed')
       else if (WALKWET.has(kind)) cls.push('walkwet')
       else cls.push(g === 'water' ? 'water' : 'land')
     }
   }
-  const f: ShoreField = { map, tide: t, ground, cls, val }
+  const f: ShoreField = { map, tide: t, ground, cls, val, ctx: ctxv, fp: new Map(), bands: new Map() }
   byTide.set(t, f)
   return f
 }
@@ -104,7 +112,7 @@ const WY = [0, 0, 0, 0]
 
 /** 월드 px (x, y)의 물 정도(0~1). 점이 든 칸이 물이면 walkwet 칸을 물로, 아니면 땅으로 센다. 칸 심지는 제 종류를 지킨다 */
 export function wetness(f: ShoreField, x: number, y: number): number {
-  const { map, cls, val } = f
+  const { map, cls, val, ctx: useCtx } = f
   const ctx = cls[clampI(Math.floor(y / TILE), map.h) * map.w + clampI(Math.floor(x / TILE), map.w)]
   const wwVal = ctx === 'water' ? 1 : 0
   const u = x / TILE - 0.5
@@ -119,7 +127,7 @@ export function wetness(f: ShoreField, x: number, y: number): number {
     let r = 0
     for (let a = 0; a < 4; a++) {
       const i = row + clampI(iu - 1 + a, map.w)
-      r += WX[a] * (cls[i] === 'walkwet' ? wwVal : val[i])
+      r += WX[a] * (useCtx[i] ? wwVal : val[i])
     }
     s += WY[b] * r
   }
@@ -142,14 +150,14 @@ export function wetness(f: ShoreField, x: number, y: number): number {
 
 /** 2칸 안에 반대 값이 있으면 물가 후보(B-스플라인이 닿는 범위) */
 function mixedNear(f: ShoreField, tx: number, ty: number): boolean {
-  const { map, cls, val } = f
+  const { map, cls, val, ctx: useCtx } = f
   const ctx = cls[ty * map.w + tx]
   const ww = ctx === 'water' ? 1 : 0
   let lo = false
   let hi = false
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     const i = clampI(ty + dy, map.h) * map.w + clampI(tx + dx, map.w)
-    const v = cls[i] === 'walkwet' ? ww : val[i]
+    const v = useCtx[i] ? ww : val[i]
     if (v > 0.5) hi = true
     else lo = true
     if (hi && lo) return true
@@ -159,6 +167,16 @@ function mixedNear(f: ShoreField, tx: number, ty: number): boolean {
 
 /** 그 칸 256픽셀(행 우선, 픽셀 중심)의 물 정도. 고정·walkwet 칸, 또는 모든 픽셀이 칸 기본 띠와 같으면 null */
 export function shoreBands(f: ShoreField, tx: number, ty: number): Float32Array | null {
+  if (tx < 0 || ty < 0 || tx >= f.map.w || ty >= f.map.h) return null
+  const key = ty * f.map.w + tx
+  const hit = f.bands.get(key)
+  if (hit !== undefined) return hit
+  const out = computeBands(f, tx, ty)
+  f.bands.set(key, out)
+  return out
+}
+
+function computeBands(f: ShoreField, tx: number, ty: number): Float32Array | null {
   const c = shoreClassAt(f, tx, ty)
   if (c !== 'water' && c !== 'land') return null
   if (!mixedNear(f, tx, ty)) return null
@@ -219,8 +237,35 @@ function decoFootprint(sprite: string): Rect {
   return r
 }
 
-/** 물체 칸의 발밑(칸 안 px 사각형, Rect를 px 단위로). 물체 칸이 아니면 null */
+/** 물체 칸의 발밑(칸 안 px 사각형, Rect를 px 단위로). 물체 칸이 아니면 null.
+ * 이웃(상하좌우)이 막힌 칸(다른 물체·절벽·건물·맵 밖 — 물은 물가선이 맡는다)이면 그쪽 변까지 늘린다:
+ * 붙어 선 나무 줄·울타리 모서리 사이로 빠져나가지 않게 */
 export function footprintAt(f: ShoreField, tx: number, ty: number): Rect | null {
+  const key = ty * f.map.w + tx
+  const hit = f.fp.get(key)
+  if (hit !== undefined) return hit
+  const base = baseFootprint(f, tx, ty)
+  let r = base
+  if (base) {
+    const solid = (dx: number, dy: number) => {
+      const nx = tx + dx
+      const ny = ty + dy
+      if (nx < 0 || ny < 0 || nx >= f.map.w || ny >= f.map.h) return true
+      if (isWalkable(f.map, nx, ny, ALL_AREAS_OPEN, STATIC_DYNAMIC)) return false
+      return f.cls[ny * f.map.w + nx] !== 'water'
+    }
+    let x0 = base.tx, x1 = base.tx + base.w - 1, y0 = base.ty, y1 = base.ty + base.h - 1
+    if (solid(-1, 0)) x0 = 0
+    if (solid(1, 0)) x1 = TILE - 1
+    if (solid(0, -1)) y0 = 0
+    if (solid(0, 1)) y1 = TILE - 1
+    r = px(x0, x1, y0, y1)
+  }
+  f.fp.set(key, r)
+  return r
+}
+
+function baseFootprint(f: ShoreField, tx: number, ty: number): Rect | null {
   const kind = tileAt(f.map, tx, ty)
   if (kind === null) return null
   if (kind === 'fence') {

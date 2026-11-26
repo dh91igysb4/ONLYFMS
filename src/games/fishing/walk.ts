@@ -94,7 +94,8 @@ export function feetBlocked(map: MapDef, x: number, y: number, opened: Opened, d
       if (fp) {
         const fx0 = tx * TILE + fp.tx
         const fy0 = ty * TILE + fp.ty
-        if (x0 < fx0 + fp.w - EDGE_EPS && x1 > fx0 + EDGE_EPS && y0 < fy0 + fp.h - EDGE_EPS && y1 > fy0 + EDGE_EPS) return true
+        // 딱 맞닿기만 해도 막는다(발 높이 6px와 같은 틈으로 미끄러져 지나가지 않게)
+        if (x0 < fx0 + fp.w + EDGE_EPS && x1 > fx0 - EDGE_EPS && y0 < fy0 + fp.h + EDGE_EPS && y1 > fy0 - EDGE_EPS) return true
       }
     }
   }

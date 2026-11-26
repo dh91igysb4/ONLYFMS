@@ -283,3 +283,29 @@ describe('부드러운 물가·물체 발밑', () => {
     }
   })
 })
+
+describe('검토 수정: 물체 사이·울타리 모서리', () => {
+  const m = (rows: string[]) => defineMap('village', rows, { spots: { water: 'shore' } })
+  it('위아래로 붙은 나무 줄은 옆으로 빠져나갈 수 없다', () => {
+    const map = m([',T,', ',T,', ',T,'])
+    let p = player({ x: 8, y: TILE + 14 })
+    for (let i = 0; i < 60; i++) p = stepWalk(map, p, { x: 1, y: 0 }, 16, ALL_AREAS_OPEN)
+    expect(p.pos.x).toBeLessThan(TILE)
+  })
+  it('나무 줄 맨 아래 나무 밑(y11–15)에는 여전히 설 수 있다', () => {
+    const map = m([',T,', ',T,', ',,,'])
+    expect(feetBlocked(map, TILE + 8, TILE + 14.5, ALL_AREAS_OPEN)).toBe(false)
+  })
+  it('울타리 모서리 칸은 위 울타리 쪽 기둥 자리도 막는다', () => {
+    const map = m([',|,,', ',||,', ',,,,'])
+    expect(feetBlocked(map, TILE + 8, TILE + 4, ALL_AREAS_OPEN)).toBe(true)
+  })
+  it('발이 발밑 사각형에 딱 닿기만 해도 막힌다', () => {
+    const map = m([',,,', ',o,', ',,,'])
+    expect(feetBlocked(map, TILE + 8, TILE + 3, ALL_AREAS_OPEN)).toBe(true)
+  })
+  it('절벽 옆 물은 물가 띠 없이 물이다', () => {
+    const map = m(['ccc', '~~~', ',,,'])
+    expect(wetness(shoreField(map, 'high'), TILE + 8, TILE + 0.5)).toBeGreaterThanOrEqual(0.5)
+  })
+})

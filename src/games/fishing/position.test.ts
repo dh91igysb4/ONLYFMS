@@ -257,3 +257,25 @@ describe('부드러운 물가로 막힌 옛 저장 위치', () => {
     expect(loadPosition('u1')).toEqual({ area: 'lake', pos: center(t.tx, t.ty), facing: 'down' })
   })
 })
+
+describe('부드러운 물가로 막힌 내 섬 저장 위치', () => {
+  test('내 섬 오목한 물가에 저장된 위치는 그 칸 가운데에서 시작한다', async () => {
+    const { feetBlocked } = await import('./walk.ts')
+    const { ALL_AREAS_OPEN, isWalkable } = await import('./map.ts')
+    const { isleMap } = await import('./isle.ts')
+    const map = isleMap('crescent', 8)
+    let saved: { x: number; y: number } | null = null
+    for (let ty = 0; ty < map.h && !saved; ty++) for (let tx = 0; tx < map.w && !saved; tx++) {
+      if (!isWalkable(map, tx, ty, ALL_AREAS_OPEN)) continue
+      for (const [dx, dy] of [[3, 3], [13, 3], [3, 13], [13, 13]]) {
+        const p = { x: tx * TILE + dx, y: ty * TILE + dy }
+        if (feetBlocked(map, p.x, p.y, ALL_AREAS_OPEN)) { saved = p; break }
+      }
+    }
+    expect(saved).not.toBeNull()
+    const t = { tx: Math.floor(saved!.x / TILE), ty: Math.floor(saved!.y / TILE) }
+    const opened = new Set<AreaId>([...DEFAULT_AREAS, 'isle' as AreaId])
+    const got = startPosition({ area: 'isle' as AreaId, pos: saved!, facing: 'down' }, opened, { layout: 'crescent', cleared: 8 })
+    expect(got).toEqual({ area: 'isle', pos: center(t.tx, t.ty), facing: 'down' })
+  })
+})

@@ -110,12 +110,18 @@ describe('shoreBands', () => {
 
 describe('footprintAt', () => {
   it('나무 x4–12 y3–10, 바위 x1–14 y6–14, 세로 울타리 x5–11, 물체 아닌 칸 null', () => {
-    const m = map([',,,|,', ',T,|,', ',o,,,'])
+    const m = map([',,,,,', ',,,|,', ',T,|,', ',,,,,', ',o,,,', ',,,,,'])
     const f = shoreField(m, 'high')
-    expect(footprintAt(f, 1, 1)).toEqual({ tx: 4, ty: 3, w: 9, h: 8 })
-    expect(footprintAt(f, 1, 2)).toEqual({ tx: 1, ty: 6, w: 14, h: 9 })
-    expect(footprintAt(f, 3, 0)).toEqual({ tx: 5, ty: 0, w: 7, h: 16 })
+    expect(footprintAt(f, 1, 2)).toEqual({ tx: 4, ty: 3, w: 9, h: 8 })
+    expect(footprintAt(f, 1, 4)).toEqual({ tx: 1, ty: 6, w: 14, h: 9 })
+    expect(footprintAt(f, 3, 1)).toEqual({ tx: 5, ty: 0, w: 7, h: 16 })
     expect(footprintAt(f, 0, 0)).toBeNull()
+  })
+
+  it('막힌 이웃 쪽 변까지 늘린다(붙은 나무 줄)', () => {
+    const f = shoreField(map([',,,', ',T,', ',T,', ',,,']), 'high')
+    expect(footprintAt(f, 1, 1)).toEqual({ tx: 4, ty: 3, w: 9, h: 13 })
+    expect(footprintAt(f, 1, 2)).toEqual({ tx: 4, ty: 0, w: 9, h: 11 })
   })
 
   it('deco 발밑은 prop 스프라이트 불투명 영역 안이고 높이 ≤ 8', () => {
@@ -136,5 +142,12 @@ describe('footprintAt', () => {
       const b = opaqueBox(sprite)
       expect([ch, r.tx >= b.x0 && r.tx + r.w - 1 <= b.x1 && r.ty >= b.y0 && r.ty + r.h - 1 <= b.y1]).toEqual([ch, true])
     }
+  })
+})
+
+describe('shoreBands 캐시', () => {
+  it('같은 칸은 한 번만 계산한다(물 그림 두 장·땅 칸 두 경로)', () => {
+    const f = shoreField(map(Array(5).fill(',,,,,,~~~~~~')), 'high')
+    expect(shoreBands(f, 5, 2)).toBe(shoreBands(f, 5, 2))
   })
 })

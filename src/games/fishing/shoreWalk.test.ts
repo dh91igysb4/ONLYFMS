@@ -86,3 +86,41 @@ describe('모든 맵 걷기', () => {
     expect(bad).toEqual([])
   })
 })
+
+describe('픽셀 도달 범위', () => {
+  it('걸어서 닿는 모든 픽셀 자리에서 서 있는 칸이 걷는 칸이다', async () => {
+    const { standTile } = await import('./map.ts')
+    const bad: string[] = []
+    for (const { name, map } of cases) {
+      const W = map.w * TILE
+      const H = map.h * TILE
+      const seen = new Uint8Array(W * H)
+      const q: number[] = []
+      for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
+        if (!isWalkable(map, tx, ty, ALL_AREAS_OPEN)) continue
+        const i = (ty * TILE + 8) * W + tx * TILE + 8
+        if (!seen[i] && !feetBlocked(map, tx * TILE + 8, ty * TILE + 8, ALL_AREAS_OPEN)) { seen[i] = 1; q.push(i) }
+      }
+      let worst = ''
+      while (q.length) {
+        const i = q.pop()!
+        const x = i % W
+        const y = (i - x) / W
+        const st = standTile(map, { x, y })
+        if (!worst && !isWalkable(map, st.tx, st.ty, ALL_AREAS_OPEN)) worst = `${name} px(${x},${y}) → (${st.tx},${st.ty})`
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue
+          const j = ny * W + nx
+          if (seen[j]) continue
+          seen[j] = 1
+          if (!feetBlocked(map, nx, ny, ALL_AREAS_OPEN)) q.push(j)
+          else seen[j] = 2
+        }
+      }
+      if (worst) bad.push(worst)
+    }
+    expect(bad).toEqual([])
+  }, 120_000)
+})

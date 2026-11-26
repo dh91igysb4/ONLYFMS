@@ -83,6 +83,12 @@ function arrivalTiles(map: MapDef, opened: Opened): { tx: number; ty: number }[]
  */
 export function startPosition(saved: SavedPosition | null, opened: Opened, shape: IsleShape | null = null): SavedPosition {
   const map = saved && opened.has(saved.area) ? mapFor(saved.area, shape) : null
+  // 발 중심 칸은 걷는 칸인데 발이 막히면(부드러운 물가로 걷기 경계가 바뀐 옛 위치 — 내 섬·집은 parse가 맵을 모른다) 그 칸 가운데로
+  if (saved && map && feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
+    const t = tileOf(saved.pos)
+    const mid = { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 }
+    if (isWalkable(map, t.tx, t.ty, opened) && !feetBlocked(map, mid.x, mid.y, opened)) saved = { ...saved, pos: mid }
+  }
   if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
     const { tx, ty } = standTile(map, saved.pos)
     // 내 섬은 배로만 온다: 배에서 내리는 칸이 도착 칸
