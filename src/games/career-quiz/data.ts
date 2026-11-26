@@ -290,7 +290,7 @@ export const QUIZ: QuizRow[] = [
   ["Q276091","코케","Koke","hard",[[2009,null,"Atlético Madrid",0]]],
   ["Q21621168","후벵 디아스","Rúben Dias","hard",[[2017,2020,"Benfica",0],[2020,null,"Manchester City",0]]],
   ["Q29624459","스콧 맥토미니","Scott McTominay","hard",[[2017,2024,"Manchester United",0],[2024,null,"Napoli",0]]],
-  ["Q17274709","마이크 메냥","Mike Maignan","hard",[[2015,2021,"Lille",0],[2021,null,"AC Milan",0]]],
+  ["Q17274709","마이크 메냥","Mike Maignan","hard",[[2012,2015,"Paris Saint-Germain",0],[2015,2021,"Lille",0],[2021,null,"AC Milan",0]]],
   ["Q483629","마르코 판 바스턴","Marco van Basten","hard",[[1981,1987,"Ajax",0],[1987,1995,"AC Milan",0]]],
   ["Q173139","조지 웨아","George Weah","hard",[[1984,1985,"Bong Range United",0],[1985,1986,"Mighty Barrolle",0],[1986,1987,"Invincible Eleven",0],[1987,1988,"Tonnerre Yaoundé",0],[1988,1992,"Monaco",0],[1992,1995,"Paris Saint-Germain",0],[1995,2000,"AC Milan",0],[2000,2000,"Chelsea",1],[2000,2000,"Manchester City",0],[2000,2001,"Marseille",0],[2001,2003,"Al Jazira",0]]],
   ["Q483583","앨런 시어러","Alan Shearer","hard",[[1988,1992,"Southampton",0],[1992,1996,"Blackburn Rovers",0],[1996,2006,"Newcastle United",0]]],
