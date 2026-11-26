@@ -22,7 +22,7 @@ select throws_ok($$insert into public.ttt_condition_players values ('club:x-r', 
   '23503', null, 'unknown player rejected');
 select results_eq($$select daily, contest, free from public.game_modes where game_id = 'tiki-taka-toe'$$,
   $$values (false, false, false)$$, 'game_modes row');
-select ok(exists (select 1 from public.hidden_games where game_id = 'tiki-taka-toe'), 'hidden at first');
+select ok(not exists (select 1 from public.hidden_games where game_id = 'tiki-taka-toe'), 'public (20261126014942)');
 
 -- 칸 0(행 클럽 × 열 클럽)을 6명으로 늘려 예시가 5명에서 잘리는지 본다
 insert into public.football_players (id, name_ko, name_en, popularity) values
@@ -55,7 +55,7 @@ select is((
 ), 0, 'every cell answer set is the intersection');
 select is((select jsonb_array_length(p -> 'answers' -> 0) from pick), 6, 'cell 0 has 6 answers');
 select is((select p -> 'examples' -> 0 from pick),
-  '["킬리안 음바페","손흥민","가선수","김민수","John Doe"]'::jsonb, 'examples: top 5 by popularity, Korean name or English');
+  '["Kylian Mbappé","Son Heung-min","A Player","Kim Min-su","John Doe"]'::jsonb, 'examples: top 5 by popularity, English name');
 select is((select p -> 'answers' -> 5 from pick), '[]'::jsonb, 'empty cell is an empty array');
 
 set local role authenticated;

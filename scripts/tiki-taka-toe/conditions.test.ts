@@ -101,20 +101,20 @@ describe('buildConditions', () => {
     })
     const r = buildConditions(d)
     expect([...r.players.get('teammate:P1')!].sort()).toEqual(['P2', 'P5'])
-    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('이브라히모비치와 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_ko).toBe('Ibrahimović의 동료')
     expect(r.conditions.find((c) => c.id === 'teammate:P1')!.label_en).toBe('Played with Ibrahimović')
   })
 
-  test('teammate_label_surname_and_particle', () => {
+  test('teammate_label_english_surname', () => {
     const d = data({
       players: rows('id,name_ko,name_en,nation_id,popularity',
         'P1,데이비드 베컴,David Beckham,Q21,100', 'P2,네이마르,Neymar,Q155,100', 'P3,로빈 판 페르시,Robin van Persie,Q55,100', 'P4,선수 넷,Player Four,Q21,50'),
       season_memberships: ms('P1,2000,CA', 'P2,2000,CA', 'P3,2000,CA', 'P4,2000,CA'),
     })
     const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
-    expect(label('teammate:P1')).toBe('베컴과 뛴 선수') // 받침 있음 → 과
-    expect(label('teammate:P2')).toBe('네이마르와 뛴 선수') // 한 단어 이름은 그대로
-    expect(label('teammate:P3')).toBe('판 페르시와 뛴 선수') // 감독과 같은 성 규칙
+    expect(label('teammate:P1')).toBe('Beckham의 동료') // 선수 이름은 영어
+    expect(label('teammate:P2')).toBe('Neymar의 동료') // 한 단어 이름은 그대로
+    expect(label('teammate:P3')).toBe('van Persie의 동료') // 감독과 같은 성 규칙
     expect(surname('마르크안드레 테어 슈테겐')).toBe('테어 슈테겐')
     expect(surname('Marc-André ter Stegen')).toBe('ter Stegen')
   })
@@ -127,10 +127,10 @@ describe('buildConditions', () => {
       season_memberships: ms('P1,2000,CA', 'P2,2000,CA', 'P3,2000,CA', 'P5,2000,CA', 'P4,2000,CA'),
     })
     const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
-    expect(label('teammate:P1')).toBe('가가와와 뛴 선수') // 일본 이름은 성이 앞
-    expect(label('teammate:P2')).toBe('오카자키와 뛴 선수')
-    expect(label('teammate:P3')).toBe('다비드 실바와 뛴 선수') // 성이 겹치면 전체 이름
-    expect(label('teammate:P5')).toBe('치아구 실바와 뛴 선수')
+    expect(label('teammate:P1')).toBe('Kagawa의 동료') // 일본 이름은 영어로 이름이 앞
+    expect(label('teammate:P2')).toBe('Okazaki의 동료')
+    expect(label('teammate:P3')).toBe('David Silva의 동료') // 성이 겹치면 전체 이름
+    expect(label('teammate:P5')).toBe('Thiago Silva의 동료')
   })
 
   test('teammate_anchors_popularity_then_club_seasons', () => {
@@ -152,10 +152,10 @@ describe('buildConditions', () => {
       players: rows('id,name_ko,name_en,nation_id,popularity', 'P1,라울 곤살레스,Raúl,Q29,100', 'P2,선수 둘,Player Two,Q155,50'),
       season_memberships: ms('P1,1996,CA', 'P2,1996,CA'),
       manager_spells: rows('manager_id,team_id,from_season,to_season', 'Q47576,CA,1996,1996'),
-      short_names: rows('player_id,short_ko', 'P1,라울', 'Q47576,아르센'),
+      short_names: rows('player_id,short_ko,short_en', 'P1,라울,Raúl González', 'Q47576,아르센,'),
     })
     const label = (id: string) => buildConditions(d).conditions.find((c) => c.id === id)?.label_ko
-    expect(label('teammate:P1')).toBe('라울과 뛴 선수')
+    expect(label('teammate:P1')).toBe('Raúl González의 동료') // short_en이 먼저
     expect(label('manager:Q47576')).toBe('아르센 감독')
   })
 
@@ -320,8 +320,9 @@ describe('mergeHonours', () => {
 describe.runIf(existsSync(join(REAL, 'nations.csv')))('실데이터', () => {
   test('zlatan_is_teammate_anchor', () => {
     const r = buildConditions(readFootballData(REAL))
-    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('즐라탄과 뛴 선수')
-    expect(r.conditions.find((c) => c.id === 'teammate:Q11576')?.label_ko).toBe('라울과 뛴 선수')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q46896')?.label_ko).toBe('Zlatan의 동료')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q11576')?.label_ko).toBe('Raúl의 동료')
+    expect(r.conditions.find((c) => c.id === 'teammate:Q17500')?.label_ko).toBe('Xavi의 동료')
     // 짧은 이름 표의 id는 모두 팀 동료 기준 선수나 감독이고, 라벨은 겹치지 않는다
     const refs = new Set(r.conditions.filter((c) => c.kind === 'teammate' || c.kind === 'manager').map((c) => c.ref))
     const table = parseCsv(readFileSync(join(ROOT, 'data', 'tiki-taka-toe', 'manual', 'short_names.csv'), 'utf8'))

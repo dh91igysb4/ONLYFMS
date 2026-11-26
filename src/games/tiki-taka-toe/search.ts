@@ -25,7 +25,7 @@ export async function searchPlayers(q: string): Promise<PlayerHit[]> {
   await loadNations([...new Set(rows.map((r) => r.nation_id).filter((x): x is string => !!x))])
   return rows.map((r) => ({
     id: r.id,
-    name: r.name_ko || r.name_en,
+    name: r.name_en, // 선수 이름은 영어로만 보인다(검색은 한글로도 된다)
     nation: r.nation_id ? nationNames.get(r.nation_id) ?? null : null,
     birthYear: r.birth_year ?? null,
   }))
