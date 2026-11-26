@@ -132,3 +132,27 @@ export function parseManagerInfobox(t: string): { club: string; from: number; to
   }
   return out
 }
+
+/**
+ * 정보상자 선수 경력(성인 클럽만): yearsN · clubsN. youthyears·national_years·manageryears는 이름이 달라 잡히지 않는다.
+ * "→ [[클럽]] (loan)"은 임대. 링크 없는 칸(Total 등)과 연도 없는 칸은 뺀다. "2014–"·"present"는 아직 소속(to = null).
+ */
+export function parsePlayerInfobox(t: string): { club: string; from: number; to: number | null; loan: boolean }[] {
+  const s = stripRefs(stripComments(t))
+  const field = (kind: 'years' | 'clubs') => {
+    const m = new Map<number, string>()
+    for (const x of s.matchAll(new RegExp(`\\|\\s*${kind}(\\d+)\\s*=([^\\n]*)`, 'gi'))) m.set(Number(x[1]), x[2].trim())
+    return m
+  }
+  const years = field('years'), clubs = field('clubs')
+  const out: { club: string; from: number; to: number | null; loan: boolean }[] = []
+  for (const n of [...clubs.keys()].sort((a, b) => a - b)) {
+    const clubRaw = clubs.get(n)!, yr = plainText(years.get(n) ?? '')
+    const club = wikiLinks(clubRaw)[0]
+    const ys = [...yr.matchAll(/\d{4}/g)].map((x) => Number(x[0]))
+    if (!club || !ys.length) continue
+    const open = /[–\-—]\s*$|present/i.test(yr)
+    out.push({ club: normalizeTitle(club), from: ys[0], to: ys.length > 1 ? ys[1] : open ? null : ys[0], loan: /→|\(loan\)/i.test(clubRaw) })
+  }
+  return out
+}

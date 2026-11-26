@@ -89,6 +89,8 @@
 1. 축구 데이터가 바뀌면 `npm run football:seasons` → `npm run football:honours` → `npm run ttt:generate` 순서로 돌려 `data/tiki-taka-toe/*.csv`를 다시 만들고 커밋한다. 축구 적재는 빠진 선수를 지우지 않고 `retired`로 표시하므로 FK로 실패하지 않는다 — 다시 생성하기 전까지 그 선수는 계속 정답으로 남으니, 축구 데이터를 갱신하면 꼭 다시 생성한다.
 2. 머지 뒤 운영 DB에 마이그레이션을 적용하고 `DATABASE_URL='…' npm run ttt:load`로 통째 교체 적재한다 (축구 적재가 먼저). 로컬 확인은 `scripts/db-up.sh`의 `TEST_DB_URL`로 `football:load` → `ttt:load`.
 3. 판정 규칙(logic)이 바뀔 때만 `logic.version`을 올린다. 데이터만 바뀌면 올리지 않는다.
+4. 정답에서 빠진 선수(위키데이터 경력 날짜 없음)는 `npm run football:gaps` 보고서 → `data/football/manual/spells.csv`(+ 없는 선수는 `manual/legends.csv`, `npm run football:add-players`) → `football:seasons` → `football:honours` → `ttt:generate` (`data/football/README.md` "빠진 경력 보정").
+5. 선수 이름은 화면에 영어(`name_en`)로만 보인다(검색·칸·예시·동료 머리칸 `"<영어 짧은 이름>의 동료"`, 짧은 이름 예외는 `short_names.csv`의 `short_en`).
 
 ## 데이터 갱신 (후알야 `who-are-ya`)
 1. FotMob 스쿼드를 다시 수집해 `data/fotmob_squads.json`을 바꾼다.

@@ -58,6 +58,22 @@ npm run football:fetch -- --seasons 3 --to 2025         # 모든 리그를 2023~
 - 진행 표시: 선수 찾기는 묶음마다 `선수 찾기 (1987~) 40/316 — 아스널, 첼시 … — 새 선수 1,203명 (예: …)`처럼 클럽 이름과 새로 찾은 선수를 화면에 찍는다.
 - 시간: 전체 수집이 몇 시간 걸릴 수 있다. 끊기면 같은 명령을 다시 돌리면 캐시(`.cache/wikidata/`)로 이어진다.
 
+## 빠진 경력 보정 (날짜 없는 위키데이터 경력)
+
+위키데이터 경력에 시작일이 없으면 수집에서 빠지고, 그 팀에만 있던 선수는 아예 수집되지 않는다(예: 다빈손 산체스 토트넘). 아예 없는 경력도 있다(산체스 갈라타사라이).
+
+```bash
+npm run football:gaps            # 보고서 .cache/football-gaps.csv (위키데이터·영어 위키백과, 처음 20~30분, 데이터는 안 바꿈)
+# 보고서 줄을 보고 manual/spells.csv에 옮긴다(add 줄 모양 그대로). DB에 없는 선수(in_db=0)는 manual/legends.csv에도 넣는다
+npm run football:add-players     # legends.csv에 있지만 players.csv에 없는 선수만 받아 더한다(전체 수집 없이)
+npm run football:seasons         # manual/spells.csv 반영 + 시즌 소속
+npm run football:honours         # 선수 우승·엔트리 다시 계산(캐시)
+npm run ttt:generate
+```
+
+- 보고서는 인지도 70 이상 선수와, 티키타카토 클럽 명단(`data/tiki-taka-toe/manual/clubs.csv`)에 날짜 없는 경력이 있는 선수의 위키백과 정보상자 성인 클럽 경력을 spells.csv와 비교한다. 명단 클럽만 본다.
+- 정보상자는 연도만 있어 한 해짜리(`2004–2004`) 경력은 어느 반 시즌인지 알 수 없다. 2026-11-26 보정에서는 여러 해 경력만 옮겼다.
+
 ### Windows PowerShell에서 돌리기
 
 위키데이터는 Claude 환경에서 막혀 있어 수집은 사람이 돌린다. Git과 Node 22.18 이상이 필요하다(`git --version`, `node -v`).

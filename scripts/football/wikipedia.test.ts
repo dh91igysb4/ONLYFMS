@@ -1,6 +1,6 @@
 // 위키백과 Action API 클라이언트 (설계 2026-11-25-football-honours-design.md §3.3). 가짜 fetcher로 네트워크 없이 본다.
 import { expect, test } from 'vitest'
-import { titlesToQids, wikitext } from './wikipedia.ts'
+import { titlesToQids, wikitext, wikitexts } from './wikipedia.ts'
 
 const fakeFetch = (...bodies: unknown[]) => {
   let i = 0
@@ -31,4 +31,14 @@ test('rate_limited_then_ok', async () => {
 test('wikitext_missing_is_null', async () => {
   const fetcher = fakeFetch({ error: { code: 'missingtitle', info: "The page you specified doesn't exist." } })
   expect(await wikitext('Nope', null, fetcher, opts)).toBeNull()
+})
+test('wikitexts_batch_follows_redirects', async () => {
+  const fetcher = fakeFetch({ query: {
+    redirects: [{ from: 'Dávinson Sánchez', to: 'Davinson Sánchez' }],
+    pages: [
+      { title: 'Davinson Sánchez', revisions: [{ slots: { main: { content: 'A' } } }] },
+      { title: 'Nobody', missing: true },
+    ] } })
+  const m = await wikitexts(['Dávinson Sánchez', 'Nobody'], null, fetcher, opts)
+  expect([...m]).toEqual([['Dávinson Sánchez', { title: 'Davinson Sánchez', text: 'A' }]])
 })

@@ -18,6 +18,8 @@
     "football:seasons": "node scripts/football/derive-seasons.ts",
     "football:eras": "node scripts/football/find-eras.ts",
     "football:honours": "node scripts/football/fetch-honours.ts",
+    "football:gaps": "node scripts/football/find-gaps.ts",
+    "football:add-players": "node scripts/football/add-players.ts",
     "ttt:generate": "node scripts/tiki-taka-toe/generate.ts",
     "ttt:load": "bash scripts/tiki-taka-toe/load.sh"
   },
