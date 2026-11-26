@@ -13,6 +13,7 @@ import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
 import { isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
+import { SPRITES } from './sprites.ts'
 import { homeArrival, homeMap } from './home.ts'
 import { RIVER } from './maps/river.ts'
 import { FOREST } from './maps/forest.ts'
@@ -3688,6 +3689,27 @@ describe('내 섬 B단계: 캐기·작업대·개간 (설계 2026-11-26-my-isle-
     await flush()
     expect(calls('gather')[0]).toMatchObject({ payload: { type: 'gather', id: tree.id } })
     expect(screen.getByText('나무 +1')).toBeInTheDocument()
+  })
+
+  test('개간 구역 나무 앞: 살펴보기 → 작업대에서 개간하라는 안내(자원 칸이 아닌 나무)', async () => {
+    stubTouch()
+    const [k] = [...isleZoneTiles('crescent')].find(([key]) => {
+      const [x, y] = key.split(',').map(Number)
+      return near('crescent', 0, x, y) !== null
+    })!
+    const [x, y] = k.split(',').map(Number)
+    await mount(makeView({ isle: newIsle('crescent') }), near('crescent', 0, x, y))
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('살펴보기')
+    pointer('down', actionButton(), 3)
+    pointer('up', actionButton(), 3)
+    await advance(50)
+    expect(screen.getByText('작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요')).toBeInTheDocument()
+  })
+
+  test('자원 칸 표시 그림이 있다', () => {
+    expect(SPRITES['node-tree']).toBeTruthy()
+    expect(SPRITES['node-rock']).toBeTruthy()
   })
 
   test('오늘 이미 캤으면 안내', async () => {
