@@ -30,6 +30,7 @@ import {
   type Teleporter,
   type TileKind,
   type Vec,
+  standTile,
 } from './map.ts'
 import type { AreaId } from './data.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -935,5 +936,39 @@ describe('마을회관', () => {
       const [tx, ty] = k.split(',').map(Number)
       for (const f of FACINGS) expect(interactionAt(HALL, center(tx, ty), f, ALL_AREAS_OPEN)?.kind === 'fish').toBe(false)
     }
+  })
+})
+
+describe('standTile', () => {
+  const m = (rows: string[], opts: Parameters<typeof defineMap>[2] = {}) => defineMap('village', rows, { spots: { water: 'shore' }, ...opts })
+  const corner = m([',,,,,', ',,,,,', ',,~~~', ',,~~~', ',,~~~'])
+
+  it('걷는 칸이면 그 칸', () => {
+    expect(standTile(corner, { x: 1 * TILE + 3, y: 1 * TILE + 12 })).toEqual({ tx: 1, ty: 1 })
+  })
+
+  it('물 칸 안 둥근 땅이면 가장 가까운 걷는 이웃 칸(같은 거리면 위 먼저)', () => {
+    expect(standTile(corner, { x: 2 * TILE + 3, y: 2 * TILE + 3 })).toEqual({ tx: 2, ty: 1 })
+    expect(standTile(corner, { x: 2 * TILE + 2, y: 2 * TILE + 4 })).toEqual({ tx: 1, ty: 2 })
+  })
+
+  it('나무 칸 아래쪽이면 아래 칸, 위를 보면 그 나무 자원', () => {
+    const map = m([',,,', ',T,', ',,,'], { nodes: [{ id: 'n1', tx: 1, ty: 1, kind: 'tree' }] })
+    const pos = { x: TILE + 8, y: TILE + 14.5 }
+    expect(standTile(map, pos)).toEqual({ tx: 1, ty: 2 })
+    expect(interactionAt(map, pos, 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'node', id: 'n1', res: 'tree' })
+  })
+
+  it('물 칸 안 땅에서 물을 보면 낚시', () => {
+    expect(interactionAt(corner, { x: 2 * TILE + 3, y: 2 * TILE + 3 }, 'down', ALL_AREAS_OPEN)).toMatchObject({ kind: 'fish' })
+  })
+
+  it('castTarget은 standTile에서 센다', () => {
+    // (2,1)에 서 있는 셈: 아래로 던지면 물 칸 (2,2)부터 센다 — 맵 끝(4행)까지 물이라 끝 지점 그대로
+    const pos = { x: 2 * TILE + 3, y: 2 * TILE + 3 }
+    const t = castTarget(corner, pos, 'down', 0)
+    expect(t).toEqual({ x: pos.x, y: pos.y + 1.5 * TILE })
+    // 물 칸 (2,2) 바로 위가 서 있는 칸이라 막힘 없이 물: 앞 칸이 물이 아니면 그 앞 칸 가운데를 돌려줬을 것
+    expect(Math.floor(t.y / TILE)).toBe(3)
   })
 })

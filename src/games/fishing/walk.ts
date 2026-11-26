@@ -44,7 +44,7 @@ function tileBlocks(map: MapDef, f: ShoreField, tx: number, ty: number, opened: 
   if (isWalkable(map, tx, ty, opened, dyn)) return false
   const cls = f.cls[ty * map.w + tx]
   if (cls === 'water') return false
-  return !((cls === 'land' || cls === 'water') && footprintAt(f, tx, ty))
+  return !(cls === 'land' && footprintAt(f, tx, ty))
 }
 
 /** 물가 판정을 받는 칸(매끄럽게 하는 물·땅)에 든 점이면 물 정도로 본다 */

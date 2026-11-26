@@ -22,7 +22,7 @@ import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.t
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
 import { spriteDataUrl } from './sprites.ts'
 import {
-  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, STATIC_DYNAMIC, TILE, tileOf,
+  addHole, castTarget, interactionAt, MAX_HOLES, nearestDryTile, openExitAt, STATIC_DYNAMIC, standTile, TILE, tileOf,
   type Facing, type FameSlot, type Interaction, type MapDef, type MapDynamic, type Opened, type TileFacing, type Vec,
 } from './map.ts'
 import { mapFor } from './maps/index.ts'
@@ -341,7 +341,7 @@ function interactionFor(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, opened: 
 function mapHere(map: MapDef, p: Pick<Player, 'pos' | 'facing'>, resolve: (area: AreaId) => MapDef | null): { area: AreaId; tx: number; ty: number; facing: Facing } {
   // 세계 지도 밖 맵은 나가는 길을 따라 세계 지도 맵에 닿을 때까지 간다(집 안 → 섬 → 마을 선착장 앞). 선착장을 먼저 본다
   let m = map
-  let here: { area: AreaId; tx: number; ty: number; facing: Facing } = { area: map.id, ...tileOf(p.pos), facing: p.facing }
+  let here: { area: AreaId; tx: number; ty: number; facing: Facing } = { area: map.id, ...standTile(map, p.pos), facing: p.facing }
   for (let i = 0; i < 4 && !m.onWorldMap; i++) {
     const out = m.docks[0] ?? m.exits[0]
     if (!out) break
@@ -529,7 +529,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     // 꾸미기 모드(내 섬, 다른 행동이 없을 때): 앞 칸의 꾸미기는 치우기, 놓을 수 있는 땅은 놓기
     if (!at && decoModeRef.current && rt.map.id === 'isle' && rt.owner === null) {
       const sh = shapeOf(viewRef.current?.isle)
-      const { tx, ty } = tileOf(rt.player.pos)
+      const { tx, ty } = standTile(rt.map, rt.player.pos)
       const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[rt.player.facing]
       const fx = tx + dx
       const fy = ty + dy
@@ -853,7 +853,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
 
   /** 보고 있는 얼음 칸에 구멍을 뚫기 시작한다(DRILL_MS 뒤 구멍. 그동안 걷지 않는다) */
   function startDrill() {
-    const { tx, ty } = tileOf(rt.player.pos)
+    const { tx, ty } = standTile(rt.map, rt.player.pos, dynNow())
     const step = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[rt.player.facing]
     setNotice(null)
     rt.drill = { tx: tx + step[0], ty: ty + step[1], ms: 0 }
@@ -873,7 +873,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     // 발 사각형이 새 구멍에 걸쳐 있으면 서 있던 칸 가운데로 당긴다(그 칸은 늘 걸을 수 있다)
     const { pos } = rt.player
     if (feetBlocked(rt.map, pos.x, pos.y, opened, dynNow())) {
-      const t = tileOf(pos)
+      const t = standTile(rt.map, pos, dynNow())
       rt.player = { ...rt.player, pos: { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 } }
     }
   }
@@ -900,7 +900,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     const { pos } = rt.player
     if (!feetBlocked(rt.map, pos.x, pos.y, opened, dyn)) return
     // 진흙으로 이어진 땅이 없으면(맵 데이터 실수) 그 맵 시작 위치로: 물 위에 갇히지 않게
-    const dry = nearestDryTile(rt.map, tileOf(pos), opened) ?? tileOf(rt.map.spawn.pos)
+    const dry = nearestDryTile(rt.map, standTile(rt.map, pos, dyn), opened) ?? tileOf(rt.map.spawn.pos)
     startTransition(rt.map.id, { tx: dry.tx, ty: dry.ty, facing: rt.player.facing }, TIDE_IN_TEXT)
   }
 
@@ -1024,7 +1024,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       if (!isle) return
       if (menuRef.current === 'workbench') closeMenu()
       if (rt.map.id !== 'isle' || rt.owner !== null || rt.trans) return
-      const { tx, ty } = tileOf(rt.player.pos)
+      const { tx, ty } = standTile(rt.map, rt.player.pos)
       startTransition('isle', { tx, ty, facing: rt.player.facing }, `개간했어요 (${isle.cleared}/${ISLE_ZONES})`, { ...shapeOf(isle)!, owner: null })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
@@ -1048,7 +1048,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   }
   /** 앞 칸이 막혔을 때 발이 걸치지 않게 서 있는 칸 가운데로 옮긴다(가구·꾸미기를 놓은 뒤) */
   const snapToTile = () => {
-    const t = tileOf(rt.player.pos)
+    const t = standTile(rt.map, rt.player.pos)
     rt.player = { ...rt.player, pos: { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 }, moving: false, walkMs: 0 }
   }
   const placeFurn = (id: FurnId) => {
@@ -1268,7 +1268,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const t = Date.now()
       const p = rt.player
       const act = rt.phase === 'charging' || rt.phase === 'waiting' || rt.phase === 'bite' || rt.phase === 'fighting' ? 'fish' : 'walk'
-      presenceRef.current?.update({ id: profile.id, handle: profile.handle, area: place, act, ...tileOf(p.pos) }, t)
+      presenceRef.current?.update({ id: profile.id, handle: profile.handle, area: place, act, ...standTile(rt.map, p.pos) }, t)
       room.tick(t, {
         id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
         outfit: JSON.stringify(outfitOf(viewRef.current)),
