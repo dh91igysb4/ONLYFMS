@@ -5,7 +5,7 @@
 import { AREAS, type AreaId } from './data.ts'
 import { isleArrival, type IsleShape } from './isle.ts'
 import { homeArrival } from './home.ts'
-import { ALL_AREAS_OPEN, nearestDryTile, reachableTiles, TILE, tileOf, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
+import { ALL_AREAS_OPEN, isWalkable, nearestDryTile, reachableTiles, standTile, TILE, tileOf, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
 import { mapFor } from './maps/index.ts'
 import { VILLAGE } from './maps/village.ts'
 import { feetBlocked } from './walk.ts'
@@ -33,6 +33,10 @@ function parse(raw: string | null): SavedPosition | null {
   // 발이 걸을 수 없는 타일에 걸친 채로 시작하면 영영 움직일 수 없다.
   // 여기서는 맵만 본다(모든 지역이 열린 것으로). 아직 안 연 지역·문 칸인지는 화면이 열린 지역으로 다시 본다
   if (!feetBlocked(map, x, y, ALL_AREAS_OPEN)) return { area: map.id, pos: { x, y }, facing: facing as Facing }
+  // 발 중심 칸은 걷는 칸인데 발이 막히면(부드러운 물가로 걷기 경계가 바뀐 옛 위치 등) 그 칸 가운데에서 시작한다
+  const here = tileOf({ x, y })
+  const mid = { x: here.tx * TILE + TILE / 2, y: here.ty * TILE + TILE / 2 }
+  if (isWalkable(map, here.tx, here.ty, ALL_AREAS_OPEN) && !feetBlocked(map, mid.x, mid.y, ALL_AREAS_OPEN)) return { area: map.id, pos: mid, facing: facing as Facing }
   // 물때 맵의 진흙 위(썰물에 저장): 지금 물때를 모르니 늘 가장 가까운 늘 걷는 칸에 세운다(썰물이면 다시 걸어 들어가면 된다)
   if (map.tidal && !feetBlocked(map, x, y, ALL_AREAS_OPEN, LOW_TIDE)) {
     const dry = nearestDryTile(map, tileOf({ x, y }), ALL_AREAS_OPEN)
@@ -79,8 +83,14 @@ function arrivalTiles(map: MapDef, opened: Opened): { tx: number; ty: number }[]
  */
 export function startPosition(saved: SavedPosition | null, opened: Opened, shape: IsleShape | null = null): SavedPosition {
   const map = saved && opened.has(saved.area) ? mapFor(saved.area, shape) : null
+  // 발 중심 칸은 걷는 칸인데 발이 막히면(부드러운 물가로 걷기 경계가 바뀐 옛 위치 — 내 섬·집은 parse가 맵을 모른다) 그 칸 가운데로
+  if (saved && map && feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
+    const t = tileOf(saved.pos)
+    const mid = { x: t.tx * TILE + TILE / 2, y: t.ty * TILE + TILE / 2 }
+    if (isWalkable(map, t.tx, t.ty, opened) && !feetBlocked(map, mid.x, mid.y, opened)) saved = { ...saved, pos: mid }
+  }
   if (saved && map && !feetBlocked(map, saved.pos.x, saved.pos.y, opened)) {
-    const { tx, ty } = tileOf(saved.pos)
+    const { tx, ty } = standTile(map, saved.pos)
     // 내 섬은 배로만 온다: 배에서 내리는 칸이 도착 칸
     const arrivals = saved.area === 'isle' && shape ? [isleArrival(shape.layout)]
       : saved.area === 'home' && shape ? [homeArrival(shape.house ?? 0)]

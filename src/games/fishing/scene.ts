@@ -10,6 +10,8 @@ import { SPRITES, drawSprite, drawSpriteData, type Sprite } from './sprites.ts'
 import { composePose, decodeOutfit, playerSprites } from './outfit.ts'
 import { FAME_ROW, type FameFrame } from './fame.ts'
 import type { Outfit } from './wardrobe.ts'
+import { computeGround, ON_NEIGHBOUR_GROUND, WATER_GROUND, type Ground } from './ground.ts'
+import { FOAM_BAND, SAND_BAND, SHORE_LINE, WET_BAND, shoreBands, shoreClassAt, shoreField, type ShoreField } from './shore.ts'
 import { formatClock, isSnow, nightLevel, type Conditions, type Tide } from './clock.ts'
 
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
@@ -237,67 +239,8 @@ function hash(a: number, b: number): number {
 
 // ── 땅: 타일 아래 깔리는 바탕 ────────────────────────────────────
 
-/** cave: 동굴 바닥·입구. 풀 가장자리를 받지도 주지도 않고, 물에 모래 거품을 만들지 않는다. snow: 눈 땅(물가에 눈 턱) */
-type Ground = 'water' | 'sand' | 'grass' | 'cave' | 'snow'
-
-// 땅이 물로 치는 타일: 바다·강·연못·웅덩이·폭포·호수·동굴 물·수정·용암·석호, 부두·다리·선착장(아래가 물).
-// 물가 거품·풀 가장자리 규칙이 그대로 적용된다.
-const WATER_GROUND: ReadonlySet<TileKind> = new Set<TileKind>([
-  'water', 'river', 'pond', 'basin', 'falls', 'pier', 'bridge', 'lake', 'cave-pool', 'crystal', 'lava', 'lagoon', 'dock',
-  'creek', 'marsh', 'bog', 'boardwalk',
-  // 낚시 5부 M3: 온천·심해, 갑판·선체·돛대(난파선은 바다 위에 떠 있다 — 둘레 바다에 모래 거품이 생기지 않게)
-  'hotspring', 'deep', 'deck', 'hull', 'mast',
-])
-
-function baseGround(map: MapDef, tx: number, ty: number, tide: Tide = 'high'): Ground | null {
-  const kind = tileAt(map, tx, ty)
-  if (kind === null || kind === 'rock' || kind === 'reed' || kind === 'deadtree' || kind === 'cliff' || kind === 'cave-wall') return null
-  // 진흙: 밀물이면 물(물가 거품을 받는다), 썰물이면 모래처럼(둘레 물에 젖은 띠·거품)
-  if (kind === 'mud') return tide === 'high' ? 'water' : 'sand'
-  // 얼음은 눈 땅으로 친다(얼음판 가의 바위·갈대가 눈 위에 놓이게). 얼음 칸 자체는 drawTile이 따로 그린다
-  if (kind === 'ice' || kind === 'snow' || kind === 'snowpine') return 'snow'
-  if (WATER_GROUND.has(kind)) return 'water'
-  if (kind === 'sand' || kind === 'palm') return 'sand'
-  if (kind === 'cave-floor' || kind === 'cave-mouth') return 'cave'
-  return 'grass'
-}
-
-/** 이웃 물 그림을 빌려 쓰는 타일: 바위, 갈대·고사목(늪 속 갈대는 늪물 위에) */
-const ON_NEIGHBOUR_GROUND: ReadonlySet<TileKind> = new Set<TileKind>(['rock', 'reed', 'deadtree'])
-
-/** 바위는 이웃 땅 중 가장 많은 것 위에 놓는다(같으면 모래 > 풀 > 물 > 동굴). */
-function rockGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
-  const count: Record<Ground, number> = { sand: 0, grass: 0, water: 0, cave: 0, snow: 0 }
-  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-    const g = baseGround(map, tx + dx, ty + dy, tide)
-    if (g) count[g]++
-  }
-  let best: Ground = 'sand'
-  for (const g of ['grass', 'water', 'cave', 'snow'] as Ground[]) if (count[g] > count[best]) best = g
-  return best
-}
-
-/** 갈대·고사목: 이웃에 땅(풀 > 모래 > 동굴)이 하나라도 있으면 그 땅, 모두 물이면 물(늪 한가운데 갈대) */
-function tallGround(map: MapDef, tx: number, ty: number, tide: Tide): Ground {
-  const near = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([dx, dy]) => baseGround(map, tx + dx, ty + dy, tide))
-  for (const g of ['grass', 'sand', 'cave', 'snow'] as Ground[]) if (near.includes(g)) return g
-  return near.includes('water') ? 'water' : 'grass'
-}
-
-/** 맵 전체의 바탕 땅(행 우선). 맵 캐시와 함께 만들고 버린다. */
-function computeGround(map: MapDef, tide: Tide): (Ground | null)[] {
-  const ground: (Ground | null)[] = []
-  for (let ty = 0; ty < map.h; ty++) {
-    for (let tx = 0; tx < map.w; tx++) {
-      const kind = tileAt(map, tx, ty)
-      ground.push(kind === 'rock' ? rockGround(map, tx, ty, tide) : kind === 'reed' || kind === 'deadtree' ? tallGround(map, tx, ty, tide) : baseGround(map, tx, ty, tide))
-    }
-  }
-  return ground
-}
-
 /** 그리기에 쓰는 맵 + 계산해 둔 땅. tide는 진흙 그림을 정한다(물때 없는 맵은 늘 'high') */
-type MapGfx = { map: MapDef; ground: readonly (Ground | null)[]; tide: Tide }
+type MapGfx = { map: MapDef; ground: readonly (Ground | null)[]; tide: Tide; field: ShoreField }
 
 function groundAt(g: MapGfx, tx: number, ty: number): Ground | null {
   if (tx < 0 || ty < 0 || tx >= g.map.w || ty >= g.map.h) return null
@@ -448,6 +391,91 @@ function waterSpriteAt(map: MapDef, tx: number, ty: number): string {
   return best
 }
 
+// ── 부드러운 물가(픽셀) ─────────────────────────────────────────
+
+const ORTHO_FIRST: readonly [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+
+/** 스프라이트 (i, j) 픽셀 색. 투명이면 null */
+function spriteColor(name: string, i: number, j: number): string | null {
+  const s = SPRITES[name]
+  if (!s) return null
+  const ch = s.rows[j]?.[i]
+  return ch === undefined || ch === '.' || ch === ' ' ? null : (s.palette[ch] ?? null)
+}
+
+/** 둘레(3×3, 없으면 5×5)에서 cls가 want인 가장 가까운 칸 */
+function nearestOfClass(g: MapGfx, tx: number, ty: number, want: 'water' | 'land'): { tx: number; ty: number } | null {
+  for (const [dx, dy] of ORTHO_FIRST) if (shoreClassAt(g.field, tx + dx, ty + dy) === want) return { tx: tx + dx, ty: ty + dy }
+  for (let r = 2; r <= 2; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (shoreClassAt(g.field, tx + dx, ty + dy) === want) return { tx: tx + dx, ty: ty + dy }
+  }
+  return null
+}
+
+/** 땅 칸의 기본 그림 이름(물가 픽셀에서 '원래 땅'으로 쓴다) */
+function landSprite(g: MapGfx, tx: number, ty: number, ground: Ground): string {
+  const kind = tileAt(g.map, tx, ty)
+  if (kind === 'path') return 'tile-path'
+  if (kind === 'flower') return 'tile-flower'
+  if (ground === 'snow') return hash(tx, ty) % 6 === 0 ? 'tile-snow-drift' : 'tile-snow'
+  if (ground === 'cave') return 'tile-cave-floor'
+  if (ground === 'sand') return 'tile-sand'
+  return hash(tx, ty) % 4 === 0 ? 'tile-grass-alt' : 'tile-grass'
+}
+
+/**
+ * 물가 칸 픽셀 덧그리기. 칸의 기본 그림(물 칸은 물, 땅 칸은 땅)은 이미 그려져 있고, 기본과 다른 띠의 픽셀만 칠한다.
+ * v ≥ WET_BAND 물, SHORE_LINE~FOAM_BAND 젖은 모래(눈은 눈 턱, 늪은 사초), FOAM_BAND~WET_BAND 거품 점선, SAND_BAND~SHORE_LINE 모래 띠(눈·동굴은 제 땅), 그 아래 원래 땅.
+ * 늪·수렁 물가는 모래 띠 없이 풀, 젖은 띠는 사초 색(늪지에 모래사장이 생기지 않게).
+ * 같은 색이 이어지는 가로 구간은 사각형 하나로.
+ */
+function drawShorePixels(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number, bands: Float32Array): void {
+  const isWater = shoreClassAt(g.field, tx, ty) === 'water'
+  const frame = (k + tx + ty * 3) % 2
+  const wt = isWater ? { tx, ty } : nearestOfClass(g, tx, ty, 'water')
+  const waterName = `${wt ? waterSpriteAt(g.map, wt.tx, wt.ty) : 'water'}-${frame}`
+  const lt = isWater ? nearestOfClass(g, tx, ty, 'land') : { tx, ty }
+  const lg = (lt && groundAt(g, lt.tx, lt.ty)) || 'sand'
+  const land: Ground = lg === 'water' ? 'sand' : lg
+  const native = lt ? landSprite(g, lt.tx, lt.ty, land) : 'tile-sand'
+  // 늪·수렁 물가: 모래 띠 없이 풀, 젖은 띠는 물가 풀(사초) 색
+  const sedgy = waterName.startsWith('marsh') || waterName.startsWith('bog')
+  const x0 = tx * TILE
+  const y0 = ty * TILE
+  for (let j = 0; j < TILE; j++) {
+    let runColor: string | null = null
+    let runStart = 0
+    const flush = (end: number) => {
+      if (runColor) rect(ctx, x0 + runStart, y0 + j, end - runStart, 1, runColor)
+      runColor = null
+    }
+    for (let i = 0; i < TILE; i++) {
+      const v = bands[j * TILE + i]
+      let color: string | null
+      if (isWater ? v >= WET_BAND : v < SAND_BAND) color = null // 이미 그린 기본 그림
+      else if (v >= WET_BAND) color = spriteColor(waterName, i, j)
+      else if (v >= SHORE_LINE) {
+        if (land === 'cave') color = spriteColor(waterName, i, j)
+        else if (sedgy) color = v < FOAM_BAND ? C.sedge : C.sedgeDark
+        else if (land === 'snow') color = v < FOAM_BAND ? C.snowLip : C.snowShade
+        else if (v < FOAM_BAND) color = C.sandWet
+        else color = foamOn(x0 + i + y0 + j, k) ? C.foam : spriteColor(waterName, i, j)
+      } else if (v >= SAND_BAND) color = sedgy && !isWater ? null : spriteColor((land === 'sand' || land === 'grass') && !sedgy ? 'tile-sand' : native, i, j)
+      else color = spriteColor(native, i, j)
+      if (color === null) {
+        flush(i)
+        continue
+      }
+      if (color !== runColor) {
+        flush(i)
+        runColor = color
+        runStart = i
+      }
+    }
+    flush(TILE)
+  }
+}
+
 /** 칸 하나: 땅 → 물가 거품·풀 가장자리 → 위에 얹는 것(나무·야자수 밑동·바위·울타리·부두·선착장 판자). 모두 자기 칸 안에 그린다. */
 function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: number, k: number): void {
   const kind = tileAt(g.map, tx, ty)
@@ -492,10 +520,14 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     // 늪 칸 몇 곳(칸마다 고정)은 연잎이 뜬 그림
     const name = kind === 'marsh' && hash(tx, ty) % 9 === 0 ? 'marsh-lily' : waterSpriteAt(g.map, tx, ty)
     drawSprite(ctx, `${name}-${(k + tx + ty * 3) % 2}`, x, y, 1)
-    drawShoreEdges(ctx, g, tx, ty, k)
-    drawSnowEdges(ctx, g, tx, ty)
-    if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
-    if (kind === 'marsh') drawSedgeFringe(ctx, g, tx, ty)
+    const bands = shoreBands(g.field, tx, ty)
+    if (bands) drawShorePixels(ctx, g, tx, ty, k, bands)
+    else {
+      drawShoreEdges(ctx, g, tx, ty, k)
+      drawSnowEdges(ctx, g, tx, ty)
+      if (kind === 'bog') drawBogRim(ctx, g, tx, ty)
+      if (kind === 'marsh') drawSedgeFringe(ctx, g, tx, ty)
+    }
   } else if (ground === 'snow') {
     // 칸 몇 곳(칸마다 고정)은 바람에 쌓인 눈더미 결
     drawSprite(ctx, hash(tx, ty) % 6 === 0 ? 'tile-snow-drift' : 'tile-snow', x, y, 1)
@@ -506,6 +538,11 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
     drawGrassFringe(ctx, g, tx, ty)
   } else {
     drawSprite(ctx, hash(tx, ty) % 4 === 0 ? 'tile-grass-alt' : 'tile-grass', x, y, 1)
+  }
+  // 물가 땅 칸: 그린 땅 위에 물·젖은 띠·모래 띠 픽셀을 덧그린다(걷기 판정과 같은 물 정도 값)
+  if (ground !== 'water') {
+    const bands = shoreBands(g.field, tx, ty)
+    if (bands) drawShorePixels(ctx, g, tx, ty, k, bands)
   }
 
   const tall = TALL_SPRITE[kind]
@@ -792,7 +829,7 @@ function mapCache(map: MapDef, tide: Tide = 'high'): Cache {
   const t: Tide = map.tidal ? tide : 'high'
   if (!cache || cache.gfx.map.id !== map.id || cache.gfx.map !== map || cache.gfx.tide !== t) {
     disposeCache(cache)
-    const gfx: MapGfx = { map, ground: computeGround(map, t), tide: t }
+    const gfx: MapGfx = { map, ground: computeGround(map, t), tide: t, field: shoreField(map, t) }
     const first = renderFrame(gfx, 0)
     cache = { gfx, frames: first ? [first] : null }
   } else if (cache.frames && cache.frames.length < 2) {

@@ -94,11 +94,11 @@ describe('position', () => {
     expect(loadPosition('u1')).toBeNull()
   })
 
-  test('a position whose feet overlap an unwalkable tile gives null even if its centre tile is walkable', () => {
-    // 부두 끝 타일 가운데에서 왼쪽으로 7px: 중심은 부두지만 발(폭 10) 왼쪽이 물에 걸친다
+  test('a position whose feet overlap an unwalkable tile restores at its (walkable) centre tile', () => {
+    // 부두 끝 타일 가운데에서 왼쪽으로 7px: 중심은 부두지만 발(폭 10) 왼쪽이 물에 걸친다 → 그 칸 가운데
     const end = center(PIER_END.tx, PIER_END.ty)
     savePosition('u1', { area: 'village', pos: { x: end.x - 7, y: end.y }, facing: 'down' })
-    expect(loadPosition('u1')).toBeNull()
+    expect(loadPosition('u1')).toEqual({ area: 'village', pos: end, facing: 'down' })
     // 발이 타일 안에 딱 맞으면(왼쪽 변이 경계) 괜찮다
     savePosition('u1', { area: 'village', pos: { x: end.x - 3, y: end.y }, facing: 'down' })
     expect(loadPosition('u1')).not.toBeNull()
@@ -235,5 +235,47 @@ describe('내 섬 위치(내 섬 설계 §5.5)', () => {
   })
   test('섬의 막힌 칸(바다)·닿지 못하는 칸은 마을 시작', () => {
     expect(startPosition({ ...onIsle, pos: center(0, 0) }, opened, { layout: 'twin' })).toEqual(AT_SPAWN)
+  })
+})
+
+describe('부드러운 물가로 막힌 옛 저장 위치', () => {
+  test('저장 위치가 새 판정에서 막히면 그 (걷는) 칸 가운데로 맞춘다', async () => {
+    const { feetBlocked } = await import('./walk.ts')
+    const { ALL_AREAS_OPEN, isWalkable } = await import('./map.ts')
+    // 호수 맵에서 걷는 칸 안인데 새 판정으로 막히는 자리(오목한 물가)를 찾는다
+    let saved: { x: number; y: number } | null = null
+    for (let ty = 0; ty < LAKE.h && !saved; ty++) for (let tx = 0; tx < LAKE.w && !saved; tx++) {
+      if (!isWalkable(LAKE, tx, ty, ALL_AREAS_OPEN)) continue
+      for (const [dx, dy] of [[3, 3], [13, 3], [3, 13], [13, 13]]) {
+        const p = { x: tx * TILE + dx, y: ty * TILE + dy }
+        if (feetBlocked(LAKE, p.x, p.y, ALL_AREAS_OPEN)) { saved = p; break }
+      }
+    }
+    expect(saved).not.toBeNull()
+    localStorage.setItem(KEY, JSON.stringify({ area: 'lake', pos: saved, facing: 'down' }))
+    const t = { tx: Math.floor(saved!.x / TILE), ty: Math.floor(saved!.y / TILE) }
+    expect(loadPosition('u1')).toEqual({ area: 'lake', pos: center(t.tx, t.ty), facing: 'down' })
+  })
+})
+
+describe('부드러운 물가로 막힌 내 섬 저장 위치', () => {
+  test('내 섬 오목한 물가에 저장된 위치는 그 칸 가운데에서 시작한다', async () => {
+    const { feetBlocked } = await import('./walk.ts')
+    const { ALL_AREAS_OPEN, isWalkable } = await import('./map.ts')
+    const { isleMap } = await import('./isle.ts')
+    const map = isleMap('crescent', 8)
+    let saved: { x: number; y: number } | null = null
+    for (let ty = 0; ty < map.h && !saved; ty++) for (let tx = 0; tx < map.w && !saved; tx++) {
+      if (!isWalkable(map, tx, ty, ALL_AREAS_OPEN)) continue
+      for (const [dx, dy] of [[3, 3], [13, 3], [3, 13], [13, 13]]) {
+        const p = { x: tx * TILE + dx, y: ty * TILE + dy }
+        if (feetBlocked(map, p.x, p.y, ALL_AREAS_OPEN)) { saved = p; break }
+      }
+    }
+    expect(saved).not.toBeNull()
+    const t = { tx: Math.floor(saved!.x / TILE), ty: Math.floor(saved!.y / TILE) }
+    const opened = new Set<AreaId>([...DEFAULT_AREAS, 'isle' as AreaId])
+    const got = startPosition({ area: 'isle' as AreaId, pos: saved!, facing: 'down' }, opened, { layout: 'crescent', cleared: 8 })
+    expect(got).toEqual({ area: 'isle', pos: center(t.tx, t.ty), facing: 'down' })
   })
 })

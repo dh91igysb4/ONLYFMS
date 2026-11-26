@@ -1,5 +1,6 @@
 // 낚시 마을 이동·충돌·카메라. 순수 함수만 (React·DOM 없음).
 import { STATIC_DYNAMIC, TILE, edgeHits, isWalkable, type Facing, type MapDef, type MapDynamic, type Opened, type Vec } from './map.ts'
+import { SHORE_BLOCK, footprintAt, shoreField, wetness, type ShoreField } from './shore.ts'
 import { MAX_DT_MS } from './minigame.ts'
 
 export const WALK_SPEED = 72 // px/s (초당 4.5타일)
@@ -31,14 +32,75 @@ export function keysVector(k: { up: boolean; down: boolean; left: boolean; right
   return { x, y }
 }
 
-/** 발 사각형(pos 중심의 FEET)이 걸을 수 없는 타일(맵 밖, opened에 없는 지역의 잠긴 문 포함)과 겹치는가 */
+const inMap = (map: MapDef, tx: number, ty: number): boolean => tx >= 0 && ty >= 0 && tx < map.w && ty < map.h
+const inRect = (r: { tx: number; ty: number; w: number; h: number }, tx: number, ty: number): boolean =>
+  tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h
+
+/** 칸 단위로 막히는가(물가 판정 전): 맵 밖, 잠긴 문·순간이동기, 물이 아닌데 못 걷는 칸(물체 칸은 발밑으로 따로 본다) */
+function tileBlocks(map: MapDef, f: ShoreField, tx: number, ty: number, opened: Opened, dyn: MapDynamic): boolean {
+  if (!inMap(map, tx, ty)) return true
+  if (map.gates.some((g) => !opened.has(g.area) && inRect(g.tiles, tx, ty))) return true
+  if (map.teleporter && inRect(map.teleporter.tiles, tx, ty)) return true
+  if (isWalkable(map, tx, ty, opened, dyn)) return false
+  const cls = f.cls[ty * map.w + tx]
+  if (cls === 'water') return false
+  return !(cls === 'land' && footprintAt(f, tx, ty))
+}
+
+/** 물가 판정을 받는 칸(매끄럽게 하는 물·땅)에 든 점이면 물 정도로 본다 */
+function shoreBlocks(f: ShoreField, x: number, y: number): boolean {
+  const tx = Math.floor(x / TILE)
+  const ty = Math.floor(y / TILE)
+  if (!inMap(f.map, tx, ty)) return false
+  const cls = f.cls[ty * f.map.w + tx]
+  return (cls === 'water' || cls === 'land') && wetness(f, x, y) >= SHORE_BLOCK
+}
+
+/** 한 점이 막혔는가(칸 판정 + 발밑 + 물가선). 시험·그림 비교용 */
+export function pointBlocked(map: MapDef, x: number, y: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): boolean {
+  const f = shoreField(map, dyn.tide)
+  const tx = Math.floor(x / TILE)
+  const ty = Math.floor(y / TILE)
+  if (tileBlocks(map, f, tx, ty, opened, dyn)) return true
+  const fp = f.cls[ty * map.w + tx] !== 'fixed' ? footprintAt(f, tx, ty) : null
+  if (fp) {
+    const lx = x - tx * TILE
+    const ly = y - ty * TILE
+    if (lx >= fp.tx && lx < fp.tx + fp.w && ly >= fp.ty && ly < fp.ty + fp.h) return true
+  }
+  return shoreBlocks(f, x, y)
+}
+
+/**
+ * 발 사각형(pos 중심의 FEET)이 막혔는가.
+ * 1) 걸친 칸(꼭짓점이 든 칸)마다 칸 판정(맵 밖·잠긴 문·순간이동기·못 걷는 칸), 물체 칸은 발밑 사각형과 겹치는지.
+ * 2) 9점(꼭짓점·변 가운데·중심) 가운데 매끄럽게 하는 물·땅 칸에 든 점은 물 정도가 SHORE_BLOCK 이상이면 막힘 — 그린 물가선과 같은 선.
+ * 3) 칸 사이 벽 모서리.
+ */
 export function feetBlocked(map: MapDef, x: number, y: number, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): boolean {
-  const tx0 = Math.floor((x - FEET.w / 2 + EDGE_EPS) / TILE)
-  const tx1 = Math.floor((x + FEET.w / 2 - EDGE_EPS) / TILE)
-  const ty0 = Math.floor((y - FEET.h / 2 + EDGE_EPS) / TILE)
-  const ty1 = Math.floor((y + FEET.h / 2 - EDGE_EPS) / TILE)
-  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (!isWalkable(map, tx, ty, opened, dyn)) return true
-  return edgeHits(map, x - FEET.w / 2, y - FEET.h / 2, x + FEET.w / 2, y + FEET.h / 2)
+  const f = shoreField(map, dyn.tide)
+  const x0 = x - FEET.w / 2
+  const x1 = x + FEET.w / 2
+  const y0 = y - FEET.h / 2
+  const y1 = y + FEET.h / 2
+  const tx0 = Math.floor((x0 + EDGE_EPS) / TILE)
+  const tx1 = Math.floor((x1 - EDGE_EPS) / TILE)
+  const ty0 = Math.floor((y0 + EDGE_EPS) / TILE)
+  const ty1 = Math.floor((y1 - EDGE_EPS) / TILE)
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (tileBlocks(map, f, tx, ty, opened, dyn)) return true
+      const fp = f.cls[ty * map.w + tx] !== 'fixed' ? footprintAt(f, tx, ty) : null
+      if (fp) {
+        const fx0 = tx * TILE + fp.tx
+        const fy0 = ty * TILE + fp.ty
+        // 딱 맞닿기만 해도 막는다(발 높이 6px와 같은 틈으로 미끄러져 지나가지 않게)
+        if (x0 < fx0 + fp.w + EDGE_EPS && x1 > fx0 - EDGE_EPS && y0 < fy0 + fp.h + EDGE_EPS && y1 > fy0 - EDGE_EPS) return true
+      }
+    }
+  }
+  for (const py of [y0 + EDGE_EPS, y, y1 - EDGE_EPS]) for (const px of [x0 + EDGE_EPS, x, x1 - EDGE_EPS]) if (shoreBlocks(f, px, py)) return true
+  return edgeHits(map, x0, y0, x1, y1)
 }
 
 /** speed: 신발 배율(shoeSpeed, 기본 1) */

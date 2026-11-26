@@ -278,6 +278,31 @@ export function tileOf(pos: Vec): { tx: number; ty: number } {
   return { tx: Math.floor(pos.x / TILE), ty: Math.floor(pos.y / TILE) }
 }
 
+/**
+ * 서 있는 칸. 발 중심이 든 칸이 (rows 기준) 걷는 칸이면 그 칸, 아니면(물 칸 안의 둥근 땅·나무 칸 아래쪽 등 — 걷기 판정은
+ * 그린 물가선·물체 발밑을 쓴다) 8이웃 가운데 걷는 칸 중 발 중심에서 칸 사각형까지 가장 가까운 칸
+ * (같으면 위·아래·왼쪽·오른쪽, 그다음 대각선). 그런 칸이 없으면 tileOf.
+ */
+export function standTile(map: MapDef, pos: Vec, dyn: MapDynamic = STATIC_DYNAMIC): { tx: number; ty: number } {
+  const here = tileOf(pos)
+  if (tileWalkable(map, here.tx, here.ty, dyn)) return here
+  let best: { tx: number; ty: number } | null = null
+  let bestD = Infinity
+  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const tx = here.tx + dx
+    const ty = here.ty + dy
+    if (!tileWalkable(map, tx, ty, dyn)) continue
+    const ox = Math.max(tx * TILE - pos.x, 0, pos.x - (tx + 1) * TILE)
+    const oy = Math.max(ty * TILE - pos.y, 0, pos.y - (ty + 1) * TILE)
+    const d = Math.hypot(ox, oy)
+    if (d < bestD - 1e-9) {
+      best = { tx, ty }
+      bestD = d
+    }
+  }
+  return best ?? here
+}
+
 function tileCenter(tx: number, ty: number): Vec {
   return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 }
 }
@@ -394,6 +419,7 @@ export function pierEnd(map: MapDef): { tx: number; ty: number } | null {
 
 /** 발 중앙이 있는 칸이 출구 칸(가장자리 범위 또는 안쪽 사각형)이면 그 출구, 아니면 null. */
 export function exitAt(map: MapDef, pos: Vec): Exit | null {
+  // 출구는 발 중심이 그 칸에 실제로 들어갔을 때만(standTile을 쓰지 않는다: 출구 옆 물 칸의 둥근 땅에서 넘어가지 않게)
   const { tx, ty } = tileOf(pos)
   // 잠긴 문 칸에는 발이 들어갈 수 없으므로 rows 칸만 본다
   if (!tileWalkable(map, tx, ty)) return null
@@ -493,13 +519,13 @@ export function spotFor(map: MapDef, standing: TileKind | null, front: TileKind 
 const standsAt = (here: { tx: number; ty: number }, facing: Facing, at: TileFacing): boolean =>
   here.tx === at.tx && here.ty === at.ty && facing === at.facing
 
-// 서 있는 타일 = tileOf(pos), 앞 타일 = 서 있는 타일 + facing.
+// 서 있는 타일 = standTile(pos), 앞 타일 = 서 있는 타일 + facing.
 // 잠긴 문의 front에서 그 방향을 보면 gate, 선착장 front에서 그 방향을 보면 dock(열림과 무관: 화면이 구매/출발을 가른다).
 // 앞 칸이 순간이동기 구조물이면 teleporter(켜짐과 무관: 화면이 목록/안내를 가른다).
 // 고정물 front에서 그 방향을 보면 고정물의 act. 그 외: 앞이 물이고 spotFor가 값을 주면 낚시, 그 외(폭포·절벽 포함) null.
 // 낚시 5부: 앞이 얼음이고 구멍이 아니면(맵에 얼음 구멍 자리가 있을 때) drill, 앞이 구멍·밀물 진흙이면 그 자리 낚시.
 export function interactionAt(map: MapDef, pos: Vec, facing: Facing, opened: Opened, dyn: MapDynamic = STATIC_DYNAMIC): Interaction {
-  const here = tileOf(pos)
+  const here = standTile(map, pos, dyn)
   const gate = map.gates.find((g) => !opened.has(g.area) && standsAt(here, facing, g.front))
   if (gate) return { kind: 'gate', area: gate.area }
   const dock = map.docks.find((d) => standsAt(here, facing, d.front))
@@ -536,7 +562,7 @@ export function castTarget(map: MapDef, pos: Vec, facing: Facing, power: number,
   const { dx, dy } = STEP[facing]
   const dist = (1.5 + 3.5 * clamp01(power)) * TILE
   const end = { x: pos.x + dx * dist, y: pos.y + dy * dist }
-  const from = tileOf(pos)
+  const from = standTile(map, pos, dyn)
   const to = tileOf(end)
   const steps = Math.abs(to.tx - from.tx) + Math.abs(to.ty - from.ty)
   for (let k = 1; k <= steps; k++) {
