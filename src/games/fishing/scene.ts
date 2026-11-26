@@ -511,12 +511,18 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   const tall = TALL_SPRITE[kind]
   // 돛대는 갑판 위에 선다
   if (kind === 'mast') drawSprite(ctx, 'deck-plank', x, y, 1)
-  if (tall) drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
-  else if (kind === 'rock') {
+  if (tall) {
+    drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
+    // 내 섬 자원 나무: 열매 표시(개간 구역 나무와 구별)
+    if (kind === 'tree' && g.map.nodes.some((n) => n.kind === 'tree' && n.tx === tx && n.ty === ty)) drawSprite(ctx, 'node-tree', x, y, 1)
+  } else if (kind === 'rock') {
     if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
     else drawSprite(ctx, ground === 'snow' ? 'tile-rock-snow' : 'tile-rock', x, y, 1)
     // 내 섬 철광: 바위 위에 철 무늬
-    if (g.map.nodes.some((n) => n.kind === 'iron' && n.tx === tx && n.ty === ty)) drawSprite(ctx, 'iron-ore', x, y, 1)
+    const node = g.map.nodes.find((n) => n.tx === tx && n.ty === ty)
+    if (node?.kind === 'iron') drawSprite(ctx, 'iron-ore', x, y, 1)
+    // 내 섬 자원 바위: 반짝이 표시
+    if (node) drawSprite(ctx, 'node-rock', x, y, 1)
   } else if (kind === 'bench') drawSprite(ctx, 'workbench', x, y, 1)
   else if (kind === 'deco') {
     const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)

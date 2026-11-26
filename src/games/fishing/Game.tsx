@@ -11,7 +11,7 @@ import { syncTags, type Tag } from './peerTags.ts'
 import { BRAG_MS, bragCard, CHAT_GAP_MS, CHAT_MAX, CHAT_MS, cleanChat, EMOTE_MS, EMOTES, encodeBrag, encodeChat, encodeEmote, parseShow, type EmoteId, type Show } from './show.ts'
 import { SPRITES } from './sprites.ts'
 import { AREAS, BAGS, bagSize, BUFFS, CHALLENGES, DEFAULT_AREAS, HOOK_WINDOW_MS, MIN_FIGHT_MS, rodAtLeast, RODS, SHOES, shoeSpeed, SPECIES, UNLOCKS, type AreaId, type BuffId, type IsleLayoutId, type TackleId } from './data.ts'
-import { canDecorate, isleArrival, placeKey, placeName, type IsleShape } from './isle.ts'
+import { canDecorate, isleArrival, isleZoneTiles, placeKey, placeName, type IsleShape } from './isle.ts'
 import { canPlace, type FurnId, type Placed } from './home.ts'
 import { BoatPanel, DecoPanel, FurnPanel, IsleChoosePanel, WorkbenchPanel } from './IslePanels.tsx'
 import type { DecoId, DecoPlaced } from './deco.ts'
@@ -375,6 +375,8 @@ function interactionKey(i: Interaction): string {
 const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], ActionLabel>>> = {
   wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대',
 }
+/** 개간 구역 나무·바위 앞 안내 */
+const ZONE_TREE_NOTICE = '작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요'
 /** 재료 이름(캐기 안내) */
 const MAT_NAMES = { wood: '나무', stone: '돌', iron: '철' } as const
 /** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
@@ -533,6 +535,14 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       const fy = ty + dy
       if (sh?.deco?.some((d) => d.tx === fx && d.ty === fy)) return { kind: 'decoHere', tx: fx, ty: fy }
       if (sh && canDecorate(sh, fx, fy, 'path')) return { kind: 'decoSpot', tx: fx, ty: fy }
+    }
+    // 내 섬의 개간 구역 나무·바위(자원 칸 아님): 왜 못 캐는지 알려 준다
+    if (!at && rt.map.id === 'isle' && rt.owner === null) {
+      const sh = shapeOf(viewRef.current?.isle)
+      const { tx, ty } = tileOf(rt.player.pos)
+      const [dx, dy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[rt.player.facing]
+      const zone = sh ? isleZoneTiles(sh.layout).get(`${tx + dx},${ty + dy}`) : undefined
+      if (sh && zone !== undefined && zone > (sh.cleared ?? 0)) return { kind: 'notice', text: ZONE_TREE_NOTICE }
     }
     return at
   }
