@@ -181,6 +181,8 @@ async function run(deps: DuelDeps, fn: (tx: Tx) => Promise<TxResult>): Promise<O
   } catch (e) {
     // _gold_move의 잔액 부족: 트랜잭션은 이미 롤백됐다(대국은 그대로)
     if (isNotEnoughGold(e)) return err(409, 'not_enough_gold')
+    // 판 준비 RPC 실패: 같은 트랜잭션이라 판돈 이동도 롤백됐다(대국은 waiting 그대로)
+    if (e instanceof PrepareFailed) return err(409, 'prepare_failed')
     throw e
   }
   if (r.signal) {
@@ -192,6 +194,32 @@ async function run(deps: DuelDeps, fn: (tx: Tx) => Promise<TxResult>): Promise<O
     }
   }
   return r.out
+}
+
+class PrepareFailed extends Error {
+  constructor() {
+    super('prepare_failed')
+  }
+}
+
+const PREPARE_RE = /^[a-z_]+$/
+
+/**
+ * 판 준비 RPC(manifest `duel.prepare`, 설계 tiki-taka-toe §5.3). 함수 이름은 manifest 값을 정규식으로 다시 확인한 뒤에만
+ * SQL에 끼우고, 옵션은 파라미터로 넘긴다. 이름이 이상하거나, 오류거나, null이면 PrepareFailed(트랜잭션 롤백).
+ */
+async function prepareFor(tx: Tx, name: string, options: Record<string, string>): Promise<unknown> {
+  if (!PREPARE_RE.test(name)) throw new PrepareFailed()
+  let p: unknown
+  try {
+    const [r] = await tx.unsafe<{ p: unknown }[]>(`select public.${name}($1::jsonb) as p`, [tx.json(options) as never])
+    p = r?.p
+  } catch (e) {
+    console.error('duel: prepare failed', name, e)
+    throw new PrepareFailed()
+  }
+  if (p === null || p === undefined) throw new PrepareFailed()
+  return p
 }
 
 function isNotEnoughGold(e: unknown): boolean {
@@ -333,8 +361,9 @@ async function buildView(tx: Tx, m: MatchRow, me: Me, logic: Logic | undefined, 
     action_no: m.action_no,
     turn_deadline: m.turn_deadline ? m.turn_deadline.toISOString() : null,
     server_now: now,
-    // 진행 중에는 내 좌석의 화면, 종료 후·관전은 viewer = null (설계 §3.2)
-    view: usable ? safe('view', () => usable.view(m.state, live ? mySeat : null), null) : null,
+    // 진행 중에는 내 좌석의 화면, 종료 후·관전은 viewer = null (설계 §3.2).
+    // 셋째 인자 ended: 대국이 끝났다(기권·시간 초과 패·무효도). 로직 결과가 진행 중이어도 끝난 화면을 그리게 한다
+    view: usable ? safe('view', () => usable.view(m.state, live ? mySeat : null, !live), null) : null,
     winner: m.winner === 0 || m.winner === 1 ? m.winner : null,
     end_reason: m.end_reason,
     final_scores: m.final_scores && m.final_scores.length === 2 ? [m.final_scores[0], m.final_scores[1]] : null,
@@ -492,6 +521,8 @@ async function create(deps: DuelDeps, reg: Registry, me: Me, b: Record<string, u
     return await createTx(deps, game, me, { options, rated, visibility, ts, stake, now })
   } catch (e) {
     if (isNotEnoughGold(e)) return err(409, 'not_enough_gold')
+    // 판 준비 RPC 실패: 같은 트랜잭션이라 판돈 이동도 롤백됐다(대국은 waiting 그대로)
+    if (e instanceof PrepareFailed) return err(409, 'prepare_failed')
     throw e
   }
 }
@@ -578,7 +609,20 @@ async function join(
   const joinerFirst = rng() < 0.5
   const logic = game.logic
   m.players = joinerFirst ? [me.id, m.created_by] : [m.created_by, me.id]
-  m.state = logic.init(rng, m.options)
+  // 판 준비 RPC가 있으면 같은 트랜잭션에서 불러 init에 넘긴다. 실패하면 PrepareFailed → run()이 409(판돈도 롤백)
+  const prepare = game.manifest.duel?.prepare
+  const prepared = prepare ? await prepareFor(tx, prepare, m.options) : undefined
+  if (prepare) {
+    // RPC 결과 모양이 틀려 init이 던지면 판 준비 실패와 같다(트랜잭션 롤백 → 409 prepare_failed)
+    try {
+      m.state = logic.init(rng, m.options, prepared)
+    } catch (e) {
+      console.error('duel: init rejected prepared', m.game_id, e)
+      throw new PrepareFailed()
+    }
+  } else {
+    m.state = logic.init(rng, m.options, prepared)
+  }
   // 상태는 지금 로직으로 만든다
   m.logic_version = logic.version
   m.status = 'active'

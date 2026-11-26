@@ -3,7 +3,7 @@
 // - 마감이 지나면 그 마감에 대해 tick을 한 번만 보낸다(409 not_due면 마감이 바뀔 때까지 기다린다).
 // - 409에 최신 화면(view)이 실려 오면 조용히 그것으로 바꾼다. version_changed만 문구를 띄운다.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, duel, duelErrorMessage, type DuelView } from '../../lib/api.ts'
+import { ApiError, duel, duelActionMessage, duelErrorMessage, type DuelView } from '../../lib/api.ts'
 import { supabase } from '../../lib/supabase.ts'
 import { now, syncFromView } from '../../lib/serverTime.ts'
 
@@ -144,8 +144,9 @@ export function useDuelMatch(id: string): DuelMatch {
           apply(v)
           if (e instanceof ApiError && e.code === 'version_changed') setError(duelErrorMessage(e.code))
         } else if (e instanceof ApiError) {
-          // 서버가 준 message는 로직 코드일 수 있어 보이지 않는다
-          setError(duelErrorMessage(e.status >= 500 ? 'network' : e.code))
+          // 거절 이유: 로직이 준 한국어 문장만 보이고, 영문 코드는 일반 문구로 바꾼다
+          if (e.code === 'invalid_action') setError(duelActionMessage((e.body as { message?: unknown } | undefined)?.message))
+          else setError(duelErrorMessage(e.status >= 500 ? 'network' : e.code))
           // 응답을 놓쳤거나 화면이 어긋났을 수 있으니 서버 상태로 맞춘다
           void refresh()
         } else {

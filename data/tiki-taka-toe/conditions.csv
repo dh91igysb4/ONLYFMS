@@ -1,0 +1,943 @@
+id,kind,label_ko,label_en,ref
+award:Q166177,award,발롱도르,Ballon d'Or,Q166177
+award:Q17355204,award,월드컵 골든볼,FIFA World Cup Golden Ball,Q17355204
+award:Q182529,award,FIFA 올해의 선수,FIFA World Player of the Year,Q182529
+award:Q233454,award,유러피언 골든슈,European Golden Shoe,Q233454
+award:Q28156245,award,더 베스트 FIFA 남자 선수상,The Best FIFA Men's Player,Q28156245
+award:Q3296848,award,프리메이라리가 득점왕,Bola de Prata,Q3296848
+award:Q461306,award,세리에 A 득점왕,Capocannoniere,Q461306
+award:Q729513,award,라리가 득점왕,Pichichi Trophy,Q729513
+award:Q794775,award,PL 득점왕,PL Golden Boot,Q794775
+award:x-belgian-top-scorer,award,벨기에 프로리그 득점왕,Belgian Pro League top scorer,x-belgian-top-scorer
+award:x-bundesliga-top-scorer,award,분데스리가 득점왕,Bundesliga top scorer,x-bundesliga-top-scorer
+award:x-england-top-flight-top-scorer,award,잉글랜드 1부 득점왕,English top-flight top scorer,x-england-top-flight-top-scorer
+award:x-eredivisie-top-scorer,award,에레디비시 득점왕,Eredivisie top scorer,x-eredivisie-top-scorer
+award:x-ligue1-top-scorer,award,리그 1 득점왕,Ligue 1 top scorer,x-ligue1-top-scorer
+award:x-super-lig-top-scorer,award,쉬페르리그 득점왕,Süper Lig top scorer,x-super-lig-top-scorer
+award:x-wc-golden-boot,award,월드컵 골든부트,FIFA World Cup Golden Boot,x-wc-golden-boot
+club:Q101859,club,볼프스부르크,VfL Wolfsburg,Q101859
+club:Q101959,club,보루시아 묀헨글라트바흐,Borussia Mönchengladbach,Q101959
+club:Q1023163,club,Clube Desportivo das Aves,Clube Desportivo das Aves,Q1023163
+club:Q1023227,club,톤델라,CD Tondela,Q1023227
+club:Q1023233,club,C.D. Trofense,C.D. Trofense,Q1023233
+club:Q102720,club,헤르타 베를린,Hertha BSC,Q102720
+club:Q10286,club,오사수나,Club Atlético Osasuna,Q10286
+club:Q10300,club,라요 바예카노,Rayo Vallecano,Q10300
+club:Q10308,club,레알 사라고사,Real Zaragoza,Q10308
+club:Q10315,club,레알 소시에다드,Real Sociedad,Q10315
+club:Q10319,club,레알 바야돌리드,Real Valladolid,Q10319
+club:Q10329,club,세비야,Sevilla,Q10329
+club:Q1033045,club,K.F.C. Verbroedering Geel,K.F.C. Verbroedering Geel,Q1033045
+club:Q10333,club,발렌시아,Valencia,Q10333
+club:Q10407,club,알메리아,Unión Deportiva Almería,Q10407
+club:Q1045811,club,도르드레흐트,FC Dordrecht,Q1045811
+club:Q1046440,club,카사 피아,Casa Pia A.C.,Q1046440
+club:Q104761,club,바이어 04 레버쿠젠,Bayer 04 Leverkusen,Q104761
+club:Q104770,club,쾰른,1. FC Köln,Q104770
+club:Q10499,club,코르도바,Córdoba,Q10499
+club:Q1050331,club,브뤼셀,Football Club Molenbeek Brussels Strombeek,Q1050331
+club:Q1051013,club,파리 FC,Paris FC,Q1051013
+club:Q10512,club,엘체,Elche,Q10512
+club:Q105254,club,마인츠 05,1. FSV Mainz 05,Q105254
+club:Q1053450,club,로센달,RBC Roosendaal,Q1053450
+club:Q1053917,club,루셀라레,K.S.V. Roeselare,Q1053917
+club:Q1056987,club,스포르팅 툴롱 바르,Sporting Toulon Var,Q1056987
+club:Q105844,club,아르미니아 빌레펠트,Arminia Bielefeld,Q105844
+club:Q105853,club,카를스루에,Karlsruher SC,Q105853
+club:Q105861,club,보훔,VfL Bochum,Q105861
+club:Q1061627,club,에먼,FC Emmen,Q1061627
+club:Q106394,club,프라이부르크,SC Freiburg,Q106394
+club:Q1065328,club,덴더르,F.C. Verbroedering Dender Eendracht Hekelgem,Q1065328
+club:Q1071713,club,텔스타,SC Telstar,Q1071713
+club:Q107818,club,에네르기 콧부스,FC Energie Cottbus,Q107818
+club:Q1110567,club,하타이스포르,Hatayspor,Q1110567
+club:Q1120838,club,칼초 코모,Como 1907,Q1120838
+club:Q1127498,club,엘라즈스포르,Elazığspor,Q1127498
+club:Q1128631,club,리즈 유나이티드,Leeds United,Q1128631
+club:Q113000,club,메헬렌,KV Mechelen,Q113000
+club:Q1130849,club,리버풀,Liverpool,Q1130849
+club:Q1132418,club,마르티그,FC Martigues,Q1132418
+club:Q118919,club,에위프스포르,Eyüpspor,Q118919
+club:Q11938,club,에인트호번,PSV Eindhoven,Q11938
+club:Q11945,club,지로나,Girona,Q11945
+club:Q11961,club,헤라클레스 알멜로,Heracles Almelo,Q11961
+club:Q11963,club,에르쿨레스,Hércules,Q11963
+club:Q11971,club,우에스카,Sociedad Deportiva Huesca,Q11971
+club:Q11979,club,라스팔마스,UD Las Palmas,Q11979
+club:Q120775987,club,AVS Futebol SAD,AVS Futebol SAD,Q120775987
+club:Q12158,club,누만시아,Club Deportivo Numancia de Soria,Q12158
+club:Q12230,club,레알 무르시아,Real Murcia,Q12230
+club:Q12236,club,라싱 산탄데르,Racing de Santander,Q12236
+club:Q12249,club,레크레아티보 우엘바,Recreativo de Huelva,Q12249
+club:Q12260,club,사바델,Centre d'Esports Sabadell Futbol Club,Q12260
+club:Q12278,club,스포르팅 히혼,Sporting de Gijón,Q12278
+club:Q12297,club,비야레알,Villarreal,Q12297
+club:Q12308,club,헤레스,Xerez C.D.,Q12308
+club:Q1231804,club,아메드,Amed S.F.K.,Q1231804
+club:Q126334,club,스트라스부르,RC Strasbourg Alsace,Q126334
+club:Q128148,club,마니사스포르,Manisaspor,Q128148
+club:Q128446,club,포르투,FC Porto,Q128446
+club:Q1293144,club,SC Eendracht Aalst,SC Eendracht Aalst,Q1293144
+club:Q131499,club,벤피카,S.L. Benfica,Q131499
+club:Q131603,club,1860 뮌헨,TSV 1860 München,Q131603
+club:Q132885,club,올랭피크 드 마르세유,Olympique de Marseille,Q132885
+club:Q13385,club,SPAL,Ars et Labor Ferrara Calcio,Q13385
+club:Q13391,club,레체,US Lecce,Q13391
+club:Q134241,club,페예노르트,Feyenoord Rotterdam,Q134241
+club:Q1346314,club,모레이렌스,Moreirense,Q1346314
+club:Q1347229,club,리에주,R.F.C. de Liège,Q1347229
+club:Q1347349,club,Pendikspor,Pendikspor,Q1347349
+club:Q1366316,club,Erzurumspor,Erzurumspor,Q1366316
+club:Q1368064,club,Malatyaspor,Malatyaspor,Q1368064
+club:Q1369461,club,사카리아스포르,Sakaryaspor,Q1369461
+club:Q137499,club,08 홈부르크,FC 08 Homburg,Q137499
+club:Q138230,club,카슴파샤,Kasımpaşa S.K.,Q138230
+club:Q138248,club,신트트라위던,Sint-Truidense V.V.,Q138248
+club:Q1386850,club,F.C. Alverca,F.C. Alverca,Q1386850
+club:Q1386869,club,아로카,F.C. Arouca,Q1386869
+club:Q1387105,club,파말리캉,FC Famalicão,Q1387105
+club:Q1387110,club,F.C. Felgueiras,F.C. Felgueiras,Q1387110
+club:Q1387471,club,페나피엘,F.C. Penafiel,Q1387471
+club:Q1387855,club,비젤라,F.C. Vizela,Q1387855
+club:Q139399,club,포자 칼초,Calcio Foggia 1920,Q139399
+club:Q1398111,club,파티흐 카라귐뤼크,Fatih Karagümrük S.K.,Q1398111
+club:Q141931,club,디나모 드레스덴,Dynamo Dresden,Q141931
+club:Q141971,club,우니온 베를린,1. FC Union Berlin,Q141971
+club:Q142005,club,한자 로스토크,F.C. Hansa Rostock,Q142005
+club:Q1422,club,유벤투스,Juventus,Q1422
+club:Q1423118,club,괴즈테페,Göztepe S.K.,Q1423118
+club:Q1423718,club,오이펜,K.A.S. Eupen,Q1423718
+club:Q1429473,club,바르징,Varzim S.C.,Q1429473
+club:Q14551982,club,울름,SSV Ulm 1846 Fußball,Q14551982
+club:Q1457,club,삼프도리아,U.C. Sampdoria,Q1457
+club:Q151747,club,포르투나 뒤셀도르프,Fortuna Düsseldorf,Q151747
+club:Q153535,club,알레마니아 아헨,Alemannia Aachen,Q153535
+club:Q153539,club,그로이터 퓌르트,SpVgg Greuther Fürth,Q153539
+club:Q154053,club,아인트라흐트 브라운슈바이크,Eintracht Braunschweig,Q154053
+club:Q154293,club,뒤스부르크,MSV Duisburg,Q154293
+club:Q1543,club,밀란,AC Milan,Q1543
+club:Q1543501,club,Giresunspor,Giresunspor,Q1543501
+club:Q157463,club,자르브뤼켄,1. FC Saarbrücken,Q157463
+club:Q157464,club,위르딩겐 05,KFC Uerdingen 05,Q157464
+club:Q15755,club,아우크스부르크,FC Augsburg,Q15755
+club:Q157828,club,홀슈타인 킬,Holstein Kiel,Q157828
+club:Q15786,club,뉘른베르크,1. FC Nürnberg,Q15786
+club:Q15789,club,바이에른 뮌헨,FC Bayern Munich,Q15789
+club:Q158121,club,운터하힝,SpVgg Unterhaching,Q158121
+club:Q1584904,club,Siirtspor,Siirtspor,Q1584904
+club:Q160532,club,파더보른 07,SC Paderborn 07,Q160532
+club:Q162251,club,하이덴하임,1. FC Heidenheim 1846,Q162251
+club:Q162317,club,로코모티프 라이프치히,1. FC Lokomotive Leipzig,Q162317
+club:Q16344,club,페루자 칼초,A.C. Perugia Calcio,Q16344
+club:Q1636012,club,Petrol Ofisi Spor,Petrol Ofisi Spor,Q1636012
+club:Q1636019,club,알라니아스포르,Alanyaspor,Q1636019
+club:Q1668203,club,Lommel SK,Lommel SK,Q1668203
+club:Q1668605,club,Kahramanmaraşspor,Kahramanmaraşspor,Q1668605
+club:Q1669847,club,K.F.C. Lommel S.K.,K.F.C. Lommel S.K.,Q1669847
+club:Q170105,club,슈투트가르터 키커스,Stuttgarter Kickers,Q170105
+club:Q170117,club,잉골슈타트 04,FC Ingolstadt 04,Q170117
+club:Q170134,club,발트호프 만하임,SV Waldhof Mannheim,Q170134
+club:Q172476,club,지롱댕 드 보르도,FC Girondins de Bordeaux,Q172476
+club:Q172567,club,베식타시,Beşiktaş J.K.,Q172567
+club:Q1753193,club,R.A.A. Louviéroise,R.A.A. Louviéroise,Q1753193
+club:Q1754163,club,S.C. Salgueiros,S.C. Salgueiros,Q1754163
+club:Q1757369,club,Yimpaş Yozgatspor,Yimpaş Yozgatspor,Q1757369
+club:Q1762119,club,우니앙,C.F. União,Q1762119
+club:Q176795,club,카르시야카,Karşıyaka S.K.,Q176795
+club:Q178180,club,오르두스포르,Orduspor,Q178180
+club:Q179930,club,Dardanel Spor A.Ş.,Dardanel Spor A.Ş.,Q179930
+club:Q180305,club,AS 모나코 FC,AS Monaco,Q180305
+club:Q1822470,club,Leça,Leça,Q1822470
+club:Q18232,club,헨트,KAA Gent,Q18232
+club:Q182876,club,오세르,AJ Auxerre,Q182876
+club:Q185163,club,니스,OGC Nice,Q185163
+club:Q18520,club,루턴 타운,Luton Town,Q18520
+club:Q1853273,club,S.C.U. Torreense,S.C.U. Torreense,Q1853273
+club:Q18656,club,맨체스터 유나이티드,Manchester United,Q18656
+club:Q18659,club,스완지 시티,Swansea City,Q18659
+club:Q18661,club,미들즈브러,Middlesbrough,Q18661
+club:Q18662,club,카디프 시티,Cardiff City,Q18662
+club:Q18708,club,풀럼,Fulham,Q18708
+club:Q18711,club,아스톤 빌라,Aston Villa,Q18711
+club:Q18716,club,뉴캐슬 유나이티드,Newcastle United,Q18716
+club:Q18721,club,노리치 시티,Norwich City,Q18721
+club:Q18723,club,퀸즈 파크 레인저스,Queens Park Rangers,Q18723
+club:Q18729,club,레딩,Reading,Q18729
+club:Q18732,club,사우샘프턴,Southampton,Q18732
+club:Q18736,club,스토크 시티,Stoke City,Q18736
+club:Q18739,club,선덜랜드,Sunderland,Q18739
+club:Q18741,club,토트넘 홋스퍼,Tottenham Hotspur,Q18741
+club:Q18744,club,웨스트브로미치 앨비언,West Bromwich Albion,Q18744
+club:Q18747,club,웨스트햄 유나이티드,West Ham United,Q18747
+club:Q18750,club,위건 애슬레틱,Wigan Athletic,Q18750
+club:Q187528,club,안데를레흐트,R.S.C. Anderlecht,Q187528
+club:Q1886,club,아탈란타,Atalanta BC,Q1886
+club:Q1891367,club,코빌량,S.C. Covilhã,Q1891367
+club:Q1893,club,볼로냐,Bologna F.C. 1909,Q1893
+club:Q1900,club,칼리아리 칼초,Cagliari Calcio,Q1900
+club:Q190561,club,스탕다르 리에주,Standard Liège,Q190561
+club:Q190916,club,클뤼프 브뤼허,Club Brugge K.V.,Q190916
+club:Q191264,club,알크마르,AZ Alkmaar,Q191264
+club:Q191843,club,랑스,R.C. Lens,Q191843
+club:Q192071,club,낭트,FC Nantes,Q192071
+club:Q192641,club,트라브존스포르,Trabzonspor,Q192641
+club:Q1933473,club,Sarıyer G.K.,Sarıyer G.K.,Q1933473
+club:Q193377,club,캉,Stade Malherbe Caen,Q193377
+club:Q1936034,club,S.C. Espinho,S.C. Espinho,Q1936034
+club:Q19442,club,반즐리,Barnsley,Q19442
+club:Q19444,club,버밍엄 시티,Birmingham City,Q19444
+club:Q19446,club,블랙번 로버스,Blackburn Rovers,Q19446
+club:Q19449,club,블랙풀,Blackpool,Q19449
+club:Q19451,club,볼턴 원더러스,Bolton Wanderers,Q19451
+club:Q19453,club,브라이턴 앤 호브 앨비언,Brighton & Hove Albion,Q19453
+club:Q19458,club,번리,Burnley,Q19458
+club:Q19462,club,찰턴 애슬레틱,Charlton Athletic,Q19462
+club:Q19467,club,크리스털 팰리스,Crystal Palace,Q19467
+club:Q19470,club,더비 카운티,Derby County,Q19470
+club:Q19473,club,허더즈필드 타운,Huddersfield Town,Q19473
+club:Q19477,club,헐 시티,Hull City,Q19477
+club:Q19481,club,레스터 시티,Leicester City,Q19481
+club:Q19482,club,윔블던,WIM,Q19482
+club:Q19487,club,밀월,Millwall,Q19487
+club:Q19490,club,노팅엄 포리스트,NFO,Q19490
+club:Q19498,club,셰필드 웬즈데이,SHW,Q19498
+club:Q19500,club,울버햄프턴 원더러스,Wolverhampton Wanderers,Q19500
+club:Q19509,club,스타드 렌,Stade Rennais,Q19509
+club:Q19512,club,소쇼 몽벨리아르,FC Sochaux-Montbéliard,Q19512
+club:Q19513,club,몽펠리에,Montpellier Hérault Sport Club,Q19513
+club:Q19516,club,릴,Lille OSC,Q19516
+club:Q19518,club,툴루즈,Toulouse,Q19518
+club:Q19521,club,생테티엔,AS Saint-Étienne,Q19521
+club:Q19523,club,낭시,A.S. Nancy-Lorraine,Q19523
+club:Q19568,club,본머스,AFC Bournemouth,Q19568
+club:Q19571,club,브렌트퍼드,Brentford,Q19571
+club:Q19580,club,코번트리 시티,COV,Q19580
+club:Q19585,club,샤를루아,Royal Charleroi S.C.,Q19585
+club:Q19598,club,노츠 카운티,Notts County,Q19598
+club:Q19601,club,올덤 애슬레틱,Oldham Athletic,Q19601
+club:Q19603,club,트벤터,FC Twente,Q19603
+club:Q19604,club,포츠머스,Portsmouth,Q19604
+club:Q19607,club,셰필드 유나이티드,Sheffield United,Q19607
+club:Q19613395,club,Çorum FK,Çorum FK,Q19613395
+club:Q196160,club,로얄 위니옹 생질루아즈,Royale Union Saint-Gilloise,Q196160
+club:Q19634,club,스윈던 타운,Swindon Town,Q19634
+club:Q197093,club,Zeytinburnuspor,Zeytinburnuspor,Q197093
+club:Q200321,club,헤이렌베인,SC Heerenveen,Q200321
+club:Q2018,club,칼초 카타니아,Catania,Q2018
+club:Q203573,club,부르사스포르,Bursaspor,Q203573
+club:Q2037,club,키에보베로나,AC ChievoVerona,Q2037
+club:Q20472948,club,Bodrum FK,Bodrum FK,Q20472948
+club:Q20473364,club,Gençlerbirliği Sports Club,Gençlerbirliği Sports Club,Q20473364
+club:Q2052,club,피오렌티나,ACF Fiorentina,Q2052
+club:Q2074,club,제노아,Genoa CFC,Q2074
+club:Q208228,club,스타드 드 랭스,Stade de Reims,Q208228
+club:Q208399,club,바스티아,SC Bastia,Q208399
+club:Q208585,club,비토리아 FC,Vitória F.C.,Q208585
+club:Q209509,club,그르노블 푸트 38,Grenoble Foot 38,Q209509
+club:Q20979061,club,RWDM,RWDM,Q20979061
+club:Q209895,club,스파르타 로테르담,Sparta Rotterdam,Q209895
+club:Q210864,club,르망,Le Mans,Q210864
+club:Q211401,club,레이리아,U.D. Leiria,Q211401
+club:Q212269,club,발랑시엔,Valenciennes,Q212269
+club:Q216032,club,헹크,K.R.C. Genk,Q216032
+club:Q216459,club,나시오날,C.D. Nacional,Q216459
+club:Q216503,club,마리티무,C.S. Marítimo,Q216503
+club:Q216510,club,벨레넨스스,C.F. Os Belenenses,Q216510
+club:Q216661,club,테네리페,C.D. Tenerife,Q216661
+club:Q218372,club,스타드 브레스트 29,Stade Brestois 29,Q218372
+club:Q219233,club,피테서,SBV Vitesse,Q219233
+club:Q2195773,club,로얄 엑셀 무스크롱,Royal Excel Mouscron,Q2195773
+club:Q219703,club,보아비스타,Boavista,Q219703
+club:Q219935,club,Zonguldak Kömürspor,Zonguldak Kömürspor,Q219935
+club:Q221525,club,메스,FC Metz,Q221525
+club:Q221927,club,더 흐라프스합,GRA,Q221927
+club:Q221940,club,로케런,K.S.C. Lokeren Oost-Vlaanderen,Q221940
+club:Q222837,club,아를 아비뇽,AC Arles,Q222837
+club:Q223450,club,비토리아 SC,Vitória S.C.,Q223450
+club:Q223620,club,데포르티보 알라베스,Deportivo Alavés,Q223620
+club:Q2268833,club,K Beerschot VA,K Beerschot VA,Q2268833
+club:Q22707,club,1899 호펜하임,TSG 1899 Hoffenheim,Q22707
+club:Q2312558,club,Racing White Daring Molenbeek,Racing White Daring Molenbeek,Q2312558
+club:Q2410944,club,아카데미코 드 비제우,Académico de Viseu,Q2410944
+club:Q2426819,club,Atlético Morelia,Atlético Morelia,Q2426819
+club:Q243235,club,아카데미카 드 코임브라,Associação Académica de Coimbra – O.A.F.,Q243235
+club:Q24680,club,위트레흐트,UTR,Q24680
+club:Q24689,club,펜로,VVV,Q24689
+club:Q24699,club,발베이크,RKC Waalwijk,Q24699
+club:Q24711,club,흐로닝언,FC Groningen,Q24711
+club:Q24719,club,로다,RJC,Q24719
+club:Q24904,club,덴하흐,ADO Den Haag,Q24904
+club:Q257984,club,힘나스틱 데 타라고나,Gimnàstic de Tarragona,Q257984
+club:Q2592492,club,K. Boom,K. Boom,Q2592492
+club:Q2609,club,라치오,SS Lazio,Q2609
+club:Q2641,club,나폴리,SSC Napoli,Q2641
+club:Q2658098,club,Schiedamse Voetbal Vereniging,Schiedamse Voetbal Vereniging,Q2658098
+club:Q2674,club,팔레르모,Palermo,Q2674
+club:Q2687689,club,R. Jet Wavre,R. Jet Wavre,Q2687689
+club:Q269151,club,즈볼러,PEC Zwolle,Q269151
+club:Q2693,club,파르마,Parma Calcio 1913,Q2693
+club:Q2694024,club,K.R.C. Zuid-West-Vlaanderen,K.R.C. Zuid-West-Vlaanderen,Q2694024
+club:Q270051,club,아작시오,A.C. Ajaccio,Q270051
+club:Q2710,club,페스카라 칼초,Delfino Pescara 1936,Q2710
+club:Q2714,club,왓퍼드,Watford,Q2714
+club:Q271574,club,레알 오비에도,Real Oviedo,Q271574
+club:Q272712,club,차이쿠르 리제스포르,Çaykur Rizespor,Q272712
+club:Q2739,club,로마,AS Roma,Q2739
+club:Q2756,club,시에나,Siena,Q2756
+club:Q2768,club,토리노,Torino,Q2768
+club:Q2798,club,우디네세 칼초,Udinese Calcio,Q2798
+club:Q285722,club,가지안테프스포르,Gaziantepspor,Q285722
+club:Q289482,club,몬차 브리안차,AC Monza,Q289482
+club:Q289613,club,피사,Pisa SC,Q289613
+club:Q289707,club,레자나,A.C. Reggiana 1919,Q289707
+club:Q290860,club,AD Fafe,AD Fafe,Q290860
+club:Q291297,club,카이세리 에르지예스포르,Kayseri Erciyesspor,Q291297
+club:Q291937,club,튀비즈,Royale Union Tubize-Braine,Q291937
+club:Q29390,club,메시나,A.C.R. Messina,Q29390
+club:Q2955908,club,F.C. Tirsense,F.C. Tirsense,Q2955908
+club:Q298217,club,아벨리노,U.S. Avellino 1912,Q298217
+club:Q298267,club,칸,AS Cannes,Q298267
+club:Q301332,club,카르데미르 카라뷔크스포르,Kardemir Karabükspor,Q301332
+club:Q303121,club,예니 말라티아스포르,Yeni Malatyaspor,Q303121
+club:Q309400,club,불로뉴,US Boulogne,Q309400
+club:Q318348,club,네이메헌,N.E.C.,Q318348
+club:Q32494,club,샬케 04,Schalke 04,Q32494
+club:Q328658,club,르아브르,LHV,Q328658
+club:Q332642,club,브레다,NAC,Q332642
+club:Q332664,club,빌럼 틸뷔르흐,Willem II,Q332664
+club:Q333838,club,에비앙 토농 가야르,Evian Thonon Gaillard,Q333838
+club:Q3347784,club,O Elvas C.A.D.,O Elvas C.A.D.,Q3347784
+club:Q33748,club,하노버 96,Hannover 96,Q33748
+club:Q340133,club,하제테페,Hacettepe S.K.,Q340133
+club:Q344328,club,이스탄불스포르,İstanbulspor A.Ş.,Q344328
+club:Q352251,club,아다나 데미르스포르,Adana Demirspor,Q352251
+club:Q352270,club,아다나스포르,Adanaspor,Q352270
+club:Q364698,club,세르클러 브뤼허,Cercle Brugge K.S.V.,Q364698
+club:Q370206,club,오스텐더,KV Oostende,Q370206
+club:Q370712,club,엑셀시오르,Excelsior Rotterdam,Q370712
+club:Q371136,club,파수스드페헤이라,F.C. Paços de Ferreira,Q371136
+club:Q372599,club,시바스스포르,Sivasspor,Q372599
+club:Q376635,club,쥘터 바레험,S.V. Zulte Waregem,Q376635
+club:Q38245,club,아인트라흐트 프랑크푸르트,Eintracht Frankfurt,Q38245
+club:Q41420,club,보루시아 도르트문트,Borussia Dortmund,Q41420
+club:Q417685,club,아크히사르 벨레디예스포르,Akhisar Belediyespor,Q417685
+club:Q424646,club,Akçaabat Sebatspor,Akçaabat Sebatspor,Q424646
+club:Q4285478,club,Çamlıdere Şekerspor,Çamlıdere Şekerspor,Q4285478
+club:Q430107,club,삼순스포르,Samsunspor,Q430107
+club:Q434929,club,알타이,Altay S.K.,Q434929
+club:Q43710,club,안탈리아스포르,Antalyaspor,Q43710
+club:Q4512,club,슈투트가르트,VfB Stuttgart,Q4512
+club:Q459148,club,갱강,En Avant de Guingamp,Q459148
+club:Q459794,club,피아첸차 칼초,Piacenza Calcio,Q459794
+club:Q460448,club,카디스,Cádiz Club de Fútbol,Q460448
+club:Q479351,club,다름슈타트 98,SV Darmstadt 98,Q479351
+club:Q483020,club,파리 생제르맹,Paris Saint-Germain,Q483020
+club:Q48879,club,브래드퍼드 시티,Bradford City,Q48879
+club:Q48911,club,로리앙,F.C. Lorient,Q48911
+club:Q48946,club,옥스퍼드 유나이티드,Oxford United,Q48946
+club:Q490586,club,몽스,R.A.E.C. Mons,Q490586
+club:Q492826,club,앙카라귀쥐,MKE Ankaragücü,Q492826
+club:Q495299,club,갈라타사라이,Galatasaray S.K.,Q495299
+club:Q501245,club,우니오네 베네치아,Venezia,Q501245
+club:Q501693,club,트루아,ES Troyes AC,Q501693
+club:Q503317,club,디종,Dijon FCO,Q503317
+club:Q50602,club,맨체스터 시티,Manchester City,Q50602
+club:Q508322,club,괴뇽,FC Gueugnon,Q508322
+club:Q509170,club,바슬란트-베베런,WAA,Q509170
+club:Q513237,club,코자엘리스포르,Kocaelispor,Q513237
+club:Q513840,club,콘야스포르,Konyaspor,Q513840
+club:Q51974,club,함부르거,Hamburger SV,Q51974
+club:Q51976,club,베르더 브레멘,SV Werder Bremen,Q51976
+club:Q520207,club,Diyarbakırspor,Diyarbakırspor,Q520207
+club:Q524378,club,바텐샤이트 09,SG Wattenscheid 09,Q524378
+club:Q536651,club,RAAL La Louvière,RAAL La Louvière,Q536651
+club:Q543467,club,샤베스,G.D. Chaves,Q543467
+club:Q556570,club,앙카라스포르,Ankaraspor,Q556570
+club:Q56542463,club,비첸차 비르투스,LR Vicenza,Q56542463
+club:Q576285,club,알바세테 발롬피에,Albacete Balompié,Q576285
+club:Q5794,club,에버턴,Everton,Q5794
+club:Q587509,club,베를링언-호이스든-졸더,K. Beringen-Heusden-Zolder,Q587509
+club:Q598083,club,KRC Mechelen,KRC Mechelen,Q598083
+club:Q6062228,club,Ümraniyespor,Ümraniyespor,Q6062228
+club:Q6080023,club,Vanspor,Vanspor,Q6080023
+club:Q608122,club,카이세리스포르,Kayserispor,Q608122
+club:Q608988,club,스당 아르덴,CS Sedan Ardennes,Q608988
+club:Q610621,club,카르피,A.C. Carpi,Q610621
+club:Q618620,club,코르트레이크,K.V. Kortrijk,Q618620
+club:Q621120,club,포르티모넨스,Portimonense S.C.,Q621120
+club:Q621259,club,올랴넨스,S.C. Olhanense,Q621259
+club:Q622432,club,히우 아브,Rio Ave,Q622432
+club:Q623730,club,레이숑이스,Leixões S.C.,Q623730
+club:Q626917,club,샤무아 니오르,Chamois Niortais,Q626917
+club:Q627334,club,가젤레크 아작시오,Gazélec Ajaccio,Q627334
+club:Q630227,club,S.C. Campomaiorense,S.C. Campomaiorense,Q630227
+club:Q630348,club,부자스포르,Bucaspor,Q630348
+club:Q631,club,인테르나치오날레 밀라노,Inter,Q631
+club:Q634829,club,이스토릴 프라이아,G.D. Estoril Praia,Q634829
+club:Q640726,club,뮐루즈,FC Mulhouse,Q640726
+club:Q641373,club,겐칠레르빌리이,Gençlerbirliği S.K.,Q641373
+club:Q643107,club,데니즐리스포르,Denizlispor,Q643107
+club:Q646079,club,베이르스홋,Beerschot A.C.,Q646079
+club:Q6463,club,장크트파울리,FC St. Pauli,Q6463
+club:Q648382,club,페인담,SC Veendam,Q648382
+club:Q652516,club,베네벤토 칼초,Benevento Calcio,Q652516
+club:Q653119,club,알메러 시티,ALM,Q653119
+club:Q657865,club,로그로녜스,CD Logroñés,Q657865
+club:Q6601875,club,페네르바흐체,Fenerbahçe Istanbul,Q6601875
+club:Q6630,club,아스콜리 칼초,Ascoli Calcio 1898,Q6630
+club:Q6641,club,바리,SSC Bari,Q6641
+club:Q6651,club,브레시아 칼초,Brescia Calcio,Q6651
+club:Q6664,club,체세나,AC Cesena,Q6664
+club:Q6690,club,크로토네,F.C. Crotone,Q6690
+club:Q6703,club,엠폴리,Empoli,Q6703
+club:Q671042,club,페이렌스,C.D. Feirense,Q671042
+club:Q6767,club,리보르노 칼초,US Livorno 1915,Q6767
+club:Q685182,club,K. Beerschot V.A.C.,K. Beerschot V.A.C.,Q685182
+club:Q688300,club,베이라마르,S.C. Beira-Mar,Q688300
+club:Q692691,club,엘페르스베르크,SV Elversberg,Q692691
+club:Q697353,club,살라망카,UD Salamanca,Q697353
+club:Q702455,club,라이프치히,RB Leipzig,Q702455
+club:Q704,club,올랭피크 리오네,OL,Q704
+club:Q7156,club,바르셀로나,FC Barcelona,Q7156
+club:Q725018,club,리르서,Lierse S.K.,Q725018
+club:Q730809,club,님 올랭피크,Nîmes Olympique,Q730809
+club:Q732002,club,로열 앤트워프,Royal Antwerp,Q732002
+club:Q732742,club,엑스트레마두라,CF Extremadura,Q732742
+club:Q738060,club,폴렌담,VOL,Q738060
+club:Q740637,club,산타클라라,C.D. Santa Clara,Q740637
+club:Q743557,club,카스테욘,CD Castellón,Q743557
+club:Q744353,club,파렌스,S.C. Farense,Q744353
+club:Q748445,club,에스키셰히르스포르,Eskişehirspor,Q748445
+club:Q749589,club,고 어헤드 이글스,GAE,Q749589
+club:Q75684,club,브라가,S.C. Braga,Q75684
+club:Q75729,club,스포르팅 CP,Sporting CP,Q75729
+club:Q759482,club,크레모네세,US Cremonese,Q759482
+club:Q760736,club,스타드 라발,Stade Lavallois,Q760736
+club:Q770740,club,에이바르,SD Eibar,Q770740
+club:Q792916,club,Aydınspor 1923,Aydınspor 1923,Q792916
+club:Q797530,club,이스트르,FC Istres,Q797530
+club:Q804557,club,Bakırköyspor,Bakırköyspor,Q804557
+club:Q805909,club,발리케시르스포르,Balıkesirspor,Q805909
+club:Q81888,club,아약스,AFC Ajax,Q81888
+club:Q824850,club,가지안테프,Gaziantep F.K.,Q824850
+club:Q837218,club,예이다,UE Lleida,Q837218
+club:Q838134,club,에스트렐라 다 아마도라,C.F. Estrela da Amadora,Q838134
+club:Q8408,club,모데나,Modena,Q8408
+club:Q8416,club,노바라 칼초,Novara Calcio,Q8416
+club:Q8428,club,칼초 파도바,Calcio Padova,Q8428
+club:Q845043,club,프로시노네 칼초,Frosinone Calcio,Q845043
+club:Q845067,club,샤토루,LB Châteauroux,Q845067
+club:Q845137,club,앙제,Angers SCO,Q845137
+club:Q846008,club,아소시아상 나발 1º 드 마이우,Associação Naval 1º de Maio,Q846008
+club:Q8466,club,카이저슬라우테른,1. FC Kaiserslautern,Q8466
+club:Q847587,club,살레르니타나,U.S. Salernitana 1919,Q847587
+club:Q8476,club,레지나 칼초,AS Reggina 1914,Q8476
+club:Q849139,club,베베런,K.S.K. Beveren,Q849139
+club:Q849544,club,베스테를로,K.V.C. Westerlo,Q849544
+club:Q852079,club,부르고스,Burgos,Q852079
+club:Q854141,club,하를럼,HFC Haarlem,Q854141
+club:Q854167,club,포르튀나 시타르트,Fortuna Sittard,Q854167
+club:Q856119,club,레가네스,CD Leganés,Q856119
+club:Q856416,club,메리다,CP Mérida,Q856416
+club:Q857938,club,이스탄불 바샥셰히르,İstanbul Başakşehir F.K.,Q857938
+club:Q8603,club,사수올로 칼초,US Sassuolo Calcio,Q8603
+club:Q8615,club,스페치아 칼초,Spezia Calcio,Q8615
+club:Q8639,club,엘라스 베로나,Hellas Verona,Q8639
+club:Q865735,club,무스크롱,Royal Excelsior Mouscron,Q865735
+club:Q866884,club,아미앵,Amiens SC,Q866884
+club:Q8682,club,레알 마드리드,Real Madrid Club de Fútbol,Q8682
+club:Q8687,club,아틀레틱 빌바오,Athletic Club,Q8687
+club:Q8701,club,아틀레티코 마드리드,Atlético Madrid,Q8701
+club:Q870182,club,클레르몽 푸트,Clermont Foot 63,Q870182
+club:Q8723,club,레알 베티스,Real Betis Balompié,Q8723
+club:Q8749,club,셀타 비고,RC Celta de Vigo,Q8749
+club:Q875120,club,캄뷔르,SC Cambuur,Q875120
+club:Q875169,club,덴보스,DBO,Q875169
+club:Q8760,club,데포르티보 라코루냐,Deportivo de A Coruña,Q8760
+club:Q876568,club,마스트리흐트,MVV,Q876568
+club:Q8780,club,에스파뇰,RCD Espanyol de Barcelona,Q8780
+club:Q8806,club,헤타페,Getafe,Q8806
+club:Q8812,club,그라나다,Granada,Q8812
+club:Q8823,club,레반테,Levante UD,Q8823
+club:Q8835,club,마요르카,RCD Mallorca,Q8835
+club:Q8857,club,말라가,Málaga,Q8857
+club:Q891679,club,Boluspor,Boluspor,Q891679
+club:Q916199,club,뢰번,Oud-Heverlee Leuven,Q916199
+club:Q925973,club,RFC Seraing,RFC Seraing,Q925973
+club:Q926438,club,질 비센트,Gil Vicente,Q926438
+club:Q929360,club,메르신 이드마니우르두,Mersin İdmanyurdu,Q929360
+club:Q929753,club,콤포스텔라,Sociedad Deportiva Compostela,Q929753
+club:Q961309,club,K.S.V. Waregem,K.S.V. Waregem,Q961309
+club:Q9616,club,첼시,Chelsea,Q9616
+club:Q9617,club,아스널,Arsenal,Q9617
+club:Q9653,club,입스위치 타운,IPS,Q9653
+club:Q967104,club,R.F.C. Seraing,R.F.C. Seraing,Q967104
+club:Q982889,club,라싱 클럽 드 프랑스,Racing Club de France Football,Q982889
+continent:africa,continent,아프리카,Africa,africa
+continent:asia,continent,아시아,Asia,asia
+continent:europe,continent,유럽,Europe,europe
+continent:north_america,continent,북중미,North & Central America,north_america
+continent:oceania,continent,오세아니아,Oceania,oceania
+continent:south_america,continent,남미,South America,south_america
+final_goal:Q19317,final_goal,월드컵 결승 득점,Scored in a World Cup final,Q19317
+league:Q13394,league,리그 1,Ligue 1,Q13394
+league:Q15804,league,세리에 A,Serie A,Q15804
+league:Q167541,league,에레디비시,Eredivisie,Q167541
+league:Q182994,league,프리메이라리가,Primeira Liga,Q182994
+league:Q216022,league,벨기에 프로리그,Belgian Pro League,Q216022
+league:Q324867,league,라리가,LaLiga,Q324867
+league:Q485568,league,쉬페르리그,Süper Lig,Q485568
+league:Q82595,league,분데스리가,Bundesliga,Q82595
+league:Q9448,league,프리미어리그,Premier League,Q9448
+league:eng-top,league,잉글랜드 1부,English top flight,eng-top
+manager:Q144048,manager,베니테스 감독,Played under Benítez,Q144048
+manager:Q152107,manager,하인케스 감독,Played under Heynckes,Q152107
+manager:Q164038,manager,과르디올라 감독,Played under Guardiola,Q164038
+manager:Q169098,manager,레이카르트 감독,Played under Rijkaard,Q169098
+manager:Q17163,manager,크루이프 감독,Played under Cruyff,Q17163
+manager:Q174614,manager,안첼로티 감독,Played under Ancelotti,Q174614
+manager:Q183108,manager,카펠로 감독,Played under Capello,Q183108
+manager:Q1835,manager,지단 감독,Played under Zidane,Q1835
+manager:Q185572,manager,아르테타 감독,Played under Arteta,Q185572
+manager:Q192635,manager,쿠만 감독,Played under Koeman,Q192635
+manager:Q207431,manager,반 할 감독,Played under van Gaal,Q207431
+manager:Q235068,manager,라니에리 감독,Played under Ranieri,Q235068
+manager:Q258115,manager,시메오네 감독,Played under Simeone,Q258115
+manager:Q26580,manager,콘테 감독,Played under Conte,Q26580
+manager:Q2844569,manager,텐 하흐 감독,Played under ten Hag,Q2844569
+manager:Q294259,manager,사키 감독,Played under Sacchi,Q294259
+manager:Q295610,manager,에메리 감독,Played under Emery,Q295610
+manager:Q310813,manager,스팔레티 감독,Played under Spalletti,Q310813
+manager:Q313000,manager,포체티노 감독,Played under Pochettino,Q313000
+manager:Q354529,manager,알레그리 감독,Played under Allegri,Q354529
+manager:Q43304,manager,리피 감독,Played under Lippi,Q43304
+manager:Q44420,manager,트라파토니 감독,Played under Trapattoni,Q44420
+manager:Q44478,manager,히츠펠트 감독,Played under Hitzfeld,Q44478
+manager:Q4462,manager,뢰브 감독,Played under Löw,Q4462
+manager:Q44980,manager,퍼거슨 감독,Played under Ferguson,Q44980
+manager:Q47576,manager,벵거 감독,Played under Wenger,Q47576
+manager:Q48330,manager,만치니 감독,Played under Mancini,Q48330
+manager:Q484534,manager,히딩크 감독,Played under Hiddink,Q484534
+manager:Q508711,manager,데샹 감독,Played under Deschamps,Q508711
+manager:Q657360,manager,델 보스케 감독,Played under del Bosque,Q657360
+manager:Q702233,manager,투헬 감독,Played under Tuchel,Q702233
+manager:Q79983,manager,무리뉴 감독,Played under Mourinho,Q79983
+manager:Q83106,manager,클롭 감독,Played under Klopp,Q83106
+nation:Q1000,nation,가봉,Gabon,Q1000
+nation:Q1005,nation,감비아,The Gambia,Q1005
+nation:Q1006,nation,기니,Guinea,Q1006
+nation:Q1007,nation,기니비사우,Guinea-Bissau,Q1007
+nation:Q1008,nation,코트디부아르,Ivory Coast,Q1008
+nation:Q1009,nation,카메룬,Cameroon,Q1009
+nation:Q1011,nation,카보베르데,Cape Verde,Q1011
+nation:Q1014,nation,라이베리아,Liberia,Q1014
+nation:Q1016,nation,리비아,Libya,Q1016
+nation:Q1019,nation,마다가스카르,Madagascar,Q1019
+nation:Q1020,nation,말라위,Malawi,Q1020
+nation:Q1025,nation,모리타니,Mauritania,Q1025
+nation:Q1027,nation,모리셔스,Mauritius,Q1027
+nation:Q1028,nation,모로코,Morocco,Q1028
+nation:Q1029,nation,모잠비크,Mozambique,Q1029
+nation:Q1030,nation,나미비아,Namibia,Q1030
+nation:Q1032,nation,니제르,Niger,Q1032
+nation:Q1033,nation,나이지리아,Nigeria,Q1033
+nation:Q1036,nation,우간다,Uganda,Q1036
+nation:Q1037,nation,르완다,Rwanda,Q1037
+nation:Q1039,nation,상투메 프린시페,São Tomé and Príncipe,Q1039
+nation:Q1041,nation,세네갈,Senegal,Q1041
+nation:Q1042,nation,세이셸,Seychelles,Q1042
+nation:Q1044,nation,시에라리온,Sierra Leone,Q1044
+nation:Q1045,nation,소말리아,Somalia,Q1045
+nation:Q1049,nation,수단,Sudan,Q1049
+nation:Q1050,nation,에스와티니,Eswatini,Q1050
+nation:Q114,nation,케냐,Kenya,Q114
+nation:Q115,nation,에티오피아,Ethiopia,Q115
+nation:Q117,nation,가나,Ghana,Q117
+nation:Q1183,nation,푸에르토리코,Puerto Rico,Q1183
+nation:Q1246,nation,코소보,Kosovo,Q1246
+nation:Q126125,nation,생마르탱,Saint-Martin,Q126125
+nation:Q13353,nation,몬트세랫,Montserrat,Q13353
+nation:Q13706,nation,시랜드 공국,Principality of Sealand,Q13706
+nation:Q1410,nation,지브롤터,Gibraltar,Q1410
+nation:Q14112,nation,코르시카,Corsica,Q14112
+nation:Q142,nation,프랑스,France,Q142
+nation:Q145,nation,영국,United Kingdom,Q145
+nation:Q14773,nation,마카오,Macau,Q14773
+nation:Q148,nation,중화인민공화국,People's Republic of China,Q148
+nation:Q15180,nation,소련,Soviet Union,Q15180
+nation:Q155,nation,브라질,Brazil,Q155
+nation:Q159,nation,러시아,Russia,Q159
+nation:Q16,nation,캐나다,Canada,Q16
+nation:Q16957,nation,동독,East Germany,Q16957
+nation:Q17,nation,일본,Japan,Q17
+nation:Q17012,nation,과들루프,Guadeloupe,Q17012
+nation:Q17054,nation,마르티니크,Martinique,Q17054
+nation:Q17070,nation,레위니옹,Réunion,Q17070
+nation:Q172579,nation,이탈리아 왕국,Kingdom of Italy,Q172579
+nation:Q176,nation,퀘벡주,Quebec,Q176
+nation:Q183,nation,독일,Germany,Q183
+nation:Q184,nation,벨라루스,Belarus,Q184
+nation:Q189,nation,아이슬란드,Iceland,Q189
+nation:Q191,nation,에스토니아,Estonia,Q191
+nation:Q20,nation,노르웨이,Norway,Q20
+nation:Q21,nation,잉글랜드,England,Q21
+nation:Q211,nation,라트비아,Latvia,Q211
+nation:Q211274,nation,폴란드 인민공화국,Polish People's Republic,Q211274
+nation:Q212,nation,우크라이나,Ukraine,Q212
+nation:Q21203,nation,아루바,Aruba,Q21203
+nation:Q213,nation,체코,Czech Republic,Q213
+nation:Q214,nation,슬로바키아,Slovakia,Q214
+nation:Q215,nation,슬로베니아,Slovenia,Q215
+nation:Q216923,nation,중화 타이베이,Chinese Taipei,Q216923
+nation:Q217,nation,몰도바,Moldova,Q217
+nation:Q218,nation,루마니아,Romania,Q218
+nation:Q219,nation,불가리아,Bulgaria,Q219
+nation:Q219060,nation,팔레스타인,Palestine,Q219060
+nation:Q22,nation,스코틀랜드,Scotland,Q22
+nation:Q221,nation,북마케도니아,North Macedonia,Q221
+nation:Q222,nation,알바니아,Albania,Q222
+nation:Q224,nation,크로아티아,Croatia,Q224
+nation:Q225,nation,보스니아 헤르체고비나,Bosnia and Herzegovina,Q225
+nation:Q227,nation,아제르바이잔,Azerbaijan,Q227
+nation:Q228,nation,안도라,Andorra,Q228
+nation:Q22890,nation,아일랜드섬,Ireland,Q22890
+nation:Q229,nation,키프로스,Cyprus,Q229
+nation:Q230,nation,조지아,Georgia,Q230
+nation:Q232,nation,카자흐스탄,Kazakhstan,Q232
+nation:Q233,nation,몰타,Malta,Q233
+nation:Q235,nation,모나코,Monaco,Q235
+nation:Q236,nation,몬테네그로,Montenegro,Q236
+nation:Q23635,nation,버뮤다,Bermuda,Q23635
+nation:Q23681,nation,북키프로스,Northern Cyprus,Q23681
+nation:Q238,nation,산마리노,San Marino,Q238
+nation:Q241,nation,쿠바,Cuba,Q241
+nation:Q244,nation,바베이도스,Barbados,Q244
+nation:Q25,nation,웨일스,Wales,Q25
+nation:Q252,nation,인도네시아,Indonesia,Q252
+nation:Q25227,nation,네덜란드령 안틸레스,Netherlands Antilles,Q25227
+nation:Q25230,nation,건지 행정관 관할구,Guernsey,Q25230
+nation:Q25279,nation,퀴라소,Curaçao,Q25279
+nation:Q258,nation,남아프리카 공화국,South Africa,Q258
+nation:Q26,nation,북아일랜드,Northern Ireland,Q26
+nation:Q262,nation,알제리,Algeria,Q262
+nation:Q26273,nation,신트마르턴,Sint Maarten,Q26273
+nation:Q265,nation,우즈베키스탄,Uzbekistan,Q265
+nation:Q27,nation,아일랜드,Ireland,Q27
+nation:Q28,nation,헝가리,Hungary,Q28
+nation:Q29,nation,스페인,Spain,Q29
+nation:Q298,nation,칠레,Chile,Q298
+nation:Q29999,nation,네덜란드 왕국,Kingdom of the Netherlands,Q29999
+nation:Q30,nation,미국,United States,Q30
+nation:Q30971,nation,프랑스령 폴리네시아,French Polynesia,Q30971
+nation:Q31,nation,벨기에,Belgium,Q31
+nation:Q32,nation,룩셈부르크,Luxembourg,Q32
+nation:Q327,nation,브르타뉴,Brittany,Q327
+nation:Q33,nation,핀란드,Finland,Q33
+nation:Q334,nation,싱가포르,Singapore,Q334
+nation:Q33788,nation,누벨칼레도니,New Caledonia,Q33788
+nation:Q33946,nation,체코슬로바키아,Czechoslovakia,Q33946
+nation:Q34,nation,스웨덴,Sweden,Q34
+nation:Q347,nation,리히텐슈타인,Liechtenstein,Q347
+nation:Q35,nation,덴마크,Denmark,Q35
+nation:Q36,nation,폴란드,Poland,Q36
+nation:Q36704,nation,유고슬라비아,Yugoslavia,Q36704
+nation:Q37,nation,리투아니아,Lithuania,Q37
+nation:Q37024,nation,세르비아 몬테네그로,Serbia and Montenegro,Q37024
+nation:Q3769,nation,프랑스령 기아나,French Guiana,Q3769
+nation:Q38,nation,이탈리아,Italy,Q38
+nation:Q39,nation,스위스,Switzerland,Q39
+nation:Q3908,nation,갈리시아 지방,Galicia,Q3908
+nation:Q3934,nation,아스투리아스 지방,Asturias,Q3934
+nation:Q398,nation,바레인,Bahrain,Q398
+nation:Q399,nation,아르메니아,Armenia,Q399
+nation:Q40,nation,오스트리아,Austria,Q40
+nation:Q403,nation,세르비아,Serbia,Q403
+nation:Q4040,nation,아라곤주,Aragon,Q4040
+nation:Q408,nation,오스트레일리아,Australia,Q408
+nation:Q41,nation,그리스,Greece,Q41
+nation:Q414,nation,아르헨티나,Argentina,Q414
+nation:Q419,nation,페루,Peru,Q419
+nation:Q423,nation,조선민주주의인민공화국,North Korea,Q423
+nation:Q424,nation,캄보디아,Cambodia,Q424
+nation:Q43,nation,튀르키예,Turkey,Q43
+nation:Q45,nation,포르투갈,Portugal,Q45
+nation:Q4628,nation,페로 제도,Faroe Islands,Q4628
+nation:Q47588,nation,바스크,Basque Country,Q47588
+nation:Q4948,nation,베네치아 공화국,Republic of Venice,Q4948
+nation:Q505632,nation,파다니아,Padania,Q505632
+nation:Q55,nation,네덜란드,Netherlands,Q55
+nation:Q5689,nation,올란드 제도,Åland,Q5689
+nation:Q5705,nation,카탈루냐,Catalonia,Q5705
+nation:Q574,nation,동티모르,Timor-Leste,Q574
+nation:Q5783,nation,안달루시아주,Andalusia,Q5783
+nation:Q5785,nation,케이맨 제도,Cayman Islands,Q5785
+nation:Q657,nation,차드,Chad,Q657
+nation:Q664,nation,뉴질랜드,New Zealand,Q664
+nation:Q668,nation,인도,India,Q668
+nation:Q691,nation,파푸아뉴기니,Papua New Guinea,Q691
+nation:Q706553,nation,니스 백작령,County of Nice,Q706553
+nation:Q713750,nation,서독,West Germany,Q713750
+nation:Q717,nation,베네수엘라,Venezuela,Q717
+nation:Q730,nation,수리남,Suriname,Q730
+nation:Q733,nation,파라과이,Paraguay,Q733
+nation:Q734,nation,가이아나,Guyana,Q734
+nation:Q736,nation,에콰도르,Ecuador,Q736
+nation:Q739,nation,콜롬비아,Colombia,Q739
+nation:Q750,nation,볼리비아,Bolivia,Q750
+nation:Q754,nation,트리니다드 토바고,Trinidad and Tobago,Q754
+nation:Q756617,nation,덴마크 왕국,Kingdom of Denmark,Q756617
+nation:Q757,nation,세인트빈센트 그레나딘,Saint Vincent and the Grenadines,Q757
+nation:Q760,nation,세인트루시아,Saint Lucia,Q760
+nation:Q763,nation,세인트키츠 네비스,Saint Kitts and Nevis,Q763
+nation:Q766,nation,자메이카,Jamaica,Q766
+nation:Q769,nation,그레나다,Grenada,Q769
+nation:Q77,nation,우루과이,Uruguay,Q77
+nation:Q774,nation,과테말라,Guatemala,Q774
+nation:Q7779,nation,독립국가연합,Commonwealth of Independent States,Q7779
+nation:Q781,nation,앤티가 바부다,Antigua and Barbuda,Q781
+nation:Q783,nation,온두라스,Honduras,Q783
+nation:Q784,nation,도미니카 연방,Dominica,Q784
+nation:Q785,nation,저지섬,Jersey,Q785
+nation:Q786,nation,도미니카 공화국,Dominican Republic,Q786
+nation:Q79,nation,이집트,Egypt,Q79
+nation:Q790,nation,아이티,Haiti,Q790
+nation:Q792,nation,엘살바도르,El Salvador,Q792
+nation:Q794,nation,이란,Iran,Q794
+nation:Q796,nation,이라크,Iraq,Q796
+nation:Q800,nation,코스타리카,Costa Rica,Q800
+nation:Q801,nation,이스라엘,Israel,Q801
+nation:Q804,nation,파나마,Panama,Q804
+nation:Q810,nation,요르단,Jordan,Q810
+nation:Q811,nation,니카라과,Nicaragua,Q811
+nation:Q813,nation,키르기스스탄,Kyrgyzstan,Q813
+nation:Q817,nation,쿠웨이트,Kuwait,Q817
+nation:Q819,nation,라오스,Laos,Q819
+nation:Q822,nation,레바논,Lebanon,Q822
+nation:Q83286,nation,유고슬라비아 사회주의 연방공화국,Socialist Federal Republic of Yugoslavia,Q83286
+nation:Q833,nation,말레이시아,Malaysia,Q833
+nation:Q836,nation,미얀마,Myanmar,Q836
+nation:Q842,nation,오만,Oman,Q842
+nation:Q843,nation,파키스탄,Pakistan,Q843
+nation:Q846,nation,카타르,Qatar,Q846
+nation:Q851,nation,사우디아라비아,Saudi Arabia,Q851
+nation:Q854,nation,스리랑카,Sri Lanka,Q854
+nation:Q858,nation,시리아,Syria,Q858
+nation:Q863,nation,타지키스탄,Tajikistan,Q863
+nation:Q8646,nation,홍콩,Hong Kong,Q8646
+nation:Q869,nation,태국,Thailand,Q869
+nation:Q874,nation,투르크메니스탄,Turkmenistan,Q874
+nation:Q878,nation,아랍에미리트,United Arab Emirates,Q878
+nation:Q881,nation,베트남,Vietnam,Q881
+nation:Q884,nation,대한민국,South Korea,Q884
+nation:Q889,nation,아프가니스탄,Afghanistan,Q889
+nation:Q912,nation,말리,Mali,Q912
+nation:Q916,nation,앙골라,Angola,Q916
+nation:Q924,nation,탄자니아,Tanzania,Q924
+nation:Q928,nation,필리핀,Philippines,Q928
+nation:Q929,nation,중앙아프리카 공화국,Central African Republic,Q929
+nation:Q945,nation,토고,Togo,Q945
+nation:Q948,nation,튀니지,Tunisia,Q948
+nation:Q953,nation,잠비아,Zambia,Q953
+nation:Q954,nation,짐바브웨,Zimbabwe,Q954
+nation:Q96,nation,멕시코,Mexico,Q96
+nation:Q962,nation,베냉,Benin,Q962
+nation:Q963,nation,보츠와나,Botswana,Q963
+nation:Q965,nation,부르키나파소,Burkina Faso,Q965
+nation:Q967,nation,부룬디,Burundi,Q967
+nation:Q970,nation,코모로,Comoros,Q970
+nation:Q971,nation,콩고 공화국,Republic of the Congo,Q971
+nation:Q974,nation,콩고 민주 공화국,Democratic Republic of the Congo,Q974
+nation:Q977,nation,지부티,Djibouti,Q977
+nation:Q983,nation,적도 기니,Equatorial Guinea,Q983
+nation:Q986,nation,에리트레아,Eritrea,Q986
+squad:Q157894,squad,아시안컵 출전,Asian Cup squad,Q157894
+squad:Q178750,squad,코파 아메리카 출전,Copa América squad,Q178750
+squad:Q19317,squad,월드컵 출전,World Cup squad,Q19317
+squad:Q260858,squad,유로 출전,Euro squad,Q260858
+teammate:Q102027,teammate,칸나바로와 뛴 선수,Played with Cannavaro,Q102027
+teammate:Q104454,teammate,괴체와 뛴 선수,Played with Götze,Q104454
+teammate:Q10520,teammate,베컴과 뛴 선수,Played with Beckham,Q10520
+teammate:Q10524,teammate,긱스와 뛴 선수,Played with Giggs,Q10524
+teammate:Q10602,teammate,애슐리 영과 뛴 선수,Played with Young,Q10602
+teammate:Q107365,teammate,노이어와 뛴 선수,Played with Neuer,Q107365
+teammate:Q110053,teammate,후멜스와 뛴 선수,Played with Hummels,Q110053
+teammate:Q115453,teammate,라키티치와 뛴 선수,Played with Rakitić,Q115453
+teammate:Q11571,teammate,호날두와 뛴 선수,Played with Cristiano Ronaldo,Q11571
+teammate:Q11576,teammate,라울과 뛴 선수,Played with Raúl,Q11576
+teammate:Q11584,teammate,카시야스와 뛴 선수,Played with Casillas,Q11584
+teammate:Q11948,teammate,발라크와 뛴 선수,Played with Ballack,Q11948
+teammate:Q119562,teammate,아구에로와 뛴 선수,Played with Agüero,Q119562
+teammate:Q124086,teammate,스네이더와 뛴 선수,Played with Sneijder,Q124086
+teammate:Q1255625,teammate,에토오와 뛴 선수,Played with Eto'o,Q1255625
+teammate:Q126503,teammate,인자기와 뛴 선수,Played with Inzaghi,Q126503
+teammate:Q127452,teammate,카르바할과 뛴 선수,Played with Carvajal,Q127452
+teammate:Q128829,teammate,오웬과 뛴 선수,Played with Owen,Q128829
+teammate:Q129700,teammate,발로텔리와 뛴 선수,Played with Balotelli,Q129700
+teammate:Q131234,teammate,크로스와 뛴 선수,Played with Kroos,Q131234
+teammate:Q131261,teammate,칸과 뛴 선수,Played with Kahn,Q131261
+teammate:Q133556,teammate,콜과 뛴 선수,Played with Cole,Q133556
+teammate:Q134976,teammate,포돌스키와 뛴 선수,Played with Podolski,Q134976
+teammate:Q138172,teammate,팔카오와 뛴 선수,Played with Falcao,Q138172
+teammate:Q142794,teammate,네이마르와 뛴 선수,Played with Neymar,Q142794
+teammate:Q151260,teammate,보아텡과 뛴 선수,Played with Boateng,Q151260
+teammate:Q151269,teammate,레반도프스키와 뛴 선수,Played with Lewandowski,Q151269
+teammate:Q152377,teammate,로이스와 뛴 선수,Played with Reus,Q152377
+teammate:Q153786,teammate,제코와 뛴 선수,Played with Džeko,Q153786
+teammate:Q154708,teammate,가가와와 뛴 선수,Played with Shinji Kagawa,Q154708
+teammate:Q160206,teammate,크레스포와 뛴 선수,Played with Crespo,Q160206
+teammate:Q160472,teammate,테어 슈테겐과 뛴 선수,Played with ter Stegen,Q160472
+teammate:Q161054,teammate,페리시치와 뛴 선수,Played with Perišić,Q161054
+teammate:Q161069,teammate,다비드 실바와 뛴 선수,Played with David Silva,Q161069
+teammate:Q163666,teammate,레이나와 뛴 선수,Played with Reina,Q163666
+teammate:Q163974,teammate,반 더 바르트와 뛴 선수,Played with Vaart,Q163974
+teammate:Q164038,teammate,과르디올라와 뛴 선수,Played with Guardiola,Q164038
+teammate:Q164676,teammate,하세베와 뛴 선수,Played with Makoto,Q164676
+teammate:Q165125,teammate,치차리토와 뛴 선수,Played with Javier Hernández,Q165125
+teammate:Q166984,teammate,미켈과 뛴 선수,Played with Obi,Q166984
+teammate:Q167790,teammate,카바니와 뛴 선수,Played with Cavani,Q167790
+teammate:Q168740,teammate,마타와 뛴 선수,Played with Mata,Q168740
+teammate:Q170328,teammate,캉토나와 뛴 선수,Played with Cantona,Q170328
+teammate:Q17158,teammate,푸욜과 뛴 선수,Played with Puyol,Q17158
+teammate:Q172720,teammate,다니 알베스와 뛴 선수,Played with Alves,Q172720
+teammate:Q17499,teammate,파브레가스와 뛴 선수,Played with Fàbregas,Q17499
+teammate:Q17500,teammate,사비와 뛴 선수,Played with Xavi Hernández,Q17500
+teammate:Q17507,teammate,피케와 뛴 선수,Played with Piqué,Q17507
+teammate:Q178649,teammate,호마리우와 뛴 선수,Played with Romário,Q178649
+teammate:Q180553,teammate,산체스와 뛴 선수,Played with Sánchez,Q180553
+teammate:Q183967,teammate,트레제게와 뛴 선수,Played with Trezeguet,Q183967
+teammate:Q184277,teammate,야야 투레와 뛴 선수,Played with Touré,Q184277
+teammate:Q185389,teammate,베르캄프와 뛴 선수,Played with Bergkamp,Q185389
+teammate:Q185572,teammate,아르테타와 뛴 선수,Played with Arteta,Q185572
+teammate:Q187159,teammate,알바와 뛴 선수,Played with Alba,Q187159
+teammate:Q188997,teammate,슈체스니와 뛴 선수,Played with Szczęsny,Q188997
+teammate:Q1907,teammate,요리스와 뛴 선수,Played with Lloris,Q1907
+teammate:Q1911,teammate,지루와 뛴 선수,Played with Giroud,Q1911
+teammate:Q1912,teammate,벤제마와 뛴 선수,Played with Benzema,Q1912
+teammate:Q1916,teammate,에브라와 뛴 선수,Played with Evra,Q1916
+teammate:Q1918,teammate,리베리와 뛴 선수,Played with Ribéry,Q1918
+teammate:Q192671,teammate,비달과 뛴 선수,Played with Vidal,Q192671
+teammate:Q193706,teammate,다비드 루이스와 뛴 선수,Played with Luiz,Q193706
+teammate:Q1939,teammate,아넬카와 뛴 선수,Played with Anelka,Q1939
+teammate:Q196219,teammate,미키타리안과 뛴 선수,Played with Mkhitaryan,Q196219
+teammate:Q20110,teammate,토티와 뛴 선수,Played with Totti,Q20110
+teammate:Q202054,teammate,혼다와 뛴 선수,Played with Keisuke,Q202054
+teammate:Q208050,teammate,보누치와 뛴 선수,Played with Bonucci,Q208050
+teammate:Q208104,teammate,알론소와 뛴 선수,Played with Alonso,Q208104
+teammate:Q20851003,teammate,뎀벨레와 뛴 선수,Played with Dembélé,Q20851003
+teammate:Q210453,teammate,티아고 실바와 뛴 선수,Played with Thiago Silva,Q210453
+teammate:Q213427,teammate,램지와 뛴 선수,Played with Ramsey,Q213427
+teammate:Q214903,teammate,고딘과 뛴 선수,Played with Godín,Q214903
+teammate:Q2339,teammate,반 페르시와 뛴 선수,Played with van Persie,Q2339
+teammate:Q250901,teammate,아르벨로아와 뛴 선수,Played with Arbeloa,Q250901
+teammate:Q251683,teammate,디 마리아와 뛴 선수,Played with María,Q251683
+teammate:Q252190,teammate,샤키리와 뛴 선수,Played with Shaqiri,Q252190
+teammate:Q258115,teammate,시메오네와 뛴 선수,Played with Simeone,Q258115
+teammate:Q26069,teammate,훈텔라르와 뛴 선수,Played with Huntelaar,Q26069
+teammate:Q261534,teammate,포를란과 뛴 선수,Played with Forlán,Q261534
+teammate:Q26517,teammate,수아레스와 뛴 선수,Played with Suárez,Q26517
+teammate:Q266613,teammate,루니와 뛴 선수,Played with Rooney,Q266613
+teammate:Q273715,teammate,헨더슨과 뛴 선수,Played with Henderson,Q273715
+teammate:Q281734,teammate,나가토모와 뛴 선수,Played with Yūto,Q281734
+teammate:Q294951,teammate,에릭센과 뛴 선수,Played with Eriksen,Q294951
+teammate:Q29516,teammate,월콧과 뛴 선수,Played with Walcott,Q29516
+teammate:Q29566,teammate,캐릭과 뛴 선수,Played with Carrick,Q29566
+teammate:Q310612,teammate,오카자키와 뛴 선수,Played with Shinji Okazaki,Q310612
+teammate:Q311872,teammate,쿠티뉴와 뛴 선수,Played with Coutinho,Q311872
+teammate:Q313316,teammate,루카쿠와 뛴 선수,Played with Lukaku,Q313316
+teammate:Q31981,teammate,알라바와 뛴 선수,Played with Alaba,Q31981
+teammate:Q349125,teammate,로브렌과 뛴 선수,Played with Lovren,Q349125
+teammate:Q368441,teammate,하메스와 뛴 선수,Played with Rodríguez,Q368441
+teammate:Q38136,teammate,마르셀루와 뛴 선수,Played with Marcelo Vieira,Q38136
+teammate:Q386876,teammate,아데바요르와 뛴 선수,Played with Adebayor,Q386876
+teammate:Q39444,teammate,호나우지뉴와 뛴 선수,Played with Ronaldinho,Q39444
+teammate:Q41244,teammate,셰브첸코와 뛴 선수,Played with Shevchenko,Q41244
+teammate:Q41533,teammate,램퍼드와 뛴 선수,Played with Lampard,Q41533
+teammate:Q42731,teammate,토레스와 뛴 선수,Played with Torres,Q42731
+teammate:Q429039,teammate,로베르토 카를로스와 뛴 선수,Played with Carlos,Q429039
+teammate:Q43666,teammate,뮐러와 뛴 선수,Played with Müller,Q43666
+teammate:Q43729,teammate,이니에스타와 뛴 선수,Played with Iniesta,Q43729
+teammate:Q43913,teammate,로벤과 뛴 선수,Played with Robben,Q43913
+teammate:Q43926,teammate,피를로와 뛴 선수,Played with Pirlo,Q43926
+teammate:Q44298,teammate,슈바인슈타이거와 뛴 선수,Played with Schweinsteiger,Q44298
+teammate:Q44977,teammate,아우바메양과 뛴 선수,Played with Aubameyang,Q44977
+teammate:Q455462,teammate,그리즈만과 뛴 선수,Played with Griezmann,Q455462
+teammate:Q45613,teammate,스콜스와 뛴 선수,Played with Scholes,Q45613
+teammate:Q45626,teammate,반 니스텔로이와 뛴 선수,Played with van Nistelrooy,Q45626
+teammate:Q45901,teammate,앙리와 뛴 선수,Played with Henry,Q45901
+teammate:Q459707,teammate,디에고 코스타와 뛴 선수,Played with Costa,Q459707
+teammate:Q459830,teammate,제라드와 뛴 선수,Played with Gerrard,Q459830
+teammate:Q4599,teammate,알비올과 뛴 선수,Played with Albiol,Q4599
+teammate:Q46347,teammate,비에라와 뛴 선수,Played with Patrick Vieira,Q46347
+teammate:Q46896,teammate,즐라탄과 뛴 선수,Played with Ibrahimović,Q46896
+teammate:Q47230,teammate,아르샤빈과 뛴 선수,Played with Arshavin,Q47230
+teammate:Q482947,teammate,나니와 뛴 선수,Played with Nani,Q482947
+teammate:Q482955,teammate,반 데 사르와 뛴 선수,Played with Sar,Q482955
+teammate:Q483027,teammate,말디니와 뛴 선수,Played with Maldini,Q483027
+teammate:Q483137,teammate,체흐와 뛴 선수,Played with Čech,Q483137
+teammate:Q483145,teammate,피구와 뛴 선수,Played with Figo,Q483145
+teammate:Q483309,teammate,라모스와 뛴 선수,Played with Ramos,Q483309
+teammate:Q483417,teammate,퍼디난드와 뛴 선수,Played with Ferdinand,Q483417
+teammate:Q483577,teammate,히바우두와 뛴 선수,Played with Rivaldo,Q483577
+teammate:Q483583,teammate,시어러와 뛴 선수,Played with Shearer,Q483583
+teammate:Q483837,teammate,모드리치와 뛴 선수,Played with Modrić,Q483837
+teammate:Q483846,teammate,이과인과 뛴 선수,Played with Higuaín,Q483846
+teammate:Q485697,teammate,페페와 뛴 선수,Played with Pepe,Q485697
+teammate:Q487459,teammate,투란과 뛴 선수,Played with Turan,Q487459
+teammate:Q48892,teammate,드로그바와 뛴 선수,Played with Drogba,Q48892
+teammate:Q49704,teammate,부스케츠와 뛴 선수,Played with Busquets,Q49704
+teammate:Q50600,teammate,테베스와 뛴 선수,Played with Tevez,Q50600
+teammate:Q52876,teammate,사네티와 뛴 선수,Played with Zanetti,Q52876
+teammate:Q529207,teammate,호나우두와 뛴 선수,Played with Ronaldo,Q529207
+teammate:Q57114,teammate,레만과 뛴 선수,Played with Lehmann,Q57114
+teammate:Q58441,teammate,호비뉴와 뛴 선수,Played with Robinho,Q58441
+teammate:Q602525,teammate,피르미누와 뛴 선수,Played with Firmino,Q602525
+teammate:Q6147586,teammate,바디와 뛴 선수,Played with Vardy,Q6147586
+teammate:Q615,teammate,메시와 뛴 선수,Played with Messi,Q615
+teammate:Q624,teammate,델 피에로와 뛴 선수,Played with Piero,Q624
+teammate:Q62786,teammate,헐크와 뛴 선수,Played with Hulk,Q62786
+teammate:Q659634,teammate,데쿠와 뛴 선수,Played with Deco,Q659634
+teammate:Q68060,teammate,부폰과 뛴 선수,Played with Buffon,Q68060
+teammate:Q73360,teammate,쿠르투아와 뛴 선수,Played with Courtois,Q73360
+teammate:Q80306,teammate,키엘리니와 뛴 선수,Played with Chiellini,Q80306
+teammate:Q80471,teammate,클로제와 뛴 선수,Played with Klose,Q80471
+teammate:Q83006,teammate,비야와 뛴 선수,Played with Villa,Q83006
+teammate:Q83456,teammate,테리와 뛴 선수,Played with Terry,Q83456
+teammate:Q969423,teammate,나바스와 뛴 선수,Played with Navas,Q969423
+teammate:Q969725,teammate,케인과 뛴 선수,Played with Kane,Q969725
+title:Q11151:1,title,FA컵 우승,FA Cup winner,Q11151
+title:Q13394:1,title,리그 1 우승,Ligue 1 winner,Q13394
+title:Q13394:3,title,리그 1 3회 이상 우승,Ligue 1 3+ titles,Q13394
+title:Q150880:1,title,DFB 포칼 우승,DFB-Pokal winner,Q150880
+title:Q157894:1,title,아시안컵 우승,Asian Cup winner,Q157894
+title:Q15804:1,title,세리에 A 우승,Serie A winner,Q15804
+title:Q15804:3,title,세리에 A 3회 이상 우승,Serie A 3+ titles,Q15804
+title:Q167541:1,title,에레디비시 우승,Eredivisie winner,Q167541
+title:Q167541:3,title,에레디비시 3회 이상 우승,Eredivisie 3+ titles,Q167541
+title:Q169918:1,title,코파 이탈리아 우승,Coppa Italia winner,Q169918
+title:Q178750:1,title,코파 아메리카 우승,Copa América winner,Q178750
+title:Q182994:1,title,프리메이라리가 우승,Primeira Liga winner,Q182994
+title:Q182994:3,title,프리메이라리가 3회 이상 우승,Primeira Liga 3+ titles,Q182994
+title:Q18756:1,title,UCL 우승,UCL winner,Q18756
+title:Q18760:1,title,UEL 우승,UEL winner,Q18760
+title:Q193041:1,title,AFC 챔스 우승,AFC CL winner,Q193041
+title:Q19317:1,title,월드컵 우승,World Cup winner,Q19317
+title:Q212412:1,title,쿠프 드 프랑스 우승,Coupe de France winner,Q212412
+title:Q216022:1,title,벨기에 프로리그 우승,Belgian Pro League winner,Q216022
+title:Q216022:3,title,벨기에 프로리그 3회 이상 우승,Belgian Pro League 3+ titles,Q216022
+title:Q216858:1,title,KNVB 베이커 우승,KNVB Cup winner,Q216858
+title:Q260858:1,title,유로 우승,Euro winner,Q260858
+title:Q29224:1,title,타사 드 포르투갈 우승,Taça de Portugal winner,Q29224
+title:Q324867:1,title,라리가 우승,LaLiga winner,Q324867
+title:Q324867:3,title,라리가 3회 이상 우승,LaLiga 3+ titles,Q324867
+title:Q40241:1,title,컵위너스컵 우승,UEFA Cup Winners' Cup winner,Q40241
+title:Q483794:1,title,코파 델 레이 우승,Copa del Rey winner,Q483794
+title:Q485568:1,title,쉬페르리그 우승,Süper Lig winner,Q485568
+title:Q485568:3,title,쉬페르리그 3회 이상 우승,Süper Lig 3+ titles,Q485568
+title:Q736856:1,title,벨기에 컵 우승,Belgian Cup winner,Q736856
+title:Q752145:1,title,튀르키예 컵 우승,Turkish Cup winner,Q752145
+title:Q82595:1,title,분데스리가 우승,Bundesliga winner,Q82595
+title:Q82595:3,title,분데스리가 3회 이상 우승,Bundesliga 3+ titles,Q82595
+title:Q9448:1,title,PL 우승,PL winner,Q9448
+title:Q9448:3,title,PL 3회 이상 우승,PL 3+ titles,Q9448
+title:eng-top:1,title,잉글랜드 1부 우승,English top flight winner,eng-top
+title:eng-top:3,title,잉글랜드 1부 3회 이상 우승,English top flight 3+ titles,eng-top

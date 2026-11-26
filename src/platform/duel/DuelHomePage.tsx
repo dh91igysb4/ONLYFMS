@@ -9,13 +9,13 @@ import { walletEnabled } from '../wallet/enabled.ts'
 import { refreshWallet, useWallet } from '../wallet/useWallet.ts'
 import { formatGold } from '../wallet/format.ts'
 import { StakePicker } from './StakePicker.tsx'
+import { defaultOptions, OptionSelects } from './OptionSelects.tsx'
 import { parseStake, stakeOf, stakeProblem } from './stake.ts'
 
 
 const gameName = (id: string) => getDuel(id)?.manifest.name ?? id
 const fallbackTurn = { choices: [60], default: 60 }
 const turnOf = (m: Manifest) => m.duel?.turnSeconds ?? fallbackTurn
-const defaultOptions = (m: Manifest) => Object.fromEntries(m.options.map((o) => [o.key, o.default]))
 
 function CreateForm({ visible }: { visible: Manifest[] }) {
   const navigate = useNavigate()
@@ -71,15 +71,7 @@ function CreateForm({ visible }: { visible: Manifest[] }) {
           {visible.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </label>
-      {manifest.options.map((o) => (
-        <label key={o.key} className="field">
-          <span>{o.label}</span>
-          <select className="input" value={options[o.key] ?? o.default}
-            onChange={(e) => setOptions((prev) => ({ ...prev, [o.key]: e.target.value }))}>
-            {o.choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </label>
-      ))}
+      <OptionSelects manifest={manifest} value={options} onChange={setOptions} />
       <fieldset className="field">
         <legend>종류</legend>
         <label className="radio"><input type="radio" name="duel-rated" checked={rated} onChange={() => setRated(true)} /> 랭크</label>

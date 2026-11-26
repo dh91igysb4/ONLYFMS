@@ -119,10 +119,20 @@ const DUEL_MESSAGES: Record<string, string> = {
   not_due: '',
   stake_mismatch: '판돈이 바뀌었어요. 다시 확인해 주세요',
   invalid_stake: '판돈을 다시 적어 주세요',
+  prepare_failed: '판을 준비하지 못했어요. 잠시 뒤 다시 해 주세요',
 }
 
 export function duelErrorMessage(code: string): string {
   return DUEL_MESSAGES[code] ?? errorMessage(code)
+}
+
+/**
+ * 거절된 대전 행동(invalid_action의 message, 같은 화면은 logic.apply의 error)의 화면 문구.
+ * 로직이 한국어 문장으로 돌려준 이유는 그대로, 영문 코드(`^[a-z0-9_]+$`)나 그 밖의 값은 일반 문구로 바꾼다(DuelLogic.apply 계약).
+ */
+export function duelActionMessage(message: unknown): string {
+  if (typeof message === 'string' && message !== '' && message.length <= 200 && !/^[a-z0-9_]+$/.test(message)) return message
+  return duelErrorMessage('invalid_action')
 }
 
 // ------------------------------------------------------------------ 승인 취소 알림 (설계 §11)

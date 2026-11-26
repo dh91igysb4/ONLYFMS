@@ -203,6 +203,17 @@ test('move: invalid_action shows the Korean message, never the raw logic code', 
   expect(screen.queryByText(/bad_pick/)).toBeNull()
 })
 
+test('move: invalid_action shows a logic sentence as is', async () => {
+  renderAt()
+  await flush()
+  duelMock.mockImplementationOnce(async () => {
+    throw new ApiError('invalid_action', 400, { error: 'invalid_action', message: '이미 쓴 선수예요' })
+  })
+  fireEvent.click(screen.getByRole('button', { name: '둔다' }))
+  await flush()
+  expect(screen.getByRole('alert').textContent).toBe('이미 쓴 선수예요')
+})
+
 test('match_polls_without_realtime', async () => {
   // Realtime을 아예 쓸 수 없어도(채널 생성이 던짐) 5초 폴링으로 진행된다
   channelThrows = true

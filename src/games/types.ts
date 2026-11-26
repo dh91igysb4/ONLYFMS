@@ -15,7 +15,10 @@ export interface GameLogic<Puzzle, Action, State, PublicState> {
   /** 문제의 고유 키. 같은 문제가 반복 출제되지 않게 하는 데 쓴다 */
   puzzleKey(puzzle: Puzzle): string
   initState(puzzle: Puzzle, ctx: Ctx): State
-  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
+  /**
+   * 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다.
+   * error가 영문 소문자 코드(`^[a-z0-9_]+$`)가 아니면 화면에 그대로 보인다(한국어 문장으로 쓴다). 코드면 일반 문구가 뜬다.
+   */
   apply(
     puzzle: Puzzle,
     state: State,
@@ -61,8 +64,12 @@ export type Manifest = {
   avatar?: { label: string }
   /** 지속형 게임이 메인 화면 미리보기를 그린다(`getWorldPreview`와 함께). 메인 미리보기 설계 §5.1 */
   preview?: true
-  /** 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부 */
-  duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean }
+  /**
+   * 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부.
+   * prepare: 판 준비 RPC 이름(`^[a-z_]+$`). 있으면 대국을 시작할 때 `public.<prepare>(options jsonb)`를 불러
+   * 결과를 `DuelLogic.init`의 세 번째 인자로 넘긴다(서버는 join 트랜잭션 안에서, 한 화면 대전은 브라우저에서 `p_options`로).
+   */
+  duel?: { turnSeconds: { choices: number[]; default: number }; sameScreen: boolean; prepare?: string }
   /**
    * 자유 플레이 기록을 보여 주는 방식. 생략하면 'solve'(정답·정답률·연속).
    * 'score'는 점수 게임: 리더보드는 플레이·평균·최고만, 최고 점수 순으로 고정한다.
@@ -96,10 +103,14 @@ export type DuelResult = { over: false } | { over: true; winner: Seat | null; sc
 export interface DuelLogic<State, Action, View> {
   /** 규칙을 바꿀 때마다 1씩 올린다 */
   version: number
-  init(rng: () => number, options: Record<string, string>): State
+  /** prepared: manifest `duel.prepare` RPC의 결과(없으면 undefined). 쓰지 않는 게임은 무시한다 */
+  init(rng: () => number, options: Record<string, string>, prepared?: unknown): State
   /** 지금 행동할 좌석 */
   toMove(state: State): Seat
-  /** 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다 */
+  /**
+   * 행동 하나를 적용한다. 잘못된 행동이면 error를 돌려주고 상태는 바뀌지 않는다.
+   * error가 영문 소문자 코드(`^[a-z0-9_]+$`)가 아니면 화면에 그대로 보인다(한국어 문장으로 쓴다). 코드면 일반 문구가 뜬다.
+   */
   apply(state: State, seat: Seat, action: Action, rng: () => number): { state: State } | { error: string }
   /**
    * 시간 초과 시 서버가 대신 적용할 "다음 행동" 하나. 아직 보이지 않는 난수(주사위)에 의존하지 않는다.
@@ -110,8 +121,12 @@ export interface DuelLogic<State, Action, View> {
   /** 진행도(채운 칸 수 등). 턴이 끝났는지와 연속 시간 초과를 판단하는 데 쓴다 (설계 §3.2) */
   turnNo(state: State): number
   result(state: State): DuelResult
-  /** 브라우저에 보낼 상태. viewer가 null이면 관전자 */
-  view(state: State, viewer: Seat | null): View
+  /**
+   * 브라우저에 보낼 상태. viewer가 null이면 관전자(또는 끝난 대국).
+   * ended: 플랫폼이 대국을 끝냈다(대국 status가 active가 아님 — 기권·시간 초과 패·무효 포함, 같은 화면은 result.over).
+   * result가 아직 진행 중이어도 끝난 화면을 보여 줄 수 있다. 쓰지 않는 게임은 무시한다.
+   */
+  view(state: State, viewer: Seat | null, ended?: boolean): View
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
