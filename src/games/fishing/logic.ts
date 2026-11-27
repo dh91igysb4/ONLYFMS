@@ -15,6 +15,10 @@ import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } fro
 /** 가구 종류마다 보관함 최대 개수 */
 const FURN_CAP = 99
 import type { NodeKind } from './map.ts'
+import {
+  ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, LICENSE_PRICE, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
+  type BaitKind, type Econ,
+} from './research.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -30,6 +34,10 @@ export type CastCtx = {
   equipped: readonly TackleId[]
   /** 신화 버프. 서버 추첨에 쓰이는 건 imugi-scale(입질). 없으면 빈 목록 */
   buffs?: readonly BuffId[]
+  /** 집어 미끼(P1): 일반 rare 가중치에 더 곱하는 배율. 없으면 1 */
+  rareMult?: number
+  /** 연구 낚시(P1): 대상과 이번 투척의 대상 입질 확률. 있으면 다른 전설·신화 최초 발견 후보는 없다 */
+  research?: { target: string; chance: number }
 }
 
 type NormalRarity = keyof Rod['weights']
@@ -63,10 +71,12 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
   const r0 = rng()
   const r1 = rng()
   const r2 = rng()
-  const special = specialCandidate(available, c)
+  const special = c.research ? speciesById(c.research.target) : specialCandidate(available, c)
   const chance = !special
     ? 0
-    : special.rarity === 'mythic'
+    : c.research
+      ? c.research.chance
+      : special.rarity === 'mythic'
       ? MYTHIC_CHANCE * (curious ? TACKLE_FX.curiousMythic : 1)
       : LEGEND_CHANCE * (curious ? TACKLE_FX.curiousLegend : 1)
 
@@ -74,7 +84,7 @@ export function rollCatch(rng: () => number, c: CastCtx): Catch {
   if (special && r0 < chance) {
     species = special
   } else {
-    const weight = (r: NormalRarity) => rod.weights[r] * (curious && r === 'rare' ? TACKLE_FX.curiousRare : 1)
+    const weight = (r: NormalRarity) => rod.weights[r] * (r === 'rare' ? (curious ? TACKLE_FX.curiousRare : 1) * (c.rareMult ?? 1) : 1)
     const total = RARITIES.reduce((sum, r) => sum + weight(r), 0)
     let pick = r1 * total
     let rarity: NormalRarity = RARITIES[RARITIES.length - 1]
@@ -119,6 +129,12 @@ export function sizePercentile(speciesId: string, sizeCm: number): number {
 export function sellPrice(f: { species: string; sizeCm: number; perfect: boolean }, buffs: readonly BuffId[] = []): number {
   const p = price(f.species, f.sizeCm, f.perfect)
   return buffs.includes('dragon-pearl') ? Math.round((p * BUFF_FX.pearlSell) / 100) : p
+}
+
+/** 개체 판매가(P1): 연구로 다시 잡은 전설·신화(origin recatch)는 round(판매가 × 50%). 판매·버리기 요금·화면 예상가가 쓴다 */
+export function fishSellPrice(f: { species: string; sizeCm: number; perfect: boolean; origin?: FishOrigin }, buffs: readonly BuffId[] = []): number {
+  const p = sellPrice(f, buffs)
+  return f.origin === 'recatch' ? Math.round((p * RECATCH_SALE_PCT) / 100) : p
 }
 
 export function price(speciesId: string, sizeCm: number, perfect: boolean): number {
@@ -209,6 +225,10 @@ export type Pending = {
   spot: string
   cond: Conditions
   power: number
+  /** 이 투척에 쓴 미끼(P1, v27). 없으면 맨 낚시 */
+  bait?: BaitKind
+  /** 연구 낚시 대상 어종(전설·신화 미끼일 때) */
+  target?: string
 }
 export type PendingView = {
   biteDelayMs: number
@@ -251,11 +271,17 @@ export type State = {
   pending: Pending | null
   /** 다음 물고기 id(v26). 가방·냉장고의 어떤 id보다 크다 */
   nextFishId: number
+  /** 경제 P1(v27): 어분·미끼·연구 해금·대상별 연구 보장 카운터 */
+  econ: Econ
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
 export type DiscardAt = 'bag' | 'trash'
 export type Action =
-  | { type: 'cast'; area: string; power: number; spot?: string }
+  | { type: 'cast'; area: string; power: number; spot?: string; bait?: BaitKind; target?: string }
+  // 경제 P1(v27, 기능 플래그): 일반 물고기 → 어분, 미끼 만들기(price는 화면이 본 골드), 연구 해금
+  | { type: 'grind'; items: { index: number; id?: number }[] }
+  | { type: 'makeBait'; kind: BaitKind; price: number }
+  | { type: 'buyLicense'; price: number }
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
@@ -323,7 +349,8 @@ export const newIsle = (layout: IsleLayoutId): IsleState => ({
   layout, cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] },
   house: 0, furniture: {}, placed: [], decoBox: {}, deco: [],
 })
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
+// econ은 v27 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 newEcon()으로 본다.
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId' | 'econ'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; econ?: Econ; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -362,6 +389,7 @@ const init = (): State => ({
   isle: null,
   pending: null,
   nextFishId: 1,
+  econ: newEcon(),
 })
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -381,6 +409,9 @@ function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
   if (closed) return { error: closed }
   if (!isNum(a.power) || a.power < 0 || a.power > 1) return { error: 'bad_power' }
   if (state.bag.length >= bagSize(state.bagTier)) return { error: 'bag_full' }
+  const used = castBait(state, a, area.id, spot)
+  if ('error' in used) return used
+  const { bait, target } = used
   const c = rollCatch(ctx.rng, {
     rodTier: state.rodTier,
     power: a.power,
@@ -391,9 +422,35 @@ function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
     legends: state.legends,
     equipped: state.equipped,
     buffs: state.buffs ?? [],
+    ...(bait === 'attractor' ? { rareMult: ATTRACTOR_RARE } : {}),
+    ...(target ? { research: { target, chance: researchChance(target, state.econ.pity[target] ?? 0, state.equipped.includes('curious')) } } : {}),
   })
-  const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power }
-  return { state: { ...state, pending }, result: pendingView(pending) }
+  const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power, ...(bait ? { bait } : {}), ...(target ? { target } : {}) }
+  // 유효 투척이면 미끼 1개를 쓰고, 연구 대상의 보장 카운터를 1 올린다(놓쳐도 유지, 대상을 잡으면 resolve가 0으로)
+  const econ: Econ = !bait
+    ? state.econ
+    : {
+        ...state.econ,
+        baits: { ...state.econ.baits, [bait]: state.econ.baits[bait] - 1 },
+        pity: target ? { ...state.econ.pity, [target]: (state.econ.pity[target] ?? 0) + 1 } : state.econ.pity,
+      }
+  return { state: { ...state, pending, econ }, result: pendingView(pending) }
+}
+
+/** cast의 미끼(P1): 없으면 맨 낚시. 거절(플래그 꺼짐·미끼 없음·자격 없음)이면 미끼를 쓰지 않는다 */
+function castBait(state: State, a: Record<string, unknown>, area: AreaId, spot: string): { bait?: BaitKind; target?: string } | { error: string } {
+  if (a.bait === undefined) return {}
+  const bait = a.bait
+  if (typeof bait !== 'string' || !BAIT_KINDS.includes(bait as BaitKind)) return { error: 'bad_action' }
+  const kind = bait as BaitKind
+  if (!featureOn(kind === 'attractor' ? 'bait' : 'research')) return { error: 'feature_off' }
+  if (state.econ.baits[kind] < 1) return { error: 'no_bait' }
+  if (kind === 'attractor') return { bait: kind }
+  if (!state.econ.license) return { error: 'no_license' }
+  if (typeof a.target !== 'string' || !baitMatches(kind, a.target)) return { error: 'bad_target' }
+  const why = researchEligibility(a.target, { legends: state.legends, area, spot, rodTier: state.rodTier, power: a.power as number })
+  if (why) return { error: why }
+  return { bait: kind, target: a.target }
 }
 
 /**
@@ -432,11 +489,12 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (p.hookedAt == null) return { error: 'not_hooked' }
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
   const isLegend = !!speciesById(p.species).legend
-  // 전설은 다시 잡을 수 없으니 실수로 팔리지 않게 잠근 채 넣는다 (가방에서 풀 수 있다)
-  // 전설·신화는 지금 한 번만 잡히므로 first. 연구 재포획(recatch)은 P1
+  // 연구 낚시로 대상을 잡았으면 recatch(판매가 50%), 대상 보장 카운터는 0. 놓치면(위 success false) 카운터 유지
+  const recatch = isLegend && p.target === p.species
+  // 전설·신화는 실수로 팔리지 않게 잠근 채 넣는다 (가방에서 풀 수 있다)
   const fish: Fish = {
     id: state.nextFishId,
-    origin: isLegend ? 'first' : 'normal',
+    origin: recatch ? 'recatch' : isLegend ? 'first' : 'normal',
     species: p.species,
     sizeCm: p.sizeCm,
     perfect: a.perfect,
@@ -452,8 +510,13 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   const facts = catchFacts(p, a.perfect)
   const judged = facts ? progressChallenges(state.challenges, facts) : { challenges: state.challenges, completed: [] }
   const gained = gainBuff(state.buffs ?? [], p.species)
+  let econ = state.econ
+  if (recatch) {
+    const { [p.species]: _done, ...pity } = state.econ.pity
+    econ = { ...state.econ, pity }
+  }
   return {
-    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null },
+    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null, econ },
     result: {
       caught: fish,
       ...(judged.completed.length > 0 ? { completed: judged.completed } : {}),
@@ -492,10 +555,10 @@ export function sellRatePct(nth: number): number {
 }
 
 /** 오늘 이미 before마리 판 뒤 fish를 순서대로 팔 때의 합. 물고기마다 round(sellPrice × 배율 / 100). 화면 예상가도 이 함수를 쓴다 */
-export function decayedSale(fish: readonly Pick<Fish, 'species' | 'sizeCm' | 'perfect'>[], buffs: readonly BuffId[], before: number): { earned: number; count: number } {
+export function decayedSale(fish: readonly (Pick<Fish, 'species' | 'sizeCm' | 'perfect'> & { origin?: FishOrigin })[], buffs: readonly BuffId[], before: number): { earned: number; count: number } {
   let earned = 0
   fish.forEach((f, i) => {
-    earned += Math.round((sellPrice(f, buffs) * sellRatePct(before + i + 1)) / 100)
+    earned += Math.round((fishSellPrice(f, buffs) * sellRatePct(before + i + 1)) / 100)
   })
   return { earned, count: fish.length }
 }
@@ -527,8 +590,8 @@ function sell(state: State, now: number): Out {
  * 버리기 환경부담금(마을회관 설계 §5, v18): 판매가(감쇠 전, 버프 포함)의 가방 50%·쓰레기통 5% 올림, 최소 1 G.
  * 화면도 이 함수를 쓴다.
  */
-export function discardFee(f: Pick<Fish, 'species' | 'sizeCm' | 'perfect'>, buffs: readonly BuffId[], at: DiscardAt = 'bag'): number {
-  return Math.max(1, Math.ceil(sellPrice(f, buffs) / (at === 'trash' ? 20 : 2)))
+export function discardFee(f: Pick<Fish, 'species' | 'sizeCm' | 'perfect'> & { origin?: FishOrigin }, buffs: readonly BuffId[], at: DiscardAt = 'bag'): number {
+  return Math.max(1, Math.ceil(fishSellPrice(f, buffs) / (at === 'trash' ? 20 : 2)))
 }
 
 function discard(state: State, a: Record<string, unknown>, gold: number): Out {
@@ -818,6 +881,26 @@ function migrate(raw: unknown, fromVersion: number): State {
     isle: migrateIsle(raw.isle),
     pending: migratePending(raw.pending, fromVersion),
     nextFishId: numbered.nextFishId,
+    econ: fromVersion >= ECON_VERSION ? migrateEcon(raw.econ, legends) : newEcon(),
+  }
+}
+
+/** 경제 P1이 생긴 버전 */
+const ECON_VERSION = 27
+
+/** v27 이상 econ: 알려진 칸만, 음이 아닌 정수만. 보장 카운터는 발견한 전설·신화만 */
+function migrateEcon(raw: unknown, legends: readonly string[]): Econ {
+  const base = newEcon()
+  if (!isObj(raw)) return base
+  const count = (v: unknown) => (isNum(v) && Number.isInteger(v) && v >= 0 ? v : 0)
+  const baits = isObj(raw.baits) ? raw.baits : {}
+  const pity: Econ['pity'] = {}
+  if (isObj(raw.pity)) for (const [id, n] of Object.entries(raw.pity)) if (legends.includes(id) && count(n) > 0) pity[id] = count(n)
+  return {
+    meal: count(raw.meal),
+    baits: { attractor: count(baits.attractor), legend: count(baits.legend), mythic: count(baits.mythic) },
+    license: raw.license === true,
+    pity,
   }
 }
 
@@ -932,6 +1015,9 @@ function migratePending(raw: unknown, fromVersion: number): Pending | null {
     spot,
     cond: { gameMinute: cond.gameMinute, gameDay: cond.gameDay, season: cond.season as Conditions['season'], weather: cond.weather as Conditions['weather'] },
     power: power as number,
+    // v27: 미끼·연구 대상(알려진 값일 때만)
+    ...(fromVersion >= 27 && BAIT_KINDS.includes(raw.bait as BaitKind) ? { bait: raw.bait as BaitKind } : {}),
+    ...(fromVersion >= 27 && knownSpecies(raw.target) && speciesById(raw.target).legend ? { target: raw.target } : {}),
   }
 }
 
@@ -990,7 +1076,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
   // 26: 물고기 id·출처(Fish.id·origin, nextFishId). v25 이하 개체는 legacy, 가방 → 냉장고 순서로 1부터. 행동은 id를 받으면 확인
   //     (경제 설계 2026-11-27-fishing-economy-design.md §4.2). 판매가·확률은 그대로
-  version: 26,
+  // 27: 경제 P1(econ: 어분·미끼·연구 해금·대상별 보장, cast의 bait·target, grind·makeBait·buyLicense, recatch 판매가 50%)과
+  //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종). 새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
+  version: 27,
   wallet: true,
   init,
   migrate,
@@ -1194,6 +1282,52 @@ function undecorate(state: State, a: Record<string, unknown>): Out {
   return { state: { ...state, isle: { ...isle, deco: isle.deco.filter((_, j) => j !== i), decoBox: { ...isle.decoBox, [id]: (isle.decoBox[id] ?? 0) + 1 } } } }
 }
 
+/** 일반 물고기 → 어분(P1, 플래그 bait). 잠긴·전설·신화는 안 된다. 하나라도 틀리면 아무것도 갈지 않는다 */
+function grind(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('bait')) return { error: 'feature_off' }
+  if (!Array.isArray(a.items) || a.items.length === 0 || a.items.length > state.bag.length) return { error: 'bad_action' }
+  const picked = new Set<number>()
+  for (const it of a.items as unknown[]) {
+    if (!isObj(it) || !validIndex(it.index, state.bag.length) || picked.has(it.index)) return { error: 'bad_action' }
+    const f = state.bag[it.index]
+    if (!sameId(it.id, f)) return { error: 'bag_changed' }
+    if (f.locked) return { error: 'locked' }
+    if (!isOrdinary(f.species)) return { error: 'not_ordinary' }
+    picked.add(it.index)
+  }
+  return {
+    state: { ...state, bag: state.bag.filter((_, j) => !picked.has(j)), econ: { ...state.econ, meal: state.econ.meal + picked.size } },
+    result: { meal: picked.size },
+  }
+}
+
+/** 미끼 만들기(P1): 1회 1개. 집어는 플래그 bait, 전설·신화는 research + 연구 해금 + 그 등급 발견 */
+function makeBait(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (typeof a.kind !== 'string' || !BAIT_KINDS.includes(a.kind as BaitKind)) return { error: 'bad_action' }
+  const kind = a.kind as BaitKind
+  if (!featureOn(kind === 'attractor' ? 'bait' : 'research')) return { error: 'feature_off' }
+  const r = BAIT_RECIPES[kind]
+  if (a.price !== r.gold) return { error: 'price_changed' }
+  if (kind !== 'attractor') {
+    if (!state.econ.license) return { error: 'no_license' }
+    if (!state.legends.some((id) => speciesById(id).rarity === kind)) return { error: 'not_discovered' }
+  }
+  if (state.econ.meal < r.meal) return { error: 'no_meal' }
+  if (gold < r.gold) return { error: 'not_enough_gold' }
+  const econ: Econ = { ...state.econ, meal: state.econ.meal - r.meal, baits: { ...state.econ.baits, [kind]: state.econ.baits[kind] + 1 } }
+  return { state: { ...state, econ }, gold: -r.gold }
+}
+
+/** 연구 해금(P1, 플래그 research): 계정당 한 번, 전설 1종 이상 발견 */
+function buyLicense(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!featureOn('research')) return { error: 'feature_off' }
+  if (state.econ.license) return { error: 'owned' }
+  if (a.price !== LICENSE_PRICE) return { error: 'price_changed' }
+  if (!state.legends.some((id) => speciesById(id).rarity === 'legend')) return { error: 'need_legend' }
+  if (gold < LICENSE_PRICE) return { error: 'not_enough_gold' }
+  return { state: { ...state, econ: { ...state.econ, license: true } }, gold: -LICENSE_PRICE }
+}
+
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
   if (!isObj(action)) return { error: 'bad_action' }
   switch (action.type) {
@@ -1255,6 +1389,12 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return decorate(state, action)
     case 'undecorate':
       return undecorate(state, action)
+    case 'grind':
+      return grind(state, action)
+    case 'makeBait':
+      return makeBait(state, action, ctx.gold)
+    case 'buyLicense':
+      return buyLicense(state, action, ctx.gold)
     default:
       return { error: 'bad_action' }
   }

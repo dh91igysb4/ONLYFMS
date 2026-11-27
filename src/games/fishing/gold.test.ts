@@ -74,9 +74,9 @@ describe('진행 시뮬레이션 (감쇠 없음)', () => {
     expect(h).toBeGreaterThan(22.1 * 0.8)
     expect(h).toBeLessThan(22.1 * 1.2)
   })
-  it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각(기록 값, 어종 확장 v19에서 다시 잼)', () => {
-    expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.05, 1.14, 1.23, 1.85, 2.48, 2.49, 2.51, 2.54])
-    expect(daily.slice(0, 13).map((m) => +m.atDay.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.14, 1.23, 1.31, 2.02, 2.65, 2.66, 2.68, 2.71])
+  it('기존 품목 13개(유리섬유 … 가시 바늘)의 구매 시각(기록 값, 지역 가격 보정 v27에서 다시 잼)', () => {
+    expect(plain.slice(0, 13).map((m) => +m.atHours.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.05, 1.14, 1.23, 1.85, 2.48, 2.49, 2.51, 2.53])
+    expect(daily.slice(0, 13).map((m) => +m.atDay.toFixed(2))).toEqual([0.12, 0.16, 0.37, 0.63, 0.67, 1.14, 1.23, 1.31, 2.02, 2.65, 2.66, 2.68, 2.7])
     expect(plain[12].label).toBe('가시 바늘')
     expect(plain.slice(13, 15).map((m) => m.label)).toEqual(['갯벌 해금', '늪지 해금'])
   })
@@ -108,12 +108,13 @@ describe('하루 여러 시간 + 판매 마릿수 감쇠 (기록, ±5%)', () => 
     return memo.get(h)!
   }
   const near = (v: number, want: number) => expect(Math.abs(v - want) / want, `${v} vs ${want}`).toBeLessThan(0.05)
-  it('하루 1·2·3·5·10시간 = 25.1 / 17.7 / 16.3 / 15.1 / 13.0일', () => {
-    near(daysFor(1), 25.05)
-    near(daysFor(2), 17.65)
-    near(daysFor(3), 16.28)
-    near(daysFor(5), 15.12)
-    near(daysFor(10), 13.02)
+  // 지역 가격 보정(v27, 경제 설계 r4: 섬·갯벌·산정 일반 50종 인상)으로 다시 잼. 그 전 25.1 / 17.7 / 16.3 / 15.1 / 13.0일
+  it('하루 1·2·3·5·10시간 = 24.3 / 17.2 / 16.0 / 14.8 / 12.2일', () => {
+    near(daysFor(1), 24.26)
+    near(daysFor(2), 17.18)
+    near(daysFor(3), 16.04)
+    near(daysFor(5), 14.77)
+    near(daysFor(10), 12.2)
   })
   it('오래 할수록 빠르지만 하루 10시간도 12일 넘게 걸린다(어종 확장 v19 전에는 2주)', () => {
     expect(daysFor(1)).toBeGreaterThan(daysFor(3))
@@ -187,9 +188,10 @@ describe('갯벌·늪지 수입 (40칸, 회전+호기심, 얻을 수 있는 신�
     expect(lava).toBeLessThan(creek)
     expect(creek).toBeLessThan(hourlyIncome('swamp', 'bog', gear(rod)))
   })
-  it('기록 값(±5%): 낚싯대 4에서 갯골 87,600 · 수렁 107,800(어종 확장 v19)', () => {
+  // 갯벌은 지역 가격 보정(v27)으로 ×1.08: 그 전 87,600
+  it('기록 값(±5%): 낚싯대 4에서 갯골 94,800 · 수렁 107,800(지역 가격 보정 v27)', () => {
     const near = (v: number, want: number) => expect(Math.abs(v - want) / want).toBeLessThan(0.05)
-    near(hourlyIncome('tideflat', 'creek', gear(4)), 87_600)
+    near(hourlyIncome('tideflat', 'creek', gear(4)), 94_800)
     near(hourlyIncome('swamp', 'bog', gear(4)), 107_800)
   })
   it('이무기의 비늘은 늪지와 백골 낚싯대가 있어야 얻었다고 본다', () => {
@@ -204,12 +206,14 @@ describe('갯벌·늪지 수입 (40칸, 회전+호기심, 얻을 수 있는 신�
 describe('산정 호수·난파선 수입과 최종 진행 (40칸, 회전+호기심, 얻을 수 있는 신화 버프 포함)', () => {
   const ALL: AreaId[] = ['village', 'river', 'forest', 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck']
   const gear = (rodTier: 4 | 5 | 6) => ({ rodTier, bagTier: 3 as const, equipped: ['spinner', 'curious'] as TackleId[], buffs: buffsAt(ALL, rodTier) })
-  it('낚싯대 5: 산정 얼음 구멍 ≈ 동굴 용암 × 1.0~1.4, 난파선 심해 ≈ × 1.3~1.9', () => {
+  // 지역 가격 보정(v27, 경제 설계 r4)으로 산정 일반 ×4/3·고급 ×1.3·희귀 1,500G: 얼음 구멍 1.1 → 약 1.6배(난파선 심해와 거의 같다). 그 전 상한 1.4
+  it('낚싯대 5: 산정 얼음 구멍 ≈ 동굴 용암 × 1.0~1.7, 난파선 심해 ≈ × 1.3~1.9, 심해 ≥ 얼음 구멍', () => {
     const lava = hourlyIncome('cave', 'cave3', gear(5))
     const ice = hourlyIncome('summit', 'ice', gear(5)) / lava
     const abyss = hourlyIncome('wreck', 'abyss', gear(5)) / lava
     expect(ice).toBeGreaterThanOrEqual(1.0)
-    expect(ice).toBeLessThanOrEqual(1.4)
+    expect(ice).toBeLessThanOrEqual(1.7)
+    expect(abyss).toBeGreaterThanOrEqual(ice)
     expect(abyss).toBeGreaterThanOrEqual(1.3)
     expect(abyss).toBeLessThanOrEqual(1.9)
   })

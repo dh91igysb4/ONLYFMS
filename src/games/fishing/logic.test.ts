@@ -7,6 +7,7 @@ import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, B
 import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
 import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
+import { newEcon } from './research.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -339,9 +340,20 @@ const viewW = (s: WS, c: { now: number }): View => {
  * 기존 migrate 시험은 "세이브 + 지갑"을 WS 한 객체로 비교한다. migrate 결과에는 gold가 없어야 한다.
  */
 function migrateW(raw: unknown, from: number): WS {
-  const m = logic.migrate(raw, from)
+  const m = asNoEcon(raw, logic.migrate(raw, from), from)
   expect(m, 'v14 migrate 결과에는 gold가 없다').not.toHaveProperty('gold')
   return { ...(from < 26 ? asOldFish(raw, m) : m), gold: logic.legacyGold!(raw, from) }
+}
+/**
+ * v27 econ 계약(옛 세이브는 빈 econ)을 확인한 뒤, 옛 migrate 시험이 v26 모양 그대로 비교하도록 econ을 지운다.
+ * logic.init()으로 만든 fixture는 econ을 들고 있으니 그 값이면 남긴다.
+ */
+function asNoEcon(raw: unknown, m: State, from: number): State {
+  if (from >= 27) return m
+  expect(m.econ).toEqual(newEcon())
+  const { econ: _e, ...rest } = m
+  const had = (raw as { econ?: unknown } | null)?.econ
+  return (had !== undefined ? { ...rest, econ: had } : rest) as State
 }
 /**
  * v26 물고기 id 계약을 확인한 뒤, 옛 migrate 시험이 v25 모양 그대로 비교하도록 되돌린다:
@@ -388,9 +400,9 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(26)
+    expect(logic.version).toBe(27)
     expect(logic.init()).toEqual({
-      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1,
+      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(),
     })
   })
 
@@ -853,7 +865,7 @@ describe('fishing WorldLogic', () => {
 
   it('migrate fills missing fields and keeps gold/dex', () => {
     const m = migrateW({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
-    const { nextFishId: _n, ...init0 } = logic.init()
+    const { nextFishId: _n, econ: _e, ...init0 } = logic.init()
     expect(m).toEqual({ ...init0, gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
     expect(logic.migrate(null, 1)).toEqual(logic.init())
     expect(logic.migrate('x', 1)).toEqual(logic.init())
@@ -2047,7 +2059,7 @@ describe('v14 지갑 계약', () => {
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
     const legacyBag = rest.bag.map((f, i) => ({ ...f, id: i + 1, origin: 'legacy' }))
-    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
+    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon() })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2256,8 +2268,8 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 25', () => {
-    expect(logic.version).toBe(26)
+  it('version 27', () => {
+    expect(logic.version).toBe(27)
   })
 })
 
