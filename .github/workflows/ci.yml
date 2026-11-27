@@ -34,6 +34,9 @@ jobs:
             sudo apt-get update && sudo apt-get install -y postgresql
           fi
           bin="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          ver="$(basename "$(dirname "$bin")")"
+          # supabase/tests/shim.sql이 pgtap 확장을 만든다
+          sudo apt-get update && sudo apt-get install -y "postgresql-$ver-pgtap"
           "$bin/postgres" --version
           echo "PGBIN=$bin" >> "$GITHUB_ENV"
       - run: npm run fn:test
