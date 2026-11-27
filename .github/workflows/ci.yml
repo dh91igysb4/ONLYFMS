@@ -16,3 +16,21 @@ jobs:
       - run: npm test
       - run: npm run test:gate
       - run: npm run build
+  # Edge Function 통합 테스트(play·duel·suggest·world): 러너에 깔린 Postgres 16으로 임시 DB를 띄운다(scripts/fn-test.sh).
+  # Deno는 스크립트가 npx deno로 받는다
+  fn-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Postgres 16 확인
+        run: |
+          if [ ! -x /usr/lib/postgresql/16/bin/initdb ]; then
+            sudo apt-get update && sudo apt-get install -y postgresql-16
+          fi
+          /usr/lib/postgresql/16/bin/postgres --version
+      - run: npm run fn:test
