@@ -49,6 +49,9 @@ function Flag({ nationId }: { nationId: string | null }) {
 
 // 타이핑이 멈춘 뒤 서버 검색(football_search)까지 기다리는 시간. 길면 후보가 늦게 뜨고, 짧으면 호출이 는다
 const DEBOUNCE_MS = 120
+/** 검색 후보 최대 수. 이미 답한 선수를 빼도 남도록 서버에는 더 넉넉히 묻는다(RPC 상한 20) */
+const SUGGEST_MAX = 12
+const FETCH_MAX = 16
 
 function Search({ guessed, n, busy, onPick }: {
   guessed: ReadonlySet<string>
@@ -71,7 +74,7 @@ function Search({ guessed, n, busy, onPick }: {
       return
     }
     const t = setTimeout(() => {
-      searchFootballPlayers(text, 10).then(
+      searchFootballPlayers(text, FETCH_MAX).then(
         (r) => { if (my === seq.current) { setHits(r); setFailed(false) } },
         () => { if (my === seq.current) { setHits([]); setFailed(true) } },
       )
@@ -79,7 +82,7 @@ function Search({ guessed, n, busy, onPick }: {
     return () => clearTimeout(t)
   }, [text])
 
-  const list = useMemo(() => hits.filter((h) => !guessed.has(h.id)).slice(0, 8), [hits, guessed])
+  const list = useMemo(() => hits.filter((h) => !guessed.has(h.id)).slice(0, SUGGEST_MAX), [hits, guessed])
   const shown = open && list.length > 0
 
   function pick(h: FootballPlayerHit) {

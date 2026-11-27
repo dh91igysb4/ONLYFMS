@@ -45,7 +45,7 @@
   margin: 0; padding: 0; list-style: none;
   background: var(--card); border: 1px solid var(--card-line); border-radius: 10px;
   box-shadow: 0 14px 40px color-mix(in srgb, var(--card-ink) 35%, transparent);
-  max-height: min(380px, 50vh); overflow-y: auto;
+  max-height: min(560px, 60vh); overflow-y: auto;
 }
 .cq-sugg li {
   display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: center;
