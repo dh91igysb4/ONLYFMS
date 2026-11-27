@@ -48,6 +48,24 @@ describe('palettes', () => {
     }
   });
 
+  it('card_tokens_readable_on_white_card', () => {
+    for (const id of PALETTE_IDS) {
+      for (const mode of MODES) {
+        const t = PALETTES[id][mode];
+        for (const token of ['cardInk', 'cardMuted'] as const) {
+          for (const bgName of ['card', 'cardHover'] as const) {
+            const v = contrast(t[token], t[bgName]);
+            expect(v, `${id}/${mode}/${token} on ${bgName}: ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+        const line = contrast(t.cardLine, t.card);
+        expect(line, `${id}/${mode}/cardLine on card: ${line.toFixed(2)}`).toBeGreaterThanOrEqual(1.5);
+        const accent = contrast(t.cardAccent, t.card);
+        expect(accent, `${id}/${mode}/cardAccent on card: ${accent.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
   it('light_tiles_visible_on_bg', () => {
     for (const id of PALETTE_IDS) {
       const t = PALETTES[id].light;

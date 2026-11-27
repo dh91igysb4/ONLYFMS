@@ -1,6 +1,6 @@
 // 커리어 퀴즈 경력 줄 만들기 (careerQuiz.ts)
 import { describe, expect, it } from 'vitest'
-import { careerLines, clubCount, isReserveName, isYouth, lineKey, shortClubName } from './careerQuiz.ts'
+import { careerLines, clubCount, isReserveName, isYouth, lineKey, nationCodes, shortClubName } from './careerQuiz.ts'
 import type { Row } from './wikidata.ts'
 
 const team = (id: string, name_en: string, name_ko = ''): Row => ({ id, kind: 'club', name_en, name_ko })
@@ -114,5 +114,22 @@ describe('커리어 퀴즈 경력 줄', () => {
 
   it('lineKey는 클럽과 시작 연도 순서', () => {
     expect(lineKey([[2004, 2021, 'X', 0], [2021, null, 'Y', 1]])).toBe('X@2004|Y@2021')
+  })
+})
+
+describe('nationCodes', () => {
+  it('iso2를 쓰고 빈 곳은 보정 표, 없으면 빈 문자열', () => {
+    const rows: Row[] = [
+      { id: 'Q21', name_ko: '잉글랜드', name_en: 'England', iso2: 'gb-eng' },
+      { id: 'Q55', name_ko: '네덜란드', name_en: 'Netherlands', iso2: '' },
+      { id: 'Q47588', name_ko: '', name_en: 'Basque Country', iso2: '' },
+      { id: 'Q38', name_ko: '이탈리아', name_en: 'Italy', iso2: 'IT' },
+    ]
+    expect(nationCodes(rows)).toEqual({
+      Q21: ['gb-eng', '잉글랜드'],
+      Q38: ['it', '이탈리아'],
+      Q47588: ['', 'Basque Country'],
+      Q55: ['nl', '네덜란드'],
+    })
   })
 })

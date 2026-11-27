@@ -1,5 +1,7 @@
 /* 커리어 퀴즈 화면. 색은 theme.css 토큰만 쓴다. */
 .cq { display: flex; flex-direction: column; gap: 12px; }
+.cq .split { --split-gap: 12px; }
+.cq-side, .cq-hist { display: flex; flex-direction: column; gap: 12px; }
 .cq-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .cq-meta strong { font-size: 17px; }
 
@@ -23,22 +25,42 @@
 }
 .cq-open { align-self: center; }
 
+/* 검색: 후알야(wya.css)와 같은 모양. 색은 흰 카드 토큰(--card-*) */
 .cq-search { position: relative; }
-.cq-search .input { width: 100%; font-size: 17px; /* 16px 이상: iOS 확대 방지 */ }
+.cq-search input {
+  width: 100%;
+  font: inherit;
+  font-size: 17px; /* 16px 이상: iOS 확대 방지 */
+  font-weight: 500;
+  padding: 13px 14px;
+  border: 3px solid var(--card-accent);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--card-ink);
+}
+.cq-search input:focus-visible { outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--card-accent) 25%, transparent); }
+.cq-search input::placeholder { color: var(--card-muted); }
 .cq-sugg {
   position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5;
   margin: 0; padding: 0; list-style: none;
-  background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-radius: 10px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 10px;
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--card-ink) 35%, transparent);
   max-height: min(380px, 50vh); overflow-y: auto;
 }
 .cq-sugg li {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: center;
+  padding: 9px 14px; border-bottom: 1px solid var(--card-line); color: var(--card-ink); cursor: pointer;
 }
 .cq-sugg li:last-child { border-bottom: 0; }
-.cq-sugg li[aria-selected='true'], .cq-sugg li:hover { background: var(--bg); }
-.cq-n { font-weight: 700; overflow-wrap: anywhere; }
-.cq-m { font-size: 12px; color: var(--muted); }
+.cq-sugg li[aria-selected='true'], .cq-sugg li:hover { background: var(--card-hover); }
+.cq-flag {
+  display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden;
+  width: 28px; height: 28px; grid-row: 1 / 3;
+  background: var(--card); box-shadow: 0 1px 0 color-mix(in srgb, var(--card-ink) 15%, transparent);
+}
+.cq-flag span { font-size: 22px; line-height: 1; transform: scale(1.55); }
+.cq-n { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.cq-m { font-size: 12px; color: var(--card-muted); }
 
 .cq-hintline { margin: 0; text-align: center; }
 .cq-tools { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
@@ -60,4 +82,22 @@
   box-shadow: inset 0 0 0 1px var(--miss); color: var(--muted); text-decoration: line-through;
 }
 .cq-guesses li.cq-hit { box-shadow: inset 0 0 0 1px var(--hit); color: var(--win-text); text-decoration: none; }
-.cq-foot { font-size: 12px; }
+.cq-foot { font-size: 12px; margin: 0; }
+.cq-histhead { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); }
+.cq-histempty { margin: 0; font-size: 14px; }
+/* 휴대폰: 기록이 없으면 제목·빈 안내를 숨긴다(칩만 쌓인다) */
+@media (max-width: 899px) {
+  .cq-histhead:has(+ .cq-histempty), .cq-histempty { display: none; }
+}
+/* 넓은 화면: 오른쪽 열은 번호 붙은 줄 목록 */
+@media (min-width: 900px) {
+  .cq-guesses { flex-direction: column; flex-wrap: nowrap; gap: 6px; counter-reset: cq-g; }
+  .cq-guesses li {
+    counter-increment: cq-g; display: flex; gap: 10px; align-items: baseline;
+    padding: 10px 14px; border-radius: 10px; font-size: 16px; font-weight: 700;
+    background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-left: 4px solid var(--miss);
+    color: var(--ink); text-decoration: none;
+  }
+  .cq-guesses li::before { content: counter(cq-g); min-width: 1.2em; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .cq-guesses li.cq-hit { box-shadow: inset 0 0 0 1px var(--edge); border-left-color: var(--hit); color: var(--win-text); }
+}
