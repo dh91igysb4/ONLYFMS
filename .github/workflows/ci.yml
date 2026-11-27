@@ -16,7 +16,8 @@ jobs:
       - run: npm test
       - run: npm run test:gate
       - run: npm run build
-  # Edge Function 통합 테스트(play·duel·suggest·world): 러너에 깔린 Postgres 16으로 임시 DB를 띄운다(scripts/fn-test.sh).
+  # Edge Function 통합 테스트(play·duel·suggest·world): 러너의 Postgres로 임시 DB를 띄운다(scripts/fn-test.sh).
+  # 러너 이미지마다 Postgres 버전이 다르다(Ubuntu 26.04는 18): 깔린 가장 높은 버전을 PGBIN으로 넘기고, 없으면 기본 패키지를 깐다.
   # Deno는 스크립트가 npx deno로 받는다
   fn-test:
     runs-on: ubuntu-latest
@@ -27,10 +28,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Postgres 16 확인
+      - name: Postgres 찾기
         run: |
-          if [ ! -x /usr/lib/postgresql/16/bin/initdb ]; then
-            sudo apt-get update && sudo apt-get install -y postgresql-16
+          if ! ls -d /usr/lib/postgresql/*/bin >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql
           fi
-          /usr/lib/postgresql/16/bin/postgres --version
+          bin="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          "$bin/postgres" --version
+          echo "PGBIN=$bin" >> "$GITHUB_ENV"
       - run: npm run fn:test
