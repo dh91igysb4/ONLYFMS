@@ -15,13 +15,15 @@
 // 결과 data.ts는 직접 고치지 않는다. 바뀌면 career-quiz logic.version을 올리고 play 함수를 다시 배포한다.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { careerLines, clubCount, lineKey, MIN_CLUBS, TIERS, type Filters, type Line, type Tier } from './careerQuiz.ts'
+import { careerLines, clubCount, lineKey, MIN_CLUBS, nationCodes, TIERS, type Filters, type Line, type Tier } from './careerQuiz.ts'
 import { parseCsv, type Row } from './wikidata.ts'
 
 const a = process.argv.slice(2)
 const get = (k: string) => { const i = a.indexOf(`--${k}`); return i >= 0 ? a[i + 1] : undefined }
 const dir = get('dir') ?? 'data/football'
 const out = get('out') ?? 'src/games/career-quiz/data.ts'
+// 검색 결과 국기(화면 전용, logic이 읽지 않아 바뀌어도 logic.version과 무관)
+const nationsOut = get('nations-out') ?? 'src/games/career-quiz/nations.ts'
 /** 경력이 같은 다른 선수를 셀 때 보는 인지도 하한 (0~100 백분위) */
 const TWIN_MIN_POPULARITY = 50
 
@@ -110,4 +112,15 @@ const body = [
   '',
 ].join('\n')
 writeFileSync(out, body)
+const nations = nationCodes(read('nations.csv'))
+writeFileSync(nationsOut, [
+  '// 자동 생성: npm run football:career-quiz (scripts/football/build-career-quiz.ts). 직접 고치지 않는다.',
+  '// 검색 결과 국기용 (화면 전용). 출처: data/football/nations.csv (위키데이터, CC0) + careerQuiz.ts NATION_ISO_FIX.',
+  '',
+  '/** 국가 QID → [iso2(잉글랜드 등은 gb-eng, 국기 없으면 빈 문자열), 한글 이름] */',
+  'export const NATIONS: Record<string, [iso: string, nameKo: string]> = {',
+  ...Object.entries(nations).map(([id, v]) => `  ${id}: ${JSON.stringify(v)},`),
+  '}',
+  '',
+].join('\n'))
 console.error(`${out}: ${rows.length}명 (쉬움 ${count('easy')}, 보통 ${count('normal')}, 어려움 ${count('hard')})`)

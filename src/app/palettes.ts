@@ -12,13 +12,13 @@ export type TokenName =
   | CardTokenName;
 export type Tokens = Record<TokenName, string>;
 
-// 흰 카드(`--card`, 모든 팔레트에서 흰색) 위 글자·구분선·고른 줄. 다크에서도 카드는 흰색이라
+// 흰 카드(`--card`, 모든 팔레트에서 흰색) 위 글자·구분선·고른 줄·강조 테두리. 다크에서도 카드는 흰색이라
 // 같은 팔레트 라이트 값을 그대로 쓴다(직접 적지 않고 cardTokens가 만든다).
-type CardTokenName = 'cardInk' | 'cardMuted' | 'cardLine' | 'cardHover';
+type CardTokenName = 'cardInk' | 'cardMuted' | 'cardLine' | 'cardHover' | 'cardAccent';
 type BaseTokens = Omit<Tokens, CardTokenName>;
 
 function cardTokens(light: BaseTokens): Record<CardTokenName, string> {
-  return { cardInk: light.ink, cardMuted: light.muted, cardLine: light.line, cardHover: light.bg };
+  return { cardInk: light.ink, cardMuted: light.muted, cardLine: light.line, cardHover: light.bg, cardAccent: light.accentStrong };
 }
 
 export const CSS_VAR: Record<TokenName, string> = {
@@ -47,6 +47,7 @@ export const CSS_VAR: Record<TokenName, string> = {
   cardMuted: '--card-muted',
   cardLine: '--card-line',
   cardHover: '--card-hover',
+  cardAccent: '--card-accent',
 };
 
 // 값은 WCAG 대비를 계산해 검증했다 (palettes.test.ts). 바꾸면 테스트가 막는다.

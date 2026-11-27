@@ -101,3 +101,22 @@ export function clubCount(lines: readonly Line[]): number {
 export function lineKey(lines: readonly Line[]): string {
   return lines.map((l) => `${l[2]}@${l[0]}`).join('|')
 }
+
+/** 위키데이터 국가 중 iso2가 비었지만 국기가 분명한 곳 (검색 결과 국기용) */
+export const NATION_ISO_FIX: Readonly<Record<string, string>> = {
+  Q55: 'nl', // Netherlands
+  Q756617: 'dk', // Kingdom of Denmark
+  Q713750: 'de', // West Germany
+  Q216923: 'tw', // Chinese Taipei
+  Q3311985: 'gg', // Guernsey
+}
+
+/** 국가 QID → [iso2(소문자, 잉글랜드 등은 gb-eng), 한글 이름]. 국기가 없는 곳은 iso2 ''. */
+export function nationCodes(nations: readonly Row[]): Record<string, [iso: string, nameKo: string]> {
+  const out: Record<string, [string, string]> = {}
+  for (const n of [...nations].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0))) {
+    const iso = (n.iso2 || NATION_ISO_FIX[n.id] || '').toLowerCase()
+    out[n.id] = [/^[a-z]{2}(-[a-z]{3})?$/.test(iso) ? iso : '', n.name_ko || n.name_en]
+  }
+  return out
+}

@@ -60,6 +60,8 @@ describe('palettes', () => {
         }
         const line = contrast(t.cardLine, t.card);
         expect(line, `${id}/${mode}/cardLine on card: ${line.toFixed(2)}`).toBeGreaterThanOrEqual(1.5);
+        const accent = contrast(t.cardAccent, t.card);
+        expect(accent, `${id}/${mode}/cardAccent on card: ${accent.toFixed(2)}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
