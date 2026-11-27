@@ -165,7 +165,7 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
 
   return (
     <section className="cq">
-      {/* 넓은 화면: 왼쪽(따라붙음) 경력·입력·도구·결과, 오른쪽 답한 선수 기록 (후알야와 같다) */}
+      {/* 넓은 화면: 왼쪽(따라붙음) 경력·결과, 오른쪽 위 입력·도구, 그 아래 답한 선수 기록 */}
       <div className="split split-sticky">
         <div className="cq-side">
           <div className="cq-meta">
@@ -185,6 +185,17 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
             )}
           </div>
 
+          {finished && (
+            <div className="cq-result" role="status">
+              <p className={s.won ? 'cq-win' : 'cq-lose'}>
+                {s.won ? (challenge ? `${s.opened}줄 보고 정답` : `${s.guesses.length}번 만에 정답`) : '정답을 못 맞혔어요'}
+              </p>
+              {score !== null && <p className="cq-score">{score}점</p>}
+            </div>
+          )}
+          {error && <p className="form-error" role="alert">{error}</p>}
+        </div>
+        <div className="cq-hist">
           {!finished && (
             <>
               <Search
@@ -209,17 +220,6 @@ export function Game({ publicState, finished, score, reveal, busy, error, onActi
             </>
           )}
 
-          {finished && (
-            <div className="cq-result" role="status">
-              <p className={s.won ? 'cq-win' : 'cq-lose'}>
-                {s.won ? (challenge ? `${s.opened}줄 보고 정답` : `${s.guesses.length}번 만에 정답`) : '정답을 못 맞혔어요'}
-              </p>
-              {score !== null && <p className="cq-score">{score}점</p>}
-            </div>
-          )}
-          {error && <p className="form-error" role="alert">{error}</p>}
-        </div>
-        <div className="cq-hist">
           <h3 className="cq-histhead">답한 선수{s.guesses.length > 0 && ` ${s.guesses.length}`}</h3>
           {s.guesses.length > 0 ? (
             <ol className="cq-guesses" aria-label="답한 선수">
