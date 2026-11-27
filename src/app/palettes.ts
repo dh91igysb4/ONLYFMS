@@ -8,8 +8,18 @@ export type Mode = 'dark' | 'light';
 export type TokenName =
   | 'bg' | 'panel' | 'card' | 'ink' | 'muted' | 'lime' | 'onAccent'
   | 'accentStrong' | 'warnText' | 'winText' | 'loseText' | 'hit' | 'near' | 'miss'
-  | 'liveBg' | 'onLive' | 'line' | 'edge' | 'accentEdge' | 'shirtHit' | 'shirtMiss';
+  | 'liveBg' | 'onLive' | 'line' | 'edge' | 'accentEdge' | 'shirtHit' | 'shirtMiss'
+  | CardTokenName;
 export type Tokens = Record<TokenName, string>;
+
+// 흰 카드(`--card`, 모든 팔레트에서 흰색) 위 글자·구분선·고른 줄. 다크에서도 카드는 흰색이라
+// 같은 팔레트 라이트 값을 그대로 쓴다(직접 적지 않고 cardTokens가 만든다).
+type CardTokenName = 'cardInk' | 'cardMuted' | 'cardLine' | 'cardHover';
+type BaseTokens = Omit<Tokens, CardTokenName>;
+
+function cardTokens(light: BaseTokens): Record<CardTokenName, string> {
+  return { cardInk: light.ink, cardMuted: light.muted, cardLine: light.line, cardHover: light.bg };
+}
 
 export const CSS_VAR: Record<TokenName, string> = {
   bg: '--bg',
@@ -33,10 +43,14 @@ export const CSS_VAR: Record<TokenName, string> = {
   accentEdge: '--accent-edge',
   shirtHit: '--shirt-hit',
   shirtMiss: '--shirt-miss',
+  cardInk: '--card-ink',
+  cardMuted: '--card-muted',
+  cardLine: '--card-line',
+  cardHover: '--card-hover',
 };
 
 // 값은 WCAG 대비를 계산해 검증했다 (palettes.test.ts). 바꾸면 테스트가 막는다.
-export const PALETTES: Record<PaletteId, { name: string; dark: Tokens; light: Tokens }> = {
+const BASE: Record<PaletteId, { name: string; dark: BaseTokens; light: BaseTokens }> = {
   classic: {
     name: '기본 보라',
     dark: { bg: '#1c1030', panel: '#2d2140', card: '#ffffff', ink: '#ffffff', muted: '#a79cb8', lime: '#c9f25c', onAccent: '#1c1030', accentStrong: '#c9f25c', warnText: '#e9a43c', winText: '#5cc169', loseText: '#ff8f7a', hit: '#5cc169', near: '#e9a43c', miss: '#97a3b8', liveBg: '#5cc169', onLive: '#1c1030', line: '#2d2140', edge: '#2d2140', accentEdge: '#c9f25c', shirtHit: '#3f9a4c', shirtMiss: '#6b7689' },
@@ -88,6 +102,14 @@ export const PALETTES: Record<PaletteId, { name: string; dark: Tokens; light: To
     light: { bg: '#f3f2fb', panel: '#ffffff', card: '#ffffff', ink: '#1a1733', muted: '#575273', lime: '#5b3fd6', onAccent: '#ffffff', accentStrong: '#5b3fd6', warnText: '#9a5800', winText: '#2b7d39', loseText: '#c4271c', hit: '#2f8a3e', near: '#b06a00', miss: '#5d6878', liveBg: '#237a33', onLive: '#ffffff', line: '#c4c2ce', edge: '#c4c2ce', accentEdge: '#5b3fd6', shirtHit: '#86d494', shirtMiss: '#a7b2c3' },
   },
 };
+
+export const PALETTES = Object.fromEntries(
+  PALETTE_IDS.map((id) => {
+    const { name, dark, light } = BASE[id];
+    const card = cardTokens(light);
+    return [id, { name, dark: { ...dark, ...card }, light: { ...light, ...card } }];
+  }),
+) as Record<PaletteId, { name: string; dark: Tokens; light: Tokens }>;
 
 export function isPaletteId(x: unknown): x is PaletteId {
   return typeof x === 'string' && (PALETTE_IDS as readonly string[]).includes(x);
