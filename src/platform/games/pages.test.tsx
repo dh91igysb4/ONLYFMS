@@ -197,3 +197,16 @@ test('free page hides hidden games from non-admins like unknown games', () => {
   render(page())
   expect(screen.getByText('남은 기회 8')).toBeInTheDocument()
 })
+
+test('home groups games into topic sections, world games first in each', async () => {
+  rpcMock.mockResolvedValue([])
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  const football = await screen.findByRole('region', { name: '축구' })
+  expect(within(football).getByRole('heading', { name: '후알야' })).toBeInTheDocument()
+  expect(within(football).queryByRole('heading', { name: '테스트 숫자 맞히기' })).toBeNull()
+  const other = screen.getByRole('region', { name: '다른 게임' })
+  const titles = within(other).getAllByRole('heading').map((h) => h.textContent)
+  expect(titles[0]).toBe('다른 게임')
+  expect(titles[1]).toBe('펨타듀 낚시') // 지속형 게임이 맨 위
+  expect(titles).toContain('테스트 숫자 맞히기')
+})

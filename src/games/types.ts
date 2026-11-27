@@ -43,6 +43,9 @@ export type ManifestOption = {
   default: string
 }
 
+/** 게임 목록 구역 주제. 새 주제는 여기와 `src/platform/games/sections.ts`의 TOPIC_TITLES에 함께 더한다 */
+export type GameTopic = 'football'
+
 export type Manifest = {
   id: string
   name: string
@@ -58,6 +61,8 @@ export type Manifest = {
   options: ManifestOption[]
   /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3), 저장이 이어지는 지속형 게임은 'world' */
   category?: 'solo' | 'duel' | 'world'
+  /** 게임 목록에서 묶는 주제(`src/platform/games/sections.ts`). 생략하면 "다른 게임" */
+  topic?: GameTopic
   /** 지속형(world) 게임이 남기는 기록 종류. key는 `WorldRecord.key`와 맞고 게임 안에서 유일하다 */
   records?: { key: string; label: string; unit?: string }[]
   /** 지속형 게임이 프로필 요약 탭에 캐릭터를 보여 준다(`WorldLogic.avatar`·`getAvatarComponent`와 함께). label은 제목 */
