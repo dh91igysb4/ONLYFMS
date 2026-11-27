@@ -277,7 +277,7 @@ describe('신화 잡기 알림', () => {
     vi.setSystemTime(atMinute(12 * 60))
     const view = makeView({ rodTier: 5, buffs: ['dragon-breath'] })
     await mount({ area: 'village', pos: tileCenter(PIER_END.tx, PIER_END.ty), facing: 'down' }, view)
-    const fish = { species: 'tmp-mythic', sizeCm: 420, perfect: false, locked: true as const }
+    const fish = { id: 901, origin: 'normal' as const, species: 'tmp-mythic', sizeCm: 420, perfect: false, locked: true as const }
     route({
       load: () => ok(view),
       cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },

@@ -8,7 +8,7 @@ import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
 import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
-import { discardFee, kstDay, newIsle, price, type PendingView, type View } from './logic.ts'
+import { discardFee, kstDay, newIsle, price, type Fish, type PendingView, type View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
 import { VILLAGE } from './maps/village.ts'
@@ -290,7 +290,7 @@ async function castAndWait(view = makeView(), biteDelayMs = 3000) {
 
 describe('fishing Game', () => {
   test('loads and shows gold and bag count', async () => {
-    await mount(makeView({ gold: 12345, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] }))
+    await mount(makeView({ gold: 12345, bag: [{ id: 901, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }] }))
     expect(worldMock).toHaveBeenCalledWith({ game: 'fishing', action: 'load' })
     expect(screen.getByText('12,345 G')).toBeInTheDocument()
     expect(screen.getByText('1/20')).toBeInTheDocument()
@@ -359,7 +359,7 @@ describe('fishing Game', () => {
       hook: () => ok(view, { species: 'mackerel', sizeCm: 40 }),
       resolve: (b) => {
         const perfect = (b as unknown as { payload: { perfect: boolean } }).payload.perfect
-        const fish = { species: 'mackerel', sizeCm: 40, perfect }
+        const fish = { id: 902, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect }
         return ok({ ...view, bag: [fish], dex: { mackerel: { count: 1, maxCm: 40 } } }, { caught: fish })
       },
     })
@@ -385,7 +385,7 @@ describe('fishing Game', () => {
   test('전설을 잡으면 알림에 "전설의 물고기!"와 "세이브당 한 마리 · 가방에 잠가 뒀어요"', async () => {
     const view = makeView({ rodTier: 3 })
     await castAndWait(view, 3000)
-    const fish = { species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
+    const fish = { id: 903, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
     route({
       hook: () => ok(view, { species: 'grouper', sizeCm: 100 }),
       resolve: () => ok({ ...view, bag: [fish], dex: { grouper: { count: 1, maxCm: 100 } }, legends: ['grouper'] }, { caught: fish }),
@@ -410,7 +410,7 @@ describe('fishing Game', () => {
   test('모르는 어종(더 새 서버)을 잡아도 알림이 죽지 않고 가격 줄만 빠진다', async () => {
     const view = makeView()
     await castAndWait(view, 3000)
-    const fish = { species: 'fish-from-the-future', sizeCm: 33, perfect: false }
+    const fish = { id: 904, origin: 'normal' as const, species: 'fish-from-the-future', sizeCm: 33, perfect: false }
     route({
       hook: () => ok(view, { species: fish.species, sizeCm: 33 }),
       resolve: () => ok({ ...view, bag: [fish], dex: { [fish.species]: { count: 1, maxCm: 33 } } }, { caught: fish }),
@@ -426,7 +426,7 @@ describe('fishing Game', () => {
   })
 
   test('shop: sell calls act sell and updates gold from the response', async () => {
-    const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
+    const view = makeView({ gold: 100, bag: [{ id: 905, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }] })
     await mountAtShop(view)
     route({ sell: () => ok({ ...view, gold: 1600, bag: [] }, { earned: 1500 }) })
     fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
@@ -438,7 +438,7 @@ describe('fishing Game', () => {
   })
 
   test('shop: sell over the site daily cap says what was sold and what actually came in (HUD = wallet)', async () => {
-    const view = makeView({ gold: 100, bag: [{ species: 'anchovy', sizeCm: 10, perfect: false }] })
+    const view = makeView({ gold: 100, bag: [{ id: 906, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }] })
     await mountAtShop(view)
     route({
       sell: () => Promise.resolve({ view: { ...view, gold: 1700, bag: [] }, result: { earned: 40_000 }, server_now: Date.now(), gold: 1700, gold_capped: { asked: 40_000, got: 1600 } }),
@@ -451,7 +451,7 @@ describe('fishing Game', () => {
   })
 
   test('가방: 물고기 칸을 누르면 lock을 보내고, 응답 뒤 잠금 표시가 바뀐다', async () => {
-    const fish = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const fish = { id: 907, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }
     const view = makeView({ bag: [fish] })
     await mount(view)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
@@ -462,16 +462,16 @@ describe('fishing Game', () => {
     expect(cell()).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(cell())
     await flush()
-    expect(calls('lock')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: true } }])
+    expect(calls('lock')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, id: 907, locked: true } }])
     expect(cell()).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(cell())
     await flush()
-    expect(calls('lock')[1]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, locked: false } })
+    expect(calls('lock')[1]).toEqual({ game: 'fishing', action: 'act', payload: { type: 'lock', index: 0, id: 907, locked: false } })
     expect(cell()).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('상점: 오늘 판 마릿수와 지금 판매가를 보이고, 예상 금액에 마릿수 감쇠를 넣는다(v15)', async () => {
-    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const anchovy = { id: 908, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }
     const p = price('anchovy', 10, false)
     const { unmount } = await mountAtShop(makeView({ bag: [anchovy, anchovy], sold: { day: kstDay(Date.now()), n: 149 } }))
     expect(screen.getByText('오늘 판 물고기 149마리 · 지금 판매가 100%')).toBeInTheDocument()
@@ -483,8 +483,8 @@ describe('fishing Game', () => {
   })
 
   test('상점: 잠긴 물고기는 마릿수·예상 금액에서 빠지고, 전부 잠겨 있으면 팔기 버튼이 꺼진다', async () => {
-    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
-    const grouper = { species: 'grouper', sizeCm: 120, perfect: false, locked: true as const }
+    const anchovy = { id: 909, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }
+    const grouper = { id: 910, origin: 'normal' as const, species: 'grouper', sizeCm: 120, perfect: false, locked: true as const }
     const { unmount } = await mountAtShop(makeView({ bag: [anchovy, grouper] }))
     const value = price('anchovy', 10, false).toLocaleString('ko-KR')
     expect(screen.getByText(`팔 물고기 1마리 · 잠금 1마리 · 예상 ${value} G`)).toBeInTheDocument()
@@ -621,7 +621,7 @@ describe('fishing Game', () => {
   })
 
   test('가방 전설 칸은 테두리 표시와 이름에 "전설"', async () => {
-    const view = makeView({ bag: [{ species: 'grouper', sizeCm: 100, perfect: false, locked: true }, { species: 'anchovy', sizeCm: 10, perfect: false }] })
+    const view = makeView({ bag: [{ id: 911, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false, locked: true }, { id: 912, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }] })
     await mount(view)
     fireEvent.click(screen.getByRole('button', { name: '가방' }))
     const bag = screen.getByRole('region', { name: '가방' })
@@ -1602,7 +1602,7 @@ describe('fishing Game: walking and interaction', () => {
       cast: () => { const p = pending(3000); return ok({ ...view, pending: p }, p) },
       hook: () => ok(view, { species: 'mackerel', sizeCm: 40 }),
       resolve: () => {
-        const fish = { species: 'mackerel', sizeCm: 40, perfect: false }
+        const fish = { id: 913, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect: false }
         return ok({ ...view, bag: [fish], dex: { mackerel: { count: 1, maxCm: 40 } } }, { caught: fish })
       },
     })
@@ -2163,7 +2163,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
 
   test('강 북쪽 출구 칸에 서도 산 호수가 닫혀 있으면 넘어가지 않는다(서버 상태에서 lake가 빠진 경우)', async () => {
     // 산 호수가 열린 상태로 강 북쪽 도착 칸에서 시작한 뒤, 응답의 areas에서 lake가 빠진다
-    const fish = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const fish = { id: 914, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }
     const view = makeView({ areas: [...BASE, 'lake'], bag: [fish] })
     await mount(view, { area: 'river', pos: tileCenter(24, 1), facing: 'up' })
     await advance(50)
@@ -2466,8 +2466,8 @@ describe('찌 상점·장비', () => {
   })
 
   test('이 판에 없는 어종 id(더 새 서버)가 가방·도감에 있어도 가방·상점·도감이 그려진다', async () => {
-    const unknown = { species: 'future-fish', sizeCm: 50, perfect: false }
-    const anchovy = { species: 'anchovy', sizeCm: 10, perfect: false }
+    const unknown = { id: 915, origin: 'normal' as const, species: 'future-fish', sizeCm: 50, perfect: false }
+    const anchovy = { id: 916, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }
     const view = makeView({ bag: [unknown, anchovy], dex: { 'future-fish': { count: 1, maxCm: 50 }, anchovy: { count: 1, maxCm: 10 } } })
     render(<BagPanel view={view} atShop={false} busy={false} onEquip={() => {}} onLock={() => {}} />)
     const bag = screen.getByRole('region', { name: '가방' })
@@ -2597,7 +2597,7 @@ describe('도전과제·순간이동기', () => {
     route({
       hook: () => ok(view, { species: 'goby', sizeCm: 12 }),
       resolve: () => {
-        const fish = { species: 'goby', sizeCm: 12, perfect: true }
+        const fish = { id: 917, origin: 'normal' as const, species: 'goby', sizeCm: 12, perfect: true }
         return ok({ ...view, bag: [fish], challenges: { 'pier-perfect': { progress: 3, done: true } } }, { caught: fish, completed: ['pier-perfect'] })
       },
     })
@@ -3065,7 +3065,7 @@ describe('fishing Game: 다른 지역 친구(프레즌스)', () => {
 })
 
 describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-brag-discard)', () => {
-  const mack = { species: 'mackerel', sizeCm: 40, perfect: false }
+  const mack = { id: 918, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect: false }
   const peer = (over: Record<string, unknown> = {}) => ({
     id: 'u2', handle: 'son', x: SAND.pos.x, y: SAND.pos.y, facing: 'down', moving: false, act: 'walk', outfit: '{}', ...over,
   })
@@ -3101,7 +3101,7 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
   test('잡은 직후 결과가 떠 있을 때 자랑해도 들고 있는다(결과가 끝나도 이어서)', async () => {
     const view = makeView({ rodTier: 3 })
     await castAndWait(view, 3000)
-    const fish = { species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
+    const fish = { id: 919, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false, locked: true as const }
     route({
       hook: () => ok(view, { species: 'grouper', sizeCm: 100 }),
       resolve: () => ok({ ...view, bag: [mack, fish], dex: { grouper: { count: 1, maxCm: 100 } }, legends: ['grouper'] }, { caught: fish }),
@@ -3172,13 +3172,14 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     expect(within(bagRegion()).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G · 쓰레기통에 버리면 ${trashFee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
     fireEvent.click(within(bagRegion()).getByRole('button', { name: '버리기 확인' }))
     await flush()
-    expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, species: 'mackerel', sizeCm: 40 }], fee, at: 'bag' } }])
+    expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, id: 918, species: 'mackerel', sizeCm: 40 }], fee, at: 'bag' } }])
     expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
   })
 })
 
 describe('여러 마리 버리기 (v21)', () => {
-  const fish = (species: string, sizeCm: number, extra: Record<string, unknown> = {}) => ({ species, sizeCm, perfect: false, ...extra })
+  let fid = 0
+  const fish = (species: string, sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ id: ++fid, origin: 'normal', species, sizeCm, perfect: false, ...extra })
   const bag = [fish('mackerel', 40), fish('anchovy', 12), fish('mackerel', 30, { locked: true }), fish('goby', 15)]
   const region = () => screen.getByRole('region', { name: '가방' })
   const won = (n: number) => `${n.toLocaleString('ko-KR')} G`
@@ -3199,7 +3200,7 @@ describe('여러 마리 버리기 (v21)', () => {
     fireEvent.click(within(region()).getByRole('button', { name: '버리기 확인' }))
     await flush()
     expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: {
-      type: 'discardMany', items: [{ index: 0, species: 'mackerel', sizeCm: 40 }, { index: 3, species: 'goby', sizeCm: 15 }], fee, at: 'bag',
+      type: 'discardMany', items: [{ index: 0, id: 1, species: 'mackerel', sizeCm: 40 }, { index: 3, id: 4, species: 'goby', sizeCm: 15 }], fee, at: 'bag',
     } }])
     expect(screen.getByText(`2마리 버렸어요 · 환경부담금 ${won(fee)}`)).toBeInTheDocument()
   })
@@ -3217,7 +3218,7 @@ describe('여러 마리 버리기 (v21)', () => {
 })
 
 describe('마을회관 냉장고·쓰레기통 (v18)', () => {
-  const mk = (sizeCm: number) => ({ species: 'mackerel', sizeCm, perfect: false })
+  const mk = (sizeCm: number) => ({ id: 920, origin: 'normal' as const, species: 'mackerel', sizeCm, perfect: false })
   const act1 = async () => {
     pointer('down', actionButton(), 2)
     pointer('up', actionButton(), 2)
@@ -3234,10 +3235,10 @@ describe('마을회관 냉장고·쓰레기통 (v18)', () => {
     route({ store: () => ok({ ...view, bag: [], fridge: [mk(50), mk(30)] }), takeOut: () => ok(view) })
     fireEvent.click(within(panel).getByRole('button', { name: '고등어 30cm 넣기' }))
     await flush()
-    expect(calls('store')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'store', index: 0, species: 'mackerel', sizeCm: 30 } }])
+    expect(calls('store')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'store', index: 0, id: 920, species: 'mackerel', sizeCm: 30 } }])
     fireEvent.click(within(screen.getByRole('region', { name: '냉장고' })).getByRole('button', { name: '고등어 50cm 꺼내기' }))
     await flush()
-    expect(calls('takeOut')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'takeOut', index: 0, species: 'mackerel', sizeCm: 50 } }])
+    expect(calls('takeOut')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'takeOut', index: 0, id: 920, species: 'mackerel', sizeCm: 50 } }])
   })
 
   test('냉장고가 바뀌었으면(다른 탭) 안내하고 다시 불러와 목록을 새로 그린다; 가방 가득은 한국어 안내', async () => {
@@ -3280,7 +3281,7 @@ describe('마을회관 냉장고·쓰레기통 (v18)', () => {
     expect(within(bin).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
     fireEvent.click(within(bin).getByRole('button', { name: '버리기 확인' }))
     await flush()
-    expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, species: 'mackerel', sizeCm: 40 }], fee, at: 'trash' } }])
+    expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, id: 920, species: 'mackerel', sizeCm: 40 }], fee, at: 'trash' } }])
   })
 })
 

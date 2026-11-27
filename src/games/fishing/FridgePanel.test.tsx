@@ -7,7 +7,7 @@ import { DEFAULT_OUTFIT } from './wardrobe.ts'
 
 vi.mock('./sprites.ts', async (orig) => ({ ...(await orig<typeof import('./sprites.ts')>()), spriteDataUrl: () => 'data:x' }))
 
-const mk = (sizeCm: number): Fish => ({ species: 'mackerel', sizeCm, perfect: false })
+const mk = (sizeCm: number): Fish => ({ id: 901, origin: 'normal' as const, species: 'mackerel', sizeCm, perfect: false })
 function makeView(over: Partial<View> = {}): View {
   return {
     gold: 0, totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [],

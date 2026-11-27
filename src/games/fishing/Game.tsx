@@ -1616,7 +1616,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   async function discard(indices: number[], fee: number, at: DiscardAt) {
     setNotice(null)
     const bag = viewRef.current?.bag ?? []
-    const items = indices.flatMap((index) => (bag[index] ? [{ index, species: bag[index].species, sizeCm: bag[index].sizeCm }] : []))
+    const items = indices.flatMap((index) => (bag[index] ? [{ index, id: bag[index].id, species: bag[index].species, sizeCm: bag[index].sizeCm }] : []))
     if (items.length === 0 || items.length !== indices.length) return
     try {
       const res = await act<{ fee: number; n?: number }>({ type: 'discardMany', items, fee, at })
@@ -1636,7 +1636,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     const f = type === 'store' ? v?.bag[index] : v?.fridge?.[index]
     if (!f) return
     try {
-      await act({ type, index, species: f.species, sizeCm: f.sizeCm })
+      await act({ type, index, id: f.id, species: f.species, sizeCm: f.sizeCm })
     } catch (e) {
       await failMove(codeOf(e))
     }
@@ -1651,7 +1651,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   async function lockFish(index: number, locked: boolean) {
     setNotice(null)
     try {
-      await act({ type: 'lock', index, locked })
+      await act({ type: 'lock', index, id: viewRef.current?.bag[index]?.id, locked })
     } catch (e) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }

@@ -124,7 +124,7 @@ describe('하루 여러 시간 + 판매 마릿수 감쇠 (기록, ±5%)', () => 
 
 describe('시뮬레이션 감쇠 = 실제 판매 감쇠(logic.decayedSale)', () => {
   it('정수 마릿수에서 decayedIncome(반올림 없음)과 decayedSale(물고기마다 반올림)이 마리당 0.5 G 안에서 같다', () => {
-    const f = { species: 'mackerel', sizeCm: 40, perfect: false }
+    const f = { id: 901, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect: false }
     const per = sellPrice(f)
     for (const before of [0, 100, 149, 150, 299, 300, 449, 450, 800]) {
       for (const n of [1, 3, 40]) {
