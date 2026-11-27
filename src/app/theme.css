@@ -260,9 +260,18 @@ select.input { padding-right: 8px; }
 }
 
 /* 헤더 로고 옆 글자 회전 (Brand.tsx). 두 줄을 같은 칸에 겹쳐 위로 밀어 올린다 */
-.brand-ticker { display: grid; align-items: center; overflow: hidden; height: 28px; }
+.brand-ticker { position: relative; display: grid; align-items: center; overflow: hidden; height: 28px; }
 .brand-ticker > .app-wordmark { grid-area: 1 / 1; white-space: nowrap; }
 .app-wordmark--note { font-size: 15px; letter-spacing: 0; }
+/* 칸 폭 = 전역일 문구 폭(보이지 않는 기준 글자). 사이트 이름은 Brand.tsx가 잰 --brand-fit만큼 줄인다 */
+.brand-ticker > .app-wordmark:not(.app-wordmark--note) { font-size: calc(22px * var(--brand-fit, 1)); }
+.brand-sizer {
+  grid-area: 1 / 1; white-space: nowrap; visibility: hidden; pointer-events: none;
+  font-family: 'Exo 2', 'Pretendard Variable', Pretendard, system-ui, sans-serif; font-style: italic; font-weight: 800;
+}
+.brand-sizer::before { content: attr(data-text); }
+/* 사이트 이름 원래 크기 재기용: 칸 폭에 들어가지 않게 띄운다 */
+.brand-sizer-name { position: absolute; font-size: 22px; letter-spacing: 0.01em; }
 .app-wordmark.is-entering { animation: brand-enter 400ms ease-out both; }
 .app-wordmark.is-leaving { animation: brand-leave 400ms ease-in both; }
 @keyframes brand-enter { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }

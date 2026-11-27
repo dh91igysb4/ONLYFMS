@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { now } from '../../lib/serverTime.ts'
 import { brandMessages, SITE_NAME } from './brandTicker.ts'
 
@@ -38,10 +38,42 @@ export function Brand() {
 
   const note = (text: string) => (text === SITE_NAME ? '' : ' app-wordmark--note')
 
+  // 칸 폭은 전역일 문구 폭으로 고정하고(보이지 않는 기준 글자), 사이트 이름은 그 폭에 맞게 줄인다.
+  // 문구가 바뀌어도 헤더 폭이 그대로라 작은 화면에서 스크롤바가 생겼다 사라지지 않는다.
+  // 글꼴이 기기마다 달라 실제 폭을 재서 비율(--brand-fit, 최대 1)로 줄인다.
+  const noteText = messages.find((m) => m !== SITE_NAME) ?? null
+  const tickerRef = useRef<HTMLSpanElement>(null)
+  const sizerRef = useRef<HTMLSpanElement>(null)
+  const nameRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const ticker = tickerRef.current
+    const sizer = sizerRef.current
+    const name = nameRef.current
+    if (!ticker || !sizer || !name) return
+    const fit = () => {
+      const w = name.getBoundingClientRect().width
+      const f = w > 0 ? Math.min(1, sizer.getBoundingClientRect().width / w) : 1
+      ticker.style.setProperty('--brand-fit', f.toFixed(3))
+    }
+    fit()
+    if (typeof ResizeObserver !== 'function') return
+    const ro = new ResizeObserver(fit) // 웹 글꼴이 늦게 들어와 폭이 바뀌어도 다시 잰다
+    ro.observe(sizer)
+    ro.observe(name)
+    return () => ro.disconnect()
+  }, [noteText])
+
   return (
     <h1 className="app-title" aria-label={SITE_NAME}>
       <img className="app-logo" src="/logo.png" alt="" width={145} height={96} />
-      <span className="brand-ticker" aria-hidden="true">
+      <span className="brand-ticker" aria-hidden="true" ref={tickerRef}>
+        {noteText !== null && (
+          <>
+            {/* 글자는 CSS content(attr)로 그린다: 폭만 차지하고 문서 텍스트에는 두 번 나오지 않게 */}
+            <span ref={sizerRef} className="brand-sizer app-wordmark--note" data-text={noteText} />
+            <span ref={nameRef} className="brand-sizer brand-sizer-name" data-text={SITE_NAME} />
+          </>
+        )}
         {leaving !== null && (
           <span key={`l${tick}`} className={`app-wordmark is-leaving${note(leaving)}`}>{leaving}</span>
         )}

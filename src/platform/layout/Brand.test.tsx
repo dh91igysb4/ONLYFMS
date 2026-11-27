@@ -51,3 +51,28 @@ test('동작 줄이기에서는 전환 애니메이션 클래스를 붙이지 �
   expect(shown()).toBe('재원이 전역까지 D-490')
   expect(document.querySelector('.app-wordmark.is-leaving')).toBeNull()
 })
+
+test('칸 폭은 전역일 문구로 고정하고 사이트 이름을 그 폭에 맞게 줄인다', () => {
+  vi.setSystemTime(new Date('2026-11-02T09:00:00Z'))
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const w = this.classList.contains('brand-sizer-name') ? 200 : this.classList.contains('brand-sizer') ? 150 : 0
+    return { width: w, height: 0, x: 0, y: 0, top: 0, left: 0, right: w, bottom: 0, toJSON() {} } as DOMRect
+  })
+  render(<Brand />)
+  const ticker = document.querySelector<HTMLElement>('.brand-ticker')!
+  expect(ticker.style.getPropertyValue('--brand-fit')).toBe('0.750')
+  expect(document.querySelector('.brand-sizer:not(.brand-sizer-name)')?.getAttribute('data-text')).toBe('재원이 전역까지 D-490')
+  expect(screen.getAllByText('playONLYFMS')).toHaveLength(1)
+  rect.mockRestore()
+})
+
+test('사이트 이름이 더 좁으면 키우지 않는다', () => {
+  vi.setSystemTime(new Date('2026-11-02T09:00:00Z'))
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const w = this.classList.contains('brand-sizer-name') ? 100 : this.classList.contains('brand-sizer') ? 150 : 0
+    return { width: w, height: 0, x: 0, y: 0, top: 0, left: 0, right: w, bottom: 0, toJSON() {} } as DOMRect
+  })
+  render(<Brand />)
+  expect(document.querySelector<HTMLElement>('.brand-ticker')!.style.getPropertyValue('--brand-fit')).toBe('1.000')
+  rect.mockRestore()
+})
