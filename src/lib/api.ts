@@ -240,11 +240,30 @@ export async function worldVisit<V = unknown>(game: string, owner: string): Prom
   return (await callFunction('world', { game, action: 'visit', owner })) as { owner: { id: string; handle: string }; view: V }
 }
 
-/** 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act). */
+/** world 행동 재시도 간격(ms). 응답을 못 받았거나(network) 5xx일 때만, 같은 action_id로 다시 보낸다 */
+export const WORLD_RETRY_MS = [300, 1000]
+const retryable = (e: unknown) => e instanceof ApiError && (e.status === 0 || e.status >= 500)
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * 지속형 게임 요청: 저장 불러오기(load) 또는 행동(act).
+ * 행동마다 action_id(UUID)를 붙인다. 서버는 같은 id·같은 payload를 한 번만 처리하므로(낚시 경제 설계 2026-11-27 §4.1)
+ * 응답을 잃었을 때 다시 보내도 두 번 반영되지 않는다.
+ */
 export async function world<V = unknown, R = unknown>(
   body: { game: string; action: 'load' } | { game: string; action: 'act'; payload: unknown },
 ): Promise<WorldView<V, R>> {
-  const res = (await callFunction('world', body)) as WorldView<V, R>
+  const send: Record<string, unknown> = body.action === 'act' ? { ...body, action_id: crypto.randomUUID() } : body
+  let res: WorldView<V, R>
+  for (let i = 0; ; i++) {
+    try {
+      res = (await callFunction('world', send)) as WorldView<V, R>
+      break
+    } catch (e) {
+      if (body.action !== 'act' || i >= WORLD_RETRY_MS.length || !retryable(e)) throw e
+      await wait(WORLD_RETRY_MS[i])
+    }
+  }
   // 지갑을 쓰는 게임은 최상위 gold(잔액)를 보낸다. 헤더 배지가 추가 요청 없이 갱신된다
   if (typeof res?.gold === 'number' && Number.isFinite(res.gold)) setBalance(res.gold)
   const c = res?.gold_capped

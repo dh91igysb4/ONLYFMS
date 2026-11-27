@@ -341,7 +341,32 @@ const viewW = (s: WS, c: { now: number }): View => {
 function migrateW(raw: unknown, from: number): WS {
   const m = logic.migrate(raw, from)
   expect(m, 'v14 migrate 결과에는 gold가 없다').not.toHaveProperty('gold')
-  return { ...m, gold: logic.legacyGold!(raw, from) }
+  return { ...(from < 26 ? asOldFish(raw, m) : m), gold: logic.legacyGold!(raw, from) }
+}
+/**
+ * v26 물고기 id 계약을 확인한 뒤, 옛 migrate 시험이 v25 모양 그대로 비교하도록 되돌린다:
+ * 가방 → 냉장고 순서로 1부터 legacy 번호인지 보고, 입력 물고기에 적혀 있던 id·origin(시험 fixture)을 같은 칸에 다시 붙인다.
+ * 입력에 없던 칸은 id·origin을 지우고, nextFishId도 지운다. id 계약 자체는 '물고기 id (v26)' 시험이 본다.
+ */
+function asOldFish(raw: unknown, m: State): State {
+  const all = [...m.bag, ...m.fridge]
+  all.forEach((f, i) => {
+    expect(f.id).toBe(i + 1)
+    expect(f.origin).toBe('legacy')
+  })
+  expect(m.nextFishId).toBe(all.length + 1)
+  const r = (raw ?? {}) as { bag?: unknown; fridge?: unknown }
+  const src = (v: unknown) => (Array.isArray(v) ? (v as Record<string, unknown>[]) : [])
+  const back = (list: Fish[], from: Record<string, unknown>[]) =>
+    list.map((f) => {
+      const { id: _id, origin: _o, ...rest } = f
+      const same = from.find((x) => x && x.species === f.species && x.sizeCm === f.sizeCm && x.perfect === f.perfect)
+      return (same && 'id' in same ? { ...rest, id: same.id, origin: same.origin } : rest) as Fish
+    })
+  // 시험 fixture가 logic.init()으로 만든 옛 세이브는 nextFishId를 들고 있다: 그 값이면 남긴다
+  const { nextFishId: _n, ...rest } = m
+  const next = (raw as { nextFishId?: unknown } | null)?.nextFishId
+  return { ...rest, ...(next !== undefined ? { nextFishId: next } : {}), bag: back(m.bag, src(r.bag)), fridge: back(m.fridge, src(r.fridge)) } as State
 }
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
 // v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
@@ -363,9 +388,9 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(25)
+    expect(logic.version).toBe(26)
     expect(logic.init()).toEqual({
-      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0,
+      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1,
     })
   })
 
@@ -380,7 +405,7 @@ describe('fishing WorldLogic', () => {
   })
 
   it('cast with full bag -> bag_full, no pending', () => {
-    const bag: Fish[] = Array.from({ length: bagSize(1) }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const bag: Fish[] = Array.from({ length: bagSize(1) }, () => ({ id: 901, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }))
     const s = deepFreeze(fresh({ bag }))
     expect(err(play(s, { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBe('bag_full')
     expect(s.pending).toBeNull()
@@ -436,7 +461,7 @@ describe('fishing WorldLogic', () => {
     expect(conditionsAt(later).season).not.toBe(p.cond.season)
     expect(conditionsAt(later).gameDay).not.toBe(p.cond.gameDay)
     const r = ok(play(hooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
-    expect(r.state.bag).toEqual([{ species: p.species, sizeCm: p.sizeCm, perfect: false }])
+    expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: p.species, sizeCm: p.sizeCm, perfect: false }])
   })
 
   it('resolve로 전설을 잡으면 legends에 추가, 이후 같은 조건·r0=0에서도 다시 안 나옴; 놓치면 legends 그대로', () => {
@@ -495,13 +520,13 @@ describe('fishing WorldLogic', () => {
     expect(ok(play(fresh({ gold: 80_000, bagTier: 3 }), { type: 'buyBag', tier: 4, price: 80000 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 4 })
     expect(ok(play(fresh({ gold: 160_000, bagTier: 4 }), { type: 'buyBag', tier: 5, price: 160000 }, ctx())).state).toMatchObject({ gold: 0, bagTier: 5 })
     // 60칸이면 60마리째까지 던지고 61번째는 bag_full
-    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ id: 903, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }))
     expect('state' in play(fresh({ bagTier: 5, bag: fish(59) }), { type: 'cast', area: 'village', power: 0.5 }, ctx())).toBe(true)
     expect(err(play(fresh({ bagTier: 5, bag: fish(60) }), { type: 'cast', area: 'village', power: 0.5 }, ctx()))).toBe('bag_full')
   })
 
   it('bagTier 2 allows the 21st..30th fish and rejects the 31st cast with bag_full', () => {
-    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const fish = (n: number): Fish[] => Array.from({ length: n }, () => ({ id: 904, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }))
     for (const n of [20, 29]) {
       expect(ok(play(fresh({ bagTier: 2, bag: fish(n) }), { type: 'cast', area: 'pier', power: 0.5 }, ctx()))).toBeTruthy()
     }
@@ -607,7 +632,7 @@ describe('fishing WorldLogic', () => {
   })
 
   it('migrate keeps every fish the bag can hold: a v1 save with 20 fish keeps 20, a bagTier 3 save with 40 keeps 40', () => {
-    const fish = (n: number): Fish[] => Array.from({ length: n }, (_, i) => ({ species: 'anchovy', sizeCm: 10 + (i % 5), perfect: i % 2 === 0 }))
+    const fish = (n: number): Fish[] => Array.from({ length: n }, (_, i) => ({ id: 905, origin: 'normal' as const, species: 'anchovy', sizeCm: 10 + (i % 5), perfect: i % 2 === 0 }))
     const v1 = fish(20)
     expect(migrateW({ gold: 5, bag: v1 }, 1).bag).toEqual(v1)
     const full = fish(40)
@@ -713,8 +738,8 @@ describe('fishing WorldLogic', () => {
     const late = ctx(T0 + 100_000)
     let s = withHooked({ dex: { anchovy: { count: 1, maxCm: 14 } } })
     let r = ok(play(s, { type: 'resolve', success: true, perfect: true }, late))
-    expect(r.result).toEqual({ caught: { species: 'anchovy', sizeCm: 12, perfect: true } })
-    expect(r.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: true }])
+    expect(r.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: true } })
+    expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: true }])
     expect(r.state.dex.anchovy).toEqual({ count: 2, maxCm: 14 })
     s = withHooked({
       pending: { species: 'anchovy', sizeCm: 15, biteDelayMs: 1500, startedAt: T0, hookedAt: T0 + 1500, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5 },
@@ -734,8 +759,8 @@ describe('fishing WorldLogic', () => {
 
   it('sell adds exact price sum to gold and totalEarned, empties bag; empty -> bag_empty', () => {
     const bag: Fish[] = [
-      { species: 'anchovy', sizeCm: 8, perfect: false },
-      { species: 'grouper', sizeCm: 140, perfect: true },
+      { id: 908, origin: 'normal' as const, species: 'anchovy', sizeCm: 8, perfect: false },
+      { id: 909, origin: 'normal' as const, species: 'grouper', sizeCm: 140, perfect: true },
     ]
     const s = deepFreeze(fresh({ gold: 10, totalEarned: 5, bag }))
     const sum = price('anchovy', 8, false) + price('grouper', 140, true)
@@ -790,7 +815,7 @@ describe('fishing WorldLogic', () => {
   })
 
   it('errors never mutate the input state', () => {
-    const full: Fish[] = Array.from({ length: bagSize(1) }, () => ({ species: 'anchovy', sizeCm: 10, perfect: false }))
+    const full: Fish[] = Array.from({ length: bagSize(1) }, () => ({ id: 910, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }))
     const cases: [State, unknown, number?][] = [
       [fresh(), { type: 'cast', area: 'x', power: 0.5 }],
       [fresh(), { type: 'cast', area: 'pier', power: 9 }],
@@ -828,14 +853,15 @@ describe('fishing WorldLogic', () => {
 
   it('migrate fills missing fields and keeps gold/dex', () => {
     const m = migrateW({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
-    expect(m).toEqual({ ...logic.init(), gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
+    const { nextFishId: _n, ...init0 } = logic.init()
+    expect(m).toEqual({ ...init0, gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
     expect(logic.migrate(null, 1)).toEqual(logic.init())
     expect(logic.migrate('x', 1)).toEqual(logic.init())
     expect(logic.migrate([], 1)).toEqual(logic.init())
   })
 
   it('migrate v2(areas [pier], dex에 grouper) → areas 기본값, legends [grouper], 골드·가방·도감 유지', () => {
-    const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
+    const bag = [{ id: 911, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: true }]
     const dex = { grouper: { count: 1, maxCm: 100 }, goby: { count: 2, maxCm: 12 } }
     const m = migrateW({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['pier'], bag, dex }, 2)
     expect(m).toEqual({ gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS], bag, dex, legends: ['grouper'], tackles: [], equipped: [], challenges: {}, pending: null, ...W0, buffs: [], wardrobe: ['hat:crown'] })
@@ -843,7 +869,7 @@ describe('fishing WorldLogic', () => {
   })
 
   it('migrate v3 세이브 → v4 그대로(골드·가방·도감·areas·legends), v2 세이브도 지금 규칙 그대로', () => {
-    const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'catfish', sizeCm: 50, perfect: false }]
+    const bag = [{ id: 912, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: true }, { id: 913, origin: 'normal' as const, species: 'catfish', sizeCm: 50, perfect: false }]
     const dex = { grouper: { count: 1, maxCm: 100 }, catfish: { count: 1, maxCm: 50 }, 'golden-mandarin': { count: 1, maxCm: 70 } }
     const v3 = { gold: 300, totalEarned: 900, rodTier: 3, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper', 'golden-mandarin'], pending: null }
     expect(migrateW(v3, 3)).toEqual({ ...v3, areas: [...DEFAULT_AREAS, 'lake'], tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
@@ -862,7 +888,7 @@ describe('fishing WorldLogic', () => {
     const m = migrateW(
       {
         gold: 'lots', totalEarned: 40, rodTier: 9, areas: ['pier', 3],
-        bag: [{ species: 'anchovy', sizeCm: 10, perfect: true }, { species: 'kraken', sizeCm: 9, perfect: false }, 'junk'],
+        bag: [{ id: 914, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: true }, { id: 915, origin: 'normal' as const, species: 'kraken', sizeCm: 9, perfect: false }, 'junk'],
         dex: { goby: { count: 1, maxCm: 10 }, kraken: { count: 1, maxCm: 99 }, mackerel: { count: 'x', maxCm: 1 } },
         pending: { species: 'anchovy', sizeCm: 10, biteDelayMs: 1, startedAt: 1 },
       },
@@ -872,7 +898,7 @@ describe('fishing WorldLogic', () => {
     expect(m.totalEarned).toBe(40)
     expect(m.rodTier).toBe(1)
     expect(m.areas).toEqual([...DEFAULT_AREAS])
-    expect(m.bag).toEqual([{ species: 'anchovy', sizeCm: 10, perfect: true }])
+    expect(m.bag).toEqual([{ id: 914, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: true }])
     expect(m.dex).toEqual({ goby: { count: 1, maxCm: 10 } })
     expect(m.pending).toBeNull()
   })
@@ -971,7 +997,7 @@ describe('fishing WorldLogic', () => {
       expect(v.equipped).toEqual(['cork'])
     })
     it('migrate v4 세이브 → tackles [], equipped [], 나머지 그대로', () => {
-      const bag = [{ species: 'anchovy', sizeCm: 10, perfect: true }]
+      const bag = [{ id: 917, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: true }]
       const dex = { grouper: { count: 1, maxCm: 100 } }
       const v4 = { gold: 300, totalEarned: 900, rodTier: 4, bagTier: 2, areas: ['village', 'river', 'forest', 'lake'], bag, dex, legends: ['grouper'], pending: null }
       expect(migrateW(v4, 4)).toEqual({ ...v4, areas: [...DEFAULT_AREAS, 'lake'], tackles: [], equipped: [], challenges: {}, ...W0, buffs: [], wardrobe: ['hat:crown'] })
@@ -1023,7 +1049,7 @@ describe('지역 해금', () => {
   it('migrate v6 세이브(장비·잠금·해금 지역 포함)는 그대로', () => {
     const v6 = {
       gold: 10, totalEarned: 70000, rodTier: 3, bagTier: 2, areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island'],
-      bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
+      bag: [{ id: 918, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
       legends: [], tackles: ['cork'], equipped: ['cork'], pending: null,
     }
     expect(migrateW(v6, 6)).toEqual({ ...v6, challenges: {}, ...W0, buffs: [] })
@@ -1031,9 +1057,9 @@ describe('지역 해금', () => {
 })
 
 describe('가방 잠금', () => {
-  const anchovy: Fish = { species: 'anchovy', sizeCm: 8, perfect: false }
-  const grouper: Fish = { species: 'grouper', sizeCm: 140, perfect: true }
-  const mackerel: Fish = { species: 'mackerel', sizeCm: 30, perfect: false }
+  const anchovy: Fish = { id: 919, origin: 'normal' as const, species: 'anchovy', sizeCm: 8, perfect: false }
+  const grouper: Fish = { id: 920, origin: 'normal' as const, species: 'grouper', sizeCm: 140, perfect: true }
+  const mackerel: Fish = { id: 921, origin: 'normal' as const, species: 'mackerel', sizeCm: 30, perfect: false }
 
   it('lock: 고른 칸만 잠그고, 풀면 locked 필드가 사라진다; 낚시 중에도 된다', () => {
     const s = deepFreeze(withPending({ gold: 7, bag: [anchovy, mackerel] }))
@@ -1071,11 +1097,11 @@ describe('가방 잠금', () => {
     const p = withHooked().pending!
     const legend = withHooked({ pending: { ...p, species: 'grouper', sizeCm: 120 } })
     const r = ok(play(legend, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
-    const fish = { species: 'grouper', sizeCm: 120, perfect: false, locked: true }
+    const fish = { id: 1, origin: 'first' as const, species: 'grouper', sizeCm: 120, perfect: false, locked: true }
     expect(r.state.bag).toEqual([fish])
     expect(r.result).toEqual({ caught: fish })
     const n = ok(play(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
-    expect(n.state.bag).toEqual([{ species: 'anchovy', sizeCm: 12, perfect: false }])
+    expect(n.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false }])
   })
 
   it('migrate: v4 이하 가방의 전설은 잠그고, v5 세이브의 잠금은 저장된 그대로(true만 인정)', () => {
@@ -1125,13 +1151,13 @@ describe('도전과제', () => {
     expect(land(hooked({ spot: 'pier' }), false).state.challenges).toEqual({})
     const one = land(hooked({ spot: 'pier' }), true)
     expect(one.state.challenges['pier-perfect']).toEqual({ progress: 1, done: false })
-    expect(one.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true } })
+    expect(one.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'goby', sizeCm: 10, perfect: true } })
     const { challenges, last } = landTimes({ spot: 'pier' }, 3, true)
     expect(challenges['pier-perfect']).toEqual({ progress: 3, done: true })
-    expect(last.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true }, completed: ['pier-perfect'] })
+    expect(last.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'goby', sizeCm: 10, perfect: true }, completed: ['pier-perfect'] })
     const more = land(hooked({ spot: 'pier' }, { challenges }), true)
     expect(more.state.challenges['pier-perfect']).toEqual({ progress: 3, done: true })
-    expect(more.result).toEqual({ caught: { species: 'goby', sizeCm: 10, perfect: true } })
+    expect(more.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'goby', sizeCm: 10, perfect: true } })
   })
 
   it('강 비: 비 오는 날 던지고 맑은 날 거둬도 센다; 맑은 날 던지고 비 올 때 거두면 안 센다', () => {
@@ -1190,7 +1216,7 @@ describe('도전과제', () => {
     const { cond: _c, area: _a, ...rest } = base.pending!
     const broken = { ...base, pending: rest as unknown as Pending }
     const r = land(broken, true)
-    expect(r.state.bag).toEqual([{ species: 'goby', sizeCm: 10, perfect: true }])
+    expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'goby', sizeCm: 10, perfect: true }])
     expect(r.state.challenges).toEqual({})
   })
 
@@ -1215,7 +1241,7 @@ describe('도전과제', () => {
   it('migrate v7 세이브(던진 중 포함) → challenges {}, pending null, 나머지 그대로', () => {
     const v7 = {
       gold: 10, totalEarned: 70000, rodTier: 3, bagTier: 2, areas: ALL_OPEN,
-      bag: [{ species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
+      bag: [{ id: 928, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false, locked: true }], dex: { anchovy: { count: 1, maxCm: 10 } },
       legends: [], tackles: ['cork'], equipped: ['cork'],
       pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'pier', cond: cond('spring', 12), power: 0.5 },
     }
@@ -1246,7 +1272,7 @@ describe('도전과제', () => {
   it('migrate v8 → v9: 세이브 그대로(고급 장비만 더해졌다)', () => {
     const v8 = {
       gold: 123_456, totalEarned: 999_999, rodTier: 4, bagTier: 3, areas: ALL_OPEN,
-      bag: [{ species: 'grouper', sizeCm: 100, perfect: true, locked: true }, { species: 'anchovy', sizeCm: 10, perfect: false }],
+      bag: [{ id: 929, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: true, locked: true }, { id: 930, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }],
       dex: { grouper: { count: 1, maxCm: 100 }, anchovy: { count: 3, maxCm: 12 } },
       legends: ['grouper'], tackles: ['cork', 'spinner', 'curious'], equipped: ['spinner', 'curious'],
       challenges: { 'pier-perfect': { progress: 3, done: true }, 'forest-variety': { progress: 1, seen: ['carp'], done: false } },
@@ -1539,7 +1565,7 @@ describe('신화 잡기·버프·판매 (합성 지역)', () => {
     const r = win(hooked('tmp-mythic', { legends: ['tmp-legend', 'grouper'] }))
     expect(r.state.legends).toEqual(['tmp-legend', 'grouper', 'tmp-mythic'])
     expect(r.state.buffs).toEqual(['imugi-scale'])
-    expect(r.state.bag.at(-1)).toEqual({ species: 'tmp-mythic', sizeCm: 400, perfect: false, locked: true })
+    expect(r.state.bag.at(-1)).toEqual({ id: 1, origin: 'first' as const, species: 'tmp-mythic', sizeCm: 400, perfect: false, locked: true })
     expect(r.result).toMatchObject({ buff: 'imugi-scale' })
     expect(viewW(r.state, { now: T0 }).buffs).toEqual(['imugi-scale'])
   })
@@ -1562,13 +1588,13 @@ describe('신화 잡기·버프·판매 (합성 지역)', () => {
     expect(at(['imugi-scale'])).toBe(Math.round(at([]) * BUFF_FX.imugiBite))
   })
   it('sellPrice: dragon-pearl이면 ×1.08 반올림, 아니면 price', () => {
-    const f: Fish = { species: 'grouper', sizeCm: 140, perfect: true }
+    const f: Fish = { id: 932, origin: 'normal' as const, species: 'grouper', sizeCm: 140, perfect: true }
     expect(sellPrice(f, [])).toBe(price('grouper', 140, true))
     expect(sellPrice(f, ['imugi-scale', 'dragon-breath'])).toBe(price('grouper', 140, true))
     expect(sellPrice(f, ['dragon-pearl'])).toBe(Math.round((price('grouper', 140, true) * 108) / 100))
   })
   it('sell: dragon-pearl이면 물고기마다 반올림한 합, 없으면 지금과 같음', () => {
-    const bag: Fish[] = [{ species: 'anchovy', sizeCm: 8, perfect: false }, { species: 'goby', sizeCm: 13, perfect: true }, { species: 'grouper', sizeCm: 100, perfect: false }]
+    const bag: Fish[] = [{ id: 933, origin: 'normal' as const, species: 'anchovy', sizeCm: 8, perfect: false }, { id: 934, origin: 'normal' as const, species: 'goby', sizeCm: 13, perfect: true }, { id: 935, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false }]
     const plain = bag.reduce((n, f) => n + price(f.species, f.sizeCm, f.perfect), 0)
     const pearl = bag.reduce((n, f) => n + Math.round((price(f.species, f.sizeCm, f.perfect) * 108) / 100), 0)
     expect(ok(play(fresh({ bag }), { type: 'sell' }, ctx())).result).toEqual({ earned: plain })
@@ -1708,7 +1734,7 @@ describe('갯벌·늪지 (logic.version 12)', () => {
       ...logic.init(), gold: 5, areas: [...DEFAULT_AREAS, 'tideflat', 'swamp'],
       dex: { mudskipper: { count: 3, maxCm: 18 }, imugi: { count: 1, maxCm: 500 }, 'century-snakehead': { count: 1, maxCm: 120 }, 'thousand-turtle': { count: 1, maxCm: 80 } },
       legends: ['century-snakehead', 'thousand-turtle', 'imugi'], buffs: ['imugi-scale'],
-      bag: [{ species: 'imugi', sizeCm: 500, perfect: false, locked: true }],
+      bag: [{ id: 936, origin: 'normal' as const, species: 'imugi', sizeCm: 500, perfect: false, locked: true }],
     }
     const m = migrateW(JSON.parse(JSON.stringify(v12)), 12)
     expect(m.areas).toEqual(v12.areas)
@@ -1833,7 +1859,7 @@ describe('산정 호수·난파선 (logic.version 13)', () => {
       dex: { char: { count: 2, maxCm: 30 }, 'white-dragon': { count: 1, maxCm: 300 }, 'dragon-king': { count: 1, maxCm: 800 }, skipjack: { count: 4, maxCm: 70 } },
       legends: ['grouper', 'silver-king-trout', 'rainbow-marlin', 'snowwhite-taimen', 'white-dragon', 'oarfish', 'dragon-king'],
       buffs: [],
-      bag: [{ species: 'dragon-king', sizeCm: 800, perfect: false, locked: true }],
+      bag: [{ id: 937, origin: 'normal' as const, species: 'dragon-king', sizeCm: 800, perfect: false, locked: true }],
     }
     const m = migrateW(JSON.parse(JSON.stringify(v13)), 13)
     expect(m.areas).toEqual(v13.areas)
@@ -1946,9 +1972,9 @@ describe('v14 지갑 계약', () => {
 
   it('sell → gold: +earned, totalEarned += earned, 잠긴 물고기는 남는다; 용왕의 여의주면 물고기마다 ×1.08', () => {
     const bag: Fish[] = [
-      { species: 'anchovy', sizeCm: 12, perfect: false },
-      { species: 'mackerel', sizeCm: 30, perfect: true },
-      { species: 'grouper', sizeCm: 100, perfect: false, locked: true },
+      { id: 938, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false },
+      { id: 939, origin: 'normal' as const, species: 'mackerel', sizeCm: 30, perfect: true },
+      { id: 940, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false, locked: true },
     ]
     const sum = price('anchovy', 12, false) + price('mackerel', 30, true)
     const r = apply(base({ bag, totalEarned: 5 }), { type: 'sell' }, 999)
@@ -2011,7 +2037,7 @@ describe('v14 지갑 계약', () => {
     const v13 = {
       gold: 123_456, totalEarned: 999_999, rodTier: 6, bagTier: 5,
       areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island', 'tideflat', 'swamp', 'summit', 'wreck'],
-      bag: [{ species: 'anchovy', sizeCm: 12, perfect: false, locked: true }, { species: 'mackerel', sizeCm: 30, perfect: true }],
+      bag: [{ id: 941, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false, locked: true }, { id: 942, origin: 'normal' as const, species: 'mackerel', sizeCm: 30, perfect: true }],
       dex: { anchovy: { count: 3, maxCm: 14 }, mackerel: { count: 1, maxCm: 30 } },
       legends: [], tackles: ['cork', 'spinner', 'curious'], equipped: ['spinner', 'curious'],
       challenges: { 'river-rain': { progress: 4, done: false } },
@@ -2020,7 +2046,8 @@ describe('v14 지갑 계약', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(v13)), 13)
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
-    expect(m).toEqual({ ...rest, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
+    const legacyBag = rest.bag.map((f, i) => ({ ...f, id: i + 1, origin: 'legacy' }))
+    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2068,7 +2095,7 @@ describe('previewData (메인 미리보기 설계 §6)', () => {
 describe('판매 마릿수 감쇠', () => {
   // 2026-11-25 12:00 KST = 03:00 UTC
   const NOON = Date.UTC(2026, 10, 25, 3, 0, 0)
-  const anchovy = (sizeCm = 15): Fish => ({ species: 'anchovy', sizeCm, perfect: false })
+  const anchovy = (sizeCm = 15): Fish => ({ id: 943, origin: 'normal' as const, species: 'anchovy', sizeCm, perfect: false })
   const nOf = (n: number) => Array.from({ length: n }, () => anchovy())
 
   it('kstDay: KST 자정 기준 날짜', () => {
@@ -2146,7 +2173,8 @@ describe('구매 가격 확인 (v15)', () => {
 
 // ---------------------------------------------------------------- 버리기·환경부담금 (설계 2026-11-25-fishing-brag-discard, v16)
 describe('여러 마리 버리기 discardMany (logic.version 21)', () => {
-  const f = (species: string, sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ species, sizeCm, perfect: false, ...extra })
+  let fid = 0
+  const f = (species: string, sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ id: ++fid, origin: 'normal', species, sizeCm, perfect: false, ...extra })
   const bag = [f('mackerel', 40), f('anchovy', 12), f('mackerel', 30, { locked: true }), f('goby', 15)]
   const item = (i: number) => ({ index: i, species: bag[i].species, sizeCm: bag[i].sizeCm })
   const feeOf = (idx: number[], at: 'bag' | 'trash' = 'bag') => idx.reduce((a, i) => a + discardFee(bag[i], [], at), 0)
@@ -2183,13 +2211,13 @@ describe('여러 마리 버리기 discardMany (logic.version 21)', () => {
 })
 
 describe('버리기', () => {
-  const mack = (sizeCm = 40): Fish => ({ species: 'mackerel', sizeCm, perfect: false })
+  const mack = (sizeCm = 40): Fish => ({ id: 944, origin: 'normal' as const, species: 'mackerel', sizeCm, perfect: false })
   it('discardFee(v18): 가방은 판매가(감쇠 전, 버프 포함)의 50% 올림, 쓰레기통은 5% 올림, 최소 1', () => {
     expect(discardFee(mack(), [])).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 2)))
     expect(discardFee(mack(), [], 'bag')).toBe(discardFee(mack(), []))
     expect(discardFee(mack(), [], 'trash')).toBe(Math.max(1, Math.ceil(sellPrice(mack()) / 20)))
     expect(discardFee({ species: 'anchovy', sizeCm: 8, perfect: false }, [], 'trash')).toBeGreaterThanOrEqual(1)
-    const g = { species: 'grouper', sizeCm: 140, perfect: true }
+    const g = { id: 946, origin: 'normal' as const, species: 'grouper', sizeCm: 140, perfect: true }
     expect(discardFee(g, ['dragon-pearl'])).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 2))
     expect(discardFee(g, ['dragon-pearl'], 'trash')).toBe(Math.ceil(sellPrice(g, ['dragon-pearl']) / 20))
   })
@@ -2229,7 +2257,7 @@ describe('버리기', () => {
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
   it('version 25', () => {
-    expect(logic.version).toBe(25)
+    expect(logic.version).toBe(26)
   })
 })
 
@@ -2264,11 +2292,11 @@ describe('어종 확장 (logic.version 19)', () => {
   const hookedOn = (species: string, sizeCm: number, area: AreaId, spot: string): WS =>
     fresh({ pending: { species, sizeCm, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area, spot, cond: cond('spring', 12), power: 0.5 } })
   it('migrate: v18 세이브의 진행 중 낚시(pending)는 그대로 남아 v19에서 끝까지 낚인다', () => {
-    const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ species: 'koi', sizeCm: 50, perfect: false }] } as WS
+    const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ id: 947, origin: 'normal' as const, species: 'koi', sizeCm: 50, perfect: false }] } as WS
     const m = logic.migrate(structuredClone(v18), 18)
-    expect(m).toEqual(v18)
+    expect(m).toEqual({ ...v18, bag: [{ ...v18.bag[0], id: 1, origin: 'legacy' }], nextFishId: 2 })
     const r = ok(play({ ...m, gold: 0 } as WS, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
-    expect(r.state.bag).toEqual([{ species: 'koi', sizeCm: 50, perfect: false }, { species: 'mackerel', sizeCm: 40, perfect: false }])
+    expect(r.state.bag).toEqual([{ id: 1, origin: 'legacy' as const, species: 'koi', sizeCm: 50, perfect: false }, { id: 2, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect: false }])
   })
   it('migrate: pending은 v18 이상 형식이고 모르는 어종·지역·깨진 값이 없을 때만 남긴다', () => {
     const good = hookedOn('mackerel', 40, 'village', 'shore')
@@ -2285,14 +2313,14 @@ describe('어종 확장 (logic.version 19)', () => {
   })
   it('새 어종을 잡으면 dex·가방에 들어가고 판매가가 0보다 크다', () => {
     const r = ok(play(hookedOn('koi', 60, 'forest', 'pond'), { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
-    expect(r.state.bag).toEqual([{ species: 'koi', sizeCm: 60, perfect: false }])
+    expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'koi', sizeCm: 60, perfect: false }])
     expect(r.state.dex).toHaveProperty('koi')
     expect(sellPrice({ species: 'koi', sizeCm: 60, perfect: false })).toBeGreaterThan(0)
   })
 })
 
 describe('냉장고 (logic.version 18)', () => {
-  const f = (sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ species: 'mackerel', sizeCm, perfect: false, ...extra })
+  const f = (sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ id: 952, origin: 'normal' as const, species: 'mackerel', sizeCm, perfect: false, ...extra })
   const store = (index: unknown, fish: Fish) => ({ type: 'store', index, species: fish.species, sizeCm: fish.sizeCm })
   const takeOut = (index: unknown, fish: Fish) => ({ type: 'takeOut', index, species: fish.species, sizeCm: fish.sizeCm })
   it('FRIDGE_SIZE 15, 처음엔 빈 냉장고, view에 fridge', () => {
@@ -2331,7 +2359,7 @@ describe('냉장고 (logic.version 18)', () => {
   })
   it('migrate: v17 → fridge [], 저장된 냉장고는 가방 규칙(모르는 어종 버림, 잠금 유지), 15개까지', () => {
     expect(migrateW({ ...logic.init(), fridge: undefined }, 17).fridge).toEqual([])
-    const saved = [{ species: 'zzz', sizeCm: 1, perfect: false }, ...Array.from({ length: 16 }, (_, i) => f(10 + i, i === 0 ? { locked: true } : {}))]
+    const saved = [{ id: 953, origin: 'normal' as const, species: 'zzz', sizeCm: 1, perfect: false }, ...Array.from({ length: 16 }, (_, i) => f(10 + i, i === 0 ? { locked: true } : {}))]
     const m = migrateW({ ...logic.init(), fridge: saved }, 18)
     expect(m.fridge).toHaveLength(15)
     expect(m.fridge[0]).toEqual(f(10, { locked: true }))
@@ -2385,7 +2413,7 @@ describe('내 섬 A단계(v22, 내 섬 설계 §5)', () => {
     expect(logic.previewData?.(fresh({ isle: { ...ISLE0, layout: 'crescent', cleared: 3, house: 2 } as State['isle'] }))?.isle).toBe('crescent:3:2')
   })
   it('publicView: 섬과 옷차림만, 가방·골드·도감은 없다', () => {
-    const s = fresh({ isle: { ...ISLE0, layout: 'twin', cleared: 2, mats: { wood: 5, stone: 1, iron: 0 } }, bag: [{ species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
+    const s = fresh({ isle: { ...ISLE0, layout: 'twin', cleared: 2, mats: { wood: 5, stone: 1, iron: 0 } }, bag: [{ id: 954, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
     const v = logic.publicView!(s) as Record<string, unknown>
     expect(v).toEqual({ isle: { layout: 'twin', cleared: 2, house: 0, placed: [], deco: [] }, outfit: s.outfit })
     for (const k of ['bag', 'gold', 'dex', 'fridge', 'totalEarned']) expect(v).not.toHaveProperty(k)
@@ -2589,5 +2617,92 @@ describe('내 섬 D단계 바깥 꾸미기 (v25, 설계 2026-11-26-my-isle-d §4
     const m = isleMap('crescent', 1, 0, after.deco)
     const reach = reachableTiles(m, [isleArrival('crescent')], ALL_AREAS_OPEN)
     for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (isWalkable(m, x, y, ALL_AREAS_OPEN)) expect(reach.has(`${x},${y}`), `${x},${y}`).toBe(true)
+  })
+})
+
+describe('물고기 id·출처 (logic.version 26, 경제 설계 2026-11-27 §4.2)', () => {
+  const old = (species: string, sizeCm: number, extra: Record<string, unknown> = {}) => ({ species, sizeCm, perfect: false, ...extra })
+  /** v25 전체 세이브(지역·장비·도감·전설·버프·옷·섬·냉장고). 물고기에 id가 없고 nextFishId도 없다 */
+  function v25Save() {
+    const s: Record<string, unknown> = structuredClone({
+      ...logic.init(),
+      totalEarned: 812_345, rodTier: 6, bagTier: 5, shoesTier: 3,
+      areas: [...DEFAULT_AREAS, 'lake', 'cave', 'island', 'swamp'],
+      dex: { anchovy: { count: 30, maxCm: 14 }, grouper: { count: 1, maxCm: 120 }, imugi: { count: 1, maxCm: 400 } },
+      legends: ['grouper', 'imugi'], buffs: ['imugi-scale'], tackles: ['cork', 'curious'], equipped: ['curious'],
+      sold: { day: '2026-11-27', n: 12 }, wardrobe: ['hat:crown'],
+      isle: newIsleFor('crescent'),
+    })
+    delete s.nextFishId
+    s.bag = [old('anchovy', 12), old('grouper', 120, { locked: true }), old('imugi', 400, { locked: true, perfect: true }), old('anchovy', 12)]
+    s.fridge = [old('mackerel', 30, { locked: true }), old('goby', 15)]
+    return s
+  }
+  const newIsleFor = (layout: string) => {
+    const r = logic.apply(logic.init(), { type: 'isleChoose', layout }, ctx())
+    if ('error' in r) throw new Error(r.error)
+    return r.state.isle
+  }
+
+  it('v25 세이브 → 물고기 수·순서·크기·퍼펙트·잠금과 나머지 필드가 그대로, 가방 → 냉장고 순서로 legacy 1..n', () => {
+    const raw = v25Save()
+    const m = logic.migrate(structuredClone(raw), 25)
+    const strip = (list: Fish[]) => list.map(({ id: _i, origin: _o, ...f }) => f)
+    expect(strip(m.bag)).toEqual(raw.bag)
+    expect(strip(m.fridge)).toEqual(raw.fridge)
+    expect([...m.bag, ...m.fridge].map((f) => [f.id, f.origin])).toEqual([1, 2, 3, 4, 5, 6].map((id) => [id, 'legacy']))
+    expect(m.nextFishId).toBe(7)
+    const { bag: _b, fridge: _f, nextFishId: _n, ...rest } = m
+    const { bag: _rb, fridge: _rf, ...rawRest } = raw
+    expect(rest).toEqual(rawRest)
+    // 저장 뒤 다시 읽어도(v26) 같다
+    expect(logic.migrate(structuredClone(m), 26)).toEqual(m)
+  })
+
+  it('v26 세이브: id·출처를 지키고, 깨진·겹친 id만 남은 번호보다 큰 새 번호를 받는다', () => {
+    const m = logic.migrate({
+      ...logic.init(),
+      nextFishId: 10,
+      bag: [old('anchovy', 12, { id: 7, origin: 'first' }), old('anchovy', 13, { id: 7, origin: 'normal' }), old('goby', 10, { id: -1, origin: 'weird' })],
+      fridge: [old('mackerel', 30, { id: 12, origin: 'recatch' }), old('goby', 11)],
+    }, 26)
+    expect(m.bag.map((f) => [f.id, f.origin])).toEqual([[7, 'first'], [13, 'normal'], [14, 'legacy']])
+    expect(m.fridge.map((f) => [f.id, f.origin])).toEqual([[12, 'recatch'], [15, 'legacy']])
+    expect(m.nextFishId).toBe(16)
+    expect(logic.migrate(structuredClone(m), 26)).toEqual(m)
+  })
+
+  it('resolve: 새 물고기는 nextFishId를 받고 하나 올린다. 전설·신화는 first, 그 밖은 normal', () => {
+    const s = fresh({ nextFishId: 41, pending: { species: 'anchovy', sizeCm: 12, biteDelayMs: 3000, startedAt: T0, hookedAt: BITE, area: 'village', spot: 'shore', cond: cond('spring', 12), power: 0.5 } })
+    const r = ok(play(s, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(r.state.bag.at(-1)).toMatchObject({ id: 41, origin: 'normal' })
+    expect(r.state.nextFishId).toBe(42)
+    const miss = ok(play(s, { type: 'resolve', success: false, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
+    expect(miss.state.nextFishId).toBe(41)
+  })
+
+  it('view에는 nextFishId가 없다', () => {
+    expect(viewW(fresh({ nextFishId: 5 }), { now: T0 })).not.toHaveProperty('nextFishId')
+  })
+
+  describe('행동이 보낸 id가 그 칸의 개체와 다르면 거절하고 아무것도 바꾸지 않는다(스테일 화면)', () => {
+    const a: Fish = { id: 3, origin: 'normal', species: 'anchovy', sizeCm: 12, perfect: false }
+    const b: Fish = { id: 4, origin: 'normal', species: 'anchovy', sizeCm: 12, perfect: false }
+    const s = deepFreeze(fresh({ gold: 10_000, bag: [a, b], fridge: [b], nextFishId: 5 }))
+    const fee = discardFee(a, [])
+    const cases: [string, (id: number | undefined) => Record<string, unknown>, string][] = [
+      ['lock', (id) => ({ type: 'lock', index: 0, id, locked: true }), 'bag_changed'],
+      ['discard', (id) => ({ type: 'discard', index: 0, id, species: 'anchovy', sizeCm: 12, fee }), 'bag_changed'],
+      ['discardMany', (id) => ({ type: 'discardMany', items: [{ index: 0, id, species: 'anchovy', sizeCm: 12 }], fee }), 'bag_changed'],
+      ['store', (id) => ({ type: 'store', index: 0, id, species: 'anchovy', sizeCm: 12 }), 'bag_changed'],
+      ['takeOut', (id) => ({ type: 'takeOut', index: 0, id: id === 3 ? 4 : id, species: 'anchovy', sizeCm: 12 }), 'fridge_changed'],
+    ]
+    for (const [name, mk, code] of cases) {
+      it(name, () => {
+        expect(err(play(s, mk(99), ctx()))).toBe(code)
+        ok(play(s, mk(3), ctx()))
+        ok(play(s, mk(undefined), ctx()))
+      })
+    }
   })
 })

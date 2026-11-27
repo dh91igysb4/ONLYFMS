@@ -10,7 +10,7 @@ vi.mock('./supabase.ts', () => ({
   supabaseKey: 'pub',
 }))
 
-import { ApiError, duel, duelActionMessage, duelErrorMessage, errorMessage, play, rpc } from './api.ts'
+import { ApiError, duel, duelActionMessage, duelErrorMessage, errorMessage, play, rpc, world } from './api.ts'
 
 beforeEach(() => { rpcMock.mockReset() })
 afterEach(() => vi.unstubAllGlobals())
@@ -116,4 +116,47 @@ test('duel action messages: logic sentences shown, codes hidden', () => {
   expect(duelActionMessage('')).toBe('할 수 없는 행동이에요')
   expect(duelActionMessage(42)).toBe('할 수 없는 행동이에요')
   expect(duelActionMessage('x'.repeat(201))).toBe('할 수 없는 행동이에요')
+})
+
+test('world act: action_id를 붙이고, 응답을 못 받으면 같은 id로 다시 보낸다(4xx는 다시 보내지 않는다)', async () => {
+  vi.useFakeTimers()
+  try {
+    const sent: Record<string, unknown>[] = []
+    let n = 0
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      sent.push(JSON.parse(init.body as string))
+      n++
+      if (n === 1) throw new TypeError('Failed to fetch')
+      if (n === 2) return new Response('{"error":"internal"}', { status: 500 })
+      return new Response(JSON.stringify({ view: { ok: true }, result: null, server_now: 1 }), { status: 200 })
+    }))
+    const p = world({ game: 'g', action: 'act', payload: { type: 'x' } })
+    await vi.runAllTimersAsync()
+    expect((await p).view).toEqual({ ok: true })
+    expect(sent).toHaveLength(3)
+    const id = sent[0].action_id
+    expect(id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(sent.every((b) => b.action_id === id && (b.payload as { type: string }).type === 'x')).toBe(true)
+
+    sent.length = 0
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      sent.push(JSON.parse(init.body as string))
+      return new Response('{"error":"bag_changed"}', { status: 400 })
+    }))
+    const e = await err(world({ game: 'g', action: 'act', payload: {} }))
+    expect(e.code).toBe('bag_changed')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].action_id).not.toBe(id)
+
+    // load에는 action_id가 없고 다시 보내지 않는다
+    sent.length = 0
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      sent.push(JSON.parse(init.body as string))
+      throw new TypeError('Failed to fetch')
+    }))
+    expect((await err(world({ game: 'g', action: 'load' }))).code).toBe('network')
+    expect(sent).toEqual([{ game: 'g', action: 'load' }])
+  } finally {
+    vi.useRealTimers()
+  }
 })

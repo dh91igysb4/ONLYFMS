@@ -186,8 +186,17 @@ export function teleporterOpen(state: Pick<State, 'areas' | 'challenges'>, area:
 }
 
 // ---------------------------------------------------------------- WorldLogic
-/** locked: 가방에서 잠근 물고기. "전부 팔기"에서 빠진다. 잠기지 않았으면 필드가 없다. */
-export type Fish = { species: string; sizeCm: number; perfect: boolean; locked?: true }
+/**
+ * 물고기 출처(v26, 경제 설계 2026-11-27-fishing-economy-design.md §4.2). 판매가·전시 자격을 가른다.
+ * legacy: v25 이하 세이브에 있던 개체, first: 최초로 잡은 전설·신화, normal: 그 밖의 새 개체, recatch: 연구로 다시 잡은 전설·신화(P1)
+ */
+export type FishOrigin = 'legacy' | 'first' | 'normal' | 'recatch'
+export const FISH_ORIGINS: readonly FishOrigin[] = ['legacy', 'first', 'normal', 'recatch']
+/**
+ * id: 세이브 안에서 유일한 양의 정수(v26). 화면이 행동에 함께 보내 스테일 화면이 다른 개체를 건드리지 않게 한다.
+ * locked: 가방에서 잠근 물고기. "전부 팔기"에서 빠진다. 잠기지 않았으면 필드가 없다.
+ */
+export type Fish = { id: number; origin: FishOrigin; species: string; sizeCm: number; perfect: boolean; locked?: true }
 export type Pending = {
   species: string
   sizeCm: number
@@ -240,6 +249,8 @@ export type State = {
   /** 내 섬(v22): 고른 섬 모양. 처음 배를 타기 전엔 null */
   isle: IsleState | null
   pending: Pending | null
+  /** 다음 물고기 id(v26). 가방·냉장고의 어떤 id보다 크다 */
+  nextFishId: number
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
 export type DiscardAt = 'bag' | 'trash'
@@ -248,14 +259,14 @@ export type Action =
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
-  | { type: 'lock'; index: number; locked: boolean }
+  | { type: 'lock'; index: number; id?: number; locked: boolean }
   // fee: 화면이 본 환경부담금(v16). 서버 값과 다르면 price_changed. species·sizeCm이 그 칸과 다르면 bag_changed
-  | { type: 'discard'; index: number; fee: number; species: string; sizeCm: number; at?: DiscardAt }
+  | { type: 'discard'; index: number; id?: number; fee: number; species: string; sizeCm: number; at?: DiscardAt }
   // 여러 마리 한 번에(v21): fee는 합계. 하나라도 틀리면 아무것도 버리지 않는다
-  | { type: 'discardMany'; items: { index: number; species: string; sizeCm: number }[]; fee: number; at?: DiscardAt }
+  | { type: 'discardMany'; items: { index: number; id?: number; species: string; sizeCm: number }[]; fee: number; at?: DiscardAt }
   // 마을회관 냉장고(v18): species·sizeCm이 그 칸과 다르면 bag_changed / fridge_changed
-  | { type: 'store'; index: number; species: string; sizeCm: number }
-  | { type: 'takeOut'; index: number; species: string; sizeCm: number }
+  | { type: 'store'; index: number; id?: number; species: string; sizeCm: number }
+  | { type: 'takeOut'; index: number; id?: number; species: string; sizeCm: number }
   // price: 화면이 본 가격(v15). 서버 가격과 다르면 price_changed — 배포 사이 옛 화면이 옛 가격을 보고 사지 않게
   | { type: 'buyRod'; tier: number; price: number }
   | { type: 'buyBag'; tier: number; price: number }
@@ -312,7 +323,7 @@ export const newIsle = (layout: IsleLayoutId): IsleState => ({
   layout, cleared: 0, tools: { axe: 1, pick: 1, shovel: 1 }, mats: { wood: 0, stone: 0, iron: 0 }, gathered: { day: '', ids: [] },
   house: 0, furniture: {}, placed: [], decoBox: {}, deco: [],
 })
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -350,6 +361,7 @@ const init = (): State => ({
   fridge: [],
   isle: null,
   pending: null,
+  nextFishId: 1,
 })
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -421,7 +433,15 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
   const isLegend = !!speciesById(p.species).legend
   // 전설은 다시 잡을 수 없으니 실수로 팔리지 않게 잠근 채 넣는다 (가방에서 풀 수 있다)
-  const fish: Fish = { species: p.species, sizeCm: p.sizeCm, perfect: a.perfect, ...(isLegend ? { locked: true as const } : {}) }
+  // 전설·신화는 지금 한 번만 잡히므로 first. 연구 재포획(recatch)은 P1
+  const fish: Fish = {
+    id: state.nextFishId,
+    origin: isLegend ? 'first' : 'normal',
+    species: p.species,
+    sizeCm: p.sizeCm,
+    perfect: a.perfect,
+    ...(isLegend ? { locked: true as const } : {}),
+  }
   const prev = state.dex[p.species]
   const dex = {
     ...state.dex,
@@ -433,7 +453,7 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   const judged = facts ? progressChallenges(state.challenges, facts) : { challenges: state.challenges, completed: [] }
   const gained = gainBuff(state.buffs ?? [], p.species)
   return {
-    state: { ...state, bag: [...state.bag, fish], dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null },
+    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null },
     result: {
       caught: fish,
       ...(judged.completed.length > 0 ? { completed: judged.completed } : {}),
@@ -516,7 +536,7 @@ function discard(state: State, a: Record<string, unknown>, gold: number): Out {
   if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= state.bag.length) return { error: 'bad_action' }
   const f = state.bag[i]
   // 화면이 본 물고기와 다르면(다른 탭·응답 유실로 칸이 밀림) 버리지 않는다
-  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm || !sameId(a.id, f)) return { error: 'bag_changed' }
   if (f.locked) return { error: 'locked' }
   if (a.at !== undefined && a.at !== 'bag' && a.at !== 'trash') return { error: 'bad_action' }
   const fee = discardFee(f, state.buffs ?? [], a.at === 'trash' ? 'trash' : 'bag')
@@ -526,6 +546,8 @@ function discard(state: State, a: Record<string, unknown>, gold: number): Out {
 }
 
 const validIndex = (i: unknown, len: number): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < len
+/** 화면이 물고기 id를 보냈으면 그 칸의 개체와 같아야 한다. 안 보냈으면(v25 화면) 위치·어종·크기만 본다 */
+const sameId = (id: unknown, f: Fish): boolean => id === undefined || id === f.id
 
 /**
  * 여러 마리 한 번에 버리기(v21). 요청 한 번(마리마다 보내면 요청이 많아진다). 모두 검사하고 하나라도 틀리면 아무것도 버리지 않는다.
@@ -540,7 +562,7 @@ function discardMany(state: State, a: Record<string, unknown>, gold: number): Ou
   for (const it of a.items as unknown[]) {
     if (!isObj(it) || !validIndex(it.index, state.bag.length) || picked.has(it.index)) return { error: 'bad_action' }
     const f = state.bag[it.index]
-    if (it.species !== f.species || it.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+    if (it.species !== f.species || it.sizeCm !== f.sizeCm || !sameId(it.id, f)) return { error: 'bag_changed' }
     if (f.locked) return { error: 'locked' }
     picked.add(it.index)
     fee += discardFee(f, state.buffs ?? [], at)
@@ -555,7 +577,7 @@ function store(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   if (!validIndex(a.index, state.bag.length)) return { error: 'bad_action' }
   const f = state.bag[a.index]
-  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'bag_changed' }
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm || !sameId(a.id, f)) return { error: 'bag_changed' }
   if (state.fridge.length >= FRIDGE_SIZE) return { error: 'fridge_full' }
   const i = a.index
   return { state: { ...state, bag: state.bag.filter((_, j) => j !== i), fridge: [...state.fridge, f] } }
@@ -566,7 +588,7 @@ function takeOut(state: State, a: Record<string, unknown>): Out {
   if (state.pending) return { error: 'busy' }
   if (!validIndex(a.index, state.fridge.length)) return { error: 'bad_action' }
   const f = state.fridge[a.index]
-  if (a.species !== f.species || a.sizeCm !== f.sizeCm) return { error: 'fridge_changed' }
+  if (a.species !== f.species || a.sizeCm !== f.sizeCm || !sameId(a.id, f)) return { error: 'fridge_changed' }
   if (state.bag.length >= bagSize(state.bagTier)) return { error: 'bag_full' }
   const i = a.index
   return { state: { ...state, fridge: state.fridge.filter((_, j) => j !== i), bag: [...state.bag, f] } }
@@ -576,6 +598,7 @@ function lock(state: State, a: Record<string, unknown>): Out {
   const i = a.index
   if (typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= state.bag.length) return { error: 'bad_action' }
   if (typeof a.locked !== 'boolean') return { error: 'bad_action' }
+  if (!sameId(a.id, state.bag[i])) return { error: 'bag_changed' }
   const { locked: _was, ...rest } = state.bag[i]
   const fish: Fish = a.locked ? { ...rest, locked: true } : rest
   return { state: { ...state, bag: state.bag.map((f, j) => (j === i ? fish : f)) } }
@@ -719,7 +742,10 @@ function migrate(raw: unknown, fromVersion: number): State {
       if (isObj(f) && knownSpecies(f.species) && isNum(f.sizeCm) && typeof f.perfect === 'boolean') {
         // v4까지는 잠금이 없었다: 가방에 있던 전설은 잠가 둔다. v5부터는 저장된 잠금 그대로.
         const locked = fromVersion < 5 ? !!speciesById(f.species).legend : f.locked === true
-        out.push({ species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
+        // v25 이하 개체는 모두 legacy. id는 아래 numberFish가 붙인다(v26부터는 저장된 id·origin을 먼저 살린다)
+        const origin: FishOrigin = fromVersion >= FISH_ID_VERSION && FISH_ORIGINS.includes(f.origin as FishOrigin) ? (f.origin as FishOrigin) : 'legacy'
+        const id = fromVersion >= FISH_ID_VERSION && isNum(f.id) ? f.id : 0
+        out.push({ id, origin, species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
       }
     }
     return out
@@ -770,13 +796,14 @@ function migrate(raw: unknown, fromVersion: number): State {
     if (typeof id === 'string' && ownsWear(facts, slot, id)) outfit[slot] = id
   }
   const buffs = migrateBuffs(raw.buffs, legends)
+  const numbered = numberFish(bag.slice(0, bagSize(bagTier)), fridge, fromVersion >= FISH_ID_VERSION ? raw.nextFishId : undefined)
   return {
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
     rodTier,
     bagTier,
     shoesTier: SHOES.some((x) => x.tier === raw.shoesTier) ? (raw.shoesTier as ShoeTier) : base.shoesTier,
     areas,
-    bag: bag.slice(0, bagSize(bagTier)),
+    bag: numbered.bag,
     dex,
     legends,
     tackles,
@@ -786,11 +813,34 @@ function migrate(raw: unknown, fromVersion: number): State {
     outfit,
     buffs,
     sold: parseSold(raw.sold),
-    fridge,
+    fridge: numbered.fridge,
     // v21 이하에는 섬이 없다. 모르는 모양도 null(다시 고른다)
     isle: migrateIsle(raw.isle),
     pending: migratePending(raw.pending, fromVersion),
+    nextFishId: numbered.nextFishId,
   }
+}
+
+/** 물고기 id·출처가 생긴 버전 */
+const FISH_ID_VERSION = 26
+
+/**
+ * 가방 → 냉장고 순서로 물고기 id를 정리한다(v26). 저장된 id가 양의 정수이고 앞에서 안 쓰였으면 그대로,
+ * 아니면(v25 이하·깨진 값·중복) 새 번호를 붙인다. 새 번호는 저장된 nextFishId와 남은 id 중 큰 값 다음부터라
+ * 두 번 migrate해도 같은 결과이고, 지운 개체의 번호를 다시 쓰지 않는다.
+ */
+function numberFish(bag: Fish[], fridge: Fish[], savedNext: unknown): { bag: Fish[]; fridge: Fish[]; nextFishId: number } {
+  const all = [...bag, ...fridge]
+  const valid = (id: number) => Number.isSafeInteger(id) && id > 0
+  const seen = new Set<number>()
+  const keep = all.map((f) => {
+    if (!valid(f.id) || seen.has(f.id)) return false
+    seen.add(f.id)
+    return true
+  })
+  let next = Math.max(1, isNum(savedNext) && Number.isSafeInteger(savedNext) ? savedNext : 1, ...[...seen].map((id) => id + 1))
+  const fixed = all.map((f, i) => (keep[i] ? f : { ...f, id: next++ }))
+  return { bag: fixed.slice(0, bag.length), fridge: fixed.slice(bag.length), nextFishId: next }
 }
 
 /**
@@ -938,7 +988,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 23: 내 섬 B단계(개간·재료·작업대: gather·craft·clear, isle에 cleared·tools·mats·gathered). v22 섬은 기본값(설계 2026-11-26-my-isle-b-design.md)
   // 24: 내 섬 C단계(집: build·makeFurn·place·pickUp, isle에 house·furniture·placed, 지역 home). v23 섬은 집 0(설계 2026-11-26-my-isle-c-design.md)
   // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
-  version: 25,
+  // 26: 물고기 id·출처(Fish.id·origin, nextFishId). v25 이하 개체는 legacy, 가방 → 냉장고 순서로 1부터. 행동은 id를 받으면 확인
+  //     (경제 설계 2026-11-27-fishing-economy-design.md §4.2). 판매가·확률은 그대로
+  version: 26,
   wallet: true,
   init,
   migrate,
@@ -949,7 +1001,11 @@ export const logic: WorldLogic<State, Action, View> = {
     // 행동으로 업적 조건을 채웠으면(잡기·과제 깨기 등) 그 자리에서 옷을 저장한다
     return 'error' in r ? r : { ...r, state: grantEarned(r.state) }
   },
-  view: (state, ctx): View => ({ ...state, gold: ctx.gold, pending: state.pending && pendingView(state.pending) }),
+  view: (state, ctx): View => {
+    // 다음 물고기 번호는 화면에 필요 없다
+    const { nextFishId: _next, ...rest } = state
+    return { ...rest, gold: ctx.gold, pending: state.pending && pendingView(state.pending) }
+  },
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
   avatar: (state) => JSON.stringify(state.outfit),

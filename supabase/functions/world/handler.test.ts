@@ -857,6 +857,83 @@ t('visit 오류: bad_owner·self·no_owner(없음·대기)·no_save·no_public_v
   assert.equal((await visit(admin, hiddenOwner, 'test-world-public-hidden')).status, 200)
 })
 
+// ---------------------------------------------------------------- action_id (낚시 경제 설계 2026-11-27 §4.1)
+const actId = (uid: string, payload: unknown, actionId: unknown, game = 'test-world') =>
+  call(uid, { game, action: 'act', payload, action_id: actionId })
+
+t('action_id: 같은 id·같은 payload를 다시 보내면 저장한 응답을 그대로, 골드·세이브는 한 번만', async () => {
+  const u = await user()
+  const id = crypto.randomUUID()
+  const a = await actId(u, { type: 'earn', n: 40 }, id, W)
+  assert.equal(a.status, 200)
+  const b = await actId(u, { type: 'earn', n: 40 }, id.toUpperCase(), W)
+  assert.equal(b.status, 200)
+  assert.deepEqual(b.body, a.body)
+  assert.equal(await balance(u), 40)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 40 })
+  const l = await ledger(u)
+  assert.equal(l.length, 1)
+  assert.equal(l[0].ref, id)
+  // 다른 id는 새 행동
+  assert.equal((await actId(u, { type: 'earn', n: 40 }, crypto.randomUUID(), W)).status, 200)
+  assert.equal(await balance(u), 80)
+})
+
+t('action_id: 같은 id·다른 payload → 409 action_id_reused, 아무것도 바뀌지 않는다', async () => {
+  const u = await user()
+  const id = crypto.randomUUID()
+  assert.equal((await actId(u, { type: 'earn', n: 5 }, id, W)).status, 200)
+  const r = await actId(u, { type: 'earn', n: 500 }, id, W)
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, 'action_id_reused')
+  assert.equal(await balance(u), 5)
+  assert.deepEqual((await save(u, W))[0].state, { n: 0, earned: 5 })
+})
+
+t('action_id: 동시에 두 번 와도 한 번만 처리된다(세이브 행 잠금)', async () => {
+  const u = await user()
+  await load(u, W)
+  const id = crypto.randomUUID()
+  const [a, b] = await Promise.all([actId(u, { type: 'earn', n: 7 }, id, W), actId(u, { type: 'earn', n: 7 }, id, W)])
+  assert.equal(a.status, 200)
+  assert.equal(b.status, 200)
+  assert.deepEqual(a.body, b.body)
+  assert.equal(await balance(u), 7)
+})
+
+t('action_id: 오류 응답은 저장하지 않는다(같은 id로 다시 처리), 형식이 틀리면 400, 사용자·게임마다 따로', async () => {
+  const u = await user()
+  const id = crypto.randomUUID()
+  assert.equal((await actId(u, { type: 'bad' }, id)).status, 400)
+  assert.equal((await actId(u, { type: 'bad' }, id)).body.error, 'nope')
+  assert.equal((await actId(u, { type: 'inc' }, id)).status, 200)
+  assert.deepEqual((await save(u))[0].state, { n: 1 })
+  for (const bad of ['x', 12, '', null]) {
+    const r = await actId(u, { type: 'inc' }, bad)
+    assert.equal(r.status, 400)
+    assert.equal(r.body.error, 'bad_action_id')
+  }
+  assert.deepEqual((await save(u))[0].state, { n: 1 })
+  const other = await user()
+  assert.equal((await actId(other, { type: 'inc' }, id)).status, 200)
+  assert.equal((await actId(u, { type: 'inc' }, id, 'test-world-v2')).status, 200)
+  // action_id 없이(옛 화면) 같은 payload는 매번 처리한다
+  await act(u, { type: 'inc' })
+  await act(u, { type: 'inc' })
+  assert.deepEqual((await save(u))[0].state, { n: 3 })
+})
+
+t('action_id: 하루 지난 기록은 그 사용자의 다음 기록 때 지운다', async () => {
+  const u = await user()
+  const id = crypto.randomUUID()
+  await actId(u, { type: 'inc' }, id)
+  await sql`update public.world_actions set created_at = now() - interval '2 days' where user_id = ${u}`
+  await actId(u, { type: 'inc' }, crypto.randomUUID())
+  const left = await sql`select action_id::text as id from public.world_actions where user_id = ${u}`
+  assert.equal(left.length, 1)
+  assert.notEqual(left[0].id, id)
+})
+
 t('teardown', async () => {
   await sql`delete from public.hidden_games where game_id in ('test-world-hidden', 'test-world-public-hidden')`
   await sql.end()

@@ -4,6 +4,10 @@
 //   세이브 행 → 지갑 행 순서로 잠그고(act), 옛 세이브의 골드를 legacyGold로 한 번 옮기고(reason migrate),
 //   apply가 돌려준 gold 증감을 _gold_move(reason world)로 장부에 반영한다. 2026-11-25부터 사이트 하루 상한은 world에 걸리지 않지만
 //   (낚시는 판매 마릿수 감쇠), 핸들러는 그대로 실제 들어간 양(잔액 차이)만 보고 줄었으면 gold_capped를 알린다. wallet이 없는 게임은 지갑을 건드리지 않는다.
+// 행동 중복 방지(낚시 경제 설계 2026-11-27 §4.1): act에 action_id(UUID)가 있으면 세이브 행을 잠근 뒤 world_actions에서 찾는다.
+//   같은 id·같은 payload는 저장한 응답을 그대로, 다른 payload는 409 action_id_reused. 처음이면 처리하고 200 응답을 같은 트랜잭션에 쓴다.
+//   골드 장부 ref도 action_id다. action_id가 없으면(옛 화면) 지금처럼 매번 처리한다.
+import { createHash } from 'node:crypto'
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getWorld } from '../../../src/games/index.ts'
@@ -20,6 +24,8 @@ export type WorldDeps = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** 행동 payload의 JSON 최대 길이 */
 const MAX_PAYLOAD_CHARS = 2048
+/** world_actions를 남겨 두는 시간. 화면 재시도는 몇 초 안이다 */
+const ACTION_KEEP = '1 day'
 
 type Out = { status: number; body: Record<string, unknown> }
 const out = (status: number, body: Record<string, unknown>): Out => ({ status, body })
@@ -85,13 +91,19 @@ async function route(req: Request, deps: WorldDeps): Promise<Out> {
   if (body.action === 'visit') return await visit(deps, mod.logic, uid, gameId, body.owner)
   if (body.action !== 'load' && body.action !== 'act') return bad('action은 load, act 또는 visit이어야 해요')
   const isAct = body.action === 'act'
-  if (isAct && (JSON.stringify(body.payload) ?? '').length > MAX_PAYLOAD_CHARS) {
+  const payloadJson = JSON.stringify(body.payload) ?? 'null'
+  if (isAct && payloadJson.length > MAX_PAYLOAD_CHARS) {
     return bad('행동이 너무 커요')
+  }
+  let action: ActionKey | null = null
+  if (isAct && body.action_id !== undefined) {
+    if (typeof body.action_id !== 'string' || !UUID_RE.test(body.action_id)) return err(400, 'bad_action_id')
+    action = { id: body.action_id.toLowerCase(), hash: createHash('sha256').update(payloadJson).digest('hex') }
   }
 
   const logic: Logic = mod.logic
   try {
-    return await txOn(deps.sql)((tx) => run(tx, deps, logic, uid, gameId, isAct, body.payload))
+    return await txOn(deps.sql)((tx) => run(tx, deps, logic, uid, gameId, isAct, body.payload, action))
   } catch (e) {
     // 게임이 ctx.gold 검사를 빠뜨렸거나 다른 지출과 겹친 경우의 마지막 안전장치. 트랜잭션은 이미 롤백됐다
     if (isNotEnoughGold(e)) return err(400, 'not_enough_gold')
@@ -127,6 +139,9 @@ async function goldMove(
   return Number(r.b)
 }
 
+/** act의 중복 방지 키: action_id(소문자)와 payload JSON의 sha256 */
+type ActionKey = { id: string; hash: string }
+
 async function run(
   tx: Tx,
   deps: WorldDeps,
@@ -135,6 +150,7 @@ async function run(
   gameId: string,
   isAct: boolean,
   payload: unknown,
+  action: ActionKey | null,
 ): Promise<Out> {
   const now = deps.now()
   // 없으면 만들고(동시 요청은 여기서 한 줄로 서게 된다), 잠근다
@@ -146,6 +162,14 @@ async function run(
   const [row] = await tx<{ state: unknown; logic_version: number }[]>`
     select state, logic_version from public.world_saves
      where user_id = ${uid} and game_id = ${gameId} for update`
+
+  // 세이브 행을 잠근 뒤라 같은 action_id의 동시 요청은 여기서 줄을 서고, 뒤 요청은 앞 요청이 커밋한 응답을 본다
+  if (action) {
+    const [done] = await tx<{ payload_hash: string; response: Record<string, unknown> }[]>`
+      select payload_hash, response from public.world_actions
+       where user_id = ${uid} and game_id = ${gameId} and action_id = ${action.id}`
+    if (done) return done.payload_hash === action.hash ? out(200, done.response) : err(409, 'action_id_reused')
+  }
 
   const wallet = logic.wallet === true
   let gold = 0
@@ -196,7 +220,7 @@ async function run(
       if (!wallet) throw new Error('world: gold returned by a game without wallet')
       if (!Number.isSafeInteger(delta)) throw new Error(`world: gold must be an integer, got ${delta}`)
       const before = gold
-      gold = await goldMove(tx, uid, delta, 'world', null, gameId)
+      gold = await goldMove(tx, uid, delta, 'world', action?.id ?? null, gameId)
       if (delta > 0 && gold - before < delta) capped = { asked: delta, got: gold - before }
     }
     state = r.state
@@ -240,10 +264,23 @@ async function run(
   }
   // 메인 미리보기 값(메인 미리보기 설계 §6): 요청마다 계산해 저장된 detail과 다른 키만 쓴다(배포 뒤 첫 load에서도 채워진다)
   if (logic.previewData) await syncPreviewData(tx, uid, gameId, logic.previewData(state))
-  if (!wallet) return out(200, { view: logic.view(state, { now, gold: 0 }), result, server_now: now })
-  const body: Record<string, unknown> = { view: logic.view(state, { now, gold }), result, server_now: now, gold }
-  if (capped) body.gold_capped = capped
+  let body: Record<string, unknown>
+  if (!wallet) body = { view: logic.view(state, { now, gold: 0 }), result, server_now: now }
+  else {
+    body = { view: logic.view(state, { now, gold }), result, server_now: now, gold }
+    if (capped) body.gold_capped = capped
+  }
+  if (action) await rememberAction(tx, uid, gameId, action, body)
   return out(200, body)
+}
+
+async function rememberAction(tx: Tx, uid: string, gameId: string, action: ActionKey, body: Record<string, unknown>) {
+  await tx`
+    delete from public.world_actions
+     where user_id = ${uid} and created_at < now() - ${ACTION_KEEP}::interval`
+  await tx`
+    insert into public.world_actions (user_id, game_id, action_id, payload_hash, response)
+    values (${uid}, ${gameId}, ${action.id}, ${action.hash}, ${tx.json(body as never)})`
 }
 
 async function writeSave(tx: Tx, uid: string, gameId: string, state: unknown, version: number) {

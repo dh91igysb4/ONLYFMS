@@ -49,7 +49,7 @@ describe('신화 표시', () => {
   })
 
   it('가방: 신화 칸은 fish-cell-mythic, aria-label "신화 …"; 전설은 그대로', () => {
-    const bag: Fish[] = [{ species: 'tmp-mythic', sizeCm: 400, perfect: false, locked: true }, { species: 'tmp-legend', sizeCm: 20, perfect: false, locked: true }]
+    const bag: Fish[] = [{ id: 901, origin: 'normal' as const, species: 'tmp-mythic', sizeCm: 400, perfect: false, locked: true }, { id: 902, origin: 'normal' as const, species: 'tmp-legend', sizeCm: 20, perfect: false, locked: true }]
     render(<BagPanel view={makeView({ bag })} atShop={false} busy={false} onEquip={noop} onLock={noop} />)
     const m = screen.getByRole('button', { name: /^신화 시험 신화 400cm/ })
     expect(m.className).toContain('fish-cell-mythic')
@@ -105,7 +105,7 @@ describe('신화의 힘(버프) 화면', () => {
     expect(group.innerHTML).not.toContain('이무기의 비늘')
   })
   it('상점: 용왕의 여의주면 예상가가 sellPrice 합', () => {
-    const bag: Fish[] = [{ species: 'anchovy', sizeCm: 8, perfect: false }, { species: 'goby', sizeCm: 13, perfect: true }, { species: 'grouper', sizeCm: 100, perfect: false }]
+    const bag: Fish[] = [{ id: 903, origin: 'normal' as const, species: 'anchovy', sizeCm: 8, perfect: false }, { id: 904, origin: 'normal' as const, species: 'goby', sizeCm: 13, perfect: true }, { id: 905, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false }]
     const total = bag.reduce((n, f) => n + sellPrice(f, ['dragon-pearl']), 0)
     render(<ShopPanel view={makeView({ bag, buffs: ['dragon-pearl'] })} busy={false} onSell={noop} onBuy={noop} onBuyBag={noop} onBuyTackle={noop} />)
     expect(screen.getByText(new RegExp(`예상 ${total.toLocaleString('ko-KR')} G`))).toBeInTheDocument()
