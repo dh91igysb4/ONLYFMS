@@ -48,35 +48,38 @@ export function GamesPage() {
       {/* 넓은 화면: 왼쪽 게임 구역, 오른쪽 좁은 열에 대회 */}
       <div className="split split-aside">
         <UpcomingContests />
-        {/* 주제별 구역(manifest topic): 넓은 화면은 좌우 두 칸, 휴대폰은 위아래. 구역이 하나뿐이면 제목 없이 한 칸 */}
-        <div className="split split-even split-main">
-          {sections.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
-          {sections.map((sec) => (
-            <section key={sec.key} className="stack" aria-label={sec.title}>
-              {sections.length > 1 && <h3 className="section-title">{sec.title}</h3>}
-              <div className="grid-cards">
-                {sec.games.map((m) => (m.category === 'world' ? (
-                  <article key={m.id} className="card">
-                    <h3 className="card-title">{m.name}</h3>
-                    <p className="muted">{m.description}</p>
-                    <div className="card-actions">
-                      <Link className="btn btn-primary" to={`/world/${m.id}`}>들어가기</Link>
-                    </div>
-                  </article>
-                ) : (
-                  <article key={m.id} className="card">
-                    <h3 className="card-title">{m.name}</h3>
-                    <p className="muted">{m.description}</p>
-                    {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
-                    <div className="card-actions">
-                      {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
-                      {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
-                    </div>
-                  </article>
-                )))}
-              </div>
-            </section>
-          ))}
+        {/* 주제별 구역(manifest topic): 넓은 화면은 좌우 두 칸, 본문 칸이 충분히 넓으면 3단(게임이 많은 구역이 2칸),
+            휴대폰은 위아래. 구역이 하나뿐이면 제목 없이 한 칸. 3단 기준은 theme.css .games-sections 컨테이너 쿼리 */}
+        <div className="split-main games-sections">
+          <div className="split split-even">
+            {sections.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
+            {sections.map((sec) => (
+              <section key={sec.key} className={sec.wide ? 'stack games-sec-wide' : 'stack'} aria-label={sec.title}>
+                {sections.length > 1 && <h3 className="section-title">{sec.title}</h3>}
+                <div className="grid-cards">
+                  {sec.games.map((m) => (m.category === 'world' ? (
+                    <article key={m.id} className="card">
+                      <h3 className="card-title">{m.name}</h3>
+                      <p className="muted">{m.description}</p>
+                      <div className="card-actions">
+                        <Link className="btn btn-primary" to={`/world/${m.id}`}>들어가기</Link>
+                      </div>
+                    </article>
+                  ) : (
+                    <article key={m.id} className="card">
+                      <h3 className="card-title">{m.name}</h3>
+                      <p className="muted">{m.description}</p>
+                      {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
+                      <div className="card-actions">
+                        {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
+                        {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
+                      </div>
+                    </article>
+                  )))}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
       </div>
     </div>
