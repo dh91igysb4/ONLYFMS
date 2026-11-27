@@ -72,6 +72,7 @@
 3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
 4. 새 물·땅 칸 종류나 키 큰 물체(나무 등)를 더하면 `src/games/fishing/shore.ts`의 분류(고정·walkwet)와 발밑 표(`footprintAt`)도 함께 고친다. 물가 그림과 걷기 판정이 같은 물 정도 값을 쓴다(`shoreWalk.test.ts`가 모든 맵의 걷는 칸을 본다). 건물(`B`)은 외관 그림(`buildingSprite`)의 불투명 픽셀로 막으므로, 건물 그림을 바꾸면 걷는 범위도 바뀐다.
 4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 약 25일, 21~31일, 설계 `2026-11-25-fishing-species-expansion-design.md`)를 다시 잰다: `src/games/fishing/econSim.ts`가 판매 마릿수 감쇠(`data.ts` `SELL_DECAY`)로 재고, `fishing/gold.test.ts`의 기록 값·날짜 검사가 통과해야 한다. 낚시 수입(`world`)은 사이트 하루 상한을 받지 않는다(상한은 미니게임 `free`만).
+6. 경제 기능(경제 설계 `2026-11-27-fishing-economy-design.md`, v27~): 규칙·가격은 `src/games/fishing/research.ts`, 새 행동은 `ECONOMY_FLAGS`가 켜져야 동작한다(운영 기본 false, `econOff.test.ts`가 지킨다). 켜려면 값을 바꾸고 `world`를 다시 배포한다.
 5. 골드는 지갑에 있다(logic.version 14부터, `wallet: true`). 새 골드 행동은 `ctx.gold`로 검사하고 `apply`의 `gold`로 증감을 돌려준다. 세이브(`State`)에 골드를 두지 않는다. `world`를 v14 아래로 되돌리지 않는다(`docs/deploy-checklist.md` "지갑 켜기").
 
 ## 커리어 퀴즈 데이터 갱신 (`career-quiz`)
