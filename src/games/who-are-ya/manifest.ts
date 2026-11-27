@@ -6,6 +6,7 @@ export const manifest: Manifest = {
   name: '후알야',
   description: '선수 한 명을 8번 안에 맞힌다',
   hidden: false,
+  topic: 'football',
   modes: { daily: true, contest: true, free: true },
   puzzleSource: 'generate',
   dailyTimeLimitSec: 600,

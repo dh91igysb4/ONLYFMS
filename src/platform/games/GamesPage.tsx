@@ -6,6 +6,7 @@ import { now } from '../../lib/serverTime.ts'
 import { games, worlds } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { UpcomingContests } from './UpcomingContests.tsx'
+import { gameSections } from './sections.ts'
 
 type DailyRow = { user_id: string; score: number }
 type Status = { kind: 'loading' } | { kind: 'done'; score: number } | { kind: 'todo' } | { kind: 'error' }
@@ -22,6 +23,7 @@ export function GamesPage() {
   const visible = games.filter((g) => !g.manifest.hidden || profile?.is_admin)
   const visibleWorlds = worlds.filter((w) => !w.manifest.hidden || profile?.is_admin)
   const [status, setStatus] = useState<Record<string, Status>>({})
+  const sections = gameSections(visible.map((g) => g.manifest), visibleWorlds.map((w) => w.manifest))
 
   useEffect(() => {
     let alive = true
@@ -43,30 +45,37 @@ export function GamesPage() {
   return (
     <div className="stack">
       <h2>게임 목록</h2>
-      {/* 넓은 화면: 왼쪽 게임 카드 격자, 오른쪽 좁은 열에 대회 */}
+      {/* 넓은 화면: 왼쪽 게임 구역, 오른쪽 좁은 열에 대회 */}
       <div className="split split-aside">
         <UpcomingContests />
-        <div className="grid-cards split-main">
-          {visible.length + visibleWorlds.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
-          {visible.map(({ manifest: m }) => (
-            <article key={m.id} className="card">
-              <h3 className="card-title">{m.name}</h3>
-              <p className="muted">{m.description}</p>
-              {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
-              <div className="card-actions">
-                {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
-                {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
+        {/* 주제별 구역(manifest topic): 넓은 화면은 좌우 두 칸, 휴대폰은 위아래. 구역이 하나뿐이면 제목 없이 한 칸 */}
+        <div className="split split-even split-main">
+          {sections.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
+          {sections.map((sec) => (
+            <section key={sec.key} className="stack" aria-label={sec.title}>
+              {sections.length > 1 && <h3 className="section-title">{sec.title}</h3>}
+              <div className="grid-cards">
+                {sec.games.map((m) => (m.category === 'world' ? (
+                  <article key={m.id} className="card">
+                    <h3 className="card-title">{m.name}</h3>
+                    <p className="muted">{m.description}</p>
+                    <div className="card-actions">
+                      <Link className="btn btn-primary" to={`/world/${m.id}`}>들어가기</Link>
+                    </div>
+                  </article>
+                ) : (
+                  <article key={m.id} className="card">
+                    <h3 className="card-title">{m.name}</h3>
+                    <p className="muted">{m.description}</p>
+                    {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
+                    <div className="card-actions">
+                      {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
+                      {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
+                    </div>
+                  </article>
+                )))}
               </div>
-            </article>
-          ))}
-          {visibleWorlds.map(({ manifest: m }) => (
-            <article key={m.id} className="card">
-              <h3 className="card-title">{m.name}</h3>
-              <p className="muted">{m.description}</p>
-              <div className="card-actions">
-                <Link className="btn btn-primary" to={`/world/${m.id}`}>들어가기</Link>
-              </div>
-            </article>
+            </section>
           ))}
         </div>
       </div>

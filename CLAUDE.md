@@ -35,6 +35,8 @@
 5. `hidden: true`로 PR 머지 → 미리보기·운영에서 관리자 확인
 6. 문제없으면 `hidden`을 풀어 공개
 
+게임 목록(게임 탭)은 manifest `topic`(예: 축구 게임 `topic: 'football'`)으로 구역을 나눈다. 주제 구역이 먼저, `topic`이 없으면 "다른 게임"이고, 구역 안에서는 지속형 게임이 먼저다. 새 주제는 `src/games/types.ts`의 `GameTopic`과 `src/platform/games/sections.ts`의 `TOPIC_TITLES`에 함께 더한다.
+
 점수로 겨루는 게임은 manifest에 `freeStats: 'score'`를 둔다. 자유 플레이 리더보드가 플레이·평균·최고만 보여 주고 최고 점수 순으로 고정되며, 홈 블록도 최고 점수를 보여 준다.
 점수 상한이 10이 아닌 자유 플레이 점수 게임은 manifest `scoreMax`·`scoreDecimals`와 마이그레이션의 `game_modes.score_max`를 맞춘다 (`registry.test.ts`가 `scoreMax`와 `score_max`를 비교한다).
 자유 플레이 골드에는 도전과제 보너스가 곱해진다(지갑 설계 §7.5): 지속형 게임의 `WorldLogic.freeBonus`(%)를 `world` 함수가 `game_records` 키 `free_bonus`(`FREE_BONUS_RECORD_KEY`, manifest records에 쓰지 않는다)에 쓰고, 트리거가 `_free_bonus_pct`(합, 상한 `FREE_BONUS_MAX_PCT` 400)로 판당 금액과 게임별 하루 상한에 곱한다. 사이트 하루 상한·상금·판돈·참가비에는 곱하지 않는다. 화면 미리 계산은 `freeGold(…, bonusPct)`.

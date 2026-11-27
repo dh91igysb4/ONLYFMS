@@ -6,6 +6,7 @@ export const manifest: Manifest = {
   name: '커리어 퀴즈',
   description: '클럽 경력을 보고 선수를 8번 안에 맞힌다',
   hidden: false,
+  topic: 'football',
   modes: { daily: false, contest: false, free: true },
   puzzleSource: 'generate',
   dailyTimeLimitSec: null,
