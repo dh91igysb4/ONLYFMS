@@ -117,12 +117,15 @@ function Revealed({ s }: { s: State }) {
 }
 
 // ---------------------------------------------------------------- 검색
+/** 검색 후보 최대 수 */
+const SUGGEST_MAX = 12
+
 function Search({ guessed, n, busy, onPick }: { guessed: ReadonlySet<number>; n: number; busy: boolean; onPick(id: number): void }) {
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [sel, setSel] = useState(0)
   const listId = useId()
-  const list: Suggestion[] = useMemo(() => search(text, guessed), [text, guessed])
+  const list: Suggestion[] = useMemo(() => search(text, guessed, SUGGEST_MAX), [text, guessed])
   const shown = open && list.length > 0
 
   function pick(id: number) {
