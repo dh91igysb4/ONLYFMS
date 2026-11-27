@@ -44,7 +44,7 @@ export function GamesPage() {
 
   return (
     <div className="stack">
-      <h2>게임 목록</h2>
+      <h2 className="page-title">게임 목록</h2>
       {/* 넓은 화면: 왼쪽 게임 구역, 오른쪽 좁은 열에 대회 */}
       <div className="split split-aside">
         <UpcomingContests />
