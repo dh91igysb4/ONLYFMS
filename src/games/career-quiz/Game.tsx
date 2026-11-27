@@ -47,7 +47,8 @@ function Flag({ nationId }: { nationId: string | null }) {
   )
 }
 
-const DEBOUNCE_MS = 250
+// 타이핑이 멈춘 뒤 서버 검색(football_search)까지 기다리는 시간. 길면 후보가 늦게 뜨고, 짧으면 호출이 는다
+const DEBOUNCE_MS = 120
 
 function Search({ guessed, n, busy, onPick }: {
   guessed: ReadonlySet<string>
