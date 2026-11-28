@@ -154,7 +154,7 @@
 - [ ] **Step 1: 실패하는 테스트**
   - `api.test.ts`: 각 함수가 맞는 RPC 이름·인자를 부르고 결과를 바꾼다, 오류 코드를 `message`로 던진다.
   - FreePage 테스트(테스트 게임에 `shop` 옵션을 단 픽스처로, `withTestGame` 방식): 승인 사용자 → `my_items` 응답 전에는 판이 시작되지 않고 "불러오는 중", 응답 뒤 선택 상자에 가진 품목 + 가격 0 품목만, 처음 값 = equipped; 선택을 바꾸면 `equip_item` 호출 + 새 판; `my_items` 실패 → 기본값으로 시작. 비로그인·미승인 → 바로 시작, 가격 0 품목만, "상점" 버튼 없음 (Review Focus 2).
-  - `ShopPanel.test.tsx`: 안 산 품목 "사기 (`formatGold(N)`)" → 확인("`formatGold(N)`로 살까요?") → `buyItem` → `setBalance(balance)`·`onBought`; 산 품목 "고르기"; 오류 코드별 한국어 문구(`not_enough_gold` → "골드가 모자라요", `price_mismatch` → "가격이 바뀌었어요. 다시 열어 주세요", `already_owned` → "이미 가진 품목이에요", 그 밖 → "사지 못했어요"); 미리보기 컴포넌트가 등록돼 있으면 그린다.
+  - `ShopPanel.test.tsx`: 안 산 품목 "사기 (`formatGold(N)`)" → 확인("`formatGold(N)`로 살까요?") → `buyItem` → `setBalance(balance)`·`onBought`; 산 품목 "고르기"; 오류 코드별 한국어 문구(`not_enough_gold` → "JWD가 부족해요", `price_mismatch` → "가격이 바뀌었어요. 다시 열어 주세요", `already_owned` → "이미 가진 품목이에요", 그 밖 → "사지 못했어요"); 미리보기 컴포넌트가 등록돼 있으면 그린다.
 - [ ] **Step 2: 실행해 실패 확인** — `npx vitest run src/platform/shop src/platform/games`.
 - [ ] **Step 3: 구현** — FreePage가 `shop` 옵션을 위해 `useOwnedItems`를 쓰고, 그 옵션의 선택 상자에는 가진 것만, 옆에 "상점" 버튼(`canShop`일 때)으로 `ShopPanel`을 연다. 구매 성공 → `refresh()`, 산 품목을 고르면 `onSelect`와 같은 경로(선택 + `equip_item` + 새 판). 게임 id·옵션 key로만 동작하고 게임별 분기 없음.
 - [ ] **Step 4: 실행해 통과 확인** — `npx vitest run src/platform`, `npm run typecheck`, `npm run build`.
