@@ -12,6 +12,7 @@ import { FAME_ROW, type FameFrame } from './fame.ts'
 import type { Outfit } from './wardrobe.ts'
 import { computeGround, ON_NEIGHBOUR_GROUND, WATER_GROUND, type Ground } from './ground.ts'
 import { FOAM_BAND, SAND_BAND, SHORE_LINE, WET_BAND, shoreBands, shoreClassAt, shoreField, type ShoreField } from './shore.ts'
+import { footprintAlpha, NO_FOOTPRINTS, stepFootprints, type Footprints } from './footprints.ts'
 import { formatClock, isSnow, nightLevel, type Conditions, type Tide } from './clock.ts'
 
 export type Phase = 'idle' | 'charging' | 'waiting' | 'bite' | 'fighting' | 'caught' | 'lost'
@@ -100,6 +101,7 @@ const GAUGE_W = 30
 const C = {
   outline: '#2a2135',
   sandWet: '#c7a96e',
+  footprint: '#b0915a', // 모래 발자국(젖은 모래보다 한 단계 짙게)
   foam: '#e9f6fb',
   bogRim: '#65805a', // 수렁 둘레 늪물(늪 바탕과 같은 색)
   bogEdge: '#3e3a2a', // 수렁 가장자리 진흙
@@ -1105,6 +1107,33 @@ function drawMythicRing(ctx: CanvasRenderingContext2D, ms: number, cx: number, c
  * 정적 맵 → 잠긴 문·배 → 찌·낚싯줄 → 캐릭터와 나무 윗부분(발 y 순) → 입질 느낌표 → 비·눈 → 밤 색조(실내는 둘 다 없음)
  * → 게이지·트랙·결과 → 시계 순으로 그린다.
  */
+// ── 모래 발자국(화면 전용) ───────────────────────────────────────
+
+/** 내 캐릭터 발자국. 맵(·물때)이 바뀌면 비운다 */
+let footprints: Footprints = NO_FOOTPRINTS
+let footprintsKey = ''
+
+function updateFootprints(g: MapGfx, s: WorldScene): void {
+  const key = `${g.map.id}:${g.tide}`
+  if (key !== footprintsKey) {
+    footprints = NO_FOOTPRINTS
+    footprintsKey = key
+  }
+  footprints = stepFootprints(footprints, s.player.pos, s.tMs, (x, y) => groundAt(g, Math.floor(x / TILE), Math.floor(y / TILE)) === 'sand')
+}
+
+/** 발자국: 발 중앙 아래 2×1 점. 왼발·오른발을 좌우로 벌린다. 월드 좌표 */
+function drawFootprints(ctx: CanvasRenderingContext2D, tMs: number): void {
+  const prev = ctx.globalAlpha
+  for (const f of footprints.prints) {
+    const a = footprintAlpha(f, tMs)
+    if (a <= 0) continue
+    ctx.globalAlpha = prev * a
+    rect(ctx, Math.round(f.x) + (f.side === 0 ? -3 : 1), Math.round(f.y) - 1, 2, 1, C.footprint)
+  }
+  ctx.globalAlpha = prev
+}
+
 export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: SceneSize): void {
   const w = Math.max(1, Math.floor(size.w) || 0)
   const h = Math.max(1, Math.floor(size.h) || 0)
@@ -1114,6 +1143,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
 
   const dyn = s.dyn ?? STATIC_DYNAMIC
   const { gfx, frames } = mapCache(s.map, dyn.tide)
+  updateFootprints(gfx, s)
   if (frames) ctx.drawImage(frames[k] ?? frames[0], cam.x, cam.y, w, h, 0, 0, w, h)
   else {
     ctx.save()
@@ -1133,6 +1163,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, s: WorldScene, size: Sc
   ctx.save()
   ctx.translate(-cam.x, -cam.y)
   try {
+    drawFootprints(ctx, s.tMs)
     drawWorldLayer(ctx, s, pose, px, py, cam, w, h)
   } finally {
     ctx.restore()
