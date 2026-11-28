@@ -7,6 +7,7 @@ import { GAME_KEYS, controlsFrom } from './input.ts'
 import type { Race, RaceSnapshot } from './race.ts'
 import type { Scene3D } from './render/scene.ts'
 import './racer.css'
+import { SpikeGame } from './spike/SpikeGame.tsx'
 
 type RaceMod = typeof import('./race.ts')
 const NITRO_CELLS = 5
@@ -22,7 +23,13 @@ export function formatTicks(ticks: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
 }
 
-export function RacerGame({ onExit }: RealtimeGameProps) {
+// 0단계 시험판(spike 브랜치 전용, 머지 금지): 주소에 ?spike 가 있으면 시험판 화면
+export function RacerGame(props: RealtimeGameProps) {
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('spike')) return <SpikeGame onExit={props.onExit} />
+  return <RacerSolo {...props} />
+}
+
+function RacerSolo({ onExit }: RealtimeGameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [phase, setPhase] = useState<'loading' | 'error' | 'ready'>('loading')
   const [hud, setHud] = useState<RaceSnapshot | null>(null)

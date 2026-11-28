@@ -15,6 +15,8 @@ import { cityBlocks } from './city.ts'
 
 export type Scene3D = {
   draw(snap: RaceSnapshot, alpha: number): void
+  /** 시험판: 상대 차(유령)를 그린다. null이면 숨김 */
+  setGhost(pose: { pos: { x: number; y: number; z: number }; quat: { x: number; y: number; z: number; w: number } } | null): void
   resize(w: number, h: number, dpr: number): void
   dispose(): void
 }
@@ -43,6 +45,7 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
   const materials: Material[] = []
   const g = <T extends BufferGeometry>(x: T) => (geometries.push(x), x)
   const m = <T extends Material>(x: T) => (materials.push(x), x)
+  const m_ = m
 
   // ---- 도로·벽
   const road = buildRoad(course)
@@ -130,6 +133,14 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     flames.push(f)
   }
   scene.add(car)
+  // 시험판 상대 차: 같은 모양, 파란 차체
+  const ghost = car.clone(true)
+  ghost.traverse((o) => {
+    const m = o as Mesh
+    if (m.isMesh && m.material === body.material) m.material = m_(new MeshLambertMaterial({ color: '#2b7bff' }))
+  })
+  ghost.visible = false
+  scene.add(ghost)
 
   // ---- 그리기: 직전 '틱' 자세(snap.prev)와 지금 틱 사이를 보간한다.
   // 직전 '프레임' 자세와 섞으면 한 프레임에 0틱·2틱이 번갈아 돌 때 차가 멈췄다 튀어 끊겨 보인다.
@@ -168,6 +179,16 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     renderer.render(scene, camera)
   }
 
+  function setGhost(pose: Parameters<Scene3D['setGhost']>[0]): void {
+    if (!pose) {
+      ghost.visible = false
+      return
+    }
+    ghost.visible = true
+    ghost.position.set(pose.pos.x, pose.pos.y, pose.pos.z)
+    ghost.quaternion.set(pose.quat.x, pose.quat.y, pose.quat.z, pose.quat.w)
+  }
+
   function resize(w: number, h: number, dpr: number): void {
     renderer.setPixelRatio(Math.min(dpr || 1, MAX_DPR))
     renderer.setSize(w, h, false)
@@ -187,5 +208,5 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     renderer.dispose()
   }
 
-  return { draw, resize, dispose }
+  return { draw, setGhost, resize, dispose }
 }
