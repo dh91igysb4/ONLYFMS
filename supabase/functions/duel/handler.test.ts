@@ -103,6 +103,40 @@ extra.set('coin-ended', {
   manifest: coinManifest('coin-ended', false),
   logic: { ...base, view: (s: CoinState, viewer: Seat | null, ended?: boolean) => ({ ...s, viewer, ended: ended ?? 'missing' }) },
 })
+// rt: 실시간 대전(manifest duel.realtime). 각 좌석이 기록 my(작을수록 좋음, null = 미완주)를 한 번 보고한다.
+// r[seat] === null이면 아직 보고 안 함. payload.mismatch === true면 무효. 둘 다 미완주도 무효.
+type RtState = { r: ({ my: number | null } | null)[]; mismatch: boolean }
+const rtLogic: DuelLogic<RtState, unknown, RtState> = {
+  version: 1,
+  init: () => ({ r: [null, null], mismatch: false }),
+  toMove: () => 0,
+  apply: () => ({ error: 'realtime_only' }),
+  timeoutAction: () => ({}),
+  turnNo: (s) => s.r.filter((x) => x !== null).length,
+  report(s, seat, p) {
+    if (s.r[seat] !== null) return { error: 'already_reported' }
+    const q = p as { my?: unknown; mismatch?: unknown }
+    if (q.my !== null && typeof q.my !== 'number') return { error: 'bad_report' }
+    const r = [...s.r]
+    r[seat] = { my: q.my }
+    return { state: { r, mismatch: s.mismatch || q.mismatch === true } }
+  },
+  reportTimeout: () => ({ my: null }),
+  result(s) {
+    const [a, b] = s.r
+    if (a === null || b === null) return { over: false }
+    if (s.mismatch || (a.my === null && b.my === null)) return { over: true, winner: null, void: true }
+    const x = a.my ?? Infinity
+    const y = b.my ?? Infinity
+    return { over: true, winner: x < y ? 0 : y < x ? 1 : null, scores: [a.my ?? 0, b.my ?? 0] }
+  },
+  view: (s) => s,
+}
+const RT_SECONDS = 245
+extra.set('rt', {
+  manifest: { ...coinManifest('rt', false), duel: { turnSeconds: { choices: [RT_SECONDS], default: RT_SECONDS }, sameScreen: false, realtime: { raceSeconds: 180 } } },
+  logic: rtLogic,
+})
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }
 
 // ---------------------------------------------------------------- helpers
@@ -255,12 +289,109 @@ t('hidden_game_admin_only', async () => {
   assert.equal(j.body.error, 'unknown_game')
 })
 
-t('realtime_game_create_409_until_phase_2', async () => {
-  // 실시간 대전(레이싱 설계 §7)은 2단계에서 결과 보고 경로가 생기기 전까지 대국을 만들 수 없다. 관리자도 같다.
-  const admin = await user('approved', true)
-  const r = await create(admin, T0, { game: 'duel-racer' })
+// ---------------------------------------------------------------- realtime (레이싱 설계 §7)
+const rtStarted = (o: Opts = {}) => started({ game: 'rt', turn: RT_SECONDS, ...o })
+const report = (uid: string, id: string, payload: unknown, now: number) => call(uid, { action: 'report', match_id: id, payload }, now)
+
+t('realtime_create_and_join_starts_with_match_deadline', async () => {
+  const s = await rtStarted()
+  assert.equal(s.view.status, 'active')
+  const m = await row(s.id)
+  assert.equal(m.turn_seconds, RT_SECONDS)
+  assert.equal(m.turn_deadline.getTime(), m.started_at.getTime() + RT_SECONDS * SEC)
+})
+
+t('realtime_report_from_either_seat_in_any_order', async () => {
+  const s = await rtStarted({ rated: true })
+  const r1 = await report(s.second, s.id, { my: 4500 }, T0 + 100 * SEC)
+  assert.equal(r1.status, 200, JSON.stringify(r1.body))
+  assert.equal((r1.body as unknown as View).status, 'active')
+  const r0 = await report(s.first, s.id, { my: 4300 }, T0 + 101 * SEC)
+  assert.equal(r0.status, 200, JSON.stringify(r0.body))
+  const v = r0.body as unknown as View
+  assert.equal(v.status, 'finished')
+  assert.equal(v.winner, 0)
+  assert.equal(v.end_reason, 'normal')
+  assert.deepEqual(v.final_scores, [4300, 4500])
+  assert.ok(v.rating_change)
+})
+
+t('realtime_report_twice_409', async () => {
+  const s = await rtStarted()
+  assert.equal((await report(s.first, s.id, { my: 4300 }, T0 + 100 * SEC)).status, 200)
+  const before = await row(s.id)
+  const again = await report(s.first, s.id, { my: 4100 }, T0 + 101 * SEC)
+  assert.equal(again.status, 409)
+  assert.equal(again.body.error, 'already_reported')
+  const after = await row(s.id)
+  assert.equal(after.action_no, before.action_no)
+  assert.equal(after.status, 'active')
+})
+
+t('realtime_mismatched_reports_void_and_refund', async () => {
+  const a = await user()
+  const b = await user()
+  for (const u of [a, b]) await sql`select public._gold_move(${u}, 1000, 'admin', ${crypto.randomUUID()})`
+  const c = await call(a, { action: 'create', game_id: 'rt', options: {}, rated: true, visibility: 'invite', turn_seconds: RT_SECONDS, stake: 500 }, T0)
+  assert.equal(c.status, 200, JSON.stringify(c.body))
+  const id = c.body.match_id as string
+  const j = await call(b, { action: 'join', match_id: id, stake: 500 }, T0 + SEC)
+  assert.equal(j.status, 200, JSON.stringify(j.body))
+  assert.equal((await report(a, id, { my: 4300 }, T0 + 100 * SEC)).status, 200)
+  const r = await report(b, id, { my: 4400, mismatch: true }, T0 + 101 * SEC)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.equal((r.body as unknown as View).status, 'void')
+  for (const u of [a, b]) {
+    const [w] = await sql`select balance from public.wallets where user_id = ${u}`
+    assert.equal(Number(w.balance), 1000)
+  }
+  const [{ n }] = await sql`select count(*)::int as n from public.duel_rating_changes where match_id = ${id}`
+  assert.equal(n, 0)
+})
+
+t('realtime_deadline_marks_unreported_as_dnf', async () => {
+  const s = await rtStarted({ rated: true })
+  assert.equal((await report(s.first, s.id, { my: 4300 }, T0 + 100 * SEC)).status, 200)
+  const early = await call(s.first, { action: 'tick', match_id: s.id }, T0 + 200 * SEC)
+  assert.equal(early.body.error, 'not_due')
+  const r = await call(s.first, { action: 'tick', match_id: s.id }, T0 + SEC + RT_SECONDS * SEC)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  const v = r.body as unknown as View
+  assert.equal(v.status, 'finished')
+  assert.equal(v.winner, 0)
+  const [mv] = await sql`select seat, auto, action from public.duel_moves where match_id = ${s.id} and auto`
+  assert.equal(mv.seat, 1)
+  assert.deepEqual(mv.action, { my: null })
+})
+
+t('realtime_report_after_deadline_runs_deadline_then_409', async () => {
+  const s = await rtStarted()
+  assert.equal((await report(s.first, s.id, { my: 4300 }, T0 + 100 * SEC)).status, 200)
+  const late = await report(s.second, s.id, { my: 4000 }, T0 + SEC + RT_SECONDS * SEC)
+  assert.equal(late.status, 409)
+  assert.equal(late.body.error, 'finished')
+  assert.equal((await row(s.id)).winner, 0)
+})
+
+t('realtime_nobody_reports_void', async () => {
+  const s = await rtStarted({ rated: true })
+  const r = await call(s.second, { action: 'tick', match_id: s.id }, T0 + SEC + RT_SECONDS * SEC)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.equal((r.body as unknown as View).status, 'void')
+})
+
+t('report_on_turn_based_game_409_not_realtime', async () => {
+  const s = await started()
+  const r = await report(s.first, s.id, { my: 1 }, T0 + 2 * SEC)
   assert.equal(r.status, 409)
-  assert.equal(r.body.error, 'realtime_unsupported')
+  assert.equal(r.body.error, 'not_realtime')
+})
+
+t('move_on_realtime_game_409', async () => {
+  const s = await rtStarted()
+  const r = await move(s.first, s.id, 0, { type: 'pick', n: 1 }, T0 + 2 * SEC)
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, 'realtime_only')
 })
 
 t('malformed_requests_400', async () => {

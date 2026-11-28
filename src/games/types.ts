@@ -116,7 +116,8 @@ export type GameModule = { manifest: Manifest; logic: GameLogic<any, any, any, a
 
 export type Seat = 0 | 1
 
-export type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number] }
+/** void: 판정할 수 없는 끝(실시간 대전의 엇갈린 기록·둘 다 미완주). 핸들러가 무효(판돈 환불, Elo 없음)로 끝낸다 */
+export type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number]; void?: true }
 
 export interface DuelLogic<State, Action, View> {
   /** 규칙을 바꿀 때마다 1씩 올린다 */
@@ -145,6 +146,13 @@ export interface DuelLogic<State, Action, View> {
    * result가 아직 진행 중이어도 끝난 화면을 보여 줄 수 있다. 쓰지 않는 게임은 무시한다.
    */
   view(state: State, viewer: Seat | null, ended?: boolean): View
+  /**
+   * 실시간 대전(manifest `duel.realtime`)만: 한 좌석의 결과 보고를 적용한다. 차례·action_no 검사 없이 받는다.
+   * 같은 좌석의 두 번째 보고 같은 잘못된 보고는 error(영문 코드)를 돌려주고, 핸들러가 409 그 코드로 거절한다.
+   */
+  report?(state: State, seat: Seat, payload: unknown): { state: State } | { error: string }
+  /** 실시간 대전만: 대국 마감까지 보고하지 않은 좌석 대신 핸들러가 `report`에 넘길 값(미완주) */
+  reportTimeout?(state: State): unknown
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

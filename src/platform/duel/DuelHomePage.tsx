@@ -147,8 +147,8 @@ export function DuelHomePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const visible = duels.map((d) => d.manifest).filter((m) => !m.hidden || !!profile?.is_admin)
-  // 실시간 대전은 2단계 전까지 대국을 만들 수 없다(서버도 realtime_unsupported). 혼자 연습만 연다
-  const creatable = visible.filter((m) => !m.duel?.realtime)
+  // 실시간 대전도 대국을 만들 수 있고(결과는 duel 함수 report), 혼자 연습 패널도 따로 연다
+  const creatable = visible
   const practice = visible.filter((m) => m.duel?.realtime)
   const [list, setList] = useState<DuelList | null>(null)
   const [error, setError] = useState<string | null>(null)
