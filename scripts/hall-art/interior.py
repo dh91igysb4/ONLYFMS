@@ -9,7 +9,7 @@ def render():
   d=ImageDraw.Draw(im)
   C=lambda h: tuple(int(h[i:i+2],16) for i in (1,3,5))
   WALL='#efe9df'; WALLF='#d7cfc2'; WALLE='#2a2135'
-  CORR='#4a5a75'; CORR2='#536481'; SHINE='#8a9bb5'
+  CORR='#4a5a75'; CORR2='#536481'
   ROOM='#c4c6c6'; ROOM2='#b8babb'
   GLASS='#bfe3ef'; FROST='#e9f5f8'; STEEL='#9aa3ab'
   WOOD='#8a5a3a'
@@ -20,9 +20,6 @@ def render():
   def box(x0,y0,x1,y1,c): d.rectangle([x0,y0,x1,y1],fill=C(c))
   # 바닥: 전체 복도(파란 타일) → 방은 베이지로 덮는다
   tiles(1,1,TW-2,TH-2,CORR,CORR2)
-  # 복도 반사 줄
-  for x in range(T*2,W-T*2,T*3):
-    box(x,8*T+5,x+T,8*T+6,SHINE); box(x+8,9*T+9,x+T+4,9*T+10,SHINE)
   # 방 배치(타일 좌표, 끝 포함)
   TOP=[(10,1,14,6,'1'),(15,1,34,6,'H')]
   BOT=[(10,11,14,16,'6'),(15,11,19,16,'7'),(20,11,24,16,'8'),(25,11,30,16,'9')]
@@ -195,8 +192,7 @@ def render():
   box(38*T+6,2*T,40*T+10,6*T+8,'#a9b0b7')   # 엘리베이터 칸 안
   # 계단: 단(왼쪽 위 열린 칸으로 걸어 들어가면 다른 층으로 간다, maps/hall.ts HALL_STAIRS)
   for i in range(9): box(38*T+4+i*5,11*T+6,38*T+6+i*5,16*T+10,'#9f988c')
-  # 로비 소파·화분(왼쪽 빈 공간)
-  box(4*T,8*T+4,7*T,9*T,'#3f6e8c'); box(4*T,8*T+4,7*T,8*T+8,'#5c8dad')
+  # 로비 화분(왼쪽 빈 공간). 가운데 소파는 뺐다(자판기 ↔ 순간이동기 사이를 막지 않게)
   for (x,y) in ((1*T+6,15*T+4),(8*T+4,15*T+4)):
     box(x,y,x+8,y+8,'#8a5a3a'); d.ellipse([x-3,y-10,x+11,y+2],fill=C('#4f7d3a'))
   # ---- 9번: 옷 가게(행거·전신 거울·탈의실)
