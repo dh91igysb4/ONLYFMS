@@ -151,3 +151,16 @@ test('Escape exits and R resets', async () => {
   fireEvent.keyDown(window, { code: 'Escape' })
   expect(onExit).toHaveBeenCalled()
 })
+
+test('in the air the arrow keys turn and tilt instead of steering', async () => {
+  h.snap = { ...baseSnap(), tick: 100, countdown: null, car: { ...baseSnap().car, grounded: false } }
+  mount()
+  await loaded()
+  fireEvent.keyDown(window, { code: 'KeyD' })
+  fireEvent.keyDown(window, { code: 'KeyW' })
+  await frame()
+  const c = h.advanced.at(-1)!
+  expect(c.yaw).toBe(1)
+  expect(c.pitch).toBe(1)
+  expect(c.steer).toBe(0)
+})

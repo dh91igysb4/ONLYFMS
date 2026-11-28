@@ -110,7 +110,9 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
         // 연습은 프레임당 250ms까지만 흘린다(숨긴 탭은 멈춤). 2단계 대국은 서버 시각 경과로 따라잡을 것(설계 §6.3)
         const ms = lastT === null ? 0 : Math.min(250, t - lastT) || 0
         lastT = t
-        mod.advance(r.race, ms, controlsFrom(keys.current))
+        // 공중이면 방향키가 차 방향·기울기를 조절한다
+        const airborne = !mod.snapshot(r.race).car.grounded
+        mod.advance(r.race, ms, controlsFrom(keys.current, airborne))
         const snap = mod.snapshot(r.race)
         scene?.draw(snap, r.race.acc ?? 0)
         if (snap.finishTicks !== null && !finished) {
@@ -188,7 +190,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
           </>
         )}
       </div>
-      <p className="dr-help">방향키·WASD 운전 · Shift 니트로(안 쓰면 잠시 뒤 저절로 참) · R 복귀 · Esc 나가기</p>
+      <p className="dr-help">방향키·WASD 운전 · 공중에서 A/D 방향, W/S 기울기 · Shift 니트로(안 쓰면 잠시 뒤 저절로 참) · R 복귀 · Esc 나가기</p>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { ACCEL_TIME, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../c
 import { flatCourse, rampCourse, walledCourse } from '../course/testCourses.ts'
 import type { Course } from '../course/types.ts'
 import { NO_CONTROLS, type Controls } from './controls.ts'
-import { STEER_YAW_RATE, carState, createCar, stepCar, type Car } from './car.ts'
+import { AIR_PITCH_RATE, AIR_YAW_RATE, STEER_YAW_RATE, carState, createCar, stepCar, type Car } from './car.ts'
 import { loadRapier, type Rapier } from './rapier.ts'
 import { createWorld, type PhysWorld } from './world.ts'
 
@@ -202,3 +202,58 @@ test('full steer turns at most STEER_YAW_RATE (not twitchy)', () => {
   expect(maxRate).toBeGreaterThan(STEER_YAW_RATE * 0.7)
 })
 
+
+/** 점프대에서 떠오른 뒤 첫 공중 틱까지 달린다 */
+function toAir(speed = 50) {
+  const { w, car } = setup(rampCourse(), { pos: { x: 0, y: 1.1, z: 300 }, yaw: 0 })
+  run(w, car, NO_CONTROLS, 0.3)
+  car.body.setLinvel({ x: 0, y: 0, z: speed }, true)
+  for (let k = 0; k < 600; k++) {
+    const s = carState(car)
+    if (!s.grounded && s.pos.z > 400 && s.pos.y > 1.5) break
+    tick(w, car, GAS)
+  }
+  return { w, car }
+}
+const headingOf = (q: { x: number; y: number; z: number; w: number }) =>
+  Math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+const pitchOf = (q: { x: number; y: number; z: number; w: number }) => {
+  // 차 앞(로컬 +z)의 수직 성분: 음수면 앞이 아래
+  const fy = 2 * (q.y * q.z - q.w * q.x)
+  return Math.asin(Math.max(-1, Math.min(1, fy)))
+}
+
+test('air yaw input turns the car at about AIR_YAW_RATE (right = angVel.y < 0)', () => {
+  const { w, car } = toAir()
+  let rate = 0
+  for (let k = 0; k < 20; k++) {
+    tick(w, car, { ...GAS, yaw: 1 })
+    rate = carState(car).localAngVel.y
+  }
+  expect(rate).toBeLessThan(-AIR_YAW_RATE * 0.7)
+  expect(rate).toBeGreaterThan(-AIR_YAW_RATE * 1.1)
+})
+
+test('air pitch input tilts the nose (W = down) at about AIR_PITCH_RATE and the angle stays after release', () => {
+  const { w, car } = toAir()
+  const start = pitchOf(carState(car).quat)
+  for (let k = 0; k < 15; k++) tick(w, car, { ...GAS, pitch: 1 })
+  expect(carState(car).localAngVel.x).toBeGreaterThan(AIR_PITCH_RATE * 0.7)
+  const tilted = pitchOf(carState(car).quat)
+  expect(tilted - start).toBeLessThan(-0.3)
+  for (let k = 0; k < 15; k++) tick(w, car, GAS)
+  // 손을 떼도 수평으로 되돌아가지 않는다(멈추기만 한다)
+  expect(pitchOf(carState(car).quat) - start).toBeLessThan((tilted - start) * 0.8)
+})
+
+test('turning in the air changes where the car goes after landing', () => {
+  const { w, car } = toAir()
+  // 약 0.25초 오른쪽으로(약 30°)
+  for (let k = 0; k < 15; k++) tick(w, car, { ...GAS, yaw: 1 })
+  run(w, car, GAS, 3)
+  const s = carState(car)
+  const h = headingOf(s.quat)
+  const travel = Math.atan2(s.vel.x, s.vel.z)
+  expect(h).toBeLessThan(-0.2)
+  expect(Math.abs(travel - h)).toBeLessThan(0.1)
+})
