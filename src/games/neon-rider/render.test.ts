@@ -9,7 +9,7 @@ import { TEMPLATES, buildTemplate, type Template } from './pieces.ts'
 import { shapeAt, type HazardShape } from './hazards.ts'
 import { initSim, initSimAt, step } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { CAR_ART, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
+import { CAR_ART, CAR_BARS, CAR_WINDOW, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -49,6 +49,43 @@ describe('차 그림', () => {
         const b = y0 + ((y1 - y0) * k) / 50
         expect(outside(a, b), `변 ${i} (${a.toFixed(0)}, ${b.toFixed(0)})`).toBeLessThanOrEqual(40)
       }
+    }
+  })
+
+  it.each(CARS.map((c) => [c.id, c] as const))('%s: 롤케이지 막대도 판정 도형 40 mm 안에 있다', (id, car) => {
+    for (const bar of CAR_BARS[id] ?? []) {
+      for (let i = 0; i + 1 < bar.length; i++) {
+        for (let k = 0; k <= 50; k++) {
+          const a = bar[i][0] + ((bar[i + 1][0] - bar[i][0]) * k) / 50
+          const b = bar[i][1] + ((bar[i + 1][1] - bar[i][1]) * k) / 50
+          const cx = Math.min(Math.max(a, 0), WHEELBASE / MM)
+          const d = Math.min(
+            Math.hypot(a - cx, b - car.bodyDY / MM) - car.bodyR / MM,
+            Math.hypot(a - WHEELBASE / MM / 2, b - car.headOffset / MM) - car.headR / MM,
+            Math.hypot(a, b) - WHEEL_R / MM,
+            Math.hypot(a - WHEELBASE / MM, b) - WHEEL_R / MM,
+          )
+          expect(d, `(${a.toFixed(0)}, ${b.toFixed(0)})`).toBeLessThanOrEqual(40)
+        }
+      }
+    }
+  })
+
+  it.each(Object.entries(CAR_WINDOW))('%s: 유리창 다각형은 차 그림 안에 있다', (id, win) => {
+    const art = CAR_ART[id]
+    const inside = (x: number, y: number): boolean => {
+      let o = false
+      for (let i = 0, j = art.length - 1; i < art.length; j = i++) {
+        const [xi, yi] = art[i]
+        const [xj, yj] = art[j]
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) o = !o
+      }
+      return o
+    }
+    for (let i = 0; i < win.length; i++) {
+      const [x0, y0] = win[i]
+      const [x1, y1] = win[(i + 1) % win.length]
+      for (let k = 0; k <= 20; k++) expect(inside(x0 + ((x1 - x0) * k) / 20, y0 + ((y1 - y0) * k) / 20), `창 ${id} 변 ${i}`).toBe(true)
     }
   })
 
