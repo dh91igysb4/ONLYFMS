@@ -9,6 +9,7 @@ import { refreshWallet } from '../wallet/useWallet.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
 import { Brand } from './Brand.tsx'
 import { UserMenu } from './UserMenu.tsx'
+import { ValleyButton } from './ValleyButton.tsx'
 
 export function Layout() {
   const { profile } = useAuth()
@@ -40,22 +41,17 @@ export function Layout() {
             <Brand />
             <div className="header-right">
               {showGold && <WalletBadge />}
-              {profile?.handle && <UserMenu handle={profile.handle} />}
+              {approved && <ValleyButton />}
+              {profile?.handle && <UserMenu handle={profile.handle} isAdmin={isAdmin} adminPending={pending} />}
             </div>
           </div>
           <nav className="nav" aria-label="주 메뉴">
             <NavLink to="/" end>홈</NavLink>
             <NavLink to="/games">게임</NavLink>
-            <NavLink to="/contests">대회</NavLink>
             <NavLink to="/duel">대전</NavLink>
-            <NavLink to="/leaderboard">리더보드</NavLink>
+            <NavLink to="/leaderboard">순위</NavLink>
+            <NavLink to="/contests">대회</NavLink>
             <NavLink to="/suggest">제안</NavLink>
-            {isAdmin && (
-              <NavLink to="/admin">
-                관리자
-                {pending > 0 && <> <span className="badge" aria-label={`결정 대기 제안 ${pending}건`}>{pending}</span></>}
-              </NavLink>
-            )}
           </nav>
         </div>
       </header>

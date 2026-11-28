@@ -49,6 +49,8 @@ export type GameTopic = 'football'
 export type Manifest = {
   id: string
   name: string
+  /** 좁은 자리(머리글 밸리 버튼 등)에 쓰는 짧은 이름. 없으면 name */
+  shortName?: string
   description: string
   hidden: boolean
   modes: { daily: boolean; contest: boolean; free: boolean }
