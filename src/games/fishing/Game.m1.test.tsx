@@ -199,7 +199,7 @@ describe('얼음 구멍', () => {
   test('얼음을 보고 행동 → 1.2초 뚫기(그동안 drill 장면) → 같은 자리에서 낚시', async () => {
     vi.setSystemTime(atMinute(12 * 60))
     await mount(ICE_FRONT)
-    expect(screen.getByText('방향키로 이동 · 스페이스로 구멍 뚫기')).toBeInTheDocument()
+    expect(screen.getByText('스페이스로 구멍 뚫기')).toBeInTheDocument()
     press()
     release()
     await advance(100)

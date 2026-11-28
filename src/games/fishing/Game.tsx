@@ -95,10 +95,10 @@ export function fitScene(availW: number, availH: number): SceneFit {
 }
 
 /**
- * 터치 안내 줄(.fish-hint-top)이 캔버스 위쪽에 차지하는 띠(CSS px): 위 여백 8 + 한 줄 높이 32(줄 20 + 위아래 6) + 틈 4.
+ * 터치 안내 줄(.fish-hint-top)이 캔버스 위쪽에 차지하는 띠(CSS px): 위 여백 8 + 한 줄 높이 36(줄 20 + 위아래 여백 5 + 테두리 3) + 틈 4.
  * 안내 줄은 한 줄로 고정한다(white-space: nowrap).
  */
-export const TOUCH_HINT_BAND = 44
+export const TOUCH_HINT_BAND = 48
 
 /** HUD 시계를 둘 맨 위 y(논리 px). 터치는 낚시 내내 위쪽에 뜨는 안내 줄 아래, 데스크톱은 0. */
 export function hudTopFor(touch: boolean, scale: number): number {
@@ -345,7 +345,6 @@ const UNLOCK_BUSY = '낚시를 마친 뒤에 열 수 있어요'
 const TELEPORT_BUSY = '낚시를 마친 뒤에 이동할 수 있어요'
 const areaNameOf = (id: AreaId) => AREAS.find((a) => a.id === id)?.name ?? id
 
-const DESKTOP_IDLE_HINT = '방향키로 이동 · 스페이스로 낚시/상점'
 /** 잠긴 문·선착장 앞에서 행동이 하는 일(행동 버튼 글자, 데스크톱 안내) */
 const GATE_ACTION = '살펴보기'
 const DOCK_ACTION = '배 타기'
@@ -2042,8 +2041,6 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
               : here?.kind === 'furn' || here?.kind === 'decoHere' ? '치우기'
             : here && !deadFame(here) ? FIXTURE_ACTION[here.kind] ?? null
             : null
-  const idleHint = touch ? undefined : placeAction ? `방향키로 이동 · 스페이스로 ${placeAction}` : DESKTOP_IDLE_HINT
-  const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
   const atShop = here?.kind === 'shop'
   const atWardrobe = here?.kind === 'wardrobe'
   // 낚시가 시작되면(충전~결과) 챔·감기를 위해 늘 누를 수 있다
@@ -2053,6 +2050,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         : placeAction ? { label: placeAction, enabled: true }
           : here?.kind === 'fish' ? { label: '낚시', enabled: true }
             : { label: '낚시', enabled: false }
+  // 대기 중 안내 줄은 앞에 할 수 있는 일이 있을 때만(데스크톱). 걷기 안내는 띄우지 않는다
+  const idleHint = touch || !action.enabled ? undefined : `스페이스로 ${action.label}`
+  const hint = menu || (fullscreen && notices) ? null : phase === 'idle' ? idleHint : HINTS[phase]
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
     gallery: '전시관', bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
