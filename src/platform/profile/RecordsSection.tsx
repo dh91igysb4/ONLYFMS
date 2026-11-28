@@ -42,15 +42,15 @@ export function RecordsSection({ handle }: { handle: string }) {
       {!error && rows === undefined && <p className="page-note" role="status">불러오는 중…</p>}
       {!error && rows && declared.length === 0 && <p className="muted">아직 기록이 없어요</p>}
       {!error && rows && declared.map((g) => (
-        <section key={g.id} className="card">
-          <span className="card-title">{g.name}</span>
-          <ul className="list" aria-label={`${g.name} 기록`}>
+        <section key={g.id} className="fm-panel">
+          <h4 className="fm-panel-head">{g.name}</h4>
+          <ul className="pf-rows" aria-label={`${g.name} 기록`}>
             {g.records.map((r) => {
               const row = rows.find((x) => x.game_id === g.id && x.key === r.key)
               return (
-                <li key={r.key} className="list-row">
-                  <span>{r.label}</span>
-                  <span className="rec-value">
+                <li key={r.key} className="fm-row">
+                  <span className="fm-row-main">{r.label}</span>
+                  <span className="fm-row-value rec-value">
                     {row ? `${row.value.toLocaleString('ko-KR')}${r.unit ?? ''}${row.detail ? ` (${row.detail})` : ''}` : '–'}
                   </span>
                 </li>

@@ -17,7 +17,6 @@ import { walletEnabled } from '../wallet/enabled.ts'
 
 /** 미니게임 골드 보너스를 주는 지속형 게임 이름(등록부의 freeBonus 선언 기준, 게임 id를 모른다) */
 const BONUS_SOURCES = worlds.filter((w) => typeof w.logic.freeBonus === 'function').map((w) => w.manifest.name).join('·')
-import '../leaderboard/leaderboard.css'
 import './profile.css'
 
 type Stats = {
@@ -51,7 +50,7 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 const day = (iso: string) => kstDate(Date.parse(iso))
 const SUMMARY_SIZE = 10
 
-type SummaryRow = { key: string; at: string; badge: string; text: string }
+type SummaryRow = { key: string; at: string; badge: string; game: string; score: string }
 
 export function ProfilePage() {
   const { handle = '' } = useParams()
@@ -156,13 +155,13 @@ export function ProfilePage() {
   const summary = useMemo<SummaryRow[]>(() => {
     const puzzle = (stats?.recent ?? []).map((r, i) => ({
       key: `p${i}`, at: r.at, badge: TYPE_LABEL[r.type],
-      text: `${r.game_id ? `${gameName(r.game_id)} · ` : ''}${r.score}점 · ${day(r.at)}`,
+      game: r.game_id ? gameName(r.game_id) : '–', score: `${r.score}점`,
     }))
     const duel = (duelStats ?? []).flatMap((g) => g.recent.map((r) => ({
-      key: `d${r.id}`, at: r.ended_at, badge: '대전',
-      text: `${duelName(g.game_id)} · vs ${r.opponent_handle ?? '알 수 없음'} · ${RESULT[r.result]}`
+      key: `d${r.id}`, at: r.ended_at, badge: '대전', game: duelName(g.game_id),
+      score: `${RESULT[r.result]} vs ${r.opponent_handle ?? '알 수 없음'}`
         + `${r.my_score !== null && r.opp_score !== null ? ` ${r.my_score} : ${r.opp_score}` : ''}`
-        + ` · ${day(r.ended_at)}${r.rated ? '' : ' · 친선'}`,
+        + `${r.rated ? '' : ' · 친선'}`,
     })))
     const t = (iso: string) => Date.parse(iso)
     return [...puzzle, ...duel].sort((a, b) => t(b.at) - t(a.at)).slice(0, SUMMARY_SIZE)
@@ -195,7 +194,7 @@ export function ProfilePage() {
 
   return (
     <div className="stack pf">
-      <section className="pf-card" aria-labelledby={`${uid}-name`}>
+      <section className="fm-panel pf-card" aria-labelledby={`${uid}-name`}>
         <div className="pf-id">
           <Avatar handle={handle} size="lg" />
           <h2 className="page-title pf-name" id={`${uid}-name`}>{handle}</h2>
@@ -216,11 +215,11 @@ export function ProfilePage() {
             데일리 상금 누적 <strong>{formatGold(prizeTotal)}</strong>
           </p>
         )}
-        <ul className="pf-chips" aria-label="요약 기록">
+        <ul className="fm-stats pf-chips" aria-label="요약 기록">
           {chips.map((c) => (
-            <li key={c.label} className="pf-chip">
-              <span className="pf-chip-value">{c.value}</span>
-              <span className="pf-chip-label">{c.label}</span>
+            <li key={c.label} className="fm-stat">
+              <span className="fm-stat-label">{c.label}</span>
+              <span className="fm-stat-value">{c.value}</span>
             </li>
           ))}
         </ul>
@@ -233,9 +232,9 @@ export function ProfilePage() {
         </button>
       )}
 
-      <div className="lb-tabs" role="tablist" aria-label="프로필 보기">
+      <div className="fm-tabs" role="tablist" aria-label="프로필 보기">
         {tabs.map((t) => (
-          <button key={t.id} ref={(el) => { tabRefs.current[t.id] = el }} type="button" role="tab" className="lb-tab"
+          <button key={t.id} ref={(el) => { tabRefs.current[t.id] = el }} type="button" role="tab"
             id={tabId(t.id)} aria-selected={tab === t.id} aria-controls={panelId} tabIndex={tab === t.id ? 0 : -1}
             onClick={() => select(t.id)} onKeyDown={onTabKey}>
             {t.label}
@@ -246,26 +245,31 @@ export function ProfilePage() {
       <div className="stack" role="tabpanel" id={panelId} aria-labelledby={tabId(tab)}>
         {tab === 'summary' && <AvatarSection key={handle} handle={handle} />}
         {tab === 'summary' && (
-          <div className="lb-panel">
-            <h3 className="lb-caption">최근 기록</h3>
-            {summary.length === 0 ? <p className="muted pf-empty">아직 기록이 없어요</p> : (
-              <ul className="pf-recent" aria-label="최근 기록">
-                {summary.map((r) => (
-                  <li key={r.key} className="pf-recent-row">
-                    <span className="badge">{r.badge}</span> <span>{r.text}</span>
-                  </li>
-                ))}
-              </ul>
+          <section className="fm-panel">
+            <h3 className="fm-panel-head">최근 기록</h3>
+            {summary.length === 0 ? <p className="fm-empty">아직 기록이 없어요</p> : (
+              <div className="pf-scroll">
+                <table className="fm-table pf-recent" aria-label="최근 기록">
+                  <thead><tr><th scope="col">구분</th><th scope="col">게임</th><th scope="col">점수</th><th scope="col">날짜</th></tr></thead>
+                  <tbody>
+                    {summary.map((r) => (
+                      <tr key={r.key}>
+                        <td><span className="badge">{r.badge}</span></td><td>{r.game}</td><td>{r.score}</td><td className="pf-date">{day(r.at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </div>
+          </section>
         )}
 
         {tab === 'puzzle' && (
           <>
-            <div className="lb-panel">
-              <h3 className="lb-caption">데일리</h3>
-              {stats.daily_by_game.length === 0 ? <p className="muted pf-empty">아직 기록이 없어요</p> : (
-                <table className="lb-table">
+            <section className="fm-panel">
+              <h3 className="fm-panel-head">데일리</h3>
+              {stats.daily_by_game.length === 0 ? <p className="fm-empty">아직 기록이 없어요</p> : (
+                <table className="fm-table">
                   <thead><tr><th scope="col">게임</th><th scope="col" className="num">참여일</th><th scope="col" className="num">평균 점수</th></tr></thead>
                   <tbody>
                     {stats.daily_by_game.map((d) => (
@@ -274,12 +278,12 @@ export function ProfilePage() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
 
-            <div className="lb-panel">
-              <h3 className="lb-caption">대회</h3>
-              {stats.contests.length === 0 ? <p className="muted pf-empty">참가한 대회가 없어요</p> : (
-                <table className="lb-table">
+            <section className="fm-panel">
+              <h3 className="fm-panel-head">대회</h3>
+              {stats.contests.length === 0 ? <p className="fm-empty">참가한 대회가 없어요</p> : (
+                <table className="fm-table">
                   <thead><tr><th scope="col">대회</th><th scope="col">구분</th><th scope="col" className="num">순위</th><th scope="col" className="num">점수</th></tr></thead>
                   <tbody>
                     {stats.contests.map((c) => (
@@ -292,12 +296,12 @@ export function ProfilePage() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
 
-            <div className="lb-panel">
-              <h3 className="lb-caption">자유 플레이</h3>
-              {stats.free_by_game.length === 0 ? <p className="muted pf-empty">아직 기록이 없어요</p> : (
-                <table className="lb-table">
+            <section className="fm-panel">
+              <h3 className="fm-panel-head">자유 플레이</h3>
+              {stats.free_by_game.length === 0 ? <p className="fm-empty">아직 기록이 없어요</p> : (
+                <table className="fm-table">
                   <thead><tr><th scope="col">게임</th><th scope="col" className="num">플레이</th><th scope="col" className="num">정답</th><th scope="col" className="num">정답률</th><th scope="col" className="num">최고 연속</th></tr></thead>
                   <tbody>
                     {stats.free_by_game.map((f) => (
@@ -309,7 +313,7 @@ export function ProfilePage() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
           </>
         )}
 
@@ -317,7 +321,7 @@ export function ProfilePage() {
 
         {tab === 'records' && <RecordsSection key={handle} handle={handle} />}
 
-        {tab === 'settings' && mine && <div className="card"><AppearanceSettings /></div>}
+        {tab === 'settings' && mine && <div className="fm-panel pf-settings"><AppearanceSettings /></div>}
       </div>
     </div>
   )
