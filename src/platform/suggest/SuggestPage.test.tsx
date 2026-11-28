@@ -67,12 +67,14 @@ test('handle이 null이면 알 수 없음', async () => {
   expect(await screen.findByText('알 수 없음')).toBeTruthy()
 })
 
-test('칩을 누르면 그 대상으로 다시 읽는다', async () => {
+test('대상 select로 거르면 목록 RPC에 그 대상', async () => {
   renderPage()
   await screen.findByText('힌트를 늘려줘')
   expect(listMock).toHaveBeenLastCalledWith(null)
-  expect(screen.queryByRole('button', { name: '비밀 게임' })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '사이트' }))
+  const sel = screen.getByRole('combobox', { name: '대상' }) as HTMLSelectElement
+  expect(Array.from(sel.options).map((o) => o.textContent)).toContain('전체')
+  expect(Array.from(sel.options).map((o) => o.textContent)).not.toContain('비밀 게임')
+  fireEvent.change(screen.getByRole('combobox', { name: '대상' }), { target: { value: 'site' } })
   await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
 })
 
@@ -85,7 +87,9 @@ test('공감순을 누르면 votes가 큰 항목이 먼저 온다', async () => 
   renderPage()
   await screen.findByText('AAAAA')
   expect(items().map((li) => li.textContent?.match(/[ABC]{5}/)?.[0])).toEqual(['AAAAA', 'CCCCC', 'BBBBB'])
-  fireEvent.click(screen.getByRole('button', { name: '공감순' }))
+  const votes = screen.getByRole('radio', { name: '공감순' })
+  expect(votes.closest('.fm-seg')).not.toBeNull()
+  fireEvent.click(votes)
   expect(items().map((li) => li.textContent?.match(/[ABC]{5}/)?.[0])).toEqual(['BBBBB', 'AAAAA', 'CCCCC'])
 })
 
@@ -94,6 +98,7 @@ test('4자면 올리기 비활성, 5자면 올리고 비우고 다시 읽는다'
   renderPage()
   await screen.findByText('힌트를 늘려줘')
   const box = screen.getByLabelText('제안 내용') as HTMLTextAreaElement
+  fireEvent.focus(box)
   const btn = screen.getByRole('button', { name: '올리기' }) as HTMLButtonElement
   expect(box.getAttribute('placeholder')).toBe('어떤 게임에 뭘 바꾸면 좋을지 적어줘')
   expect(box.maxLength).toBe(500)
@@ -108,13 +113,13 @@ test('4자면 올리기 비활성, 5자면 올리고 비우고 다시 읽는다'
   await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(before))
 })
 
-test('특정 대상 칩을 고르면 대상 선택이 없고 그 대상으로 올린다', async () => {
+test('대상을 고르면 글쓰기 대상 선택이 없고 그 대상으로 올린다', async () => {
   postMock.mockResolvedValue('new')
   renderPage()
   await screen.findByText('힌트를 늘려줘')
-  fireEvent.click(screen.getByRole('button', { name: '사이트' }))
+  fireEvent.change(screen.getByRole('combobox', { name: '대상' }), { target: { value: 'site' } })
   await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
-  expect(screen.queryByLabelText('대상')).toBeNull()
+  expect(screen.queryByLabelText('올릴 대상')).toBeNull()
   fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
   const before = listMock.mock.calls.length
   fireEvent.click(screen.getByRole('button', { name: '올리기' }))
@@ -127,18 +132,18 @@ test('전체에서는 대상 선택이 보이고 고른 대상으로 올린다',
   postMock.mockResolvedValue('new')
   renderPage()
   await screen.findByText('힌트를 늘려줘')
-  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'yacht' } })
+  fireEvent.change(screen.getByLabelText('올릴 대상'), { target: { value: 'yacht' } })
   fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
   fireEvent.click(screen.getByRole('button', { name: '올리기' }))
   await waitFor(() => expect(postMock).toHaveBeenCalledWith('yacht', 'abcde'))
 })
 
-test('전체에서 대상을 고른 뒤 칩을 누르면 칩의 대상으로 올린다', async () => {
+test('전체에서 올릴 대상을 고른 뒤 위 대상을 고르면 위 대상으로 올린다', async () => {
   postMock.mockResolvedValue('new')
   renderPage()
   await screen.findByText('힌트를 늘려줘')
-  fireEvent.change(screen.getByLabelText('대상'), { target: { value: 'yacht' } })
-  fireEvent.click(screen.getByRole('button', { name: '사이트' }))
+  fireEvent.change(screen.getByLabelText('올릴 대상'), { target: { value: 'yacht' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '대상' }), { target: { value: 'site' } })
   await waitFor(() => expect(listMock).toHaveBeenLastCalledWith('site'))
   fireEvent.change(screen.getByLabelText('제안 내용'), { target: { value: 'abcde' } })
   fireEvent.click(screen.getByRole('button', { name: '올리기' }))
@@ -154,7 +159,7 @@ test('전체 필터에서 올리면 필터는 그대로 전체다', async () => 
   await waitFor(() => expect(postMock).toHaveBeenCalled())
   await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(1))
   expect(listMock).toHaveBeenLastCalledWith(null)
-  expect(screen.getByRole('button', { name: '전체' }).getAttribute('aria-pressed')).toBe('true')
+  expect((screen.getByRole('combobox', { name: '대상' }) as HTMLSelectElement).value).toBe('')
 })
 
 test('올리기 실패는 alert로 보인다', async () => {
@@ -220,4 +225,28 @@ test('목록 읽기 실패는 오류와 다시 시도', async () => {
   renderPage()
   fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }))
   expect(await screen.findByText('힌트를 늘려줘')).toBeTruthy()
+})
+
+test('입력칸을 누르면 커지고 올리기 버튼이 보인다', async () => {
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  const box = screen.getByLabelText('제안 내용') as HTMLTextAreaElement
+  expect(box.rows).toBe(1)
+  expect(screen.queryByRole('button', { name: '올리기' })).toBeNull()
+  fireEvent.focus(box)
+  expect(box.rows).toBe(4)
+  expect(screen.getByRole('button', { name: '올리기' })).toBeTruthy()
+  fireEvent.change(box, { target: { value: 'ab' } })
+  fireEvent.blur(box)
+  expect(box.rows).toBe(4) // 글자가 있으면 펼친 채
+  fireEvent.change(box, { target: { value: '' } })
+  expect(box.rows).toBe(1)
+})
+
+test('정렬 라디오: 기본 최신, 글 목록은 판 안', async () => {
+  renderPage()
+  await screen.findByText('힌트를 늘려줘')
+  expect((screen.getByRole('radio', { name: '최신' }) as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByRole('list', { name: '제안 목록' }).closest('.fm-panel')).not.toBeNull()
+  expect(screen.getByRole('heading', { name: '제안' }).className).toContain('sr-only')
 })

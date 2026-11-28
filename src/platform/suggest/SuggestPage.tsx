@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import {
@@ -30,6 +30,8 @@ export function SuggestPage() {
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
+  const sortId = useId()
   const seq = useRef(0)
 
   const load = useCallback(async () => {
@@ -49,9 +51,11 @@ export function SuggestPage() {
     return () => { seq.current++ }
   }, [load])
 
-  // 칩으로 대상을 골랐으면 그 대상으로 올린다. 대상 선택은 '전체'일 때만 보인다
+  // 위에서 대상을 골랐으면 그 대상으로 올린다. 올릴 대상 선택은 '전체'일 때만 보인다
   const target = filter ?? draftTarget ?? targets[0].id
   const canPost = body.trim().length >= MIN_LEN && !posting
+  // 입력칸은 처음 1줄, 누르거나 글자가 있으면 4줄로 펼치고 올리기 버튼을 보인다
+  const open = focused || body.length > 0
 
   const shown = useMemo(() => {
     const rows = [...(items ?? [])]
@@ -109,48 +113,53 @@ export function SuggestPage() {
 
   return (
     <div className="stack">
-      <h2 className="page-title">제안</h2>
+      <h2 className="page-title sr-only">제안</h2>
 
-      <div className="suggest-chips" role="group" aria-label="대상 필터">
-        <button type="button" className="btn btn-ghost btn-sm suggest-chip" aria-pressed={filter === null} onClick={() => setFilter(null)}>전체</button>
-        {targets.map((t) => (
-          <button key={t.id} type="button" className="btn btn-ghost btn-sm suggest-chip" aria-pressed={filter === t.id} onClick={() => setFilter(t.id)}>
-            {t.name}
-          </button>
-        ))}
+      <div className="suggest-bar">
+        <span className="suggest-target">
+          <select aria-label="대상" value={filter ?? ''} onChange={(e) => setFilter(e.target.value || null)}>
+            <option value="">전체</option>
+            {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </span>
+        <span className="fm-seg" role="radiogroup" aria-label="정렬">
+          {([['new', '최신'], ['votes', '공감순']] as [Sort, string][]).map(([v, label]) => (
+            <Fragment key={v}>
+              <input type="radio" id={`${sortId}-${v}`} name="suggest-sort" checked={sort === v} onChange={() => setSort(v)} />
+              <label htmlFor={`${sortId}-${v}`}>{label}</label>
+            </Fragment>
+          ))}
+        </span>
       </div>
 
-      <form className="card suggest-form" onSubmit={(e) => { e.preventDefault(); if (canPost) void submit() }}>
-        {filter === null && (
-          <label className="suggest-field">
-            대상
-            <select className="input" value={target} onChange={(e) => setDraftTarget(e.target.value)}>
+      <form className="fm-panel suggest-form" onSubmit={(e) => { e.preventDefault(); if (canPost) void submit() }}>
+        <div className="suggest-compose">
+          {filter === null && (
+            <select className="input suggest-draft-target" aria-label="올릴 대상" value={target} onChange={(e) => setDraftTarget(e.target.value)}>
               {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-          </label>
-        )}
-        <label className="suggest-field">
-          제안 내용
+          )}
           <textarea
             className="input"
+            aria-label="제안 내용"
+            rows={open ? 4 : 1}
             value={body}
             maxLength={MAX_LEN}
             placeholder="어떤 게임에 뭘 바꾸면 좋을지 적어줘"
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onChange={(e) => setBody(e.target.value)}
           />
-        </label>
+        </div>
         {postError && <p className="form-error" role="alert">{postError}</p>}
-        <div className="card-actions">
-          <button type="submit" className="btn btn-primary" disabled={!canPost}>올리기</button>
-        </div>
+        {open && (
+          <div className="suggest-actions">
+            <span className="muted">{body.trim().length}/{MAX_LEN}</span>
+            {/* 누르는 순간 입력칸이 blur돼도 버튼이 사라지지 않게 mousedown 기본 동작을 막는다 */}
+            <button type="submit" className="btn btn-primary btn-sm" disabled={!canPost} onMouseDown={(e) => e.preventDefault()}>올리기</button>
+          </div>
+        )}
       </form>
-
-      <div className="row between">
-        <div className="suggest-sort" role="group" aria-label="정렬">
-          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={sort === 'new'} onClick={() => setSort('new')}>최신</button>
-          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={sort === 'votes'} onClick={() => setSort('votes')}>공감순</button>
-        </div>
-      </div>
 
       {actionError && <p className="form-error" role="alert">{actionError}</p>}
 
@@ -164,12 +173,17 @@ export function SuggestPage() {
       ) : shown.length === 0 ? (
         <p className="muted suggest-empty">아직 제안이 없어요</p>
       ) : (
-        <ul className="suggest-list">
+        <section className="fm-panel">
+        <h3 className="fm-panel-head">제안 {shown.length}개</h3>
+        <ul className="suggest-list" aria-label="제안 목록">
           {shown.map((s) => (
-            <li key={s.id} id={itemDomId(s.id)} tabIndex={-1} className="card suggest-item">
-              <div className="suggest-meta">{targetName(s.target)} · {STATUS_LABEL[s.status]}</div>
+            <li key={s.id} id={itemDomId(s.id)} tabIndex={-1} className="suggest-item">
+              <div className="suggest-meta">
+                <span>{targetName(s.target)}</span>
+                <span className={`suggest-status is-${s.status}`}>{STATUS_LABEL[s.status]}</span>
+              </div>
               <p className="suggest-body">{s.body}</p>
-              {s.publicReason && <p className="suggest-reason">└ {s.publicReason}</p>}
+              {s.publicReason && <p className="suggest-reason">{s.publicReason}</p>}
               <div className="row between">
                 <span className="muted">{s.handle ?? '알 수 없음'}</span>
                 <div className="card-actions">
@@ -203,6 +217,7 @@ export function SuggestPage() {
             </li>
           ))}
         </ul>
+        </section>
       )}
     </div>
   )
