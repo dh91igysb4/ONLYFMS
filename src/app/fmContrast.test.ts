@@ -1,0 +1,47 @@
+// FM 스타일 파생 색(theme.css :root의 color-mix)이 모든 팔레트에서 읽히는지 본다(설계 2026-11-28-fm-ui §4.1).
+import { describe, expect, it } from 'vitest'
+import css from './theme.css?raw'
+import { PALETTES, PALETTE_IDS, type Mode } from './palettes.ts'
+
+function lum(hex: string): number {
+  const ch = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+}
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+/** color-mix(in srgb, a, b p) — sRGB 채널별 선형 섞기 */
+function mix(a: string, b: string, p: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16)
+  return '#' + [1, 3, 5].map((i) => Math.round(ch(a, i) * (1 - p) + ch(b, i) * p).toString(16).padStart(2, '0')).join('')
+}
+
+const MODES: Mode[] = ['dark', 'light']
+
+describe('fm contrast', () => {
+  it('fm contrast: 판 제목 띠·내 줄 바탕·판 위 승무패 칸 글자가 20개 조합 모두 4.5 이상', () => {
+    for (const id of PALETTE_IDS) for (const mode of MODES) {
+      const t = PALETTES[id][mode]
+      const head = mix(t.panel, t.ink, 0.06)
+      const me = mix(t.panel, t.accentStrong, 0.12)
+      const checks: [string, string, string][] = [
+        ['muted on head', t.muted, head], ['ink on head', t.ink, head], ['ink on me', t.ink, me],
+        ['win on panel', t.winText, t.panel], ['lose on panel', t.loseText, t.panel], ['muted on panel', t.muted, t.panel],
+      ]
+      for (const [name, fg, bg] of checks) {
+        const v = contrast(fg, bg)
+        expect(v, `${id}/${mode}/${name}: ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('theme.css에 fm 파생 변수 식이 그대로 있다', () => {
+    expect(css).toContain('--fm-head: color-mix(in srgb, var(--panel), var(--ink) 6%)')
+    expect(css).toContain('--fm-line: color-mix(in srgb, var(--panel), var(--ink) 12%)')
+    expect(css).toContain('--fm-me: color-mix(in srgb, var(--panel), var(--accent-strong) 12%)')
+  })
+})

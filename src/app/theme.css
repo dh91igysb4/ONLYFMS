@@ -29,6 +29,10 @@
   --card-hover: #f4f1fa;
   --card-accent: #4d6b00;
   --sky: #008fdb; /* 로고 하늘색 */
+  /* FM 스타일 파생 색(설계 2026-11-28-fm-ui §4.1). 팔레트 토큰을 섞기만 한다 */
+  --fm-head: color-mix(in srgb, var(--panel), var(--ink) 6%);
+  --fm-line: color-mix(in srgb, var(--panel), var(--ink) 12%);
+  --fm-me: color-mix(in srgb, var(--panel), var(--accent-strong) 12%);
 }
 
 * { box-sizing: border-box; }
@@ -151,7 +155,7 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
   font: inherit;
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: 4px;
   border: 0;
   cursor: pointer;
 }
@@ -163,19 +167,19 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
   font: inherit;
   min-height: 44px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: 4px;
   border: 1px solid var(--muted);
   background: var(--bg);
   color: var(--ink);
 }
 .form-error { color: var(--warn-text); margin: 0; }
 
-.card { background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .card-title { margin: 0; font-size: 18px; }
 .card-status { margin: 0; color: var(--accent-strong); }
 .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .card-actions .btn { display: inline-flex; align-items: center; text-decoration: none; }
-.notice { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--warn-text); }
+.notice { margin: 0; padding: 10px 12px; border-radius: 4px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--warn-text); }
 .free-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .free-title { margin: 0; font-size: 17px; font-weight: 700; }
 .free-options { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -208,7 +212,7 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row.between { justify-content: space-between; }
 .grow { flex: 1; min-width: 0; }
-.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--muted); color: var(--muted); font-size: 13px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; background: var(--panel); border: 1px solid var(--muted); color: var(--muted); font-size: 13px; }
 .badge-official { background: var(--lime); border-color: var(--accent-edge); color: var(--on-accent); font-weight: 700; }
 /* 초록 배지 위 글자는 고정색 */
 .badge-live { background: var(--live-bg); border-color: var(--live-bg); color: var(--on-live); font-weight: 700; }
@@ -216,7 +220,7 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
 .btn-link { display: inline-flex; align-items: center; text-decoration: none; }
 .countdown { margin: 0; font-size: 20px; font-weight: 700; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.list-row { padding: 12px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); display: flex; flex-direction: column; gap: 6px; }
+.list-row { padding: 12px; border-radius: 4px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); display: flex; flex-direction: column; gap: 6px; }
 .list-row a { color: var(--accent-strong); font-weight: 700; }
 .reveal { margin: 0; font-size: 12px; color: var(--muted); white-space: pre-wrap; }
 .table { width: 100%; border-collapse: collapse; }
@@ -297,3 +301,72 @@ select.input { padding-right: 8px; }
 @media (prefers-reduced-motion: reduce) {
   .app-wordmark.is-entering, .app-wordmark.is-leaving { animation: none; }
 }
+
+/* ── FM 스타일 공통 부품 (설계 2026-11-28-fm-ui §4.2). 판·제목 띠·줄·표·숫자 칸·양식·구분 버튼·승무패 칸·글자 탭 ── */
+.fm-panel { background: var(--panel); border-radius: 4px; min-width: 0; }
+.fm-panel-head {
+  margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-radius: 4px 4px 0 0; background: var(--fm-head);
+  color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+}
+.fm-panel-head a, .fm-panel-aside { color: var(--muted); font-weight: 500; letter-spacing: 0; text-decoration: none; }
+.fm-panel-head a:hover { color: var(--ink); }
+.fm-panel-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.fm-empty { margin: 0; padding: 12px; color: var(--muted); font-size: 14px; }
+
+.fm-row {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; box-sizing: border-box;
+  color: var(--ink); text-decoration: none; border-top: 1px solid var(--fm-line);
+}
+.fm-panel-head + .fm-row, .fm-row:first-child { border-top: 0; }
+a.fm-row:hover { background: var(--fm-me); }
+.fm-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fm-row-title { font-size: 15px; font-weight: 700; }
+.fm-row-sub { font-size: 12px; color: var(--muted); }
+.fm-row-value { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fm-row-go { flex: none; color: var(--muted); }
+.fm-row-actions { flex: none; display: flex; gap: 6px; }
+
+.fm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fm-table th { padding: 6px 12px; text-align: left; font-size: 11px; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--fm-line); }
+.fm-table td { padding: 9px 12px; border-top: 1px solid var(--fm-line); font-variant-numeric: tabular-nums; }
+.fm-table tr:first-child td { border-top: 0; }
+.fm-table .num { text-align: right; }
+.fm-table tr.is-me td { background: var(--fm-me); font-weight: 700; }
+.fm-table tr.is-me td:first-child { box-shadow: inset 3px 0 0 var(--accent-strong); }
+.fm-table a { color: var(--ink); font-weight: 700; text-decoration: none; }
+
+.fm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); background: var(--panel); border-radius: 4px; overflow: hidden; }
+.fm-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; box-shadow: inset -1px -1px 0 var(--fm-line); }
+.fm-stat-label { font-size: 11px; color: var(--muted); }
+.fm-stat-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.fm-form { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.fm-form-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px; }
+.fm-form-row > :first-child { color: var(--muted); font-size: 14px; }
+.fm-form .input { min-height: 38px; }
+
+.fm-seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--fm-line); border-radius: 4px; overflow: hidden; }
+.fm-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.fm-seg label { display: flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.fm-seg label:not(:first-of-type) { border-left: 1px solid var(--fm-line); }
+.fm-seg input:checked + label { background: var(--fm-me); color: var(--ink); font-weight: 700; }
+.fm-seg input:focus-visible + label { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+
+.fm-chip {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px;
+  border-radius: 2px; border: 1px solid currentColor; background: var(--panel); font-size: 10px; font-weight: 700;
+}
+.fm-chip.is-win { color: var(--win-text); }
+.fm-chip.is-loss { color: var(--lose-text); }
+.fm-chip.is-draw { color: var(--muted); }
+.fm-chips { display: inline-flex; gap: 3px; }
+
+.fm-tabs { display: flex; overflow-x: auto; background: var(--panel); border-radius: 4px; padding: 0 4px; scrollbar-width: none; }
+.fm-tabs > a, .fm-tabs > button {
+  font: inherit; flex: none; padding: 9px 10px; border: 0; background: transparent; color: var(--muted);
+  text-decoration: none; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.fm-tabs > .active, .fm-tabs > [aria-selected='true'] { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent-strong); }
+
+.btn-text { font: inherit; background: transparent; border: 0; padding: 0; color: var(--accent-strong); font-weight: 700; text-decoration: none; cursor: pointer; }
