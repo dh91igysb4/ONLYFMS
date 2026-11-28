@@ -398,6 +398,16 @@ export function bagSize(tier: number): number {
 /** 부두에서 던지면 크기 추첨 힘에 더해지는 값 */
 export const PIER_POWER_BONUS = 0.25
 export const MIN_FIGHT_MS = 2000
+/**
+ * 서버 싸움 시간 검사(경제 설계 §6.1, v27). 성공 진행도는 0.3에서 초당 0.35씩 올라 어떤 성공이든 2.0초 이상 걸리고(MIN_FIGHT_MS),
+ * 퍼펙트(끝까지 바 안)는 정확히 2.0초에 끝난다. 사람 비슷한 봇 2종 × 전 어종·낚싯대·찌 16,260판(2026-11-28): 성공 중앙값 4.9초,
+ * 99.9% 57초, 최대 85초, 퍼펙트는 모두 2,000ms.
+ * - MAX_FIGHT_MS: 챈 뒤 이보다 늦게 온 성공은 놓친 것으로 본다(정상 최대의 2배 이상)
+ * - PERFECT_MAX_MS: 챈 뒤 이보다 늦게 온 퍼펙트는 일반 포획으로 낮춘다(2초 + 응답 왕복·재시도 여유 10초)
+ * 이 창 안에서 보낸 거짓 성공·퍼펙트는 막지 못한다(입력 재생 검증은 하지 않는다).
+ */
+export const MAX_FIGHT_MS = 180_000
+export const PERFECT_MAX_MS = 12_000
 export const HOOK_WINDOW_MS = 800
 /** 챔 창이 끝난 뒤 서버가 더 받아 주는 네트워크 지연 여유 */
 export const HOOK_GRACE_MS = 1500

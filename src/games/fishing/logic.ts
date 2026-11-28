@@ -3,7 +3,7 @@ import type { WorldLogic, WorldRecord } from '../types.ts'
 import { conditionsAt, isNight, type Conditions } from './clock.ts'
 import {
   AREAS, areaHasSpecies, areaMinRod, BAGS, bagSize, BUFF_FX, BUFFS, CHALLENGES, DEFAULT_AREAS, FRIDGE_SIZE, ISLE_LAYOUTS, type IsleLayoutId, HOOK_GRACE_MS, HOOK_WINDOW_MS, isBuffId,
-  LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
+  LEGEND_CHANCE, MAX_FIGHT_MS, MIN_FIGHT_MS, MYTHIC_CHANCE, PERFECT_MAX_MS, PIER_POWER_BONUS, RODS, SELL_DECAY, SPECIES, speciesAvailable, spotOpen, TACKLE_FX, tackleSlots, TACKLES,
   TIDE_GRACE_MIN, UNLOCKS,
   type AreaId, type BagTier, type BuffId, type Challenge, type Rod, type RodTier, type Species, type TackleId, SHOES, type ShoeTier } from './data.ts'
 import { teleportFee, teleporterWorld } from './teleport.ts'
@@ -488,6 +488,9 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   if (!a.success) return { state: { ...state, pending: null }, result: { caught: null } }
   if (p.hookedAt == null) return { error: 'not_hooked' }
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
+  // 서버 싸움 시간 검사(§6.1): 너무 늦은 성공은 놓친 것, 늦은 퍼펙트는 일반 포획
+  if (now > p.hookedAt + MAX_FIGHT_MS) return { state: { ...state, pending: null }, result: { caught: null, rejected: 'fight_time' } }
+  const perfect = a.perfect && now <= p.hookedAt + PERFECT_MAX_MS
   const isLegend = !!speciesById(p.species).legend
   // 연구 낚시로 대상을 잡았으면 recatch(판매가 50%), 대상 보장 카운터는 0. 놓치면(위 success false) 카운터 유지
   const recatch = isLegend && p.target === p.species
@@ -497,7 +500,7 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     origin: recatch ? 'recatch' : isLegend ? 'first' : 'normal',
     species: p.species,
     sizeCm: p.sizeCm,
-    perfect: a.perfect,
+    perfect,
     ...(isLegend ? { locked: true as const } : {}),
   }
   const prev = state.dex[p.species]
@@ -507,7 +510,7 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   }
   const legends = isLegend && !state.legends.includes(p.species) ? [...state.legends, p.species] : state.legends
   // 과제는 던질 때 저장한 지역·자리·조건으로 센다. 그 값이 없는(비정상) pending이면 과제만 건너뛴다
-  const facts = catchFacts(p, a.perfect)
+  const facts = catchFacts(p, perfect)
   const judged = facts ? progressChallenges(state.challenges, facts) : { challenges: state.challenges, completed: [] }
   const gained = gainBuff(state.buffs ?? [], p.species)
   let econ = state.econ
@@ -1076,7 +1079,7 @@ export const logic: WorldLogic<State, Action, View> = {
   // 25: 내 섬 D단계(바깥 꾸미기: makeDeco·decorate·undecorate, isle에 decoBox·deco). v24 섬은 꾸미기 없음(설계 2026-11-26-my-isle-d-design.md)
   // 26: 물고기 id·출처(Fish.id·origin, nextFishId). v25 이하 개체는 legacy, 가방 → 냉장고 순서로 1부터. 행동은 id를 받으면 확인
   //     (경제 설계 2026-11-27-fishing-economy-design.md §4.2). 판매가·확률은 그대로
-  // 27: 경제 P1(econ: 어분·미끼·연구 해금·대상별 보장, cast의 bait·target, grind·makeBait·buyLicense, recatch 판매가 50%)과
+  // 27: 서버 싸움 시간 검사(챈 뒤 180초 넘은 성공은 놓침, 12초 넘은 퍼펙트는 일반), 경제 P1(econ: 어분·미끼·연구 해금·대상별 보장, cast의 bait·target, grind·makeBait·buyLicense, recatch 판매가 50%)과
   //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종). 새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
   version: 27,
   wallet: true,

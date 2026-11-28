@@ -472,7 +472,9 @@ describe('fishing WorldLogic', () => {
     const later = now + 2 * WEEK + 5_000_000
     expect(conditionsAt(later).season).not.toBe(p.cond.season)
     expect(conditionsAt(later).gameDay).not.toBe(p.cond.gameDay)
-    const r = ok(play(hooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
+    // 싸움 시간 상한(v27, MAX_FIGHT_MS) 안에서 거두도록 챈 시각만 옮긴다: 판정은 던질 때 조건
+    const lateHooked = { ...hooked, pending: { ...hooked.pending!, hookedAt: later - 5000 } }
+    const r = ok(play(lateHooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
     expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: p.species, sizeCm: p.sizeCm, perfect: false }])
   })
 
@@ -747,7 +749,8 @@ describe('fishing WorldLogic', () => {
   })
 
   it('resolve success adds to bag and dex; maxCm keeps the larger', () => {
-    const late = ctx(T0 + 100_000)
+    // 퍼펙트 상한(v27, PERFECT_MAX_MS 12초) 안
+    const late = ctx(BITE + 5000)
     let s = withHooked({ dex: { anchovy: { count: 1, maxCm: 14 } } })
     let r = ok(play(s, { type: 'resolve', success: true, perfect: true }, late))
     expect(r.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: true } })
@@ -1108,11 +1111,11 @@ describe('가방 잠금', () => {
   it('resolve: 전설은 잠긴 채 가방에 들어가고, 일반 어종은 잠기지 않는다', () => {
     const p = withHooked().pending!
     const legend = withHooked({ pending: { ...p, species: 'grouper', sizeCm: 120 } })
-    const r = ok(play(legend, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    const r = ok(play(legend, { type: 'resolve', success: true, perfect: false }, ctx(BITE + 5000)))
     const fish = { id: 1, origin: 'first' as const, species: 'grouper', sizeCm: 120, perfect: false, locked: true }
     expect(r.state.bag).toEqual([fish])
     expect(r.result).toEqual({ caught: fish })
-    const n = ok(play(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    const n = ok(play(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(BITE + 5000)))
     expect(n.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false }])
   })
 
@@ -1173,9 +1176,9 @@ describe('도전과제', () => {
   })
 
   it('강 비: 비 오는 날 던지고 맑은 날 거둬도 센다; 맑은 날 던지고 비 올 때 거두면 안 센다', () => {
-    const rainCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'rain') })
-    // 거두는 시각(now)은 맑은 날·다른 계절이어도 된다
+    // 거두는 시각(now)은 맑은 날·다른 계절이어도 된다(챈 시각은 싸움 시간 상한 안으로)
     const sunnyNow = nowAt(5, 9)
+    const rainCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'rain'), hookedAt: sunnyNow - 5000 })
     expect(conditionsAt(sunnyNow).weather === 'sun' || conditionsAt(sunnyNow).season !== 'summer').toBe(true)
     expect(land(rainCast, false, sunnyNow).state.challenges['river-rain']).toEqual({ progress: 1, done: false })
     const sunCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'sun') })
