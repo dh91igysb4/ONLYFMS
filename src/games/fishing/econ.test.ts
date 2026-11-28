@@ -8,7 +8,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, sellPrice, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
-import { newEcon, researchChance } from './research.ts'
+import { MAX_BAIT_BATCH, maxBait, newEcon, researchChance } from './research.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
 type R = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -146,6 +146,42 @@ describe('재포획 판매가', () => {
     for (const o of ['legacy', 'first', 'normal'] as const) expect(fishSellPrice({ ...f, origin: o })).toBe(full)
     const r = ok(act(base({ bag: [{ ...f, origin: 'recatch' }], nextFishId: 2 }), { type: 'sell' }))
     expect(r.gold).toBe(Math.round(full / 2))
+  })
+})
+
+describe('미끼 여러 개 한 번에 (logic.version 29)', () => {
+  it('count만큼 만들고 골드·어분을 그만큼 쓴다. count 없으면 1개', () => {
+    const s = base({ econ: { ...newEcon(), meal: 10 } })
+    const r = ok(act(s, { type: 'makeBait', kind: 'attractor', price: 50, count: 7 }))
+    expect(r.gold).toBe(-350)
+    expect([r.state.econ.meal, r.state.econ.baits.attractor]).toEqual([3, 7])
+    expect(ok(act(s, { type: 'makeBait', kind: 'attractor', price: 50 })).state.econ.baits.attractor).toBe(1)
+  })
+  it('어분·골드가 count만큼 없으면 거절(일부만 만들지 않는다), count는 1 이상 정수', () => {
+    const s = base({ econ: { ...newEcon(), meal: 5 } })
+    expect(err(act(s, { type: 'makeBait', kind: 'attractor', price: 50, count: 6 }))).toBe('no_meal')
+    expect(err(act(s, { type: 'makeBait', kind: 'attractor', price: 50, count: 5 }, { gold: 249 }))).toBe('not_enough_gold')
+    for (const count of [0, -1, 1.5, '3', MAX_BAIT_BATCH + 1]) {
+      expect(err(act(s, { type: 'makeBait', kind: 'attractor', price: 50, count } as never))).toBe('bad_action')
+    }
+  })
+  it('신화 미끼는 개당 어분 2: 어분 5면 최대 2개', () => {
+    const s = base({ legends: ['grouper', 'imugi'], econ: { ...newEcon(), meal: 5, license: true } })
+    expect(maxBait('mythic', 5, 10_000)).toBe(2)
+    const r = ok(act(s, { type: 'makeBait', kind: 'mythic', price: 1200, count: 2 }))
+    expect([r.gold, r.state.econ.meal, r.state.econ.baits.mythic]).toEqual([-2400, 1, 2])
+  })
+  it('maxBait: 어분·골드 중 모자란 쪽까지, 상한 MAX_BAIT_BATCH', () => {
+    expect(maxBait('attractor', 10, 120)).toBe(2)
+    expect(maxBait('attractor', 3, 1_000_000)).toBe(3)
+    expect(maxBait('attractor', 0, 1_000_000)).toBe(0)
+    expect(maxBait('attractor', 1_000_000, 1_000_000_000)).toBe(MAX_BAIT_BATCH)
+  })
+  it('v28 세이브는 그대로 읽는다(세이브 형식은 28과 같다)', () => {
+    const raw = { ...logic.init(), legends: ['grouper'], econ: { meal: 4, baits: { attractor: 3, legend: 1, mythic: 0 }, license: true, pity: { grouper: 9 } } }
+    const m = logic.migrate(JSON.parse(JSON.stringify(raw)), 28)
+    expect(m.econ).toEqual(raw.econ)
+    expect(logic.migrate(JSON.parse(JSON.stringify(m)), 28)).toEqual(m)
   })
 })
 

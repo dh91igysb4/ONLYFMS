@@ -1743,7 +1743,11 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       await failMove(codeOf(e))
     }
   }
-  const makeBait = (kind: BaitKind) => void econAct({ type: 'makeBait', kind, price: BAIT_RECIPES[kind].gold }, '미끼를 만들었어요')
+  // 1개는 count를 보내지 않는다(옛 서버와 같은 행동)
+  const makeBait = (kind: BaitKind, count = 1) => void econAct(
+    { type: 'makeBait', kind, price: BAIT_RECIPES[kind].gold, ...(count > 1 ? { count } : {}) },
+    count > 1 ? `미끼 ${count}개를 만들었어요` : '미끼를 만들었어요',
+  )
   const buyLicense = () => void econAct({ type: 'buyLicense', price: LICENSE_PRICE }, '연구를 해금했어요')
 
   /** 마을회관 냉장고: 가방 칸 넣기(store)·냉장고 칸 꺼내기(takeOut) */

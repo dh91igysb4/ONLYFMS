@@ -17,6 +17,13 @@ export const BAIT_RECIPES: Readonly<Record<BaitKind, { gold: number; meal: numbe
   legend: { gold: 600, meal: 1 },
   mythic: { gold: 1200, meal: 2 },
 }
+/** 미끼 한 번에 만들 수 있는 최대 개수(행동 하나, logic.version 29) */
+export const MAX_BAIT_BATCH = 999
+/** 가진 어분·골드로 만들 수 있는 미끼 수(0..MAX_BAIT_BATCH). 자격(연구 해금·발견)은 따로 본다 */
+export function maxBait(kind: BaitKind, meal: number, gold: number): number {
+  const r = BAIT_RECIPES[kind]
+  return Math.max(0, Math.min(MAX_BAIT_BATCH, Math.floor(meal / r.meal), Math.floor(gold / r.gold)))
+}
 /** 연구 해금(계정당 한 번). 전설 1종 이상 발견해야 살 수 있다 */
 export const LICENSE_PRICE = 50_000
 /** 집어 미끼: 그 투척 1회의 일반 rare 등급 가중치 배율. 전설·신화 확률에는 영향 없다 */
