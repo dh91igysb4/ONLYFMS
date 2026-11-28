@@ -32,6 +32,8 @@ type Side = {
   inbox: Msg[]
   latest: Msg | null
   ghostPos: CarState['pos'] | null
+  /** 직전 틱 유령 위치(그리기 보간용) */
+  ghostPrev: CarState['pos'] | null
   ghostVel: CarState['vel']
   hitTicks: number[]
   touching: boolean
@@ -58,7 +60,7 @@ function makeSide(R: Rapier, lateral: number): Side {
   const ghost = w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0, -500, 0))
   const ghostCol = w.createCollider(R.ColliderDesc.cuboid(CAR_HALF.x + GHOST_MARGIN, CAR_HALF.y + GHOST_MARGIN, CAR_HALF.z + GHOST_MARGIN).setSensor(true), ghost)
   return {
-    race, ghost, ghostCol, carCol: race.car.body.collider(0), inbox: [], latest: null, ghostPos: null,
+    race, ghost, ghostCol, carCol: race.car.body.collider(0), inbox: [], latest: null, ghostPos: null, ghostPrev: null,
     ghostVel: { x: 0, y: 0, z: 0 }, hitTicks: [], touching: false, lastTouch: -1e9,
   }
 }
@@ -81,6 +83,7 @@ function placeGhost(side: Side, d: SpikeDuel) {
   // 보낸 상태는 그 틱 물리 전이므로 한 틱 더 앞으로
   const age = Math.min(EXTRAP_MAX_MS, now - m.sentTick * TICK_MS + TICK_MS) / 1000
   const pos = { x: m.pos.x + m.vel.x * age, y: m.pos.y + m.vel.y * age, z: m.pos.z + m.vel.z * age }
+  side.ghostPrev = side.ghostPos ?? pos
   side.ghostPos = pos
   side.ghostVel = m.vel
   side.ghost.setNextKinematicTranslation(pos)

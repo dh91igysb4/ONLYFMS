@@ -75,9 +75,15 @@ export function SpikeGame({ onExit }: { onExit(): void }) {
           airborneRef.current = airborne
           sp.stepSpike(d, ms, controlsFrom(keys.current, airborne, airKeys.current))
           const snap = rc.snapshot(d.me.race)
-          const g = d.me.latest && d.me.ghostPos ? { pos: d.me.ghostPos, quat: d.me.latest.quat } : null
+          // 경주는 한 틱씩 돌리므로 틱 사이 비율은 d.acc에 있다(race.acc는 늘 0)
+          const a = d.acc
+          const gp = d.me.ghostPos
+          const gq = d.me.ghostPrev ?? gp
+          const g = d.me.latest && gp && gq
+            ? { pos: { x: gq.x + (gp.x - gq.x) * a, y: gq.y + (gp.y - gq.y) * a, z: gq.z + (gp.z - gq.z) * a }, quat: d.me.latest.quat }
+            : null
           scene?.setGhost(g)
-          scene?.draw(snap, d.me.race.acc)
+          scene?.draw(snap, a)
           if (t - lastHud > 150) {
             lastHud = t
             setHud({ speed: Math.round(Math.abs(snap.car.speed) * 3.6), me: d.hits.me, bot: d.hits.bot, one: d.hits.mismatched, err: '' })
