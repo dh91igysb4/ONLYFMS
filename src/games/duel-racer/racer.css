@@ -1,0 +1,50 @@
+/* 레이싱 화면. HUD·오버레이 색은 theme.css 토큰만 쓴다.
+   캔버스 안(3D 장면)의 색은 render/의 고정색이다 (CLAUDE.md 색 예외). */
+.dr { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dr-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 82vh;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dr-canvas { display: block; width: 100%; height: 100%; }
+.dr-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--ink);
+  font-weight: 700;
+}
+.dr-time {
+  position: absolute; top: 12px; right: 16px; margin: 0;
+  font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink);
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.6);
+}
+.dr-meter { position: absolute; right: 16px; bottom: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.dr-speed { margin: 0; font-size: 40px; font-weight: 900; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px rgb(0 0 0 / 0.6); }
+.dr-speed small { font-size: 13px; font-weight: 700; margin-left: 4px; }
+.dr-nitro { display: flex; gap: 4px; }
+.dr-nitro span { width: 26px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 25%, transparent); }
+.dr-nitro span.on { background: var(--lime); }
+.dr-nitro-burn span.on { box-shadow: 0 0 8px var(--lime); }
+.dr-progress { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 20%, transparent); display: flex; align-items: flex-end; }
+.dr-progress-fill { width: 100%; border-radius: 4px; background: var(--lime); }
+.dr-countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 120px; font-weight: 900; color: var(--ink); text-shadow: 0 2px 12px rgb(0 0 0 / 0.7); pointer-events: none; }
+.dr-toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); margin: 0; padding: 6px 14px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--ink); font-weight: 800; }
+.dr-result-title { margin: 0; font-size: 18px; }
+.dr-result-time { margin: 0; font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.dr-result-best { margin: 0; font-size: 14px; font-weight: 600; }
+.dr-result-actions { display: flex; gap: 8px; }
+.dr-help { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
