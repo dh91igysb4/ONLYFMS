@@ -9,6 +9,9 @@ export const CONNECT_TIMEOUT_MS = 4000
 /** 대체 경로 보내기 상한(초당). Supabase 무료 한도 초당 100건(낚시 80건)을 넘지 않게 */
 export const RELAY_HZ = 10
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
+/** 주소 모으기를 기다리는 최대 시간(ms). 넘으면 모은 데까지 보낸다 */
+const GATHER_MAX_MS = 2000
+const log = (...a: unknown[]) => console.info('duel rtc:', ...a)
 
 export type LinkStatus = 'connecting' | 'direct' | 'relay' | 'closed'
 
@@ -43,6 +46,12 @@ export interface DataChannelLike {
 export interface RTCPeerConnectionLike {
   onicecandidate: ((e: { candidate: unknown }) => void) | null
   ondatachannel: ((e: { channel: DataChannelLike }) => void) | null
+  onicegatheringstatechange: (() => void) | null
+  onconnectionstatechange: (() => void) | null
+  readonly iceGatheringState: string
+  readonly connectionState: string
+  /** 주소 모으기가 끝난 뒤에는 후보가 모두 SDP 안에 들어 있다 */
+  readonly localDescription: unknown
   createDataChannel(label: string, opts: { ordered: boolean; maxRetransmits: number }): DataChannelLike
   createOffer(): Promise<unknown>
   createAnswer(): Promise<unknown>
@@ -63,13 +72,13 @@ export type LinkOpts = {
 }
 
 /**
- * 신호. hi: 링크마다 새 sid(새로고침하면 바뀐다). offer·answer·ice는 offer id로 짝을 맞춰, 옛 offer에 대한 답·후보를
- * 새 연결에 넣지 않는다(최종 리뷰 I4).
+ * 신호. hi: 링크마다 새 sid(새로고침하면 바뀐다). offer·answer는 offer id로 짝을 맞춰 옛 offer에 대한 답을 새 연결에
+ * 넣지 않는다(최종 리뷰 I4). 후보(ICE)는 따로 보내지 않고, 주소 모으기가 끝난 설명(SDP) 안에 담아 보낸다:
+ * 실제 브라우저 시험에서 따로 보낸 후보가 상대에 하나도 붙지 않아 연결이 바로 failed였다.
  */
 type Sig =
   | { from: 0 | 1; kind: 'hi'; sid: string }
   | { from: 0 | 1; kind: 'offer' | 'answer'; id: string; data: unknown }
-  | { from: 0 | 1; kind: 'ice'; id: string; data: unknown }
 
 type SigBody = Sig extends infer T ? (T extends Sig ? Omit<T, 'from'> : never) : never
 
@@ -98,7 +107,6 @@ export function openLink(opts: LinkOpts): RealtimeLink {
   const statusCbs = new Set<(s: LinkStatus) => void>()
   let pc: RTCPeerConnectionLike | null = null
   let dc: DataChannelLike | null = null
-  let remoteSet = false
   // 대체 경로 보내기 조절
   const gap = 1000 / RELAY_HZ
   let lastRelay = -Infinity
@@ -110,8 +118,17 @@ export function openLink(opts: LinkOpts): RealtimeLink {
   let offerId: string | null = null
   let answered = false
   let peerSid: string | null = null
-  // 아직 짝이 될 연결이 없는 후보(offer id별)
-  let earlyIce: { id: string; c: unknown }[] = []
+  // 연결이 확실히 실패했다(다시 offer를 받아도 된다)
+  let failed = false
+
+  /** 주소 모으기가 끝나기를(최대 GATHER_MAX_MS) 기다린 뒤 후보가 든 설명을 돌려준다 */
+  const gathered = (p: RTCPeerConnectionLike): Promise<unknown> =>
+    new Promise((resolve) => {
+      if (p.iceGatheringState === 'complete') return resolve(p.localDescription)
+      const done = () => { clearTimeout(t); p.onicegatheringstatechange = null; resolve(p.localDescription) }
+      const t = setTimeout(done, GATHER_MAX_MS)
+      p.onicegatheringstatechange = () => { if (p.iceGatheringState === 'complete') done() }
+    })
 
   const setStatus = (s: LinkStatus) => {
     if (status === s || status === 'closed') return
@@ -123,16 +140,17 @@ export function openLink(opts: LinkOpts): RealtimeLink {
     if (status === 'closed') return
     void channel.send({ type: 'broadcast', event: 'sig', payload: { ...msg, from: mySeat } }).catch(() => {})
   }
-  const dcOpen = () => !!dc && dc.readyState === 'open'
 
   const attach = (ch: DataChannelLike) => {
     dc = ch
     ch.binaryType = 'arraybuffer'
     ch.onmessage = (e) => { if (e.data instanceof ArrayBuffer) deliver(e.data) }
-    ch.onopen = () => { if (dc === ch) setStatus('direct') }
+    ch.onopen = () => { if (dc === ch) { log('direct open'); failed = false; setStatus('direct') } }
     ch.onclose = () => {
       if (dc !== ch) return
+      log('direct closed')
       dc = null
+      failed = true
       setStatus('relay')
       // 좌석 1은 다시 연결해 달라고 인사한다(좌석 0이 새 offer를 낸다)
       if (mySeat === 1) signal({ kind: 'hi', sid })
@@ -148,7 +166,7 @@ export function openLink(opts: LinkOpts): RealtimeLink {
     pc = null
     if (oldDc) { oldDc.onclose = null; oldDc.onopen = null; oldDc.onmessage = null; try { oldDc.close() } catch { /* ignore */ } }
     if (oldPc) { oldPc.onicecandidate = null; oldPc.ondatachannel = null; try { oldPc.close() } catch { /* ignore */ } }
-    remoteSet = false
+    failed = false
     let p: RTCPeerConnectionLike
     try {
       p = makeRtc()
@@ -159,17 +177,17 @@ export function openLink(opts: LinkOpts): RealtimeLink {
       return null
     }
     pc = p
-    p.onicecandidate = (e) => { if (e.candidate && pc === p) signal({ kind: 'ice', id: (mySeat === 0 ? offerId : peerOffer) ?? '', data: e.candidate }) }
     p.ondatachannel = (e) => { if (pc === p) attach(e.channel) }
+    p.onconnectionstatechange = () => {
+      if (pc !== p) return
+      log('connection', p.connectionState)
+      if (p.connectionState === 'failed') {
+        failed = true
+        // 좌석 1은 다시 해 보자고 인사한다(좌석 0이 새 offer)
+        if (mySeat === 1) signal({ kind: 'hi', sid })
+      }
+    }
     return p
-  }
-  // 좌석 1이 지금 답한 offer
-  let peerOffer: string | null = null
-
-  const flushIce = async (p: RTCPeerConnectionLike, id: string) => {
-    const mine = earlyIce.filter((x) => x.id === id)
-    earlyIce = earlyIce.filter((x) => x.id !== id)
-    for (const x of mine) await p.addIceCandidate(x.c).catch(() => {})
   }
 
   const offer = async () => {
@@ -182,8 +200,10 @@ export function openLink(opts: LinkOpts): RealtimeLink {
     const o = await p.createOffer()
     if (offerId !== id) return
     await p.setLocalDescription(o)
-    if (offerId !== id) return
-    signal({ kind: 'offer', id, data: o })
+    const full = await gathered(p)
+    if (offerId !== id || pc !== p) return
+    log('offer sent')
+    signal({ kind: 'offer', id, data: full })
   }
 
   const onSig = async (s: Sig) => {
@@ -191,40 +211,35 @@ export function openLink(opts: LinkOpts): RealtimeLink {
     try {
       if (s.kind === 'hi') {
         if (mySeat === 0) {
-          // 같은 상대에게 낸 offer가 답을 기다리는 중이거나 이미 이어졌으면 그대로 둔다. 새로고침한 상대(sid가 다름)나
-          // 답을 받고도 열리지 않은 연결이면 새 offer
-          if (s.sid === peerSid && (!answered || dcOpen())) return
+          // 같은 상대(sid)와 이미 진행 중이거나 이어졌으면 그대로 둔다. 새로고침한 상대(sid가 다름)나 실패한 연결만 새 offer.
+          // 열리는 데 걸리는 0.x초 동안 오는 인사로 연결을 갈아엎지 않는다
+          if (s.sid === peerSid && !failed) return
+          log('hi from seat 1, offering', s.sid === peerSid ? '(retry)' : '(new)')
           peerSid = s.sid
           await offer()
-        } else if (!dcOpen()) {
-          // 좌석 1은 연결이 열리지 않았으면 언제든 인사로 답한다(늦게 들어오거나 새로고침한 좌석 0을 위해)
+        } else if (!pc || failed) {
+          // 좌석 1은 offer를 아직 못 받았거나 연결이 실패했을 때만 인사로 답한다
           signal({ kind: 'hi', sid })
         }
       } else if (s.kind === 'offer' && mySeat === 1) {
-        peerOffer = s.id
+        log('offer received')
         const p = resetPc()
         if (!p) return
         await p.setRemoteDescription(s.data)
         if (pc !== p) return
-        remoteSet = true
-        await flushIce(p, s.id)
         const a = await p.createAnswer()
         if (pc !== p) return
         await p.setLocalDescription(a)
-        signal({ kind: 'answer', id: s.id, data: a })
+        const full = await gathered(p)
+        if (pc !== p) return
+        log('answer sent')
+        signal({ kind: 'answer', id: s.id, data: full })
       } else if (s.kind === 'answer' && mySeat === 0) {
         // 옛 offer에 대한 답은 버린다
         if (s.id !== offerId || answered || !pc) return
+        log('answer received')
         answered = true
-        const p = pc
-        await p.setRemoteDescription(s.data)
-        if (pc !== p) return
-        remoteSet = true
-        await flushIce(p, s.id)
-      } else if (s.kind === 'ice') {
-        const current = mySeat === 0 ? offerId : peerOffer
-        if (pc && remoteSet && s.id === current) await pc.addIceCandidate(s.data).catch(() => {})
-        else earlyIce.push({ id: s.id, c: s.data })
+        await pc.setRemoteDescription(s.data)
       }
     } catch (e) {
       console.warn('duel: rtc signaling failed', e)
