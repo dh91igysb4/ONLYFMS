@@ -8,6 +8,7 @@ import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './i
 import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
 import { newEcon } from './research.ts'
+import { newGallery } from './gallery.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -351,9 +352,11 @@ function migrateW(raw: unknown, from: number): WS {
 function asNoEcon(raw: unknown, m: State, from: number): State {
   if (from >= 27) return m
   expect(m.econ).toEqual(newEcon())
-  const { econ: _e, ...rest } = m
+  expect(m.gallery).toEqual(newGallery())
+  const { econ: _e, gallery: _g, ...rest } = m
   const had = (raw as { econ?: unknown } | null)?.econ
-  return (had !== undefined ? { ...rest, econ: had } : rest) as State
+  const hadG = (raw as { gallery?: unknown } | null)?.gallery
+  return { ...rest, ...(had !== undefined ? { econ: had } : {}), ...(hadG !== undefined ? { gallery: hadG } : {}) } as State
 }
 /**
  * v26 물고기 id 계약을 확인한 뒤, 옛 migrate 시험이 v25 모양 그대로 비교하도록 되돌린다:
@@ -402,7 +405,7 @@ describe('fishing WorldLogic', () => {
   it('init and version', () => {
     expect(logic.version).toBe(27)
     expect(logic.init()).toEqual({
-      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(),
+      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(), gallery: newGallery(),
     })
   })
 
@@ -868,7 +871,7 @@ describe('fishing WorldLogic', () => {
 
   it('migrate fills missing fields and keeps gold/dex', () => {
     const m = migrateW({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
-    const { nextFishId: _n, econ: _e, ...init0 } = logic.init()
+    const { nextFishId: _n, econ: _e, gallery: _g, ...init0 } = logic.init()
     expect(m).toEqual({ ...init0, gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
     expect(logic.migrate(null, 1)).toEqual(logic.init())
     expect(logic.migrate('x', 1)).toEqual(logic.init())
@@ -2062,7 +2065,7 @@ describe('v14 지갑 계약', () => {
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
     const legacyBag = rest.bag.map((f, i) => ({ ...f, id: i + 1, origin: 'legacy' }))
-    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon() })
+    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon(), gallery: newGallery() })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)

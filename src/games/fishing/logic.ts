@@ -19,6 +19,10 @@ import {
   ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, LICENSE_PRICE, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
   type BaitKind, type Econ,
 } from './research.ts'
+import {
+  ACTIVE_CAP_MS, CALM_ALT, DONATE_NEED, EXPANSIONS, GOLD_BUDGET, GOLD_PCT, LUCK_RARE, MAT_AREAS, MAT_MAX, POTION_IDS, POTION_MAX_MS, POTION_MS, POTIONS, SPECIAL_IDS,
+  drainPotions, exhibitFee, expansionMats, extractYield, hasMats as hasAreaMats, minusMats as minusAreaMats, newGallery, potionOn, stageB, type Gallery, type MatArea, type PotionId,
+} from './gallery.ts'
 
 export type Catch = { species: string; sizeCm: number; biteDelayMs: number }
 export type CastCtx = {
@@ -132,9 +136,9 @@ export function sellPrice(f: { species: string; sizeCm: number; perfect: boolean
 }
 
 /** 개체 판매가(P1): 연구로 다시 잡은 전설·신화(origin recatch)는 round(판매가 × 50%). 판매·버리기 요금·화면 예상가가 쓴다 */
-export function fishSellPrice(f: { species: string; sizeCm: number; perfect: boolean; origin?: FishOrigin }, buffs: readonly BuffId[] = []): number {
+export function fishSellPrice(f: { species: string; sizeCm: number; perfect: boolean; origin?: FishOrigin; bonus?: number }, buffs: readonly BuffId[] = []): number {
   const p = sellPrice(f, buffs)
-  return f.origin === 'recatch' ? Math.round((p * RECATCH_SALE_PCT) / 100) : p
+  return (f.origin === 'recatch' ? Math.round((p * RECATCH_SALE_PCT) / 100) : p) + (f.bonus ?? 0)
 }
 
 export function price(speciesId: string, sizeCm: number, perfect: boolean): number {
@@ -212,7 +216,16 @@ export const FISH_ORIGINS: readonly FishOrigin[] = ['legacy', 'first', 'normal',
  * id: 세이브 안에서 유일한 양의 정수(v26). 화면이 행동에 함께 보내 스테일 화면이 다른 개체를 건드리지 않게 한다.
  * locked: 가방에서 잠근 물고기. "전부 팔기"에서 빠진다. 잠기지 않았으면 필드가 없다.
  */
-export type Fish = { id: number; origin: FishOrigin; species: string; sizeCm: number; perfect: boolean; locked?: true }
+export type Fish = {
+  id: number
+  origin: FishOrigin
+  species: string
+  sizeCm: number
+  perfect: boolean
+  locked?: true
+  /** 금전 포션이 잡을 때 붙인 판매 보너스(G, v27). 감쇠 전에 더한다 */
+  bonus?: number
+}
 export type Pending = {
   species: string
   sizeCm: number
@@ -273,6 +286,8 @@ export type State = {
   nextFishId: number
   /** 경제 P1(v27): 어분·미끼·연구 해금·대상별 연구 보장 카운터 */
   econ: Econ
+  /** 경제 P2(v27): 기증·전시·지역 재료·포션·전시관 확장 */
+  gallery: Gallery
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
 export type DiscardAt = 'bag' | 'trash'
@@ -282,6 +297,12 @@ export type Action =
   | { type: 'grind'; items: { index: number; id?: number }[] }
   | { type: 'makeBait'; kind: BaitKind; price: number }
   | { type: 'buyLicense'; price: number }
+  // 경제 P2(v27, 플래그 exhibit·alchemy): 재포획 기증, 영구 전시, 지역 재료 추출, 포션 만들어 마시기, 전시관 확장
+  | { type: 'donate'; index: number; id?: number }
+  | { type: 'exhibit'; species: string; price: number }
+  | { type: 'extract'; items: { index: number; id?: number }[] }
+  | { type: 'brew'; potion: PotionId; price: number; alt?: boolean }
+  | { type: 'expand'; stage: number; price: number }
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
   | { type: 'sell' }
@@ -350,7 +371,7 @@ export const newIsle = (layout: IsleLayoutId): IsleState => ({
   house: 0, furniture: {}, placed: [], decoBox: {}, deco: [],
 })
 // econ은 v27 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 newEcon()으로 본다.
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId' | 'econ'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; econ?: Econ; gold: number }
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId' | 'econ' | 'gallery'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; econ?: Econ; gallery?: Gallery; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -390,6 +411,7 @@ const init = (): State => ({
   pending: null,
   nextFishId: 1,
   econ: newEcon(),
+  gallery: newGallery(),
 })
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -422,7 +444,7 @@ function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
     legends: state.legends,
     equipped: state.equipped,
     buffs: state.buffs ?? [],
-    ...(bait === 'attractor' ? { rareMult: ATTRACTOR_RARE } : {}),
+    ...rareMultOf(state, bait),
     ...(target ? { research: { target, chance: researchChance(target, state.econ.pity[target] ?? 0, state.equipped.includes('curious')) } } : {}),
   })
   const pending: Pending = { ...c, startedAt: ctx.now, hookedAt: null, area: area.id, spot, cond, power: a.power, ...(bait ? { bait } : {}), ...(target ? { target } : {}) }
@@ -435,6 +457,12 @@ function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
         pity: target ? { ...state.econ.pity, [target]: (state.econ.pity[target] ?? 0) + 1 } : state.econ.pity,
       }
   return { state: { ...state, pending, econ }, result: pendingView(pending) }
+}
+
+/** 일반 rare 가중치 배율: 집어 미끼 ×1.2, 행운 포션 ×1.2(곱해 ×1.44). 1이면 넣지 않는다 */
+function rareMultOf(state: State, bait: BaitKind | undefined): { rareMult?: number } {
+  const m = (bait === 'attractor' ? ATTRACTOR_RARE : 1) * (featureOn('alchemy') && potionOn(state.gallery, 'luck') ? LUCK_RARE : 1)
+  return m === 1 ? {} : { rareMult: m }
 }
 
 /** cast의 미끼(P1): 없으면 맨 낚시. 거절(플래그 꺼짐·미끼 없음·자격 없음)이면 미끼를 쓰지 않는다 */
@@ -485,11 +513,13 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
   const p = state.pending
   if (!p) return { error: 'no_pending' }
   if (typeof a.success !== 'boolean' || typeof a.perfect !== 'boolean') return { error: 'bad_action' }
-  if (!a.success) return { state: { ...state, pending: null }, result: { caught: null } }
+  // 포션 활동 시간(§6.3 잠정): 투척에서 거두기까지, 한 번에 최대 ACTIVE_CAP_MS
+  const gallery0 = { ...state.gallery, potions: drainPotions(state.gallery.potions, Math.max(0, Math.min(ACTIVE_CAP_MS, now - p.startedAt))) }
+  if (!a.success) return { state: { ...state, pending: null, gallery: gallery0 }, result: { caught: null } }
   if (p.hookedAt == null) return { error: 'not_hooked' }
   if (now < p.hookedAt + MIN_FIGHT_MS) return { error: 'too_early' }
   // 서버 싸움 시간 검사(§6.1): 너무 늦은 성공은 놓친 것, 늦은 퍼펙트는 일반 포획
-  if (now > p.hookedAt + MAX_FIGHT_MS) return { state: { ...state, pending: null }, result: { caught: null, rejected: 'fight_time' } }
+  if (now > p.hookedAt + MAX_FIGHT_MS) return { state: { ...state, pending: null, gallery: gallery0 }, result: { caught: null, rejected: 'fight_time' } }
   const perfect = a.perfect && now <= p.hookedAt + PERFECT_MAX_MS
   const isLegend = !!speciesById(p.species).legend
   // 연구 낚시로 대상을 잡았으면 recatch(판매가 50%), 대상 보장 카운터는 0. 놓치면(위 success false) 카운터 유지
@@ -502,6 +532,15 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     sizeCm: p.sizeCm,
     perfect,
     ...(isLegend ? { locked: true as const } : {}),
+  }
+  // 금전 포션(이 투척 동안 켜져 있었으면): 일반 개체에 판매가 15% 보너스, 남은 예산까지
+  let gallery = gallery0
+  if (!isLegend && featureOn('alchemy') && potionOn(state.gallery, 'gold') && state.gallery.goldBudget > 0) {
+    const bonus = Math.min(state.gallery.goldBudget, Math.round((fishSellPrice(fish, state.buffs ?? []) * GOLD_PCT) / 100))
+    if (bonus > 0) {
+      fish.bonus = bonus
+      gallery = { ...gallery, goldBudget: state.gallery.goldBudget - bonus }
+    }
   }
   const prev = state.dex[p.species]
   const dex = {
@@ -519,7 +558,7 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     econ = { ...state.econ, pity }
   }
   return {
-    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null, econ },
+    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null, econ, gallery },
     result: {
       caught: fish,
       ...(judged.completed.length > 0 ? { completed: judged.completed } : {}),
@@ -811,7 +850,8 @@ function migrate(raw: unknown, fromVersion: number): State {
         // v25 이하 개체는 모두 legacy. id는 아래 numberFish가 붙인다(v26부터는 저장된 id·origin을 먼저 살린다)
         const origin: FishOrigin = fromVersion >= FISH_ID_VERSION && FISH_ORIGINS.includes(f.origin as FishOrigin) ? (f.origin as FishOrigin) : 'legacy'
         const id = fromVersion >= FISH_ID_VERSION && isNum(f.id) ? f.id : 0
-        out.push({ id, origin, species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}) })
+        const bonus = fromVersion >= 27 && isNum(f.bonus) && Number.isInteger(f.bonus) && f.bonus > 0 ? f.bonus : 0
+        out.push({ id, origin, species: f.species, sizeCm: f.sizeCm, perfect: f.perfect, ...(locked ? { locked: true as const } : {}), ...(bonus ? { bonus } : {}) })
       }
     }
     return out
@@ -885,7 +925,23 @@ function migrate(raw: unknown, fromVersion: number): State {
     pending: migratePending(raw.pending, fromVersion),
     nextFishId: numbered.nextFishId,
     econ: fromVersion >= ECON_VERSION ? migrateEcon(raw.econ, legends) : newEcon(),
+    gallery: fromVersion >= ECON_VERSION ? migrateGallery(raw.gallery, legends) : newGallery(),
   }
+}
+
+/** v27 gallery: 알려진 칸만. 전시·기증은 발견한 13종만, 재료·시간·예산은 범위 안 정수 */
+function migrateGallery(raw: unknown, legends: readonly string[]): Gallery {
+  const base = newGallery()
+  if (!isObj(raw)) return base
+  const int = (v: unknown, max: number) => (isNum(v) && Number.isInteger(v) && v > 0 ? Math.min(v, max) : 0)
+  const exhibits = Array.isArray(raw.exhibits) ? [...new Set(raw.exhibits.filter((id): id is string => typeof id === 'string' && SPECIAL_IDS.includes(id) && legends.includes(id)))] : []
+  const donated: Gallery['donated'] = {}
+  if (isObj(raw.donated)) for (const [id, n] of Object.entries(raw.donated)) if (SPECIAL_IDS.includes(id) && legends.includes(id) && !exhibits.includes(id) && int(n, DONATE_NEED) > 0) donated[id] = int(n, DONATE_NEED)
+  const mats: Gallery['mats'] = {}
+  if (isObj(raw.mats)) for (const a of MAT_AREAS) if (int(raw.mats[a], MAT_MAX) > 0) mats[a as MatArea] = int(raw.mats[a], MAT_MAX)
+  const potions: Gallery['potions'] = {}
+  if (isObj(raw.potions)) for (const id of POTION_IDS) if (int(raw.potions[id], POTION_MAX_MS) > 0) potions[id] = int(raw.potions[id], POTION_MAX_MS)
+  return { donated, exhibits, mats, potions, goldBudget: int(raw.goldBudget, 2 * GOLD_BUDGET), expansions: int(raw.expansions, EXPANSIONS.length) }
 }
 
 /** 경제 P1이 생긴 버전 */
@@ -1080,7 +1136,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 26: 물고기 id·출처(Fish.id·origin, nextFishId). v25 이하 개체는 legacy, 가방 → 냉장고 순서로 1부터. 행동은 id를 받으면 확인
   //     (경제 설계 2026-11-27-fishing-economy-design.md §4.2). 판매가·확률은 그대로
   // 27: 서버 싸움 시간 검사(챈 뒤 180초 넘은 성공은 놓침, 12초 넘은 퍼펙트는 일반), 경제 P1(econ: 어분·미끼·연구 해금·대상별 보장, cast의 bait·target, grind·makeBait·buyLicense, recatch 판매가 50%)과
-  //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종). 새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
+  //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종), 경제 P2(gallery: 기증·전시·재료·포션·확장, Fish.bonus).
+  //     새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
   version: 27,
   wallet: true,
   init,
@@ -1331,6 +1388,97 @@ function buyLicense(state: State, a: Record<string, unknown>, gold: number): Out
   return { state: { ...state, econ: { ...state.econ, license: true } }, gold: -LICENSE_PRICE }
 }
 
+/** 재포획 기증(P2, 플래그 exhibit): 연구로 다시 잡은 전설·신화 1마리를 그 어종 전시 준비에 귀속(되팔 수 없다) */
+function donate(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('exhibit')) return { error: 'feature_off' }
+  if (!validIndex(a.index, state.bag.length)) return { error: 'bad_action' }
+  const f = state.bag[a.index]
+  if (!sameId(a.id, f)) return { error: 'bag_changed' }
+  if (f.origin !== 'recatch') return { error: 'not_recatch' }
+  const g = state.gallery
+  if (g.exhibits.includes(f.species)) return { error: 'exhibited' }
+  const n = g.donated[f.species] ?? 0
+  if (n >= DONATE_NEED) return { error: 'donated_full' }
+  const i = a.index
+  return {
+    state: { ...state, bag: state.bag.filter((_, j) => j !== i), gallery: { ...g, donated: { ...g.donated, [f.species]: n + 1 } } },
+    result: { donated: n + 1 },
+  }
+}
+
+/** 영구 전시(P2): 최초 발견 + 기증 2마리 + 전시료(전설 10만·신화 25만) */
+function exhibit(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!featureOn('exhibit')) return { error: 'feature_off' }
+  if (typeof a.species !== 'string' || !SPECIAL_IDS.includes(a.species)) return { error: 'bad_action' }
+  const id = a.species
+  const g = state.gallery
+  if (g.exhibits.includes(id)) return { error: 'exhibited' }
+  if (!state.legends.includes(id)) return { error: 'not_discovered' }
+  if ((g.donated[id] ?? 0) < DONATE_NEED) return { error: 'need_donation' }
+  const fee = exhibitFee(id)!
+  if (a.price !== fee) return { error: 'price_changed' }
+  if (gold < fee) return { error: 'not_enough_gold' }
+  const { [id]: _d, ...donated } = g.donated
+  return { state: { ...state, gallery: { ...g, donated, exhibits: [...g.exhibits, id] } }, gold: -fee }
+}
+
+/** 지역 재료 추출(P2, 플래그 alchemy, 첫 신화 전시 뒤): 일반 물고기 → 그 지역 재료 1·2·3 */
+function extract(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('alchemy')) return { error: 'feature_off' }
+  if (!stageB(state.gallery)) return { error: 'need_mythic_exhibit' }
+  if (!Array.isArray(a.items) || a.items.length === 0 || a.items.length > state.bag.length) return { error: 'bad_action' }
+  const picked = new Set<number>()
+  const mats: Gallery['mats'] = { ...state.gallery.mats }
+  for (const it of a.items as unknown[]) {
+    if (!isObj(it) || !validIndex(it.index, state.bag.length) || picked.has(it.index)) return { error: 'bad_action' }
+    const f = state.bag[it.index]
+    if (!sameId(it.id, f)) return { error: 'bag_changed' }
+    if (f.locked) return { error: 'locked' }
+    const y = extractYield(f.species)
+    if (!y) return { error: 'not_ordinary' }
+    if ((mats[y.area] ?? 0) + y.n > MAT_MAX) return { error: 'mats_full' }
+    mats[y.area] = (mats[y.area] ?? 0) + y.n
+    picked.add(it.index)
+  }
+  return { state: { ...state, bag: state.bag.filter((_, j) => !picked.has(j)), gallery: { ...state.gallery, mats } }, result: { mats } }
+}
+
+/** 포션 만들어 바로 마시기(P2, B단계 1병 10분): 같은 포션은 시간만 늘어 최대 20분 */
+function brew(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!featureOn('alchemy')) return { error: 'feature_off' }
+  if (!stageB(state.gallery)) return { error: 'need_mythic_exhibit' }
+  if (typeof a.potion !== 'string' || !POTION_IDS.includes(a.potion as PotionId)) return { error: 'bad_action' }
+  const id = a.potion as PotionId
+  if (a.alt !== undefined && (a.alt !== true || id !== 'calm')) return { error: 'bad_action' }
+  const r = a.alt === true ? CALM_ALT : POTIONS[id]
+  if (a.price !== r.gold) return { error: 'price_changed' }
+  const g = state.gallery
+  if ((g.potions[id] ?? 0) + POTION_MS > POTION_MAX_MS) return { error: 'potion_full' }
+  if (!hasAreaMats(g.mats, r.mats)) return { error: 'not_enough_mats' }
+  if (gold < r.gold) return { error: 'not_enough_gold' }
+  return {
+    state: {
+      ...state,
+      gallery: { ...g, mats: minusAreaMats(g.mats, r.mats), potions: { ...g.potions, [id]: (g.potions[id] ?? 0) + POTION_MS }, goldBudget: g.goldBudget + (id === 'gold' ? GOLD_BUDGET : 0) },
+    },
+    gold: -r.gold,
+  }
+}
+
+/** 전시관 확장(P2, r4 가격): 첫 신화 전시 뒤, 앞 단계 다음. 6지역 재료를 그 단계 양만큼 */
+function expand(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!featureOn('exhibit')) return { error: 'feature_off' }
+  if (!stageB(state.gallery)) return { error: 'need_mythic_exhibit' }
+  const g = state.gallery
+  if (a.stage !== g.expansions + 1 || g.expansions >= EXPANSIONS.length) return { error: 'bad_tier' }
+  const e = EXPANSIONS[g.expansions]
+  if (a.price !== e.gold) return { error: 'price_changed' }
+  const need = expansionMats(g.expansions + 1)
+  if (!hasAreaMats(g.mats, need)) return { error: 'not_enough_mats' }
+  if (gold < e.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, gallery: { ...g, mats: minusAreaMats(g.mats, need), expansions: g.expansions + 1 } }, gold: -e.gold }
+}
+
 function applyAction(state: State, action: unknown, ctx: Ctx): Out {
   if (!isObj(action)) return { error: 'bad_action' }
   switch (action.type) {
@@ -1398,6 +1546,16 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return makeBait(state, action, ctx.gold)
     case 'buyLicense':
       return buyLicense(state, action, ctx.gold)
+    case 'donate':
+      return donate(state, action)
+    case 'exhibit':
+      return exhibit(state, action, ctx.gold)
+    case 'extract':
+      return extract(state, action)
+    case 'brew':
+      return brew(state, action, ctx.gold)
+    case 'expand':
+      return expand(state, action, ctx.gold)
     default:
       return { error: 'bad_action' }
   }

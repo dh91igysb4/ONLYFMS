@@ -8,7 +8,7 @@ const err = (r: unknown) => (r as { error?: string }).error
 
 describe('경제 P1 플래그 꺼짐', () => {
   it('운영 기본값은 모두 꺼짐(실수로 켠 채 머지 방지)', () => {
-    expect(ECONOMY_FLAGS).toEqual({ bait: false, research: false })
+    expect(ECONOMY_FLAGS).toEqual({ bait: false, research: false, exhibit: false, alchemy: false })
   })
   it('grind·makeBait·buyLicense·미끼 투척은 feature_off, 맨 낚시는 그대로', () => {
     const s: State = { ...logic.init(), rodTier: 3, legends: ['grouper'], econ: { ...newEcon(), meal: 5, license: true, baits: { attractor: 1, legend: 1, mythic: 0 } }, bag: [{ id: 1, origin: 'normal', species: 'anchovy', sizeCm: 10, perfect: false }], nextFishId: 2 }
@@ -17,6 +17,9 @@ describe('경제 P1 플래그 꺼짐', () => {
     expect(err(logic.apply(s, { type: 'buyLicense', price: 50_000 } as never, ctx))).toBe('feature_off')
     expect(err(logic.apply(s, { type: 'cast', area: 'village', spot: 'shore', power: 0.5, bait: 'attractor' } as never, ctx))).toBe('feature_off')
     expect(err(logic.apply(s, { type: 'cast', area: 'village', spot: 'pier', power: 0.95, bait: 'legend', target: 'grouper' } as never, ctx))).toBe('feature_off')
+    for (const a of [{ type: 'donate', index: 0 }, { type: 'exhibit', species: 'grouper', price: 100_000 }, { type: 'extract', items: [{ index: 0 }] }, { type: 'brew', potion: 'luck', price: 6000 }, { type: 'expand', stage: 1, price: 90_000 }]) {
+      expect(err(logic.apply(s, a as never, ctx)), a.type).toBe('feature_off')
+    }
     expect(err(logic.apply(s, { type: 'cast', area: 'village', spot: 'shore', power: 0.5 } as never, ctx))).toBeUndefined()
   })
 })
