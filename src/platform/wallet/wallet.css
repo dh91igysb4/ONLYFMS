@@ -52,6 +52,10 @@
 /* 대전 판돈 (지갑 4단계, 설계 §9): 대국 만들기 입력, 대국·결과의 판돈 */
 .stake-picker { display: flex; flex-direction: column; gap: 6px; }
 .stake-label { font-weight: 600; }
+/* 대국 만들기 FM 양식 안(StakePicker): 왼쪽 이름 칸 + 오른쪽 입력 묶음 */
+.fm-form-row.stake-picker { display: grid; align-items: start; }
+.fm-form-row > .stake-label { padding-top: 8px; font-weight: 400; }
+.stake-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stake-presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .stake-chip { min-height: 36px; padding: 6px 10px; font-variant-numeric: tabular-nums; }
 .stake-chip.is-on { color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-edge); }

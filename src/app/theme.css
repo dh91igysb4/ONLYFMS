@@ -319,6 +319,7 @@ select.input { padding-right: 8px; }
 .fm-panel-head a:hover { color: var(--ink); }
 .fm-panel-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .fm-empty { margin: 0; padding: 12px; color: var(--muted); font-size: 14px; }
+.fm-panel > .form-error { margin: 0; padding: 8px 12px; }
 
 .fm-row {
   display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; box-sizing: border-box;
