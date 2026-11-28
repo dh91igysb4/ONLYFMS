@@ -32,7 +32,7 @@ function stepWith(race: Race, opp: Opponent, tick: number) {
 
 test('ghost body is the car box enlarged by GHOST_MARGIN', () => {
   const { opp } = setup()
-  const he = opp.collider.halfExtents()
+  const he = opp.collider.halfExtents()!
   expect(he.x).toBeCloseTo(CAR_HALF.x + GHOST_MARGIN)
   expect(he.z).toBeCloseTo(CAR_HALF.z + GHOST_MARGIN)
   expect(opp.collider.isSensor()).toBe(true)
