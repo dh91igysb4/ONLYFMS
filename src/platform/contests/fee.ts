@@ -32,8 +32,8 @@ export function feePresets(balance: number | null): number[] {
 /** 입력한 참가비의 문제(없으면 null). 잔액을 모르면 잔액 검사는 서버에 맡긴다 */
 export function feeProblem(fee: number | null, balance: number | null): string | null {
   if (fee === null || fee < 0) return '참가비를 다시 적어 주세요'
-  if (fee > FEE_MAX) return `참가비는 ${FEE_MAX.toLocaleString('ko-KR')} G까지예요`
-  if (balance !== null && fee > balance) return '골드가 부족해요'
+  if (fee > FEE_MAX) return `참가비는 ${FEE_MAX.toLocaleString('ko-KR')} JWD까지예요`
+  if (balance !== null && fee > balance) return 'JWD가 부족해요'
   return null
 }
 

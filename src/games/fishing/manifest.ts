@@ -14,7 +14,7 @@ export const manifest: Manifest = {
   preview: true,
   avatar: { label: '낚시꾼' },
   records: [
-    { key: 'total_earned', label: '누적 수익', unit: 'G' },
+    { key: 'total_earned', label: '누적 수익', unit: 'JWD' },
     { key: 'biggest', label: '최대어', unit: 'cm' },
     { key: 'dex', label: '도감', unit: '종' },
     { key: 'challenges', label: '도전과제', unit: '개' },

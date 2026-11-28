@@ -1,4 +1,4 @@
-// 내 골드 잔액 저장소 (설계 docs/superpowers/specs/2026-11-23-wallet-design.md §5.5). React 없음.
+// 보유 잔액 저장소 (설계 docs/superpowers/specs/2026-11-23-wallet-design.md §5.5). React 없음.
 // 채우는 길: 앱 로드 때 my_wallet(), world 응답의 최상위 gold, 자유 플레이·대전·대회 뒤 my_wallet().
 // 실시간 구독은 하지 않는다.
 

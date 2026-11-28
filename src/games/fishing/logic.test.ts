@@ -2074,7 +2074,7 @@ describe('v14 지갑 계약', () => {
 })
 
 // ---------------------------------------------------------------- 도전과제 보너스 (지갑 설계 §7.5)
-describe('freeBonus: 깬 도전과제의 미니게임 골드 보너스', () => {
+describe('freeBonus: 깬 도전과제의 미니게임 JWD 보너스', () => {
   const done = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, { progress: 9, done: true }]))
   it('지역마다 하나, 10 단위, 합 400(×5)', () => {
     expect(CHALLENGES.map((c) => c.area)).toEqual(FISHING_AREAS.map((a) => a.id))

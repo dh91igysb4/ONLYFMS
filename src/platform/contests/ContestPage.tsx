@@ -292,7 +292,7 @@ export function ContestPage() {
           ) : (
             <>
               <button className="btn btn-primary" disabled={joining || short} onClick={() => setConfirmJoin(true)}>{joinLabel}</button>
-              {short && <p className="form-error">골드가 부족해요 · 내 골드 {formatGold(balance ?? 0)}</p>}
+              {short && <p className="form-error">JWD가 부족해요 · 보유 {formatGold(balance ?? 0)}</p>}
             </>
           )
         ) : (

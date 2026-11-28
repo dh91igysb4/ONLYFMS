@@ -108,7 +108,7 @@ describe('신화의 힘(버프) 화면', () => {
     const bag: Fish[] = [{ id: 903, origin: 'normal' as const, species: 'anchovy', sizeCm: 8, perfect: false }, { id: 904, origin: 'normal' as const, species: 'goby', sizeCm: 13, perfect: true }, { id: 905, origin: 'normal' as const, species: 'grouper', sizeCm: 100, perfect: false }]
     const total = bag.reduce((n, f) => n + sellPrice(f, ['dragon-pearl']), 0)
     render(<ShopPanel view={makeView({ bag, buffs: ['dragon-pearl'] })} busy={false} onSell={noop} onBuy={noop} onBuyBag={noop} onBuyTackle={noop} />)
-    expect(screen.getByText(new RegExp(`예상 ${total.toLocaleString('ko-KR')} G`))).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`예상 ${total.toLocaleString('ko-KR')} JWD`))).toBeInTheDocument()
     expect(total).toBeGreaterThan(bag.reduce((n, f) => n + sellPrice(f), 0))
   })
   it('팔레트 대비: 모든 팔레트에서 --ink 위 --bg 글자 대비 4.5:1 이상(신화 배지)', () => {

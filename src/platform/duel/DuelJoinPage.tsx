@@ -71,9 +71,9 @@ export function DuelJoinPage() {
         <p className="card-title">판돈 {formatGold(confirmStake)}를 걸고 참가할까요?</p>
         <p className="muted">
           이기면 {formatGold(confirmStake * 2)}를 받아요 · 비기거나 무효면 돌려받아요
-          {balance !== null && ` · 내 골드 ${formatGold(balance)}`}
+          {balance !== null && ` · 보유 ${formatGold(balance)}`}
         </p>
-        {short && <p className="form-error">골드가 부족해요</p>}
+        {short && <p className="form-error">JWD가 부족해요</p>}
         {confirmError && <p className="form-error" role="alert">{confirmError}</p>}
         <div className="card-actions">
           <button

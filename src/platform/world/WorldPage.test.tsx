@@ -88,7 +88,7 @@ test('hidden world shows only to admins', () => {
   expect(screen.queryByText('fake:hidden-world')).toBeNull()
 })
 
-const CAP_TEXT = '오늘 골드 상한을 넘어 일부만 들어왔어요 (+800 G / +1,000 G)'
+const CAP_TEXT = '오늘 JWD 상한을 넘어 일부만 들어왔어요 (+800 JWD / +1,000 JWD)'
 
 test('world 응답에 gold_capped가 있으면 상한 알림을 3초 보여 준다', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })

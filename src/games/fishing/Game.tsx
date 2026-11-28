@@ -232,7 +232,7 @@ const isLegend = (id: string) => !!SPECIES.find((s) => s.id === id)?.legend
 const isMythic = (id: string) => SPECIES.find((s) => s.id === id)?.rarity === 'mythic'
 /** 화면용 가격(실제로 팔리는 값, 버프 포함): 모르는 어종이면 null(price는 모르는 id에 throw한다) */
 const safePrice = (f: Fish, buffs: readonly BuffId[] = []): number | null => (SPECIES.some((s) => s.id === f.species) ? fishSellPrice(f, buffs) : null)
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 // 결과를 모르는 실패: 오류 화면 없이 view를 다시 불러와 맞춘다.
 const SILENT_CODES = new Set(['network', 'no_pending'])
 
@@ -243,7 +243,7 @@ const NEED_ROD_TIER = Math.min(...Object.values(UNLOCKS).flatMap((u) => (u?.minR
 const NEED_ROD = `${rodAtLeast(NEED_ROD_TIER)}이 있어야 해요`
 const FISHING_MESSAGES: Record<string, string> = {
   bag_empty: '팔 물고기가 없어요',
-  not_enough_gold: '골드가 부족해요',
+  not_enough_gold: 'JWD가 부족해요',
   price_changed: '가격이 바뀌었어요. 새로고침한 뒤 다시 해 주세요',
   bag_changed: '가방이 바뀌었어요. 다시 골라 주세요',
   fridge_full: '냉장고가 가득 찼어요',

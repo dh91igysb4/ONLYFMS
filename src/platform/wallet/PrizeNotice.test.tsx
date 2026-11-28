@@ -25,7 +25,7 @@ test('상금 하나: 게임 이름·등수·금액과 보기 링크', () => {
   const box = screen.getByRole('status')
   expect(box.textContent).toContain('데일리 상금이 들어왔어요')
   expect(box.textContent).toContain('테스트 숫자 맞히기 1등')
-  expect(box.textContent).toContain('+6,150 G')
+  expect(box.textContent).toContain('+6,150 JWD')
   expect(screen.getByRole('link', { name: '보기' }).getAttribute('href')).toBe('/contests/c5')
 })
 
@@ -52,14 +52,14 @@ test('여러 건: 건수와 합계, 보기 링크 없음', () => {
   mount()
   const box = screen.getByRole('status')
   expect(box.textContent).toContain('상금이 들어왔어요 · 2건')
-  expect(box.textContent).toContain('+11,270 G')
+  expect(box.textContent).toContain('+11,270 JWD')
   expect(screen.queryByRole('link', { name: '보기' })).toBeNull()
 })
 
 test('대회 상금(5단계)은 문구가 다르다, 게임 없음', () => {
   setPrizes([prize(3, { reason: 'contest_prize', gameId: null, amount: 1800 })])
   mount()
-  expect(screen.getByRole('status').textContent).toContain('대회 상금이 들어왔어요 · 1등 +1,800 G')
+  expect(screen.getByRole('status').textContent).toContain('대회 상금이 들어왔어요 · 1등 +1,800 JWD')
 })
 
 test('이미 확인한 상금·빈 목록 → 아무것도 그리지 않는다', () => {

@@ -31,8 +31,8 @@ export function stakePresets(balance: number | null): number[] {
 /** 입력한 판돈의 문제(없으면 null). 잔액을 모르면 잔액 검사는 서버에 맡긴다 */
 export function stakeProblem(stake: number | null, balance: number | null): string | null {
   if (stake === null || stake < 0) return '판돈을 다시 적어 주세요'
-  if (stake > STAKE_MAX) return `판돈은 ${STAKE_MAX.toLocaleString('ko-KR')} G까지예요`
-  if (balance !== null && stake > balance) return '골드가 부족해요'
+  if (stake > STAKE_MAX) return `판돈은 ${STAKE_MAX.toLocaleString('ko-KR')} JWD까지예요`
+  if (balance !== null && stake > balance) return 'JWD가 부족해요'
   return null
 }
 

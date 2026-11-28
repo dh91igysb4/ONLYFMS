@@ -245,7 +245,7 @@ test('경로가 바뀐 뒤 조회가 실패하면 조용히 이전 배지를 유
 
 test('로드 때 my_wallet을 한 번 읽고 헤더에 잔액을 보여 준다', async () => {
   mount()
-  expect(await screen.findByLabelText('지갑 1,234 G')).toBeTruthy()
+  expect(await screen.findByLabelText('지갑 1,234 JWD')).toBeTruthy()
   expect(fetchMyWallet).toHaveBeenCalledTimes(1)
 })
 
@@ -281,7 +281,7 @@ test('받은 상금이 있으면 헤더 아래 상금 알림 (지갑 3단계)', 
     return w
   })
   mount()
-  expect((await screen.findByRole('status')).textContent).toContain('데일리 상금이 들어왔어요 · 1등 +6,150 G')
+  expect((await screen.findByRole('status')).textContent).toContain('데일리 상금이 들어왔어요 · 1등 +6,150 JWD')
 })
 
 test('지갑 게임이 없으면 상금 알림도 없다', async () => {

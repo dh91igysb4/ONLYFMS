@@ -37,7 +37,7 @@ describe('buildHallOfFame', () => {
       { handle: 'kane', text: '48.5cm', detail: '참돔', avatar: 'AV' },
       { handle: 'son', text: '40cm', detail: '농어', avatar: null },
     ])
-    expect(hof.records.find((b) => b.key === 'total_earned')!.rows[0].text).toBe('12,345G')
+    expect(hof.records.find((b) => b.key === 'total_earned')!.rows[0].text).toBe('12,345 JWD')
     expect(hof.records.find((b) => b.key === 'dex')!.rows).toEqual([])
   })
 

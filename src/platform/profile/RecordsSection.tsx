@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { duels, games, worlds } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { withUnit } from '../wallet/format.ts'
 
 type Row = { game_id: string; key: string; value: number; detail: string | null }
 
@@ -51,7 +52,7 @@ export function RecordsSection({ handle }: { handle: string }) {
                 <li key={r.key} className="fm-row">
                   <span className="fm-row-main">{r.label}</span>
                   <span className="fm-row-value rec-value">
-                    {row ? `${row.value.toLocaleString('ko-KR')}${r.unit ?? ''}${row.detail ? ` (${row.detail})` : ''}` : '–'}
+                    {row ? `${withUnit(row.value.toLocaleString('ko-KR'), r.unit)}${row.detail ? ` (${row.detail})` : ''}` : '–'}
                   </span>
                 </li>
               )

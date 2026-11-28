@@ -52,8 +52,8 @@ describe('FridgePanel', () => {
     setup({ bag: [fish], fridge: [big], buffs: ['dragon-pearl'] })
     const p = sellPrice(fish, ['dragon-pearl']).toLocaleString('ko-KR')
     const q = sellPrice(big, ['dragon-pearl']).toLocaleString('ko-KR')
-    expect(screen.getByRole('button', { name: `고등어 30cm 넣기, 예상 ${p} G` })).toHaveTextContent(`${p} G`)
-    expect(screen.getByRole('button', { name: `고등어 500cm 꺼내기, 예상 ${q} G` })).toHaveTextContent(`${q} G`)
+    expect(screen.getByRole('button', { name: `고등어 30cm 넣기, 예상 ${p} JWD` })).toHaveTextContent(`${p} JWD`)
+    expect(screen.getByRole('button', { name: `고등어 500cm 꺼내기, 예상 ${q} JWD` })).toHaveTextContent(`${q} JWD`)
   })
   test('모르는 어종이면 가격을 보이지 않는다', () => {
     setup({ bag: [{ ...mk(30), species: 'no-such-fish' }] })

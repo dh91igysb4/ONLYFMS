@@ -9,7 +9,7 @@ import './wallet.css'
 const LIMIT = 50
 
 export const REASON_LABEL: Record<LedgerReason, string> = {
-  migrate: '옛 골드 이전',
+  migrate: '옛 JWD 이전',
   world: '게임 안',
   free: '자유 플레이',
   daily_prize: '데일리 상금',
@@ -98,7 +98,7 @@ export function AdminGoldSection() {
 
   return (
     <section className="stack" aria-labelledby="admin-gold-title">
-      <h3 className="section-title" id="admin-gold-title">골드</h3>
+      <h3 className="section-title" id="admin-gold-title">JWD</h3>
       <form className="card admin-gold-form" onSubmit={submit}>
         <label>
           아이디

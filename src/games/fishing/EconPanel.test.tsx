@@ -38,7 +38,7 @@ describe('EconSection', () => {
     const on = econ(makeView({ gold: 120, econ: { ...newEcon(), meal: 10 } }))
     const max = screen.getByRole('button', { name: '집어 미끼 최대 2개 만들기' })
     expect(max.textContent).toContain('최대 2개')
-    expect(screen.getByText(/2개 · 100 G \+ 어분 2/)).toBeTruthy()
+    expect(screen.getByText(/2개 · 100 JWD \+ 어분 2/)).toBeTruthy()
     fireEvent.click(max)
     expect(on.onMake).toHaveBeenCalledWith('attractor', 2)
   })
@@ -63,7 +63,7 @@ describe('EconSection', () => {
   test('자동 어분이 켜져 있으면 기준을 보여 주고 끄기 → onAutoMeal(null)', () => {
     const on = econ(makeView({ econ: { ...newEcon(), autoMeal: 30 } }))
     const box = screen.getByRole('group', { name: '자동 어분' })
-    expect(box.textContent).toContain('30 G 이하')
+    expect(box.textContent).toContain('30 JWD 이하')
     expect((within(box).getByRole('spinbutton') as HTMLInputElement).value).toBe('30')
     fireEvent.click(within(box).getByRole('button', { name: '끄기' }))
     expect(on.onAutoMeal).toHaveBeenCalledWith(null)

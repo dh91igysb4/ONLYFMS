@@ -186,6 +186,6 @@ test('cancel_live_contest_requires_confirm', async () => {
 
 test('골드 섹션: 최근 장부를 읽는다', async () => {
   renderPage()
-  expect(await screen.findByRole('heading', { name: '골드' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'JWD' })).toBeTruthy()
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('admin_gold_ledger', { p_limit: 50 }))
 })

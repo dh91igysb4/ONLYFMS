@@ -50,7 +50,7 @@ export function WorldPage() {
       <Component key={game} gameId={game} onOpenGames={() => navigate('/games')} />
       {capped && (
         <p className="wallet-cap-toast" role="status">
-          오늘 골드 상한을 넘어 일부만 들어왔어요 (+{formatGold(capped.got)} / +{formatGold(capped.asked)})
+          오늘 JWD 상한을 넘어 일부만 들어왔어요 (+{formatGold(capped.got)} / +{formatGold(capped.asked)})
         </p>
       )}
     </div>

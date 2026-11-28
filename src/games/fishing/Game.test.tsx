@@ -292,7 +292,7 @@ describe('fishing Game', () => {
   test('loads and shows gold and bag count', async () => {
     await mount(makeView({ gold: 12345, bag: [{ id: 901, origin: 'normal' as const, species: 'anchovy', sizeCm: 10, perfect: false }] }))
     expect(worldMock).toHaveBeenCalledWith({ game: 'fishing', action: 'load' })
-    expect(screen.getByText('12,345 G')).toBeInTheDocument()
+    expect(screen.getByText('12,345 JWD')).toBeInTheDocument()
     expect(screen.getByText('1/20')).toBeInTheDocument()
   })
 
@@ -305,7 +305,7 @@ describe('fishing Game', () => {
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
     await flush()
     expect(calls('load')).toHaveLength(2)
-    expect(screen.getByText('7 G')).toBeInTheDocument()
+    expect(screen.getByText('7 JWD')).toBeInTheDocument()
   })
 
   test('press-release sends cast with power in [0,1]', async () => {
@@ -377,7 +377,7 @@ describe('fishing Game', () => {
     expect(sent[0].payload.success).toBe(true)
     expect(screen.getByText('새로운 물고기!')).toBeInTheDocument()
     expect(screen.getByText(/고등어 40cm/)).toBeInTheDocument()
-    expect(screen.getByText(`${price('mackerel', 40, sent[0].payload.perfect).toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(screen.getByText(`${price('mackerel', 40, sent[0].payload.perfect).toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
     await advance(1300)
     expect(screen.queryByText('새로운 물고기!')).not.toBeInTheDocument()
   })
@@ -432,8 +432,8 @@ describe('fishing Game', () => {
     fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
     await flush()
     expect(calls('sell')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'sell' } }])
-    expect(screen.getByText('1,600 G')).toBeInTheDocument()
-    expect(screen.getByText('1,500 G어치를 팔았어요')).toBeInTheDocument()
+    expect(screen.getByText('1,600 JWD')).toBeInTheDocument()
+    expect(screen.getByText('1,500 JWD어치를 팔았어요')).toBeInTheDocument()
     expect(screen.getByText('0/20')).toBeInTheDocument()
   })
 
@@ -445,8 +445,8 @@ describe('fishing Game', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '전부 팔기' }))
     await flush()
-    expect(screen.getByText('40,000 G어치를 팔았어요 · 오늘 상한으로 1,600 G만 들어왔어요')).toBeInTheDocument()
-    expect(screen.getByText('1,700 G')).toBeInTheDocument()
+    expect(screen.getByText('40,000 JWD어치를 팔았어요 · 오늘 상한으로 1,600 JWD만 들어왔어요')).toBeInTheDocument()
+    expect(screen.getByText('1,700 JWD')).toBeInTheDocument()
     expect(screen.queryByText(/벌었어요/)).toBeNull()
   })
 
@@ -475,7 +475,7 @@ describe('fishing Game', () => {
     const p = price('anchovy', 10, false)
     const { unmount } = await mountAtShop(makeView({ bag: [anchovy, anchovy], sold: { day: kstDay(Date.now()), n: 149 } }))
     expect(screen.getByText('오늘 판 물고기 149마리 · 지금 판매가 100%')).toBeInTheDocument()
-    expect(screen.getByText(`팔 물고기 2마리 · 예상 ${(p + Math.round(p / 2)).toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(screen.getByText(`팔 물고기 2마리 · 예상 ${(p + Math.round(p / 2)).toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
     unmount()
     // 어제 판 기록·옛 서버 응답(sold 없음)은 0마리
     await mountAtShop(makeView({ bag: [anchovy], sold: { day: '2000-01-01', n: 999 } }))
@@ -487,11 +487,11 @@ describe('fishing Game', () => {
     const grouper = { id: 910, origin: 'normal' as const, species: 'grouper', sizeCm: 120, perfect: false, locked: true as const }
     const { unmount } = await mountAtShop(makeView({ bag: [anchovy, grouper] }))
     const value = price('anchovy', 10, false).toLocaleString('ko-KR')
-    expect(screen.getByText(`팔 물고기 1마리 · 잠금 1마리 · 예상 ${value} G`)).toBeInTheDocument()
+    expect(screen.getByText(`팔 물고기 1마리 · 잠금 1마리 · 예상 ${value} JWD`)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '전부 팔기' })).toBeEnabled()
     unmount()
     await mountAtShop(makeView({ bag: [grouper] }))
-    expect(screen.getByText('팔 물고기 0마리 · 잠금 1마리 · 예상 0 G')).toBeInTheDocument()
+    expect(screen.getByText('팔 물고기 0마리 · 잠금 1마리 · 예상 0 JWD')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '전부 팔기' })).toBeDisabled()
   })
 
@@ -499,7 +499,7 @@ describe('fishing Game', () => {
     const { unmount } = await mountAtShop(makeView({ gold: 1000 }))
     const rods = screen.getByRole('list', { name: '낚싯대 목록' })
     expect(within(rods).getByRole('button', { name: '구매' })).toBeDisabled()
-    expect(within(rods).getByText('골드가 부족해요')).toBeInTheDocument()
+    expect(within(rods).getByText('JWD가 부족해요')).toBeInTheDocument()
     expect(within(rods).getAllByText('이전 단계를 먼저 사야 해요')).toHaveLength(4)
     // 5단계(백골)는 난파선 앞바다를 연다, 6단계(용왕)는 고급 장비: 신화 말고는 없어도 모든 물고기를 낚는다
     expect(within(rods).getAllByText('난파선 앞바다(원양 어선)를 열 수 있어요')).toHaveLength(1)
@@ -514,7 +514,7 @@ describe('fishing Game', () => {
     fireEvent.click(buy)
     await flush()
     expect(calls('buyRod')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyRod', tier: 2, price: 1500 } }])
-    expect(screen.getByText('500 G')).toBeInTheDocument()
+    expect(screen.getByText('500 JWD')).toBeInTheDocument()
   })
 
   test('shop: a not_enough_gold failure on buy shows the Korean message', async () => {
@@ -523,7 +523,7 @@ describe('fishing Game', () => {
     route({ buyRod: () => Promise.reject(new ApiError('not_enough_gold', 400)), load: () => ok(rich) })
     fireEvent.click(screen.getByRole('button', { name: '구매' }))
     await flush()
-    expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+    expect(screen.getByRole('alert')).toHaveTextContent('JWD가 부족해요')
   })
 
   test('shop shows the top-tier message when the best rod is owned', async () => {
@@ -652,7 +652,7 @@ describe('fishing Game', () => {
     await flush()
     await flush()
     expect(calls('load')).toHaveLength(2)
-    expect(screen.getByText('999 G')).toBeInTheDocument()
+    expect(screen.getByText('999 JWD')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
     // idle로 돌아와 다시 던질 수 있다
@@ -675,7 +675,7 @@ describe('fishing Game', () => {
     await flush()
     await flush()
     expect(calls('load')).toHaveLength(2)
-    expect(screen.getByText('42 G')).toBeInTheDocument()
+    expect(screen.getByText('42 JWD')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
   })
 
@@ -1683,7 +1683,7 @@ describe('fishing Game: walking and interaction', () => {
     const bags = screen.getByRole('list', { name: '가방 목록' })
     const buy = within(bags).getByRole('button', { name: '30칸 가방 구매' })
     expect(buy).toBeEnabled()
-    expect(within(bags).getByText('800 G')).toBeInTheDocument()
+    expect(within(bags).getByText('800 JWD')).toBeInTheDocument()
     fireEvent.click(buy)
     await flush()
     expect(calls('buyBag')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyBag', tier: 2, price: 800 } }])
@@ -1697,7 +1697,7 @@ describe('fishing Game: walking and interaction', () => {
     const shoes = screen.getByRole('list', { name: '신발 목록' })
     for (const t of ['기본 장화', '운동화', '러닝화', '재원이의 군화']) expect(within(shoes).getByText(t)).toBeInTheDocument()
     expect(within(shoes).getByText('걷기 ×1.25')).toBeInTheDocument()
-    expect(within(shoes).getByText('30,000 G')).toBeInTheDocument()
+    expect(within(shoes).getByText('30,000 JWD')).toBeInTheDocument()
     expect(within(shoes).getByText('사용 중')).toBeInTheDocument()
     const buy = within(shoes).getByRole('button', { name: '운동화 구매' })
     expect(buy).toBeEnabled()
@@ -1707,7 +1707,7 @@ describe('fishing Game: walking and interaction', () => {
     expect(calls('buyShoes')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyShoes', tier: 2, price: 1000 } }])
   })
 
-  test('shop: 신발은 1 G 모자라면 꺼지고, 최고 단계면 그렇게 알린다', async () => {
+  test('shop: 신발은 1 JWD 모자라면 꺼지고, 최고 단계면 그렇게 알린다', async () => {
     const { unmount } = await mountAtShop(makeView({ gold: 999 }))
     expect(within(screen.getByRole('list', { name: '신발 목록' })).getByRole('button', { name: '운동화 구매' })).toBeDisabled()
     unmount()
@@ -1719,7 +1719,7 @@ describe('fishing Game: walking and interaction', () => {
     const { unmount } = await mountAtShop(makeView({ gold: 799 }))
     const bags = screen.getByRole('list', { name: '가방 목록' })
     expect(within(bags).getByRole('button', { name: '30칸 가방 구매' })).toBeDisabled()
-    expect(within(bags).getByText('골드가 부족해요')).toBeInTheDocument()
+    expect(within(bags).getByText('JWD가 부족해요')).toBeInTheDocument()
     unmount()
 
     await mountAtShop(makeView({ gold: 99999, bagTier: 5, rodTier: 1 }))
@@ -2043,24 +2043,24 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     await advance(300)
   }
 
-  test('잠긴 다리 앞: 안내는 살펴보기, 행동 → 해금 창(무너진 다리 수리 · 5,000 G · 보유 골드); 골드가 모자라면 열기 비활성·문구', async () => {
+  test('잠긴 다리 앞: 안내는 살펴보기, 행동 → 해금 창(무너진 다리 수리 · 5,000 JWD · 보유 골드); 골드가 모자라면 열기 비활성·문구', async () => {
     const { unmount } = await mount(makeView({ gold: 4999, areas: BASE }), AT_BRIDGE)
     await advance(50)
     expect(screen.getByText('방향키로 이동 · 스페이스로 살펴보기')).toBeInTheDocument()
     await interact()
     const panel = unlockPanel()
     expect(within(panel).getByText('무너진 다리 수리')).toBeInTheDocument()
-    expect(within(panel).getByText('5,000 G')).toBeInTheDocument()
-    expect(within(panel).getByText('보유 4,999 G')).toBeInTheDocument()
+    expect(within(panel).getByText('5,000 JWD')).toBeInTheDocument()
+    expect(within(panel).getByText('보유 4,999 JWD')).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '열기' })).toBeDisabled()
-    expect(within(panel).getByText('골드가 모자라요')).toBeInTheDocument()
+    expect(within(panel).getByText('JWD가 모자라요')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '산 호수' })).toBeInTheDocument()
     unmount()
 
     await mount(makeView({ gold: 5000, areas: BASE }), AT_BRIDGE)
     await interact()
     expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeEnabled()
-    expect(within(unlockPanel()).queryByText('골드가 모자라요')).not.toBeInTheDocument()
+    expect(within(unlockPanel()).queryByText('JWD가 모자라요')).not.toBeInTheDocument()
   })
 
   test('터치: 잠긴 다리 앞 행동 버튼은 살펴보기, 선착장 앞은 배 타기', async () => {
@@ -2090,7 +2090,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(calls('unlockArea')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'unlockArea', area: 'lake', price: 5000 } }])
     expect(screen.queryByRole('region', { name: '지역 열기' })).not.toBeInTheDocument()
     expect(screen.getByText('산 호수 가는 다리를 고쳤어요')).toBeInTheDocument()
-    expect(screen.getByText('1,000 G')).toBeInTheDocument()
+    expect(screen.getByText('1,000 JWD')).toBeInTheDocument()
     key('ArrowUp', true)
     await advance(1200)
     key('ArrowUp', false)
@@ -2122,7 +2122,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
     await flush()
     expect(unlockPanel()).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+    expect(screen.getByRole('alert')).toHaveTextContent('JWD가 부족해요')
   })
 
   test('already_open(다른 기기에서 이미 엶) → 창이 닫히고 알림, view를 다시 불러와 다리를 지나갈 수 있다', async () => {
@@ -2141,7 +2141,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(screen.getByText('이미 열려 있어요')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(calls('load')).toHaveLength(loadsBefore + 1)
-    expect(screen.getByText('1,000 G')).toBeInTheDocument()
+    expect(screen.getByText('1,000 JWD')).toBeInTheDocument()
     key('ArrowUp', true)
     await advance(1200)
     key('ArrowUp', false)
@@ -2199,7 +2199,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     await mount(view, { area: 'forest', pos: tileCenter(gate.front.tx, gate.front.ty), facing: gate.front.facing })
     await interact()
     expect(within(unlockPanel()).getByText('동굴 장비')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('15,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('15,000 JWD')).toBeInTheDocument()
     route({ unlockArea: () => ok({ ...view, gold: 5000, areas: [...BASE, 'cave'] }) })
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
     await flush()
@@ -2221,7 +2221,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     await interact()
     expect(screen.getByRole('heading', { name: '갯벌' })).toBeInTheDocument()
     expect(within(unlockPanel()).getByText('갯벌 장화')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('30,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('30,000 JWD')).toBeInTheDocument()
     route({ unlockArea: () => ok({ ...view, gold: 5000, areas: [...BASE, 'tideflat'] }) })
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
     await flush()
@@ -2240,7 +2240,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     const { unmount } = await mount(makeView({ gold: 131999, areas: BASE }), at)
     await interact()
     expect(within(unlockPanel()).getByText('늪 나무 데크')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('132,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('132,000 JWD')).toBeInTheDocument()
     expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeDisabled()
     unmount()
     const view = makeView({ gold: 132000, areas: BASE })
@@ -2259,7 +2259,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     await interact()
     expect(screen.getByRole('heading', { name: '산정 호수' })).toBeInTheDocument()
     expect(within(unlockPanel()).getByText('등산 장비')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('264,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('264,000 JWD')).toBeInTheDocument()
     expect(within(unlockPanel()).queryByText(/낚싯대 이상/)).not.toBeInTheDocument()
     route({ unlockArea: () => ok({ ...view, gold: 10000, areas: [...BASE, 'lake', 'summit'] }) })
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
@@ -2280,7 +2280,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     await interact()
     expect(screen.getByRole('heading', { name: '난파선 앞바다' })).toBeInTheDocument()
     expect(within(unlockPanel()).getByText('원양 어선')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('330,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('330,000 JWD')).toBeInTheDocument()
     expect(within(unlockPanel()).getByText('백골 낚싯대 이상이 있어야 나갈 수 있어요')).toBeInTheDocument()
     expect(within(unlockPanel()).getByRole('button', { name: '열기' })).toBeDisabled()
     unmount()
@@ -2308,7 +2308,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     expect(screen.getByText('백골 낚싯대 이상이 있어야 해요')).toBeInTheDocument()
   })
 
-  test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 G); 사면 알림, 다시 행동하면 배를 탄다', async () => {
+  test('마을 선착장, 섬 잠김 → 배 구매 창(배 · 50,000 JWD); 사면 알림, 다시 행동하면 배를 탄다', async () => {
     const view = makeView({ gold: 132000, areas: BASE })
     await mount(view, AT_VILLAGE_DOCK)
     await advance(50)
@@ -2317,7 +2317,7 @@ describe('fishing Game: 지역 해금·배 타기', () => {
     fireEvent.click(within(boatPanel()).getByRole('button', { name: '섬' }))
     await advance(300)
     expect(within(unlockPanel()).getByText('배')).toBeInTheDocument()
-    expect(within(unlockPanel()).getByText('50,000 G')).toBeInTheDocument()
+    expect(within(unlockPanel()).getByText('50,000 JWD')).toBeInTheDocument()
     expect(lastScene().map.id).toBe('village')
     route({ unlockArea: () => ok({ ...view, gold: 10000, areas: [...BASE, 'island'] }) })
     fireEvent.click(within(unlockPanel()).getByRole('button', { name: '열기' }))
@@ -2439,7 +2439,7 @@ describe('찌 상점·장비', () => {
     fireEvent.click(within(list).getByRole('button', { name: '코르크 찌 사기' }))
     await flush()
     expect(calls('buyTackle')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyTackle', id: 'cork' } }])
-    expect(screen.getByText('200 G')).toBeInTheDocument()
+    expect(screen.getByText('200 JWD')).toBeInTheDocument()
   })
 
   test('상점: 낚싯대 단계 2면 카본 낚싯대부터 낄 수 있다는 안내', async () => {
@@ -2478,7 +2478,7 @@ describe('찌 상점·장비', () => {
     cleanup()
     await mountAtShop(view)
     const value = price('anchovy', 10, false).toLocaleString('ko-KR')
-    expect(screen.getByText(`팔 물고기 2마리 · 예상 ${value} G`)).toBeInTheDocument()
+    expect(screen.getByText(`팔 물고기 2마리 · 예상 ${value} JWD`)).toBeInTheDocument()
     cleanup()
     render(<DexPanel view={view} />)
     expect(screen.getByRole('region', { name: '도감' })).toBeInTheDocument()
@@ -2584,11 +2584,11 @@ describe('도전과제·순간이동기', () => {
     expect(items[1]).toHaveTextContent('완료 · 순간이동기 켜짐')
     expect(items[2]).toHaveTextContent('0/3')
     expect(within(panel).getByText('깬 과제 1/10')).toBeInTheDocument()
-    // 도전과제 보너스(지갑 설계 §7.5): 과제마다 미니게임 골드 +N%, 지금 배율(강 20% → ×1.2)
-    expect(items[0]).toHaveTextContent('미니게임 골드 +20%')
-    expect(items[4]).toHaveTextContent('미니게임 골드 +60%')
-    expect(items[9]).toHaveTextContent('미니게임 골드 +80%')
-    expect(within(panel).getByText('지금 미니게임 골드 ×1.2')).toBeInTheDocument()
+    // 도전과제 보너스(지갑 설계 §7.5): 과제마다 미니게임 JWD +N%, 지금 배율(강 20% → ×1.2)
+    expect(items[0]).toHaveTextContent('미니게임 JWD +20%')
+    expect(items[4]).toHaveTextContent('미니게임 JWD +60%')
+    expect(items[9]).toHaveTextContent('미니게임 JWD +80%')
+    expect(within(panel).getByText('지금 미니게임 JWD ×1.2')).toBeInTheDocument()
   })
 
   test('잡은 결과에 completed가 있으면 완료 알림', async () => {
@@ -2638,9 +2638,9 @@ describe('도전과제·순간이동기', () => {
     // 강과 마을회관(과제 없이 켜짐, v18)
     expect(rows).toHaveLength(2)
     const river = rows.find((r) => r.textContent?.includes('마을 강'))!
-    expect(river).toHaveTextContent(`${fee} G`)
+    expect(river).toHaveTextContent(`${fee} JWD`)
     expect(rows.some((r) => r.textContent?.includes('마을회관'))).toBe(true)
-    expect(within(panel).getByText('보유 500 G')).toBeInTheDocument()
+    expect(within(panel).getByText('보유 500 JWD')).toBeInTheDocument()
     route({ teleport: () => ok({ ...view, gold: 500 - fee }, { from: 'village', to: 'river', fee }) })
     fireEvent.click(within(panel).getByRole('button', { name: '마을 강 이동' }))
     await flush()
@@ -2657,7 +2657,7 @@ describe('도전과제·순간이동기', () => {
     expect(lastScene().player.pos).toEqual(tileCenter(front.tx, front.ty))
     expect(lastScene().player.facing).toBe(front.facing)
     expect(savedPos()).toEqual({ area: 'river', pos: tileCenter(front.tx, front.ty), facing: front.facing })
-    expect(screen.getByText(`${(500 - fee).toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(screen.getByText(`${(500 - fee).toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
     await interact()
     expect(screen.queryByRole('region', { name: '순간이동기' })).not.toBeInTheDocument()
   })
@@ -2668,7 +2668,7 @@ describe('도전과제·순간이동기', () => {
     await advance(50)
     await interact()
     expect(within(tpPanel()).getByRole('button', { name: '마을 강 이동' })).toBeDisabled()
-    expect(within(tpPanel()).getByText('골드가 모자라요')).toBeInTheDocument()
+    expect(within(tpPanel()).getByText('JWD가 모자라요')).toBeInTheDocument()
     unmount()
 
     await mount(makeView({ gold: 9999, areas: BASE, challenges: { 'pier-perfect': DONE, 'river-rain': DONE } }), AT_VILLAGE_TP)
@@ -2875,7 +2875,7 @@ describe('옷장', () => {
     fireEvent.click(screen.getByRole('button', { name: '남색 야구모자 사기' }))
     await flush()
     expect(calls('buyWear')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'buyWear', slot: 'hat', id: 'cap' } }])
-    expect(screen.getByText('4,000 G', { selector: '.fish-gold' })).toBeInTheDocument()
+    expect(screen.getByText('4,000 JWD', { selector: '.fish-gold' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '모자 없음 입기' }))
     await flush()
     expect(calls('wear')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'wear', slot: 'hat', id: 'none' } }])
@@ -3090,7 +3090,7 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     expect(lastTick().show).toBe('b:mackerel:40:0')
     const me = tagOf(container, 'u1')!
     expect(me.querySelector('.fish-peer-name')?.textContent).toBe('kane')
-    expect(me.querySelector('.fish-peer-card')?.textContent).toBe(`고등어 40cm · ${price('mackerel', 40, false).toLocaleString('ko-KR')} G · 흔함`)
+    expect(me.querySelector('.fish-peer-card')?.textContent).toBe(`고등어 40cm · ${price('mackerel', 40, false).toLocaleString('ko-KR')} JWD · 흔함`)
     await advance(6100)
     expect(lastScene().holding ?? null).toBeNull()
     expect(lastTick().show).toBeUndefined()
@@ -3169,11 +3169,11 @@ describe('fishing Game: 자랑·이모트·버리기 (설계 2026-11-25-fishing-
     expect(within(bagRegion()).getByRole('button', { name: /고등어 30cm/ })).toBeDisabled()
     fireEvent.click(within(bagRegion()).getByRole('button', { name: /고등어 40cm/ }))
     const trashFee = discardFee(mack, [], 'trash')
-    expect(within(bagRegion()).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G · 쓰레기통에 버리면 ${trashFee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(within(bagRegion()).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} JWD · 쓰레기통에 버리면 ${trashFee.toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
     fireEvent.click(within(bagRegion()).getByRole('button', { name: '버리기 확인' }))
     await flush()
     expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, id: 918, species: 'mackerel', sizeCm: 40 }], fee, at: 'bag' } }])
-    expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(screen.getByText(`버렸어요 · 환경부담금 ${fee.toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
   })
 })
 
@@ -3182,7 +3182,7 @@ describe('여러 마리 버리기 (v21)', () => {
   const fish = (species: string, sizeCm: number, extra: Partial<Fish> = {}): Fish => ({ id: ++fid, origin: 'normal', species, sizeCm, perfect: false, ...extra })
   const bag = [fish('mackerel', 40), fish('anchovy', 12), fish('mackerel', 30, { locked: true }), fish('goby', 15)]
   const region = () => screen.getByRole('region', { name: '가방' })
-  const won = (n: number) => `${n.toLocaleString('ko-KR')} G`
+  const won = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
   test('두 마리를 골라 확인 한 번 → discardMany 한 번, 합계 요금, 다시 누르면 선택 해제', async () => {
     const view = makeView({ gold: 10000, bag })
     await mount(view, SAND)
@@ -3278,7 +3278,7 @@ describe('마을회관 냉장고·쓰레기통 (v18)', () => {
     const bin = screen.getByRole('region', { name: '가방' })
     expect(screen.getByRole('heading', { name: '쓰레기통' })).toBeInTheDocument()
     fireEvent.click(within(bin).getByRole('button', { name: /고등어 40cm 버리기/ }))
-    expect(within(bin).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} G`)).toBeInTheDocument()
+    expect(within(bin).getByText(`고등어 40cm 버리기 · 환경부담금 ${fee.toLocaleString('ko-KR')} JWD`)).toBeInTheDocument()
     fireEvent.click(within(bin).getByRole('button', { name: '버리기 확인' }))
     await flush()
     expect(calls('discardMany')).toEqual([{ game: 'fishing', action: 'act', payload: { type: 'discardMany', items: [{ index: 0, id: 920, species: 'mackerel', sizeCm: 40 }], fee, at: 'trash' } }])

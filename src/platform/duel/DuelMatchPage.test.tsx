@@ -450,23 +450,23 @@ test('match_stake_badge_and_waiting_note', async () => {
   rpcMock.mockResolvedValue('abcde12345')
   renderAt()
   await flush()
-  expect(screen.getByText('판돈 1,000 G')).toBeInTheDocument()
-  expect(screen.getByText(/판돈 1,000 G를 맡겼어요/)).toBeInTheDocument()
+  expect(screen.getByText('판돈 1,000 JWD')).toBeInTheDocument()
+  expect(screen.getByText(/판돈 1,000 JWD를 맡겼어요/)).toBeInTheDocument()
 })
 
-test('match_stake_result: win shows +2,000 G and refreshes wallet', async () => {
+test('match_stake_result: win shows +2,000 JWD and refreshes wallet', async () => {
   current = ended({ winner: 0, end_reason: 'normal' })
   renderAt()
   await flush()
-  expect(screen.getByText('+2,000 G')).toBeInTheDocument()
+  expect(screen.getByText('+2,000 JWD')).toBeInTheDocument()
   expect(refreshMock).toHaveBeenCalledTimes(1)
 })
 
-test('match_stake_result: loss shows −1,000 G', async () => {
+test('match_stake_result: loss shows −1,000 JWD', async () => {
   current = ended({ winner: 1, end_reason: 'timeout' })
   renderAt()
   await flush()
-  expect(screen.getByText('−1,000 G')).toBeInTheDocument()
+  expect(screen.getByText('−1,000 JWD')).toBeInTheDocument()
 })
 
 test('match_stake_result: draw and void refund', async () => {
@@ -490,7 +490,7 @@ test('match_stake_rematch_keeps_stake', async () => {
     if (b.action === 'view') return current
     throw new Error(b.action)
   })
-  fireEvent.click(screen.getByRole('button', { name: '재대결 (판돈 1,000 G)' }))
+  fireEvent.click(screen.getByRole('button', { name: '재대결 (판돈 1,000 JWD)' }))
   await flush()
   expect((calls('create')[0][0] as { stake: number }).stake).toBe(1000)
 })
@@ -501,5 +501,5 @@ test('match_stake_result: uses server ledger amounts when present', async () => 
   renderAt()
   await flush()
   expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
-  expect(screen.queryByText('−1,000 G')).toBeNull()
+  expect(screen.queryByText('−1,000 JWD')).toBeNull()
 })

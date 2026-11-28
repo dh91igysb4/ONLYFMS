@@ -3,6 +3,7 @@
 import { rpc } from '../../lib/api.ts'
 import { duels, games, worlds } from '../../games/index.ts'
 import { formatFreeScore } from '../games/score.ts'
+import { withUnit } from '../wallet/format.ts'
 
 export type FameRow = { handle: string; text: string; detail: string | null; avatar: string | null }
 export type FameBoard = { gameId: string; group: 'record' | 'free' | 'duel'; key: string; title: string; label: string; rows: FameRow[] }
@@ -32,7 +33,7 @@ export function buildHallOfFame(raw: unknown, isAdmin: boolean): HallOfFame {
     (w.manifest.records ?? []).map((r) => ({
       gameId: w.manifest.id, group: 'record' as const, key: r.key, title: w.manifest.name, label: r.label,
       rows: recs.filter((x) => x.game_id === w.manifest.id && x.key === r.key && num(x.value) !== null)
-        .map((x) => row(x, `${num(x.value)!.toLocaleString('ko-KR')}${r.unit ?? ''}`, str(x.detail))),
+        .map((x) => row(x, withUnit(num(x.value)!.toLocaleString('ko-KR'), r.unit), str(x.detail))),
     })),
   )
 

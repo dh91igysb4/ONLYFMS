@@ -28,7 +28,7 @@ const MARK_HALF = 14
 const YOU_HALF = 9
 const ICON_SCALE = 2
 const CHECK_MS = 1000
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 const areaName = (id: AreaId) => AREAS.find((a) => a.id === id)?.name ?? id
 const spotName = (s: string) => SPOT_NAMES[s] ?? s
 /** 썰물 구간 글("2~6시·14~18시") */

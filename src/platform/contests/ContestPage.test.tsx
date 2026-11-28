@@ -300,9 +300,9 @@ test('ended_daily_shows_prize_column_and_my_prize', async () => {
     { user_id: 'u2', handle: 'son', amount: 5120, note: '2등' },
   ]])
   renderAt()
-  expect(await screen.findByText('내 상금 +6,150 G (1등)')).toBeInTheDocument()
+  expect(await screen.findByText('내 상금 +6,150 JWD (1등)')).toBeInTheDocument()
   expect(screen.getByRole('columnheader', { name: '상금' })).toBeInTheDocument()
-  expect(screen.getByText('+5,120 G')).toBeInTheDocument()
+  expect(screen.getByText('+5,120 JWD')).toBeInTheDocument()
   expect(calls).toContain('contest_prizes')
   expect(calls).not.toContain('my_wallet')
 })
@@ -311,7 +311,7 @@ test('ended_daily_without_prizes_settles_once_then_reloads', async () => {
   dataMock.getContest.mockResolvedValue(endedDaily())
   setupPrizes([[], [{ user_id: 'u1', handle: 'kane', amount: 6150, note: '1등' }]])
   renderAt()
-  expect(await screen.findByText('내 상금 +6,150 G (1등)')).toBeInTheDocument()
+  expect(await screen.findByText('내 상금 +6,150 JWD (1등)')).toBeInTheDocument()
   expect(calls.filter((c) => c === 'my_wallet')).toHaveLength(1)
   expect(calls.filter((c) => c === 'contest_prizes')).toHaveLength(2)
 })
@@ -377,24 +377,24 @@ test('참가비 대회 대기실: 참가비·모인 돈, 확인 뒤 "참가비 N
   dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
   setup({ entries: ['u9', 'u2'] })
   renderAt()
-  expect(await screen.findByText(/모인 돈/)).toHaveTextContent('참가비 1,000 G · 모인 돈 2,000 G')
-  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  expect(await screen.findByText(/모인 돈/)).toHaveTextContent('참가비 1,000 JWD · 모인 돈 2,000 JWD')
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 JWD 내고 참가' }))
   // 첫 클릭은 확인 단계
-  expect(screen.getByText(/참가비 1,000 G를 내고 참가할까요/)).toBeInTheDocument()
+  expect(screen.getByText(/참가비 1,000 JWD를 내고 참가할까요/)).toBeInTheDocument()
   expect(calls).not.toContain('join_contest')
-  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 JWD 내고 참가' }))
   await vi.waitFor(() => expect(rpcMock).toHaveBeenCalledWith('join_contest', { p_id: 'c1', p_entry_fee: 1000 }))
-  await vi.waitFor(() => expect(screen.getByText(/모인 돈/)).toHaveTextContent('모인 돈 3,000 G'))
+  await vi.waitFor(() => expect(screen.getByText(/모인 돈/)).toHaveTextContent('모인 돈 3,000 JWD'))
   expect(calls).toContain('my_wallet') // 참가 뒤 잔액 다시 읽기
 })
 
-test('잔액이 참가비보다 적으면 참가 버튼이 막히고 "골드가 부족해요"', async () => {
+test('잔액이 참가비보다 적으면 참가 버튼이 막히고 "JWD가 부족해요"', async () => {
   setBalance(500)
   dataMock.getContest.mockResolvedValue(contest({ entry_fee: 1000 }))
   setup({ entries: ['u9'] })
   renderAt()
-  expect(await screen.findByRole('button', { name: '참가비 1,000 G 내고 참가' })).toBeDisabled()
-  expect(screen.getByText(/골드가 부족해요/)).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '참가비 1,000 JWD 내고 참가' })).toBeDisabled()
+  expect(screen.getByText(/JWD가 부족해요/)).toBeInTheDocument()
 })
 
 test('진행 중인 공개 참가비 대회는 자동 참가하지 않고 버튼을 보인다', async () => {
@@ -403,7 +403,7 @@ test('진행 중인 공개 참가비 대회는 자동 참가하지 않고 버튼
   )
   setup({ entries: [] })
   renderAt()
-  expect(await screen.findByRole('button', { name: '참가비 500 G 내고 참가' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '참가비 500 JWD 내고 참가' })).toBeInTheDocument()
   await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
   expect(calls).not.toContain('join_contest')
 })
@@ -419,8 +419,8 @@ test('fee_mismatch면 대회를 다시 읽고 안내한다', async () => {
     return null
   })
   renderAt()
-  fireEvent.click(await screen.findByRole('button', { name: '참가비 1,000 G 내고 참가' }))
-  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 G 내고 참가' }))
+  fireEvent.click(await screen.findByRole('button', { name: '참가비 1,000 JWD 내고 참가' }))
+  fireEvent.click(screen.getByRole('button', { name: '참가비 1,000 JWD 내고 참가' }))
   expect(await screen.findByText('참가비를 다시 확인해 주세요')).toBeInTheDocument()
   await vi.waitFor(() => expect(dataMock.getContest.mock.calls.length).toBeGreaterThan(1))
 })
@@ -439,7 +439,7 @@ test('취소된 참가비 대회에 참가했으면 "참가비를 돌려받았�
   setup({ entries: ['u1'] })
   renderAt()
   expect(await screen.findByText('참가비를 돌려받았어요')).toBeInTheDocument()
-  expect(document.querySelector('.contest-fee')).toHaveTextContent('참가비 1,000 G')
+  expect(document.querySelector('.contest-fee')).toHaveTextContent('참가비 1,000 JWD')
   expect(screen.queryByText(/모인 돈/)).toBeNull()
 })
 
@@ -482,7 +482,7 @@ test('문제 화면에서 참가비 대회에 바로 들어오면(fee_mismatch) 
     return name === 'lb_contest' ? [] : null
   })
   renderAt('/contests/c1/1')
-  expect(await screen.findByRole('button', { name: '참가비 500 G 내고 참가' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: '참가비 500 JWD 내고 참가' })).toBeInTheDocument()
   expect(playMock).not.toHaveBeenCalled()
 })
 
@@ -492,8 +492,8 @@ test('끝난 참가비 대회: 모인 돈·상금 열·내 상금, 정산 전이
     { user_id: 'u1', handle: 'kane', amount: 2000, note: '1등' },
   ]])
   renderAt()
-  expect(await screen.findByText('내 상금 +2,000 G (1등)')).toBeInTheDocument()
-  expect(screen.getByText(/모인 돈/)).toHaveTextContent('참가비 1,000 G · 모인 돈 2,000 G')
+  expect(await screen.findByText('내 상금 +2,000 JWD (1등)')).toBeInTheDocument()
+  expect(screen.getByText(/모인 돈/)).toHaveTextContent('참가비 1,000 JWD · 모인 돈 2,000 JWD')
   expect(screen.getByRole('columnheader', { name: '상금' })).toBeInTheDocument()
   expect(calls.filter((c) => c === 'my_wallet')).toHaveLength(1)
 })

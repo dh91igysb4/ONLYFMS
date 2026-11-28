@@ -31,8 +31,8 @@ test('stakePresets: 상한 이하만, 0은 언제나', () => {
 
 test('stakeProblem', () => {
   expect(stakeProblem(null, 1000)).toBe('판돈을 다시 적어 주세요')
-  expect(stakeProblem(STAKE_MAX + 1, null)).toBe('판돈은 41,000 G까지예요')
-  expect(stakeProblem(1500, 1000)).toBe('골드가 부족해요')
+  expect(stakeProblem(STAKE_MAX + 1, null)).toBe('판돈은 41,000 JWD까지예요')
+  expect(stakeProblem(1500, 1000)).toBe('JWD가 부족해요')
   expect(stakeProblem(1000, 1000)).toBeNull()
   expect(stakeProblem(0, 0)).toBeNull()
   expect(stakeProblem(500, null)).toBeNull()

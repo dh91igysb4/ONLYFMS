@@ -42,7 +42,7 @@ export function StakePicker({ text, onText, balance }: Props) {
           onChange={(e) => onText(e.target.value)}
         />
         <span id="duel-stake-help" className="muted stake-help">
-          이기면 상대 판돈까지 가져가요 · 최대 {formatGold(cap)}{balance !== null && ` · 내 골드 ${formatGold(balance)}`}
+          이기면 상대 판돈까지 가져가요 · 최대 {formatGold(cap)}{balance !== null && ` · 보유 ${formatGold(balance)}`}
         </span>
         {problem && <span className="form-error stake-problem">{problem}</span>}
       </div>
