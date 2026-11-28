@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { AUTO_MEAL_MAX, BAIT_RECIPES, LICENSE_PRICE, maxBait, newEcon, type BaitKind, type Econ } from './research.ts'
 import type { View } from './logic.ts'
 
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 const BAIT_NAMES: Record<BaitKind, string> = { attractor: '집어 미끼', legend: '전설 미끼', mythic: '신화 미끼' }
 const BAIT_DESC: Record<BaitKind, string> = {
   attractor: '다음 투척 한 번, 희귀 물고기가 조금 더 잘 나와요(전설·신화 확률은 그대로)',

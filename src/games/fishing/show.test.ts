@@ -22,7 +22,7 @@ describe('show 형식 (설계 2026-11-25-fishing-brag-discard)', () => {
   })
   it('카드: 이름 크기 · 기본 판매가 · 희귀도, 전설·신화는 tone', () => {
     const card = bragCard({ kind: 'brag', species: 'mackerel', sizeCm: 40, perfect: false })
-    expect(card.text).toBe(`고등어 40cm · ${price('mackerel', 40, false).toLocaleString('ko-KR')} G · 흔함`)
+    expect(card.text).toBe(`고등어 40cm · ${price('mackerel', 40, false).toLocaleString('ko-KR')} JWD · 흔함`)
     expect(card.tone).toBe('common')
     const legend = SPECIES.find((s) => s.rarity === 'legend')!
     expect(bragCard({ kind: 'brag', species: legend.id, sizeCm: legend.minCm, perfect: true }).tone).toBe('legend')

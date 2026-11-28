@@ -317,11 +317,11 @@ function LocalRunner({ gameId, options, onNext }: { gameId: string; options: Rec
 /** 자유 플레이 결과의 번 골드 한 줄 (설계 §7.4). 게임 id를 모른다: manifest gold로만 정해진다 */
 function FreeGoldLine({ asked, got, capReached, saved, bonusPct }: { asked: number; got: number; capReached: boolean; saved: boolean | null; bonusPct: number }) {
   let text: string | null = null
-  if (capReached) text = '오늘 이 게임 골드는 다 벌었어요'
-  else if (got > 0 && saved === false) text = `+${got.toLocaleString('ko-KR')} G · 저장되면 골드가 들어가요`
-  else if (got > 0 && got < asked) text = `+${got.toLocaleString('ko-KR')} G · 오늘 상한을 넘어 일부만`
-  else if (got > 0) text = `+${got.toLocaleString('ko-KR')} G`
-  else if (asked > 0) text = '+0 G · 오늘 골드 상한을 넘었어요'
+  if (capReached) text = '오늘 이 게임 JWD는 다 벌었어요'
+  else if (got > 0 && saved === false) text = `+${got.toLocaleString('ko-KR')} JWD · 저장되면 JWD가 들어가요`
+  else if (got > 0 && got < asked) text = `+${got.toLocaleString('ko-KR')} JWD · 오늘 상한을 넘어 일부만`
+  else if (got > 0) text = `+${got.toLocaleString('ko-KR')} JWD`
+  else if (asked > 0) text = '+0 JWD · 오늘 JWD 상한을 넘었어요'
   if (!text) return null
   // 도전과제 보너스(지갑 설계 §7.5): 골드가 들어오는 줄에만 배율을 붙인다
   if (bonusPct > 0 && got > 0) text += ` (도전과제 보너스 ${formatMultiplier(bonusPct)})`

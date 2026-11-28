@@ -6,7 +6,7 @@ import { composePose, normalizeOutfit, outfitKey, playerSprites } from './outfit
 import { drawSpriteData, type Sprite } from './sprites.ts'
 import { isShopItem, ownsWear, SLOT_NAMES, unlockText, WEAR, WEAR_SLOTS, type Outfit, type WearItem, type WearSlot } from './wardrobe.ts'
 
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 const PREVIEW_SCALE = 5
 const THUMB_SCALE = 2
 /** 이 값 이상인 옷은 사기 전에 한 번 더 묻는다(되팔기가 없어서) */
@@ -193,7 +193,7 @@ export function WardrobePanel({ view, canBuy, busy, onWear, onBuy }: Props) {
                   ) : (
                     <span className="muted">{gold(w.price)}</span>
                   )}
-                  {!owned && isShopItem(w) && canBuy && view.gold < w.price && <span className="fish-shop-note">골드가 부족해요</span>}
+                  {!owned && isShopItem(w) && canBuy && view.gold < w.price && <span className="fish-shop-note">JWD가 부족해요</span>}
                 </span>
               </button>
               {status(w)}

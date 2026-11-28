@@ -88,7 +88,7 @@ function StakeLine({ v }: { v: DuelView }) {
   if (!o) return null
   if (o.kind === 'refund') return <p className="card-status">판돈을 돌려받았어요</p>
   const n = o.kind === 'won' ? o.amount : -o.amount
-  return <p className={`stake-amount ${o.kind === 'won' ? 'stake-won' : 'stake-lost'}`}>{`${signedGold(n)} G`}</p>
+  return <p className={`stake-amount ${o.kind === 'won' ? 'stake-won' : 'stake-lost'}`}>{`${signedGold(n)} JWD`}</p>
 }
 
 function Result({ v, onRematch, rematchBusy, rematchError }: {

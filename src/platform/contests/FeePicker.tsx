@@ -44,7 +44,7 @@ export function FeePicker({ text, onText, balance, error }: Props) {
       />
       <span id="contest-fee-help" className="muted stake-help">
         모인 참가비를 1~3등이 6:3:1로 나눠 가져요 · 만든 뒤에는 바꿀 수 없어요 · 최대 {formatGold(cap)}
-        {balance !== null && ` · 내 골드 ${formatGold(balance)}`}
+        {balance !== null && ` · 보유 ${formatGold(balance)}`}
       </span>
       {problem && <span className="form-error stake-problem">{problem}</span>}
     </div>

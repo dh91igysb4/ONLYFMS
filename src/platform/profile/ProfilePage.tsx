@@ -15,7 +15,7 @@ import { fetchUserFreeBonus, fetchUserPrizeTotal, fetchUserWallet } from '../wal
 import { formatGold, formatMultiplier } from '../wallet/format.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
 
-/** 미니게임 골드 보너스를 주는 지속형 게임 이름(등록부의 freeBonus 선언 기준, 게임 id를 모른다) */
+/** 미니게임 JWD 보너스를 주는 지속형 게임 이름(등록부의 freeBonus 선언 기준, 게임 id를 모른다) */
 const BONUS_SOURCES = worlds.filter((w) => typeof w.logic.freeBonus === 'function').map((w) => w.manifest.name).join('·')
 import './profile.css'
 
@@ -200,13 +200,13 @@ export function ProfilePage() {
           <h2 className="page-title pf-name" id={`${uid}-name`}>{handle}</h2>
         </div>
         {gold !== null && (
-          <p className="pf-gold" aria-label={`골드 ${formatGold(gold)}`}>
-            골드 <strong>{formatGold(gold)}</strong>
+          <p className="pf-gold" aria-label={`보유 ${formatGold(gold)}`}>
+            보유 <strong>{formatGold(gold)}</strong>
           </p>
         )}
         {freeBonus !== null && (
-          <p className="pf-gold" aria-label={`미니게임 골드 ${formatMultiplier(freeBonus)}`}>
-            미니게임 골드 <strong>{formatMultiplier(freeBonus)}</strong>
+          <p className="pf-gold" aria-label={`미니게임 JWD ${formatMultiplier(freeBonus)}`}>
+            미니게임 JWD <strong>{formatMultiplier(freeBonus)}</strong>
             {BONUS_SOURCES && <span className="muted">{` · ${BONUS_SOURCES} 보너스`}</span>}
           </p>
         )}

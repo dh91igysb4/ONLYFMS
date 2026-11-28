@@ -38,7 +38,7 @@ beforeEach(() => {
 
 test('최근 장부: 시각 KST·아이디·이유 라벨+게임 이름·금액·상한·잔액', async () => {
   render(<AdminGoldSection />)
-  expect(screen.getByRole('heading', { name: '골드' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'JWD' })).toBeTruthy()
   const table = await screen.findByRole('table')
   const rows = within(table).getAllByRole('row').slice(1)
   expect(rows).toHaveLength(3)
@@ -62,7 +62,7 @@ test('조정 성공 → 결과 문구, 목록 다시 읽음', async () => {
   fireEvent.change(screen.getByLabelText('메모'), { target: { value: '보상' } })
   fireEvent.click(screen.getByRole('button', { name: '반영' }))
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('admin_gold_adjust', { p_handle: 'kane', p_delta: 100, p_note: '보상' }))
-  expect(await screen.findByText('반영했어요. kane 잔액 600 G')).toBeTruthy()
+  expect(await screen.findByText('반영했어요. kane 잔액 600 JWD')).toBeTruthy()
   expect(rpcMock.mock.calls.filter((c) => c[0] === 'admin_gold_ledger')).toHaveLength(2)
 })
 

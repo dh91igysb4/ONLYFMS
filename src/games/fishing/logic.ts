@@ -1194,7 +1194,7 @@ export const logic: WorldLogic<State, Action, View> = {
   freeBonus,
 }
 
-/** 깬 도전과제의 미니게임 골드 보너스 합(%, 지갑 설계 §7.5). 열 개 다 깨면 400 */
+/** 깬 도전과제의 미니게임 JWD 보너스 합(%, 지갑 설계 §7.5). 열 개 다 깨면 400 */
 export function freeBonus(state: Pick<State, 'challenges'>): number {
   return CHALLENGES.reduce((sum, c) => sum + (state.challenges[c.id]?.done === true ? c.freeBonusPct : 0), 0)
 }

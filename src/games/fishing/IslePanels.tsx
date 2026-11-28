@@ -85,7 +85,7 @@ export function IsleChoosePanel({ busy, onChoose }: { busy: boolean; onChoose: (
 const TOOL_NAMES: Readonly<Record<ToolId, string>> = { axe: '도끼', pick: '곡괭이', shovel: '삽' }
 const matLine = (m: Mats) => `나무 ${m.wood} · 돌 ${m.stone} · 철 ${m.iron}`
 const costLine = (c: Cost) => {
-  const parts = [c.wood ? `나무 ${c.wood}` : '', c.stone ? `돌 ${c.stone}` : '', c.iron ? `철 ${c.iron}` : '', c.gold ? `${c.gold.toLocaleString('ko-KR')} G` : '']
+  const parts = [c.wood ? `나무 ${c.wood}` : '', c.stone ? `돌 ${c.stone}` : '', c.iron ? `철 ${c.iron}` : '', c.gold ? `${c.gold.toLocaleString('ko-KR')} JWD` : '']
   return parts.filter(Boolean).join(' · ')
 }
 const enough = (have: Mats, gold: number, c: Cost) => have.wood >= c.wood && have.stone >= c.stone && have.iron >= c.iron && gold >= c.gold

@@ -13,7 +13,7 @@ type Props = { view: View; busy: boolean; onStore(index: number): void; onTakeOu
 
 function FishRow({ f, buffs, verb, disabled, onClick }: { f: Fish; buffs: readonly BuffId[]; verb: '넣기' | '꺼내기'; disabled: boolean; onClick(): void }) {
   const price = fishPrice(f, buffs)
-  const priceText = price === null ? null : `${price.toLocaleString('ko-KR')} G`
+  const priceText = price === null ? null : `${price.toLocaleString('ko-KR')} JWD`
   return (
     <li className="fish-cell-slot">
       <button

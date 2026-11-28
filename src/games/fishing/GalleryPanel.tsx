@@ -7,7 +7,7 @@ import {
 } from './gallery.ts'
 import type { Action, View } from './logic.ts'
 
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 const AREA_NAMES: Record<MatArea, string> = { village: '마을', river: '강', forest: '숲', lake: '산 호수', cave: '동굴', island: '섬', tideflat: '갯벌', swamp: '늪지', summit: '산정', wreck: '난파선' }
 const POTION_NAMES: Record<PotionId, string> = { luck: '행운 포션', gold: '금전 포션', calm: '안정 포션' }
 const POTION_DESC: Record<PotionId, string> = {

@@ -69,5 +69,5 @@ export function parseShow(s: string | undefined): Show | null {
 export function bragCard(b: Brag): { text: string; tone: Rarity } {
   const sp = SPECIES.find((x) => x.id === b.species)!
   const g = price(b.species, b.sizeCm, b.perfect).toLocaleString('ko-KR')
-  return { text: `${sp.name}${b.perfect ? ' ★퍼펙트' : ''} ${b.sizeCm}cm · ${g} G · ${RARITY_NAMES[sp.rarity]}`, tone: sp.rarity }
+  return { text: `${sp.name}${b.perfect ? ' ★퍼펙트' : ''} ${b.sizeCm}cm · ${g} JWD · ${RARITY_NAMES[sp.rarity]}`, tone: sp.rarity }
 }

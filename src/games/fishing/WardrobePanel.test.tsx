@@ -38,7 +38,7 @@ describe('WardrobePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '남색 야구모자 사기' }))
     expect(onBuy).toHaveBeenCalledWith('hat', 'cap')
     expect((screen.getByRole('button', { name: '밀짚모자 사기' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(within(row('밀짚모자')).getByText('골드가 부족해요')).toBeTruthy()
+    expect(within(row('밀짚모자')).getByText('JWD가 부족해요')).toBeTruthy()
   })
 
   test('옷 가게 밖이면 사기가 꺼지고 어디서 사는지 알려 준다', () => {
@@ -95,19 +95,19 @@ describe('WardrobePanel', () => {
 })
 
 describe('비싼 옷 사기 확인', () => {
-  test('20,000 G 이상은 한 번 더 묻고, 확인해야 산다. 취소하면 그대로', () => {
+  test('20,000 JWD 이상은 한 번 더 묻고, 확인해야 산다. 취소하면 그대로', () => {
     const { onBuy } = setup({ gold: 1_000_000 })
     fireEvent.click(screen.getByRole('button', { name: '밀짚모자 사기' }))
     expect(onBuy).not.toHaveBeenCalled()
-    expect(screen.getByText('20,000 G에 살까요?')).toBeTruthy()
+    expect(screen.getByText('20,000 JWD에 살까요?')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
-    expect(screen.queryByText('20,000 G에 살까요?')).toBeNull()
+    expect(screen.queryByText('20,000 JWD에 살까요?')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '개구리 모자 사기' }))
-    fireEvent.click(screen.getByRole('button', { name: '개구리 모자 140,000 G에 사기' }))
+    fireEvent.click(screen.getByRole('button', { name: '개구리 모자 140,000 JWD에 사기' }))
     expect(onBuy).toHaveBeenCalledWith('hat', 'frog')
   })
 
-  test('20,000 G 미만은 바로 산다', () => {
+  test('20,000 JWD 미만은 바로 산다', () => {
     const { onBuy } = setup({ gold: 1_000_000 })
     fireEvent.click(screen.getByRole('button', { name: '카키 버킷햇 사기' }))
     expect(onBuy).toHaveBeenCalledWith('hat', 'bucket')

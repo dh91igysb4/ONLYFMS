@@ -29,8 +29,8 @@ test('상한은 min(잔액, FEE_MAX), 빠른 선택은 상한 이하', () => {
 test('feeProblem 문구', () => {
   expect(feeProblem(0, 0)).toBeNull()
   expect(feeProblem(null, 0)).toBe('참가비를 다시 적어 주세요')
-  expect(feeProblem(41001, null)).toBe('참가비는 41,000 G까지예요')
-  expect(feeProblem(1000, 999)).toBe('골드가 부족해요')
+  expect(feeProblem(41001, null)).toBe('참가비는 41,000 JWD까지예요')
+  expect(feeProblem(1000, 999)).toBe('JWD가 부족해요')
   expect(feeProblem(1000, null)).toBeNull()
 })
 

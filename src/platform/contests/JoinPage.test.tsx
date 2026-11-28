@@ -44,8 +44,8 @@ test('참가비 대회는 fee_mismatch로 금액을 알고 확인 화면을 거�
   })
   renderAt()
   expect(await screen.findByText('참가비가 있는 대회예요')).toBeInTheDocument()
-  expect(screen.getByText(/내 골드 100,000 G/)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '참가비 700 G 내고 참가' }))
+  expect(screen.getByText(/보유 100,000 JWD/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '참가비 700 JWD 내고 참가' }))
   expect(await screen.findByText('대회 화면')).toBeInTheDocument()
   expect(rpcMock).toHaveBeenCalledWith('join_by_invite_code', { p_code: 'abcde12345', p_entry_fee: 700 })
 })
@@ -54,8 +54,8 @@ test('잔액이 모자라면 확인 화면의 참가 버튼이 막힌다', async
   setBalance(300)
   rpcMock.mockRejectedValue(new ApiError('fee_mismatch', 400, { details: '700' }))
   renderAt()
-  expect(await screen.findByRole('button', { name: '참가비 700 G 내고 참가' })).toBeDisabled()
-  expect(screen.getByRole('alert')).toHaveTextContent('골드가 부족해요')
+  expect(await screen.findByRole('button', { name: '참가비 700 JWD 내고 참가' })).toBeDisabled()
+  expect(screen.getByRole('alert')).toHaveTextContent('JWD가 부족해요')
 })
 
 test('확인 화면에서 서버가 not_enough_gold면 그 화면에 문구', async () => {
@@ -64,8 +64,8 @@ test('확인 화면에서 서버가 not_enough_gold면 그 화면에 문구', as
     throw new ApiError('not_enough_gold', 400)
   })
   renderAt()
-  fireEvent.click(await screen.findByRole('button', { name: '참가비 700 G 내고 참가' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('골드가 부족해요')
+  fireEvent.click(await screen.findByRole('button', { name: '참가비 700 JWD 내고 참가' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('JWD가 부족해요')
   expect(screen.getByText('참가비가 있는 대회예요')).toBeInTheDocument()
 })
 

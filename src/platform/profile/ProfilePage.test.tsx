@@ -372,7 +372,7 @@ test('profile_records_tab_direct_entry_shows_record', async () => {
 test('profile_gold: 다른 사람 프로필 요약에 골드', async () => {
   setup({ user_stats: emptyStats, user_wallet: 5000 })
   renderAt('messi')
-  expect(await screen.findByLabelText('골드 5,000 G')).toBeTruthy()
+  expect(await screen.findByLabelText('보유 5,000 JWD')).toBeTruthy()
   expect(rpcMock).toHaveBeenCalledWith('user_wallet', { p_handle: 'messi' })
 })
 
@@ -393,22 +393,22 @@ test('profile_gold: 지갑을 쓰는 게임이 없으면 user_wallet을 부르�
   expect(screen.queryByLabelText(/^골드/)).toBeNull()
 })
 
-test('profile_free_bonus: 미니게임 골드 배율(도전과제 보너스), 0이면 ×1, null이거나 지갑이 꺼져 있으면 줄 없음', async () => {
+test('profile_free_bonus: 미니게임 JWD 배율(도전과제 보너스), 0이면 ×1, null이거나 지갑이 꺼져 있으면 줄 없음', async () => {
   setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 140 })
   const v = renderAt('messi')
-  expect(await screen.findByLabelText('미니게임 골드 ×2.4')).toBeTruthy()
+  expect(await screen.findByLabelText('미니게임 JWD ×2.4')).toBeTruthy()
   // 플랫폼은 게임 이름을 적지 않는다: 보너스를 주는 게임(freeBonus 선언)이 없는 등록부에서는 꼬리말 없음
-  expect(screen.getByLabelText('미니게임 골드 ×2.4').textContent).toBe('미니게임 골드 ×2.4')
+  expect(screen.getByLabelText('미니게임 JWD ×2.4').textContent).toBe('미니게임 JWD ×2.4')
   expect(rpcMock).toHaveBeenCalledWith('user_free_bonus', { p_handle: 'messi' })
   v.unmount()
   setup({ user_stats: emptyStats, user_wallet: 5000, user_free_bonus: 0 })
   const v2 = renderAt('messi')
-  expect(await screen.findByLabelText('미니게임 골드 ×1')).toBeTruthy()
+  expect(await screen.findByLabelText('미니게임 JWD ×1')).toBeTruthy()
   v2.unmount()
   setup({ user_stats: emptyStats, user_wallet: 5000 })
   const v3 = renderAt('messi')
-  await screen.findByLabelText('골드 5,000 G')
-  expect(screen.queryByLabelText(/미니게임 골드/)).toBeNull()
+  await screen.findByLabelText('보유 5,000 JWD')
+  expect(screen.queryByLabelText(/미니게임 JWD/)).toBeNull()
   v3.unmount()
   rpcMock.mockClear()
   wallet.enabled = false
@@ -416,20 +416,20 @@ test('profile_free_bonus: 미니게임 골드 배율(도전과제 보너스), 0�
   renderAt('messi')
   await screen.findByRole('heading', { name: 'messi' })
   expect(rpcMock).not.toHaveBeenCalledWith('user_free_bonus', expect.anything())
-  expect(screen.queryByLabelText(/미니게임 골드/)).toBeNull()
+  expect(screen.queryByLabelText(/미니게임 JWD/)).toBeNull()
 })
 
 test('profile_prize: 데일리 상금 누적 (지갑 3단계)', async () => {
   setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 12300 })
   renderAt('messi')
-  expect(await screen.findByLabelText('데일리 상금 누적 12,300 G')).toBeTruthy()
+  expect(await screen.findByLabelText('데일리 상금 누적 12,300 JWD')).toBeTruthy()
   expect(rpcMock).toHaveBeenCalledWith('user_prize_total', { p_handle: 'messi' })
 })
 
 test('profile_prize: 0이거나 지갑 게임이 없으면 줄 없음', async () => {
   setup({ user_stats: emptyStats, user_wallet: 5000, user_prize_total: 0 })
   const v = renderAt('messi')
-  await screen.findByLabelText('골드 5,000 G')
+  await screen.findByLabelText('보유 5,000 JWD')
   expect(screen.queryByLabelText(/데일리 상금/)).toBeNull()
   v.unmount()
   rpcMock.mockClear()

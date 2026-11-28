@@ -70,71 +70,71 @@ beforeEach(() => {
 
 test('score_3_shows_plus_30_and_refreshes_wallet_after_save', async () => {
   await playTo(3)
-  await goldLine('+30 G')
+  await goldLine('+30 JWD')
   expect(refreshMock).toHaveBeenCalledTimes(1)
 })
 
 test('play_cap_limits_to_50', async () => {
   await playTo(9)
-  await goldLine('+50 G')
+  await goldLine('+50 JWD')
 })
 
 test('game_daily_cap_leftover_and_reached', async () => {
   setWallet({ balance: 0, today: { 'test-guess': 100 }, earnedToday: 0 })
   await playTo(3)
-  await goldLine('+20 G')
+  await goldLine('+20 JWD')
 })
 
 test('game_daily_cap_reached_message', async () => {
   setWallet({ balance: 0, today: { 'test-guess': 120 }, earnedToday: 0 })
   await playTo(3)
-  await goldLine('오늘 이 게임 골드는 다 벌었어요')
+  await goldLine('오늘 이 게임 JWD는 다 벌었어요')
 })
 
 test('site_cap_partial', async () => {
   setWallet({ balance: 0, today: {}, earnedToday: 30750 })
   await playTo(3)
-  await goldLine('+22 G · 오늘 상한을 넘어 일부만') // 30 × 0.75 내림
+  await goldLine('+22 JWD · 오늘 상한을 넘어 일부만') // 30 × 0.75 내림
 })
 
 test('site_cap_straddle', async () => {
   setWallet({ balance: 0, today: {}, earnedToday: 30740 })
   await playTo(3)
-  await goldLine('+25 G · 오늘 상한을 넘어 일부만') // 10 + 20 × 0.75
+  await goldLine('+25 JWD · 오늘 상한을 넘어 일부만') // 10 + 20 × 0.75
 })
 
 test('site_cap_rounds_to_zero', async () => {
   // 게임별 남은 몫 1 → 75% 구간에서 floor(0.75) = 0
   setWallet({ balance: 0, today: { 'test-guess': 119 }, earnedToday: 31000 })
   await playTo(3)
-  await goldLine('+0 G · 오늘 골드 상한을 넘었어요')
+  await goldLine('+0 JWD · 오늘 JWD 상한을 넘었어요')
 })
 
 test('challenge_bonus_multiplies_and_shows_multiplier', async () => {
   // 도전과제 보너스 140% (×2.4): 30 → 72
   setWallet({ balance: 0, today: {}, earnedToday: 0, freeBonusPct: 140 })
   await playTo(3)
-  await goldLine('+72 G (도전과제 보너스 ×2.4)')
+  await goldLine('+72 JWD (도전과제 보너스 ×2.4)')
 })
 
 test('challenge_bonus_raises_play_and_daily_caps', async () => {
   // 판당 상한 50 × 2.4 = 120. 게임별 하루 상한 120 × 2.4 = 288에서 오늘 200을 받았으면 남은 88
   setWallet({ balance: 0, today: { 'test-guess': 200 }, earnedToday: 0, freeBonusPct: 140 })
   await playTo(9)
-  await goldLine('+88 G (도전과제 보너스 ×2.4)')
+  await goldLine('+88 JWD (도전과제 보너스 ×2.4)')
 })
 
 test('challenge_bonus_daily_cap_reached_uses_bonus_cap', async () => {
   // 하루 상한 288에 닿으면 다 벌었다고 한다 (보너스 없는 120이 아니라)
   setWallet({ balance: 0, today: { 'test-guess': 288 }, earnedToday: 0, freeBonusPct: 140 })
   await playTo(3)
-  await goldLine('오늘 이 게임 골드는 다 벌었어요')
+  await goldLine('오늘 이 게임 JWD는 다 벌었어요')
 })
 
 test('save_failure_says_gold_comes_later', async () => {
   submitMock.mockResolvedValue(false)
   await playTo(3)
-  await goldLine('+30 G · 저장되면 골드가 들어가요')
+  await goldLine('+30 JWD · 저장되면 JWD가 들어가요')
   expect(refreshMock).not.toHaveBeenCalled()
 })
 

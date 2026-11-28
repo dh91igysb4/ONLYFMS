@@ -59,10 +59,10 @@ export function JoinPage() {
         <h2 className="page-title">참가비가 있는 대회예요</h2>
         <p>
           참가비 <strong className="stake-amount">{formatGold(confirmFee)}</strong>를 내고 참가할까요?
-          {balance !== null && <span className="muted"> · 내 골드 {formatGold(balance)}</span>}
+          {balance !== null && <span className="muted"> · 보유 {formatGold(balance)}</span>}
         </p>
         <p className="muted">모인 참가비를 1~3등이 6:3:1로 나눠 가져요. 대회가 취소되면 돌려받아요.</p>
-        {(short || confirmError) && <p className="form-error" role="alert">{confirmError ?? '골드가 부족해요'}</p>}
+        {(short || confirmError) && <p className="form-error" role="alert">{confirmError ?? 'JWD가 부족해요'}</p>}
         <button
           className="btn btn-primary"
           disabled={busy || short}

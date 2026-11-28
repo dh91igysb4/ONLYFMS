@@ -11,7 +11,7 @@ const ICON_SCALE = 2
 const PREMIUM_ROD = Math.max(...SPECIES.filter((s) => s.rarity !== 'mythic').map((s) => s.minRod))
 /** 그 낚싯대가 있어야 들어가는 지역 이름들(난파선 앞바다는 백골 이상) */
 const areasNeeding = (tier: number) => AREAS.filter((a) => a.minRod === tier)
-const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
+const gold = (n: number) => `${n.toLocaleString('ko-KR')} JWD`
 const speciesName = (id: string) => SPECIES.find((s) => s.id === id)?.name ?? id
 /** 이 판에 있는 어종인가. 더 새 서버가 준 모르는 id는 그림·가격 없이 이름(id)만 보인다 */
 const knownSpecies = (id: string) => SPECIES.some((s) => s.id === id)
@@ -347,7 +347,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyShoes, onB
                 {!owned && areasNeeding(rod.tier).length > 0 && <span className="muted">{areasNeeding(rod.tier).map((a) => `${a.name}(${UNLOCKS[a.id]?.name ?? '해금'})`).join('·') + '를 열 수 있어요'}</span>}
                 {rod.tier > PREMIUM_ROD && !owned && areasNeeding(rod.tier).length === 0 && <span className="muted">고급 장비 · 신화 말고는 없어도 모든 물고기를 낚아요</span>}
                 {owned && <span className="fish-rod-state">{rod.tier === view.rodTier ? '사용 중' : '보유'}</span>}
-                {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
+                {next && short && <span className="fish-shop-note">JWD가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
               </div>
               {next && (
@@ -378,7 +378,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyShoes, onB
                 <strong>{name}</strong>
                 <span className="muted">{bag.price === 0 ? '기본' : gold(bag.price)}</span>
                 {owned && <span className="fish-rod-state">{bag.tier === view.bagTier ? '사용 중' : '보유'}</span>}
-                {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
+                {next && short && <span className="fish-shop-note">JWD가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
               </div>
               {next && (
@@ -410,7 +410,7 @@ export function ShopPanel({ view, busy, onSell, onBuy, onBuyBag, onBuyShoes, onB
                 <span className="muted">{sh.price === 0 ? '기본' : gold(sh.price)}</span>
                 <span className="muted">{`걷기 ×${sh.speed}`}</span>
                 {owned && <span className="fish-rod-state">{sh.tier === shoesTier ? '사용 중' : '보유'}</span>}
-                {next && short && <span className="fish-shop-note">골드가 부족해요</span>}
+                {next && short && <span className="fish-shop-note">JWD가 부족해요</span>}
                 {!owned && !next && <span className="muted">이전 단계를 먼저 사야 해요</span>}
               </div>
               {next && (
@@ -485,7 +485,7 @@ export function UnlockPanel({ view, area, busy, onUnlock }: UnlockProps) {
           {unlock.minRod !== undefined && (
             <span className={rodShort ? 'fish-shop-note' : 'muted'}>{`${rodAtLeast(unlock.minRod)}이 있어야 나갈 수 있어요`}</span>
           )}
-          {short && <span className="fish-shop-note">골드가 모자라요</span>}
+          {short && <span className="fish-shop-note">JWD가 모자라요</span>}
         </div>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy || short || rodShort} onClick={onUnlock}>
           열기
@@ -508,8 +508,8 @@ export function ChallengePanel({ view }: { view: View }) {
   return (
     <section className="fish-panel-body" aria-label="도전과제">
       <p className="muted">{`깬 과제 ${done}/${CHALLENGES.length}`}</p>
-      <p className="muted">과제를 깨면 그 지역 순간이동기가 켜지고, 미니게임(자유 플레이) 골드가 영구히 늘어요</p>
-      <p className="fish-bonus-now">{`지금 미니게임 골드 ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>
+      <p className="muted">과제를 깨면 그 지역 순간이동기가 켜지고, 미니게임(자유 플레이) JWD가 영구히 늘어요</p>
+      <p className="fish-bonus-now">{`지금 미니게임 JWD ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>
       <ul className="fish-rods" aria-label="도전과제 목록">
         {CHALLENGES.map((c) => {
           const finished = progress[c.id]?.done === true
@@ -518,7 +518,7 @@ export function ChallengePanel({ view }: { view: View }) {
               <div className="fish-rod-info">
                 <strong>{`${areaName(c.area)} · ${c.title}`}</strong>
                 <span className="muted">{c.desc}</span>
-                <span className="muted">{`미니게임 골드 +${c.freeBonusPct}%`}</span>
+                <span className="muted">{`미니게임 JWD +${c.freeBonusPct}%`}</span>
                 {finished
                   ? <span className="fish-rod-state">완료 · 순간이동기 켜짐</span>
                   : <span className="muted">{progressLabel(view, c.id, c.count)}</span>}
@@ -576,7 +576,7 @@ export function TeleportPanel({ view, area, busy, onTeleport }: TeleportProps) {
                 <div className="fish-rod-info">
                   <strong>{a.name}</strong>
                   <span className="fish-unlock-price">{gold(fee)}</span>
-                  {short && <span className="fish-shop-note">골드가 모자라요</span>}
+                  {short && <span className="fish-shop-note">JWD가 모자라요</span>}
                 </div>
                 <button
                   type="button"
