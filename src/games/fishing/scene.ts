@@ -7,7 +7,7 @@ import { HALL2_GALLERY_RIGHT, HALL2_PEDESTALS, HALL2_THEME_FLOOR, HALL2_WINGS } 
 import type { FacilityId } from './facility.ts'
 import { THEME_LOOK, themeLook, type Gallery, type ThemeId } from './gallery.ts'
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
-import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
+import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type NodeKind, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
 import { SPRITES, drawSprite, drawSpriteData, type Sprite } from './sprites.ts'
 import { composePose, decodeOutfit, playerSprites } from './outfit.ts'
@@ -60,6 +60,8 @@ export type WorldScene = {
   gallery?: GalleryScene
   /** 내 섬(또는 구경하는 섬)의 시설 외형(facility.ts). 바다 칸 위에 그린다 */
   facilities?: readonly { id: FacilityId; tx: number; ty: number }[]
+  /** 내 섬에서 오늘 아직 안 캔 자원 칸(드러난 칸만). 위에 반짝이를 띄운다 */
+  readyNodes?: readonly { tx: number; ty: number; kind: NodeKind }[]
 }
 
 /** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
@@ -234,6 +236,19 @@ function drawSpritePart(ctx: CanvasRenderingContext2D, name: string, x: number, 
 }
 
 const TREE_BOTTOM: Part = { col0: 0, col1: TILE, row0: TILE, row1: 2 * TILE }
+/** 그 칸의 자원 칸(내 섬). 없으면 undefined */
+const nodeAt = (map: MapDef, tx: number, ty: number) => (map.nodes.length ? map.nodes.find((n) => n.tx === tx && n.ty === ty) : undefined)
+/** 캘 수 있음 표시: 흰·노랑 반짝이(테두리 진한 색), 사과나무는 잎 위, 바위는 바위 위. 0.5초마다 1px 오르내림 */
+function drawNodeReady(ctx: CanvasRenderingContext2D, n: { tx: number; ty: number; kind: NodeKind }, tMs: number): void {
+  const cx = n.tx * TILE + 8
+  const top = n.kind === 'tree' ? (n.ty - 1) * TILE + 7 : n.ty * TILE + 3
+  const y = top - 6 - (Math.floor(tMs / 500) % 2)
+  rect(ctx, cx - 1, y - 3, 3, 7, '#2a2135')
+  rect(ctx, cx - 3, y - 1, 7, 3, '#2a2135')
+  rect(ctx, cx, y - 2, 1, 5, '#fff6c2')
+  rect(ctx, cx - 2, y, 5, 1, '#fff6c2')
+  rect(ctx, cx, y, 1, 1, '#ffd84a')
+}
 const TREE_TOP: Part = { col0: 0, col1: TILE, row0: 0, row1: TILE }
 /** 가로 울타리 기둥이 놓인 열(tile-fence의 5~10열). 끝 칸은 기둥 바깥 난간을 잘라 낸다. */
 const FENCE_POST_COL0 = 5
@@ -558,17 +573,14 @@ function drawTile(ctx: CanvasRenderingContext2D, g: MapGfx, tx: number, ty: numb
   // 돛대는 갑판 위에 선다
   if (kind === 'mast') drawSprite(ctx, 'deck-plank', x, y, 1)
   if (tall) {
-    drawSpritePart(ctx, tall, x, y - TILE, TREE_BOTTOM)
-    // 내 섬 자원 나무: 열매 표시(개간 구역 나무와 구별)
-    if (kind === 'tree' && g.map.nodes.some((n) => n.kind === 'tree' && n.tx === tx && n.ty === ty)) drawSprite(ctx, 'node-tree', x, y, 1)
+    // 내 섬 자원 나무는 그림 자체가 사과나무(개간 구역 나무와 한눈에 구별)
+    drawSpritePart(ctx, kind === 'tree' && nodeAt(g.map, tx, ty)?.kind === 'tree' ? 'node-fruit-tree' : tall, x, y - TILE, TREE_BOTTOM)
   } else if (kind === 'rock') {
-    if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
+    // 내 섬 자원 바위: 밝은 채석 바위·짙은 철광 바위(일반 바위 그림 대신)
+    const node = nodeAt(g.map, tx, ty)
+    if (node) drawSprite(ctx, node.kind === 'iron' ? 'node-iron' : 'node-stone', x, y, 1)
+    else if (ground === 'water') drawSprite(ctx, 'rock', x + 1, y + 4, 1)
     else drawSprite(ctx, ground === 'snow' ? 'tile-rock-snow' : 'tile-rock', x, y, 1)
-    // 내 섬 철광: 바위 위에 철 무늬
-    const node = g.map.nodes.find((n) => n.tx === tx && n.ty === ty)
-    if (node?.kind === 'iron') drawSprite(ctx, 'iron-ore', x, y, 1)
-    // 내 섬 자원 바위: 반짝이 표시
-    if (node) drawSprite(ctx, 'node-rock', x, y, 1)
   } else if (kind === 'bench') drawSprite(ctx, 'workbench', x, y, 1)
   else if (kind === 'deco') {
     const prop = g.map.props.find((p) => p.tx === tx && p.ty === ty)
@@ -1546,7 +1558,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
       const kind = tileAt(s.map, tx, ty)
-      const name = kind === null ? undefined : TALL_SPRITE[kind]
+      const name = kind === null ? undefined : kind === 'tree' && nodeAt(s.map, tx, ty)?.kind === 'tree' ? 'node-fruit-tree' : TALL_SPRITE[kind]
       if (name) tall.push({ key: ty * TILE + TREE_BASE, draw: () => drawSpritePart(ctx, name, tx * TILE, (ty - 1) * TILE, TREE_TOP) })
     }
   }
@@ -1568,6 +1580,9 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   for (const it of tall) if (it.key <= feet) it.draw()
   drawPlayer(ctx, s, pose, px, py, tip)
   for (const it of tall) if (it.key > feet) it.draw()
+
+  // 오늘 캘 수 있는 자원 칸: 위에 반짝이가 떠서 오르내린다(나무보다도 위)
+  for (const n of s.readyNodes ?? []) drawNodeReady(ctx, n, t)
 
   // 자랑으로 든 물고기는 나무보다도 위(누가 무엇을 들었는지 가려지지 않게). 모르는 어종은 그리지 않는다
   if (s.holding) drawHeld(ctx, s.holding, Math.round(s.player.pos.x), py, t)

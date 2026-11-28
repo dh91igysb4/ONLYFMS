@@ -3736,12 +3736,21 @@ describe('내 섬 B단계: 캐기·작업대·개간 (설계 2026-11-26-my-isle-
     pointer('down', actionButton(), 3)
     pointer('up', actionButton(), 3)
     await advance(50)
-    expect(screen.getByText('작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요')).toBeInTheDocument()
+    expect(screen.getByText('작업대에서 개간하면 치울 수 있어요. 사과나무·흰 줄무늬 바위·주황 광석 바위를 캐 주세요')).toBeInTheDocument()
   })
 
-  test('자원 칸 표시 그림이 있다', () => {
-    expect(SPRITES['node-tree']).toBeTruthy()
-    expect(SPRITES['node-rock']).toBeTruthy()
+  test('자원 칸 그림이 있다(사과나무 16×32, 채석·철광 바위 16×16)', () => {
+    expect([SPRITES['node-fruit-tree'].w, SPRITES['node-fruit-tree'].h]).toEqual([16, 32])
+    for (const k of ['node-stone', 'node-iron']) expect([SPRITES[k].w, SPRITES[k].h]).toEqual([16, 16])
+  })
+
+  test('내 섬 장면: 오늘 안 캔 드러난 자원 칸만 반짝이(readyNodes), 캔 칸은 빠진다', async () => {
+    const rock = isleNodes('crescent').find((n) => n.zone === 0 && n.kind === 'rock')!
+    await mount(makeView({ isle: newIsle('crescent') }), near('crescent', 0, rock.tx, rock.ty))
+    await advance(50)
+    const ready = lastScene().readyNodes!
+    expect(ready.some((n) => n.tx === rock.tx && n.ty === rock.ty)).toBe(true)
+    expect(ready.length).toBe(isleNodes('crescent').filter((n) => n.zone === 0).length)
   })
 
   test('오늘 이미 캤으면 안내', async () => {
