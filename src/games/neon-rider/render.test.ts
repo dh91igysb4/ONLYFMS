@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BODY_DY, BODY_R, CAR_LEN, HEAD_OFFSET, HEAD_R, MM, REST_LEN, START_LEN, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { CARS } from './cars.ts'
 import { chassisOf } from './collide.ts'
 import { courseFromTemplates, courseOf } from './course.ts'
 import type { MoverDef } from './movers.ts'
@@ -8,7 +9,7 @@ import { TEMPLATES, buildTemplate, type Template } from './pieces.ts'
 import { shapeAt, type HazardShape } from './hazards.ts'
 import { initSim, initSimAt, step } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { BODY, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
+import { CAR_ART, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -23,21 +24,26 @@ function moved(s: SimState, dx: number, dy = 0): SimState {
 }
 
 describe('차 그림', () => {
-  it('차체 다각형의 가장자리(꼭짓점 사이 표본 포함) 모든 점이 판정 도형(두 바퀴·지붕 원·올린 차대 캡슐)에서 40 mm 안에 있다', () => {
-    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, HEAD_OFFSET), 차대 캡슐 = 선분 (0, BODY_DY)–(WHEELBASE, BODY_DY), 반지름 BODY_R.
+  it('CAR_ART의 키 집합은 CARS의 id 집합과 같다', () => {
+    expect(Object.keys(CAR_ART).sort()).toEqual(CARS.map((c) => c.id).sort())
+  })
+
+  it.each(CARS.map((c) => [c.id, c] as const))('%s: 그림의 가장자리(꼭짓점 사이 표본 포함) 모든 점이 판정 도형(두 바퀴·지붕 원·올린 차대 캡슐)에서 40 mm 안에 있다', (id, car) => {
+    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, headOffset), 차대 캡슐 = 선분 (0, bodyDY)–(WHEELBASE, bodyDY), 반지름 bodyR.
+    const art = CAR_ART[id]
     const circles = [
       { x: 0, y: 0, r: WHEEL_R / MM },
       { x: WHEELBASE / MM, y: 0, r: WHEEL_R / MM },
-      { x: WHEELBASE / MM / 2, y: HEAD_OFFSET / MM, r: HEAD_R / MM },
+      { x: WHEELBASE / MM / 2, y: car.headOffset / MM, r: car.headR / MM },
     ]
     const outside = (a: number, b: number): number => {
       const cx = Math.min(Math.max(a, 0), WHEELBASE / MM)
-      const cap = Math.hypot(a - cx, b - BODY_DY / MM) - BODY_R / MM
+      const cap = Math.hypot(a - cx, b - car.bodyDY / MM) - car.bodyR / MM
       return Math.min(cap, ...circles.map((c) => Math.hypot(a - c.x, b - c.y) - c.r))
     }
-    for (let i = 0; i < BODY.length; i++) {
-      const [x0, y0] = BODY[i]
-      const [x1, y1] = BODY[(i + 1) % BODY.length]
+    for (let i = 0; i < art.length; i++) {
+      const [x0, y0] = art[i]
+      const [x1, y1] = art[(i + 1) % art.length]
       for (let k = 0; k <= 50; k++) {
         const a = x0 + ((x1 - x0) * k) / 50
         const b = y0 + ((y1 - y0) * k) / 50
@@ -46,8 +52,8 @@ describe('차 그림', () => {
     }
   })
 
-  it('판정 캡슐의 아래 끝은 축선 아래 바퀴 바닥보다 위다(바퀴 사이 길 아래로 처지지 않는다)', () => {
-    expect(BODY_R - BODY_DY).toBeLessThan(WHEEL_R)
+  it.each(CARS.map((c) => [c.id, c] as const))('%s: 판정 캡슐의 아래 끝은 축선 아래 바퀴 바닥보다 위다(바퀴 사이 길 아래로 처지지 않는다)', (_id, car) => {
+    expect(car.bodyR - car.bodyDY).toBeLessThan(WHEEL_R)
   })
 })
 
