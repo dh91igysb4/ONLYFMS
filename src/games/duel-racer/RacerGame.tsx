@@ -11,7 +11,6 @@ import './racer.css'
 type RaceMod = typeof import('./race.ts')
 const NITRO_CELLS = 5
 const HUD_MS = 100
-const TOAST_TICKS = 90
 const COURSE = 'neon-1'
 
 /** 틱 → mm:ss.cc */
@@ -21,13 +20,6 @@ export function formatTicks(ticks: number): string {
   const s = Math.floor((cs % 6000) / 100)
   const c = cs % 100
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
-}
-
-function toastOf(snap: RaceSnapshot): string | null {
-  const l = snap.lastLanding
-  if (!l || snap.tick - l.tick > TOAST_TICKS) return null
-  const parts = [l.flips > 0 ? `${l.flips}회전` : null, l.clean ? '깔끔한 착지' : null].filter(Boolean)
-  return parts.length ? parts.join(' · ') : null
 }
 
 export function RacerGame({ onExit }: RealtimeGameProps) {
@@ -118,8 +110,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
         // 연습은 프레임당 250ms까지만 흘린다(숨긴 탭은 멈춤). 2단계 대국은 서버 시각 경과로 따라잡을 것(설계 §6.3)
         const ms = lastT === null ? 0 : Math.min(250, t - lastT) || 0
         lastT = t
-        const pre = mod.snapshot(r.race)
-        mod.advance(r.race, ms, controlsFrom(keys.current, !pre.car.grounded))
+        mod.advance(r.race, ms, controlsFrom(keys.current))
         const snap = mod.snapshot(r.race)
         scene?.draw(snap, r.race.acc ?? 0)
         if (snap.finishTicks !== null && !finished) {
@@ -155,7 +146,6 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
 
   const snap = hud
   const finishedTicks = snap?.finishTicks ?? null
-  const toast = snap ? toastOf(snap) : null
   const filled = snap ? Math.floor(snap.nitro.gauge * NITRO_CELLS + 1e-9) : 0
 
   return (
@@ -184,7 +174,6 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
               </div>
             </div>
             {snap.countdown !== null && <p className="dr-countdown" data-testid="racer-countdown">{snap.countdown}</p>}
-            {toast && finishedTicks === null && <p className="dr-toast" data-testid="racer-toast">{toast}</p>}
             {finishedTicks !== null && (
               <div className="dr-overlay dr-result" role="status">
                 <p className="dr-result-title">완주</p>
@@ -199,7 +188,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
           </>
         )}
       </div>
-      <p className="dr-help">방향키·WASD 운전 · Space 드리프트 · Shift 니트로 · 공중에서 방향키·Q·E 회전 · R 복귀 · Esc 나가기</p>
+      <p className="dr-help">방향키·WASD 운전 · Shift 니트로(안 쓰면 잠시 뒤 저절로 참) · R 복귀 · Esc 나가기</p>
     </div>
   )
 }

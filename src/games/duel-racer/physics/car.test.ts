@@ -3,7 +3,7 @@ import { ACCEL_TIME, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../c
 import { flatCourse, rampCourse, walledCourse } from '../course/testCourses.ts'
 import type { Course } from '../course/types.ts'
 import { NO_CONTROLS, type Controls } from './controls.ts'
-import { AIR_YAW_RATE, STEER_YAW_RATE, carState, createCar, stepCar, type Car } from './car.ts'
+import { STEER_YAW_RATE, carState, createCar, stepCar, type Car } from './car.ts'
 import { loadRapier, type Rapier } from './rapier.ts'
 import { createWorld, type PhysWorld } from './world.ts'
 
@@ -76,18 +76,6 @@ test('steering right responds on the next tick (angVel.y < 0)', () => {
   expect(carState(car).angVel.y).toBeLessThan(0)
 })
 
-test('handbrake drifts and recovers', () => {
-  const { w, car } = setup(flatCourse())
-  settle(w, car)
-  run(w, car, GAS, 2.5)
-  expect(carState(car).speed).toBeGreaterThan(38)
-  let maxSlip = 0
-  run(w, car, { ...GAS, steer: 1, handbrake: true }, 1, false, () => { maxSlip = Math.max(maxSlip, carState(car).slipDeg) })
-  expect(maxSlip).toBeGreaterThan(15)
-  run(w, car, GAS, 1)
-  expect(carState(car).slipDeg).toBeLessThan(5)
-})
-
 test('does not roll over at full steer and top speed', () => {
   const { w, car } = setup(flatCourse())
   settle(w, car)
@@ -95,24 +83,6 @@ test('does not roll over at full steer and top speed', () => {
   let minUp = 1
   run(w, car, { ...GAS, steer: 1 }, 3, false, () => { minUp = Math.min(minUp, carState(car).up.y) })
   expect(minUp).toBeGreaterThan(0.7)
-})
-
-test('air controls rotate the car while airborne', () => {
-  const { w, car } = setup(rampCourse())
-  settle(w, car)
-  let airTicks = 0
-  let pitchRate = 0
-  // 점프대는 400m 지점: 가속해서 10초쯤 닿는다
-  run(w, car, GAS, 14, false, () => {
-    const s = carState(car)
-    if (!s.grounded && s.pos.y > 2 && airTicks < 20) {
-      airTicks++
-      tick(w, car, { ...GAS, pitch: 1 })
-      pitchRate = carState(car).localAngVel.x
-    }
-  })
-  expect(airTicks).toBeGreaterThan(0)
-  expect(pitchRate).toBeGreaterThan(0.5)
 })
 
 function dropTest(rollDeg: number): number {
@@ -205,16 +175,16 @@ function spinLanding(speed: number): { x: number; headingDeg: number; landHeadin
       landed = true
       landHeading = heading()
     }
-    // 공중에서 E를 0.7초(약 90°) 누르고, 착지 1.2초 뒤까지
-    if (air && !landed) airTicks++
-    tick(w, car, { ...GAS, yaw: air && !landed && airTicks <= 42 ? 1 : 0 })
+    // 공중에서 0.7초 동안 바깥 힘으로 돌린다(2단계: 상대와 부딪혀 도는 경우), 착지 1.2초 뒤까지
+    if (air && !landed && ++airTicks <= 42) car.body.setAngvel({ x: 0, y: -2.4, z: 0 }, true)
+    tick(w, car, GAS)
     if (landed && --budget <= 0) break
   }
   return { x: carState(car).pos.x, headingDeg: Math.abs(heading()), landHeading }
 }
 let budget = 0
 
-test('landing sideways after an air spin keeps going down the road and straightens', () => {
+test('landing sideways while spinning keeps going down the road and straightens', () => {
   budget = 72
   const r = spinLanding(55)
   expect(Math.abs(r.landHeading)).toBeGreaterThan(30)
@@ -232,17 +202,3 @@ test('full steer turns at most STEER_YAW_RATE (not twitchy)', () => {
   expect(maxRate).toBeGreaterThan(STEER_YAW_RATE * 0.7)
 })
 
-test('Q/E air spin is slower than flips (AIR_YAW_RATE)', () => {
-  const { w, car } = setup(rampCourse())
-  settle(w, car)
-  let maxRate = 0
-  run(w, car, GAS, 14, false, () => {
-    const s = carState(car)
-    if (!s.grounded && s.pos.y > 2) {
-      tick(w, car, { ...GAS, yaw: 1 })
-      maxRate = Math.max(maxRate, Math.abs(carState(car).localAngVel.y))
-    }
-  })
-  expect(maxRate).toBeGreaterThan(AIR_YAW_RATE * 0.7)
-  expect(maxRate).toBeLessThanOrEqual(AIR_YAW_RATE * 1.1)
-})

@@ -1,45 +1,51 @@
 import { expect, test } from 'vitest'
-import { NITRO_BURN_PER_SEC, NITRO_CLEAN_LANDING, NITRO_PER_AIR_SEC, NITRO_PER_DRIFT_SEC, NITRO_PER_FLIP } from './constants.ts'
+import { NITRO_BURN_PER_SEC, NITRO_REGEN_DELAY, NITRO_REGEN_PER_SEC } from './constants.ts'
 import { NITRO_START, stepNitro, type Nitro } from './nitro.ts'
 
 const DT = 1 / 60
-const idle = { want: false, airborne: false, drifting: false, landed: null }
+const hold = (n: Nitro, want: boolean, seconds: number) => {
+  for (let k = 0; k < Math.round(seconds / DT); k++) n = stepNitro(n, want, DT)
+  return n
+}
 
-test('airtime, flips and clean landing fill the gauge', () => {
-  let n: Nitro = NITRO_START
-  for (let k = 0; k < 60; k++) n = stepNitro(n, { ...idle, airborne: true }, DT)
-  n = stepNitro(n, { ...idle, landed: { airTime: 1, flips: 1, clean: true } }, DT)
-  expect(n.gauge).toBeCloseTo(NITRO_START.gauge + NITRO_PER_AIR_SEC + NITRO_PER_FLIP + NITRO_CLEAN_LANDING, 5)
+test('starts empty', () => {
+  expect(NITRO_START.gauge).toBe(0)
 })
 
-test('rough landing gives flips but no clean bonus', () => {
-  const n = stepNitro(NITRO_START, { ...idle, landed: { airTime: 1, flips: 2, clean: false } }, DT)
-  expect(n.gauge).toBeCloseTo(NITRO_START.gauge + 2 * NITRO_PER_FLIP, 5)
+test('nothing refills before NITRO_REGEN_DELAY', () => {
+  expect(hold(NITRO_START, false, NITRO_REGEN_DELAY - 0.1).gauge).toBe(0)
 })
 
-test('drifting fills slowly', () => {
-  let n: Nitro = NITRO_START
-  for (let k = 0; k < 60; k++) n = stepNitro(n, { ...idle, drifting: true }, DT)
-  expect(n.gauge).toBeCloseTo(NITRO_START.gauge + NITRO_PER_DRIFT_SEC, 5)
+test('after the delay it refills at NITRO_REGEN_PER_SEC', () => {
+  const n = hold(NITRO_START, false, NITRO_REGEN_DELAY + 2)
+  expect(n.gauge).toBeCloseTo(2 * NITRO_REGEN_PER_SEC, 2)
 })
 
 test('burning drains at NITRO_BURN_PER_SEC and stops at empty', () => {
-  let n: Nitro = { gauge: 0.1, burning: false }
-  n = stepNitro(n, { ...idle, want: true }, DT)
+  let n: Nitro = { gauge: 0.1, burning: false, idle: 10 }
+  n = stepNitro(n, true, DT)
   expect(n.burning).toBe(true)
   expect(n.gauge).toBeCloseTo(0.1 - NITRO_BURN_PER_SEC * DT, 6)
-  for (let k = 0; k < 60; k++) n = stepNitro(n, { ...idle, want: true }, DT)
+  n = hold(n, true, 1)
   expect(n.gauge).toBe(0)
   expect(n.burning).toBe(false)
 })
 
-test('letting go stops burning', () => {
-  const n = stepNitro({ gauge: 0.5, burning: true }, idle, DT)
-  expect(n.burning).toBe(false)
-  expect(n.gauge).toBe(0.5)
+test('using it restarts the refill delay', () => {
+  let n: Nitro = { gauge: 0.5, burning: false, idle: 10 }
+  n = hold(n, true, 0.5)
+  const after = n.gauge
+  n = hold(n, false, NITRO_REGEN_DELAY - 0.1)
+  expect(n.gauge).toBeCloseTo(after, 6)
+  n = hold(n, false, 1)
+  expect(n.gauge).toBeGreaterThan(after)
+})
+
+test('holding the key on an empty gauge does not count as idle', () => {
+  const n = hold({ gauge: 0, burning: false, idle: 0 }, true, NITRO_REGEN_DELAY + 2)
+  expect(n.gauge).toBe(0)
 })
 
 test('gauge never exceeds 1', () => {
-  const n = stepNitro({ gauge: 0.95, burning: false }, { ...idle, landed: { airTime: 2, flips: 3, clean: true } }, DT)
-  expect(n.gauge).toBe(1)
+  expect(hold({ gauge: 0.99, burning: false, idle: 10 }, false, 5).gauge).toBe(1)
 })

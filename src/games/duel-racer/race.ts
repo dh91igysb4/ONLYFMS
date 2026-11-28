@@ -10,14 +10,11 @@ import { carState, createCar, resetCar, stepCar, type Car, type CarState } from 
 import { NO_CONTROLS, type Controls } from './physics/controls.ts'
 import type { Rapier } from './physics/rapier.ts'
 import { createWorld, type PhysWorld } from './physics/world.ts'
-import { AIR_IDLE, trackAir, type AirTrack } from './stunt.ts'
 
 /** 3·2·1 (틱) */
 export const COUNTDOWN_TICKS = 3 * TICK_HZ
 const DT = 1 / TICK_HZ
 const STUCK_TICKS = STUCK_SECONDS * TICK_HZ
-/** 드리프트로 볼 미끄러짐 각 (도) */
-const DRIFT_SLIP_DEG = 10
 
 export type Pose = { pos: { x: number; y: number; z: number }; quat: { x: number; y: number; z: number; w: number } }
 
@@ -32,7 +29,6 @@ export type RaceSnapshot = {
   /** 0..1 */
   progress: number
   finishTicks: number | null
-  lastLanding: null | { flips: number; clean: boolean; tick: number }
 }
 
 export type Race = {
@@ -44,13 +40,11 @@ export type Race = {
   /** 틱 단위 누적기 */
   acc: number
   nitro: Nitro
-  air: AirTrack
   progressIndex: number
   lastCheckpoint: number
   stuck: number
   resetRequested: boolean
   finishTicks: number | null
-  lastLanding: RaceSnapshot['lastLanding']
   /** 직전 틱 자세 */
   prevPose: Pose
 }
@@ -68,8 +62,8 @@ export function createRace(R: Rapier, course: string | Course): Race {
   const s0 = carState(car)
   return {
     prevPose: { pos: s0.pos, quat: s0.quat },
-    pw, course: c, car, elapsed: 0, acc: 0, nitro: NITRO_START, air: AIR_IDLE,
-    progressIndex: 0, lastCheckpoint: 0, stuck: 0, resetRequested: false, finishTicks: null, lastLanding: null,
+    pw, course: c, car, elapsed: 0, acc: 0, nitro: NITRO_START,
+    progressIndex: 0, lastCheckpoint: 0, stuck: 0, resetRequested: false, finishTicks: null,
   }
 }
 
@@ -80,7 +74,6 @@ export function requestReset(race: Race): void {
 function respawn(race: Race): void {
   resetCar(race.car, poseAt(race.course, race.lastCheckpoint))
   race.progressIndex = race.lastCheckpoint
-  race.air = AIR_IDLE
   race.stuck = 0
   const s = carState(race.car)
   race.prevPose = { pos: s.pos, quat: s.quat }
@@ -101,9 +94,9 @@ function step(race: Race, input: Controls): void {
   const c: Controls = !started ? NO_CONTROLS : done ? { ...NO_CONTROLS, brake: 0.5 } : input
   const before = carState(race.car)
   race.prevPose = { pos: before.pos, quat: before.quat }
-  const airborne = !before.grounded
-  const drifting = c.handbrake && before.grounded && before.slipDeg > DRIFT_SLIP_DEG
-  race.nitro = stepNitro(race.nitro, { want: c.nitro, airborne, drifting, landed: null }, DT)
+  // 니트로는 출발 뒤부터만 쓰고 차오른다(자동 충전 대기는 출발 순간부터 센다)
+  if (started && !done) race.nitro = stepNitro(race.nitro, c.nitro, DT)
+  else race.nitro = { ...race.nitro, burning: false }
   stepCar(race.car, c, race.nitro.burning, DT)
   race.pw.world.step()
   race.elapsed++
@@ -112,12 +105,6 @@ function step(race: Race, input: Controls): void {
   if (!finite(s) || s.pos.y < FALL_Y) {
     respawn(race)
     s = carState(race.car)
-  }
-  const a = trackAir(race.air, { grounded: s.grounded, localAngVel: s.localAngVel, upY: s.up.y }, DT)
-  race.air = a.track
-  if (a.landed) {
-    race.nitro = stepNitro(race.nitro, { want: false, airborne: false, drifting: false, landed: a.landed }, 0)
-    race.lastLanding = { flips: a.landed.flips, clean: a.landed.clean, tick: race.elapsed - COUNTDOWN_TICKS }
   }
   if (!started || done) return
 
@@ -160,7 +147,6 @@ export function snapshot(race: Race): RaceSnapshot {
     nitro: race.nitro,
     progress,
     finishTicks: race.finishTicks,
-    lastLanding: race.lastLanding,
   }
 }
 

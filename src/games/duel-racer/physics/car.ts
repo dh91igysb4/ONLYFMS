@@ -1,8 +1,8 @@
 // 아케이드 차량 (레이싱 설계 §5.1). Rapier 레이캐스트 차량 컨트롤러가 서스펜션·접지·바퀴 마찰을 맡고,
-// 그 위에 손맛 보정을 직접 건다: 속도 곡선 구동력, 최고속 제한, 조향 보조 토크, 드리프트, 공중 회전, 착지 보정.
+// 그 위에 손맛 보정을 직접 건다: 속도 곡선 구동력, 최고속 제한, 조향 보조 토크, 옆 미끄러짐 정리, 공중 자세 유지, 착지 보정. (드리프트·공중 회전은 2026-11-28 없앰)
 // 좌표 약속(course/types.ts): 차 로컬 +z가 앞, +y가 위. steer +1(오른쪽) = 월드 yaw 각속도 음수.
 import type { DynamicRayCastVehicleController, RigidBody } from '@dimforge/rapier3d-compat'
-import { ACCEL_TIME, CAR_HALF, CAR_MASS, DRIFT_REAR_GRIP, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../constants.ts'
+import { ACCEL_TIME, CAR_HALF, CAR_MASS, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../constants.ts'
 import type { Vec3 } from '../course/types.ts'
 import type { Controls } from './controls.ts'
 import { quatYPR, type PhysWorld } from './world.ts'
@@ -34,8 +34,6 @@ export type Car = {
   wasGrounded: boolean
   /** 착지 보정이 남은 시간 (s) */
   assistLeft: number
-  /** 뒷바퀴 횡그립 배율 (핸드브레이크 뒤 서서히 회복) */
-  rearGrip: number
   /** 정렬 모드 중인지(옆 그립을 뺀다) */
   spinning: boolean
   /** 정렬 모드: 맞출 수평 방향, 남은 시간, 속도 방향을 지킬지(착지) */
@@ -62,8 +60,6 @@ const STEER_HIGH = 0.12
 /** 조향 최대 yaw 각속도 (rad/s) */
 export const STEER_YAW_RATE = 1.2
 const YAW_GAIN = 12
-const DRIFT_YAW_BONUS = 1.5
-const REAR_GRIP_RECOVER_SEC = 0.3
 /** 이 각(rad)보다 크게 옆으로 미끄러지면 '돌고 있음'으로 보고 머리를 진행 방향으로 세운다 */
 const SPIN_SLIP = 0.35
 const SPIN_MIN_SPEED = 5
@@ -79,10 +75,6 @@ const ALIGN_MAX_SEC = 1.2
 /** 돌고 있을 때 바퀴 옆 그립 배율 */
 const SPIN_TIRE_GRIP = 0.08
 const ROLL_DAMP = 6
-const AIR_RATE = 4.5
-/** 공중 Q/E 제자리 돌기 각속도 (rad/s). 앞·옆구르기(AIR_RATE)보다 느리게 */
-export const AIR_YAW_RATE = 2.4
-const AIR_GAIN = 10
 /** 공중에서 입력 없는 축의 회전 감쇠(1/s)와 수평 복원 강도 */
 const AIR_HOLD_DAMP = 3
 const AIR_HOLD_LEVEL = 4
@@ -143,7 +135,7 @@ export function createCar(pw: PhysWorld, pose: { pos: Vec3; yaw: number }, roll 
     vc.setWheelFrictionSlip(i, FRICTION_SLIP)
     vc.setWheelSideFrictionStiffness(i, SIDE_STIFF)
   }
-  return { pw, body, vc, wasGrounded: false, assistLeft: 0, rearGrip: 1, spinning: false, align: null, lastAirDir: null }
+  return { pw, body, vc, wasGrounded: false, assistLeft: 0, spinning: false, align: null, lastAirDir: null }
 }
 
 export function resetCar(car: Car, pose: { pos: Vec3; yaw: number }): void {
@@ -152,7 +144,6 @@ export function resetCar(car: Car, pose: { pos: Vec3; yaw: number }): void {
   car.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
   car.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
   car.assistLeft = 0
-  car.rearGrip = 1
   car.align = null
   car.lastAirDir = null
 }
@@ -207,11 +198,11 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
   const hv = Math.hypot(s.vel.x, s.vel.z)
   const fh = Math.hypot(fwd.x, fwd.z) || 1
   const touchdown = s.grounded && !car.wasGrounded
-  if (touchdown && hv > SPIN_MIN_SPEED && !c.handbrake) {
+  if (touchdown && hv > SPIN_MIN_SPEED) {
     const d = car.lastAirDir
     if (d && slipTo(fwd, fh, d.x, d.z) > LAND_ALIGN_MIN) car.align = { x: d.x, z: d.z, left: ALIGN_MAX_SEC, keepSpeed: true }
   }
-  if (!car.align && s.grounded && !c.handbrake && hv > SPIN_MIN_SPEED && slipTo(fwd, fh, s.vel.x / hv, s.vel.z / hv) > SPIN_SLIP) {
+  if (!car.align && s.grounded && hv > SPIN_MIN_SPEED && slipTo(fwd, fh, s.vel.x / hv, s.vel.z / hv) > SPIN_SLIP) {
     car.align = { x: s.vel.x / hv, z: s.vel.z / hv, left: ALIGN_MAX_SEC, keepSpeed: false }
   }
   let alignTarget: number | null = null
@@ -223,7 +214,7 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
     }
     const err = slipTo(fwd, fh, a.x, a.z)
     a.left -= dt
-    if (err < ALIGN_DONE || a.left <= 0 || c.handbrake || !s.grounded) {
+    if (err < ALIGN_DONE || a.left <= 0 || !s.grounded) {
       car.align = null
     } else {
       const crossY = (fwd.z * a.x - fwd.x * a.z) / fh
@@ -242,15 +233,13 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
   const steerAngle = c.steer * (STEER_LOW + (STEER_HIGH - STEER_LOW) * k)
   vc.setWheelSteering(0, -steerAngle)
   vc.setWheelSteering(1, -steerAngle)
-  // 드리프트: 뒷바퀴 횡그립
-  if (c.handbrake && s.grounded) car.rearGrip = DRIFT_REAR_GRIP
-  else car.rearGrip = Math.min(1, car.rearGrip + ((1 - DRIFT_REAR_GRIP) * dt) / REAR_GRIP_RECOVER_SEC)
+  // 바퀴 옆 그립
   // 크게 돌고 있으면(아래 spinning) 바퀴 옆 그립도 낮춰 속도가 옆으로 꺾이지 않게 한다
   const spinGrip = car.spinning ? SPIN_TIRE_GRIP : 1
   vc.setWheelSideFrictionStiffness(0, SIDE_STIFF * spinGrip)
   vc.setWheelSideFrictionStiffness(1, SIDE_STIFF * spinGrip)
-  vc.setWheelSideFrictionStiffness(2, SIDE_STIFF * car.rearGrip * spinGrip)
-  vc.setWheelSideFrictionStiffness(3, SIDE_STIFF * car.rearGrip * spinGrip)
+  vc.setWheelSideFrictionStiffness(2, SIDE_STIFF * spinGrip)
+  vc.setWheelSideFrictionStiffness(3, SIDE_STIFF * spinGrip)
   for (let i = 0; i < 4; i++) {
     vc.setWheelEngineForce(i, 0)
     vc.setWheelBrake(i, 0)
@@ -270,34 +259,31 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
     const speedK = Math.min(1, Math.abs(v) / 8)
     const target = alignTarget !== null
       ? alignTarget
-      : -c.steer * STEER_YAW_RATE * speedK * Math.sign(v || 1) * (c.handbrake ? DRIFT_YAW_BONUS : 1)
+      : -c.steer * STEER_YAW_RATE * speedK * Math.sign(v || 1)
     const yawErr = target - lw.y
     const upW = rot(q, { x: 0, y: 1, z: 0 })
     if (spinning || c.steer !== 0 || Math.abs(lw.y) > 0.01) {
       const gain = spinning || c.steer !== 0 ? YAW_GAIN : YAW_GAIN * 0.5
       body.applyTorqueImpulse(scale(upW, 2336 * yawErr * gain * dt), true)
     }
-    // 드리프트 뒤 회복: 그립이 돌아오면 미끄러짐(옆 속도)을 줄인다
+    // 옆 미끄러짐(옆 속도)을 줄인다. 정렬 모드에서는 약하게
     const side = dot(s.vel, right)
-    if (!c.handbrake) {
-      const cancel = car.rearGrip * (spinning ? SPIN_SIDE_CANCEL : 6) * dt
+    {
+      const cancel = (spinning ? SPIN_SIDE_CANCEL : 6) * dt
       body.applyImpulse(scale(right, -side * m * Math.min(1, cancel)), true)
     }
     // 지상 롤 안정
     const fw = rot(q, { x: 0, y: 0, z: 1 })
     body.applyTorqueImpulse(scale(fw, -lw.z * ROLL_DAMP * 900 * dt), true)
   } else {
-    // 공중 회전: 입력 각속도로 끌어당긴다
-    const want = { x: c.pitch * AIR_RATE, y: -c.yaw * AIR_YAW_RATE, z: -c.roll * AIR_RATE }
-    const err = { x: want.x - lw.x, y: want.y - lw.y, z: want.z - lw.z }
-    const active = { x: c.pitch !== 0, y: c.yaw !== 0, z: c.roll !== 0 }
-    // 입력이 없는 축은 자세를 지킨다: 회전을 줄이고 수평 쪽으로 천천히 되돌린다(점프대에서 앞이 처박히지 않게)
+    // 공중: 조작 없음(공중 회전은 2026-11-28 없앰). 자세를 지킨다: 회전을 줄이고 수평 쪽으로 천천히 되돌린다
+    // (점프대에서 앞이 처박히지 않게)
     const upL = rot(conj(q), { x: 0, y: 1, z: 0 })
     const level = { x: upL.z, z: -upL.x }
     const tl = {
-      x: active.x ? err.x * AIR_GAIN * 2080 * dt : (-lw.x * AIR_HOLD_DAMP + level.x * AIR_HOLD_LEVEL) * 2080 * dt,
-      y: active.y ? err.y * AIR_GAIN * 2336 * dt : -lw.y * AIR_HOLD_DAMP * 0.5 * 2336 * dt,
-      z: active.z ? err.z * AIR_GAIN * 900 * dt : (-lw.z * AIR_HOLD_DAMP + level.z * AIR_HOLD_LEVEL) * 900 * dt,
+      x: (-lw.x * AIR_HOLD_DAMP + level.x * AIR_HOLD_LEVEL) * 2080 * dt,
+      y: -lw.y * AIR_HOLD_DAMP * 0.5 * 2336 * dt,
+      z: (-lw.z * AIR_HOLD_DAMP + level.z * AIR_HOLD_LEVEL) * 900 * dt,
     }
     body.applyTorqueImpulse(rot(q, tl), true)
   }

@@ -42,7 +42,6 @@
 .dr-progress { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 20%, transparent); display: flex; align-items: flex-end; }
 .dr-progress-fill { width: 100%; border-radius: 4px; background: var(--lime); }
 .dr-countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 120px; font-weight: 900; color: var(--ink); text-shadow: 0 2px 12px rgb(0 0 0 / 0.7); pointer-events: none; }
-.dr-toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); margin: 0; padding: 6px 14px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--ink); font-weight: 800; }
 .dr-result-title { margin: 0; font-size: 18px; }
 .dr-result-time { margin: 0; font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .dr-result-best { margin: 0; font-size: 14px; font-weight: 600; }

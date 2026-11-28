@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   rapierFail: false,
 }))
 const baseSnap = (): Snap => ({
-  tick: -180, countdown: 3, progress: 0, finishTicks: null, lastLanding: null,
+  tick: -180, countdown: 3, progress: 0, finishTicks: null,
   car: { speed: 0, grounded: true, pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, quat: { x: 0, y: 0, z: 0, w: 1 } },
   nitro: { gauge: 0.3, burning: false },
 })
@@ -150,12 +150,4 @@ test('Escape exits and R resets', async () => {
   expect(h.resets).toBe(1)
   fireEvent.keyDown(window, { code: 'Escape' })
   expect(onExit).toHaveBeenCalled()
-})
-
-test('landing toast names flips and clean landing', async () => {
-  h.snap = { ...baseSnap(), tick: 600, countdown: null, lastLanding: { flips: 1, clean: true, tick: 590 } }
-  mount()
-  await loaded()
-  await frame()
-  expect(screen.getByTestId('racer-toast').textContent).toBe('1회전 · 깔끔한 착지')
 })
