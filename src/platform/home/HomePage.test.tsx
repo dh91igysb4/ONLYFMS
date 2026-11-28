@@ -30,7 +30,17 @@ vi.mock('../world/presence.ts', () => ({
     }
   },
 }))
-vi.mock('./Shortcuts.tsx', () => ({ Shortcuts: () => <nav aria-label="바로가기">버튼들</nav> }))
+vi.mock('./Shortcuts.tsx', () => ({
+  TodayPanel: () => <section aria-label="오늘">오늘 판</section>,
+  GamesPanel: () => <section aria-label="게임">게임 판</section>,
+}))
+const topMock = vi.fn()
+const duelListMock = vi.fn()
+vi.mock('./shortcuts.ts', async (orig) => ({
+  ...(await orig<typeof import('./shortcuts.ts')>()),
+  loadTodayTop: (...a: unknown[]) => topMock(...a),
+  loadDuelList: () => duelListMock(),
+}))
 vi.mock('../../games/index.ts', () => {
   const manifest = (id: string, extra: Partial<Manifest>) => ({
     id, name: id === 'fishing' ? '펨타듀 낚시' : id, description: '', hidden: false,
@@ -71,6 +81,13 @@ function resize(width: number) {
   act(() => { roCallback?.([{ contentRect: { width } } as ResizeObserverEntry], {} as ResizeObserver) })
 }
 
+const duelItem = {
+  id: 'd1', game_id: 'g', rated: true, visibility: 'public', turn_seconds: 60, status: 'finished', stake: 0,
+  players: [{ id: 'u1', handle: 'kane', rating: 1000 }, { id: 'o', handle: 'son', rating: 1000 }],
+  created_by_handle: 'kane', created_at: '2026-11-27T00:00:00Z', winner: 0, end_reason: null, final_scores: [3, 1],
+}
+const regions = () => screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+
 const view = () => render(<MemoryRouter><HomePage /></MemoryRouter>)
 const lastProps = () => previewProps.mock.calls.at(-1)![0]
 
@@ -83,6 +100,15 @@ beforeEach(() => {
   worldMock.mockReset()
   previewProps.mockReset()
   previewMode = 'ok'
+  topMock.mockReset().mockResolvedValue({
+    top: [
+      { rank: 1, user_id: 'a', handle: 'son', score: 9 },
+      { rank: 2, user_id: 'b', handle: 'kim', score: 8 },
+      { rank: 3, user_id: 'c', handle: 'park', score: 7 },
+    ],
+    me: { rank: 6, user_id: 'u1', handle: 'kane', score: 4 },
+  })
+  duelListMock.mockReset().mockResolvedValue({ lobby: [], mine: [], due: [], recent: [duelItem] })
   fishingHidden = false
   pres.joins = []
   pres.peers = []
@@ -103,8 +129,7 @@ describe('HomePage', () => {
     expect(await screen.findByTestId('preview')).toBeTruthy()
     const a = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
     expect(a.getAttribute('href')).toBe('/world/fishing')
-    expect(a.textContent).toContain('들어가기')
-    expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: '게임' })).toBeTruthy()
   })
 
   test('user_records를 내 아이디로 한 번 부르고 그 게임 행만 넘긴다', async () => {
@@ -133,14 +158,14 @@ describe('HomePage', () => {
     expect(a.getAttribute('href')).toBe('/world/fishing')
     expect(a.className).toContain('btn')
     expect(screen.queryByRole('button', { name: '실패시키기' })).toBeNull()
-    expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: '게임' })).toBeTruthy()
   })
 
   test('미리보기가 렌더 중 던지면 대체 버튼, 바로가기는 그대로', async () => {
     previewMode = 'throw'
     view()
     await waitFor(() => expect(screen.getByRole('link', { name: '펨타듀 낚시 들어가기' }).className).toContain('btn'))
-    expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: '게임' })).toBeTruthy()
   })
 
   test('user_records가 오기 전에는 미리보기를 그리지 않고 같은 크기의 빈 자리만 둔다', async () => {
@@ -165,7 +190,7 @@ describe('HomePage', () => {
     fishingHidden = true
     view()
     expect(screen.queryByRole('link', { name: '펨타듀 낚시 들어가기' })).toBeNull()
-    expect(screen.getByRole('navigation', { name: '바로가기' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: '게임' })).toBeTruthy()
   })
 
   test('미리보기 크기: 폭 360 → 360, 폭 1200 → 480', async () => {
@@ -181,6 +206,71 @@ describe('HomePage', () => {
     view()
     expect(screen.getByRole('heading', { name: '홈' }).className).toContain('sr-only')
     expect(screen.queryByRole('button', { name: '편집' })).toBeNull()
+  })
+})
+
+describe('HomePage: 판', () => {
+  test('판 순서: 밸리 → 오늘 → 오늘 순위 → 최근 대전 → 게임', async () => {
+    view()
+    await screen.findByText('vs son')
+    expect(regions()).toEqual(['펨타듀 낚시', '오늘', '오늘 순위', '최근 대전', '게임'])
+    const valley = screen.getByRole('region', { name: '펨타듀 낚시' })
+    expect(valley.textContent).toContain('입장 ›')
+  })
+
+  test('오늘 순위: 위 3명 + 4위 밖인 내 줄, "전체 ›"는 순위 화면', async () => {
+    view()
+    const panel = screen.getByRole('region', { name: '오늘 순위' })
+    await waitFor(() => expect(panel.textContent).toContain('son'))
+    const rows = panel.querySelectorAll('tbody tr')
+    expect([...rows].map((r) => r.textContent)).toEqual(['1son9', '2kim8', '3park7', '6kane4'])
+    expect(rows[3].className).toContain('is-me')
+    expect(topMock).toHaveBeenCalledWith('u1')
+    const all = screen.getByRole('link', { name: '전체 순위' })
+    expect(all.getAttribute('href')).toBe('/leaderboard')
+  })
+
+  test('오늘 순위에 아무도 없으면 빈 문구', async () => {
+    topMock.mockResolvedValue({ top: [], me: null })
+    view()
+    const panel = screen.getByRole('region', { name: '오늘 순위' })
+    await waitFor(() => expect(panel.textContent).toContain('아직 오늘 기록이 없어요'))
+  })
+
+  test('오늘 순위 RPC가 실패하면 그 판만 "불러오지 못했어요", 다른 판은 그대로', async () => {
+    topMock.mockRejectedValue(new Error('x'))
+    view()
+    const panel = screen.getByRole('region', { name: '오늘 순위' })
+    await waitFor(() => expect(panel.textContent).toContain('불러오지 못했어요'))
+    expect(screen.getAllByText('불러오지 못했어요')).toHaveLength(1)
+    expect(await screen.findByText('vs son')).toBeTruthy()
+    expect(screen.getByRole('region', { name: '게임' })).toBeTruthy()
+  })
+
+  test('최근 대전: 앞 3개 줄은 그 대국으로, 승·무·패 칸', async () => {
+    const d = (id: string, winner: 0 | 1 | null, status = 'finished') => ({ ...duelItem, id, winner, status })
+    duelListMock.mockResolvedValue({ lobby: [], mine: [], due: [], recent: [d('a', 0), d('b', 1), d('c', null), d('d', null, 'void')] })
+    view()
+    const panel = await screen.findByRole('region', { name: '최근 대전' })
+    await waitFor(() => expect(panel.querySelectorAll('a.fm-row')).toHaveLength(3))
+    expect(panel.querySelector('a.fm-row')!.getAttribute('href')).toBe('/duel/a')
+    expect([...panel.querySelectorAll('.fm-chip')].map((c) => c.textContent)).toEqual(['승', '패', '무'])
+    expect(screen.getByRole('link', { name: '전체 대전' }).getAttribute('href')).toBe('/duel')
+  })
+
+  test('최근 대전이 없으면 최근 대전 판이 없다', async () => {
+    duelListMock.mockResolvedValue({ lobby: [], mine: [], due: [], recent: [] })
+    view()
+    await waitFor(() => expect(duelListMock).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.queryByRole('region', { name: '최근 대전' })).toBeNull()
+  })
+
+  test('최근 대전을 불러오지 못하면 그 판만 "불러오지 못했어요"', async () => {
+    duelListMock.mockRejectedValue(new Error('x'))
+    view()
+    const panel = await screen.findByRole('region', { name: '최근 대전' })
+    await waitFor(() => expect(panel.textContent).toContain('불러오지 못했어요'))
   })
 })
 
