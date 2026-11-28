@@ -58,4 +58,11 @@ describe('fm contrast', () => {
     expect(flat(css)).toMatch(/@media \(max-width: 430px\) \{[^}]*\.valley-btn-text \{ display: none; \}/)
     expect(flat(css)).toContain('@media (max-width: 374px) { .valley-btn { display: none; } }')
   })
+
+  it('버튼 글자는 가운데: 링크로 된 .btn도 가로·세로 가운데, 밑줄 없음', () => {
+    const btn = css.replace(/\s+/g, ' ').match(/\.btn \{([^}]*)\}/)![1]
+    for (const rule of ['display: inline-flex;', 'align-items: center;', 'justify-content: center;', 'text-decoration: none;']) {
+      expect(btn).toContain(rule)
+    }
+  })
 })

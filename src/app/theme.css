@@ -89,6 +89,9 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
 .avatar-sm { width: 30px; height: 30px; font-size: 15px; }
 .avatar-md { width: 44px; height: 44px; font-size: 20px; }
 .avatar-lg { width: 56px; height: 56px; font-size: 26px; }
+/* 머리글 동그라미 안의 게임 캐릭터 머리(HeadAvatar). 얼굴이 가운데 오게 조금 아래로 */
+.avatar-head { overflow: hidden; align-items: flex-end; }
+.avatar-head canvas { display: block; }
 
 /* 오른쪽 위 아이디 메뉴 */
 .user-menu { position: relative; min-width: 0; }
@@ -171,6 +174,9 @@ html.game-screen :is(input, textarea, [contenteditable="true"]) { -webkit-user-s
 
 .btn {
   font: inherit;
+  /* 링크(a)로 쓴 버튼도 글자가 가로·세로 가운데, 밑줄 없음 */
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  text-decoration: none; text-align: center; box-sizing: border-box;
   min-height: 44px;
   padding: 0 16px;
   border-radius: 4px;

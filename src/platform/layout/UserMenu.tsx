@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.ts'
-import { Avatar } from '../profile/Avatar.tsx'
+import { HeadAvatar } from './HeadAvatar.tsx'
 
 /** 오른쪽 위 아이디 메뉴: 내 프로필 · 화면 설정 · (관리자) · 로그아웃. 관리자 결정 대기 숫자는 메뉴 버튼과 항목에 붙는다 */
 export function UserMenu({ handle, isAdmin = false, adminPending = 0 }: { handle: string; isAdmin?: boolean; adminPending?: number }) {
@@ -52,7 +52,7 @@ export function UserMenu({ handle, isAdmin = false, adminPending = 0 }: { handle
       <button ref={buttonRef} type="button" className="user-menu-button"
         aria-label={`${handle} 계정 메뉴`} aria-haspopup="menu" aria-expanded={open}
         aria-controls={open ? menuId : undefined} onClick={() => setOpen((v) => !v)}>
-        <Avatar handle={handle} size="sm" />
+        <HeadAvatar handle={handle} />
         <span className="user-menu-handle">{handle}</span>
         {isAdmin && adminPending > 0 && <span className="badge user-menu-badge" aria-label={`결정 대기 제안 ${adminPending}건`}>{adminPending}</span>}
         <span className="user-menu-caret" aria-hidden="true" />
