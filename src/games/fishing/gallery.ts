@@ -161,3 +161,18 @@ export const PROJECTS: readonly Project[] = [
   ...FACILITIES.map((f) => ({ id: f.id, name: f.name, gold: f.gold, mats: Object.fromEntries(f.areas.map((a) => [a, f.mats])) })),
 ]
 export const projectById = (id: string): Project | undefined => PROJECTS.find((p) => p.id === id)
+
+/** 테마 외형(2층 전시관 덧그림, scene.ts). 배경 = 벽 색·무늬, 바닥 = 바닥 체크, 조명 = 움직이는 연출. 산 부품만 그린다 */
+export const THEME_LOOK: Readonly<Record<ThemeId, { wall: string; wallDark: string; motif: string; floorA: string; floorB: string; fx: 'glint' | 'firefly' | 'ember' | 'snow' | 'sparkle' | 'bubble'; fxColor: string }>> = {
+  sea: { wall: '#bfe0ec', wallDark: '#7fb6cc', motif: '#ffffff', floorA: '#e9dcb8', floorB: '#dccda4', fx: 'glint', fxColor: '#fff6c9' },
+  forest: { wall: '#bcd9a8', wallDark: '#7fa86a', motif: '#4f7d3a', floorA: '#b98b5e', floorB: '#a97b50', fx: 'firefly', fxColor: '#e9ff8a' },
+  volcano: { wall: '#5a3a3a', wallDark: '#3a2424', motif: '#e2662c', floorA: '#4a4248', floorB: '#3e373d', fx: 'ember', fxColor: '#ffb44a' },
+  snow: { wall: '#e6f1f7', wallDark: '#b9d2e0', motif: '#8fb7d0', floorA: '#f4f8fb', floorB: '#e3edf3', fx: 'snow', fxColor: '#b8d3e3' },
+  coral: { wall: '#f6c9c3', wallDark: '#e09a90', motif: '#ff7f6a', floorA: '#f3e2c4', floorB: '#e8d3ad', fx: 'sparkle', fxColor: '#ffe3f0' },
+  abyss: { wall: '#2c3e63', wallDark: '#1b2742', motif: '#4fc1c9', floorA: '#25304a', floorB: '#1f2940', fx: 'bubble', fxColor: '#9fe6f0' },
+}
+/** 전시관 덧그림의 테마 입력: 적용한 테마와 그 테마에서 산 바닥·조명 */
+export function themeLook(g: Pick<Gallery, 'theme' | 'projects'>): { id: ThemeId; floor: boolean; light: boolean } | null {
+  if (!g.theme || !g.projects.includes(`${g.theme}-bg`)) return null
+  return { id: g.theme, floor: g.projects.includes(`${g.theme}-floor`), light: g.projects.includes(`${g.theme}-light`) }
+}

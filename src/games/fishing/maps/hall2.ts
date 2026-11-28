@@ -26,7 +26,7 @@ const FIXTURES: Fixture[] = [
   ...[12, 13].map((ty): Fixture => ({ front: { tx: 21, ty, facing: 'right' }, act: { kind: 'stairs', target: 'hall', entry: { tx: 37, ty: 12, facing: 'left' } } })),
 ]
 
-export const HALL2 = defineMap('hall2', [
+const ROWS = [
   'YYYYYYYYYYYYYYYYYYYYYYYYYY',
   'YFFFFFFFFFFFFFFFFFFFFFFFFY',
   'YFFFFFFFFFYFYFYFFFFFFFFFFY',
@@ -43,7 +43,15 @@ export const HALL2 = defineMap('hall2', [
   'YFFFFFFFFFFFFFFFFFFFFFYYYY',
   'YFFFFFFFFFFFFFFFFFFFFFYYYY',
   'YYYYYYYYYYYYYYYYYYYYYYYYYY',
-], {
+]
+/** 테마 바닥을 덮는 칸: 걷는 대리석 칸 중 카펫·단상·확장 구역·계단 앞·화분 칸을 뺀 곳(그림 gallery.py와 맞춘다) */
+const onCarpet = (tx: number, ty: number) => (tx >= 11 && tx <= 13 && ty >= 4 && ty <= 11) || (ty === 12 && tx >= 14 && tx <= 21) || (ty <= 3 && tx >= 9 && tx <= 15)
+const covered = (tx: number, ty: number) => onCarpet(tx, ty) || (ty >= 13 && tx <= 20) || (tx >= 22 && ty >= 11) || (ty === 1 && (tx === 1 || tx === 23))
+export const HALL2_THEME_FLOOR: readonly { tx: number; ty: number }[] = ROWS.flatMap((row, ty) =>
+  [...row].flatMap((ch, tx) => (ch === 'F' && !covered(tx, ty) ? [{ tx, ty }] : [])),
+)
+
+export const HALL2 = defineMap('hall2', ROWS, {
   indoor: true,
   onWorldMap: false,
   backdrop: 'hall-gallery',

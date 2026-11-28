@@ -3,7 +3,8 @@
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
-import { HALL2_PEDESTALS, HALL2_WINGS } from './maps/hall2.ts'
+import { HALL2_PEDESTALS, HALL2_THEME_FLOOR, HALL2_WINGS } from './maps/hall2.ts'
+import { THEME_LOOK, themeLook, type Gallery, type ThemeId } from './gallery.ts'
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
 import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
@@ -1261,17 +1262,102 @@ function faceOf(avatar: string): Sprite {
   return sp
 }
 
-export type GalleryScene = { exhibits: readonly { tx: number; ty: number; species: string }[]; tape: readonly { tx: number; ty: number; w: number; h: number }[] }
-/** 전시관 그림 입력: 전시한 어종의 받침대 칸, 확장 단계보다 뒤 구역 */
-export function galleryScene(g: { exhibits: readonly string[]; expansions: number }): GalleryScene {
+export type GalleryScene = {
+  exhibits: readonly { tx: number; ty: number; species: string }[]
+  tape: readonly { tx: number; ty: number; w: number; h: number }[]
+  /** 적용한 테마(배경을 산 경우만)와 그 테마에서 산 바닥·조명 */
+  theme: { id: ThemeId; floor: boolean; light: boolean } | null
+}
+/** 전시관 그림 입력: 전시한 어종의 받침대 칸, 확장 단계보다 뒤 구역, 테마 외형 */
+export function galleryScene(g: Pick<Gallery, 'exhibits' | 'expansions' | 'theme' | 'projects'>): GalleryScene {
   return {
     exhibits: g.exhibits.flatMap((id) => (HALL2_PEDESTALS[id] ? [{ ...HALL2_PEDESTALS[id], species: id }] : [])),
     tape: HALL2_WINGS.slice(g.expansions),
+    theme: themeLook(g),
+  }
+}
+/** 테마 벽 무늬(3×3, '#' = motif 색). 위쪽 벽 아래 띠에 반복한다 */
+const THEME_MOTIF: Readonly<Record<ThemeId, readonly string[]>> = {
+  sea: ['#..', '.#.', '..#'],
+  forest: ['.#.', '###', '.#.'],
+  volcano: ['.#.', '#.#', '...'],
+  snow: ['#.#', '.#.', '#.#'],
+  coral: ['#.#', '###', '.#.'],
+  abyss: ['.#.', '#.#', '.#.'],
+}
+/** 회관 2층 벽 구획(gallery.py): 위 벽 창 x(16px 단위 2칸 폭), 옆 벽 액자 줄 */
+const HALL2_W = 26 * TILE
+const HALL2_H = 16 * TILE
+const HALL2_WINDOWS = [2, 7, 12, 17, 22].map((k) => k * TILE)
+const HALL2_FRAME_ROWS = [3, 8]
+/** 테마 배경: 위 벽 면(창 사이)과 옆·아래 벽을 테마 색으로, 위 벽 아래 띠에 무늬 */
+function drawThemeWalls(ctx: CanvasRenderingContext2D, id: ThemeId): void {
+  const L = THEME_LOOK[id]
+  rect(ctx, 0, 0, HALL2_W, 4, L.wall)
+  let x = 0
+  for (const wx of HALL2_WINDOWS.filter((v) => v < HALL2_W - 2 * TILE)) {
+    rect(ctx, x, 4, wx - x, TILE - 4, L.wallDark)
+    x = wx + 2 * TILE + 1
+  }
+  rect(ctx, x, 4, HALL2_W - x, TILE - 4, L.wallDark)
+  const motif = THEME_MOTIF[id]
+  for (let mx = 2; mx < HALL2_W - 3; mx += 6) {
+    if (HALL2_WINDOWS.some((wx) => mx + 3 > wx && mx < wx + 2 * TILE + 1)) continue
+    motif.forEach((row, yy) => [...row].forEach((ch, xx) => ch === '#' && rect(ctx, mx + xx, 9 + yy, 1, 1, L.motif)))
+  }
+  for (const sx of [0, HALL2_W - TILE]) {
+    let y = TILE
+    for (const fr of HALL2_FRAME_ROWS) {
+      rect(ctx, sx, y, TILE, fr * TILE - y, L.wall)
+      y = fr * TILE + TILE + 5
+    }
+    rect(ctx, sx, y, TILE, HALL2_H - TILE - y, L.wall)
+  }
+  rect(ctx, 0, HALL2_H - TILE, HALL2_W, TILE, L.wall)
+  rect(ctx, 0, HALL2_H - TILE, HALL2_W, 4, L.wallDark)
+}
+/** 테마 바닥: 걷는 대리석 칸(HALL2_THEME_FLOOR)을 테마 체크로 덮는다 */
+function drawThemeFloor(ctx: CanvasRenderingContext2D, id: ThemeId): void {
+  const L = THEME_LOOK[id]
+  for (const f of HALL2_THEME_FLOOR) rect(ctx, f.tx * TILE, f.ty * TILE, TILE, TILE, (f.tx + f.ty) % 2 ? L.floorA : L.floorB)
+}
+/** 테마 조명·연출: tMs로만 정해지는 입자 24개(같은 시각이면 같은 그림) */
+export function themeParticles(id: ThemeId, tMs: number): { x: number; y: number; on: boolean }[] {
+  const fx = THEME_LOOK[id].fx
+  const top = TILE
+  const h = HALL2_H - 2 * TILE
+  const w = HALL2_W - 2 * TILE
+  return Array.from({ length: 24 }, (_, i) => {
+    const x0 = TILE + 6 + ((i * 97) % (w - 12))
+    const y0 = top + 4 + ((i * 53) % (h - 8))
+    const ph = tMs / 1000 + i * 0.7
+    if (fx === 'snow') return { x: x0 + Math.round(Math.sin(ph) * 3), y: top + Math.floor((y0 - top + tMs * 0.02) % h), on: true }
+    if (fx === 'ember' || fx === 'bubble') return { x: x0 + Math.round(Math.sin(ph * 1.3) * 2), y: top + h - 1 - Math.floor((h - 1 - (y0 - top) + tMs * (fx === 'ember' ? 0.03 : 0.015)) % h), on: true }
+    if (fx === 'firefly') return { x: x0 + Math.round(Math.sin(ph) * 6), y: y0 + Math.round(Math.cos(ph * 0.8) * 4), on: Math.sin(ph * 2) > -0.2 }
+    // glint·sparkle: 제자리에서 깜빡
+    return { x: x0, y: y0, on: Math.floor(tMs / 250 + i * 3) % 6 === 0 }
+  })
+}
+function drawThemeLight(ctx: CanvasRenderingContext2D, id: ThemeId, tMs: number): void {
+  const L = THEME_LOOK[id]
+  for (const p of themeParticles(id, tMs)) {
+    if (!p.on) continue
+    const x = Math.round(p.x)
+    const y = Math.round(p.y)
+    if (L.fx === 'glint' || L.fx === 'sparkle') {
+      rect(ctx, x - 1, y, 3, 1, L.fxColor)
+      rect(ctx, x, y - 1, 1, 3, L.fxColor)
+    } else if (L.fx === 'ember') rect(ctx, x, y, 1, 2, L.fxColor)
+    else rect(ctx, x, y, 2, 2, L.fxColor)
   }
 }
 const GALLERY_C = { glass: '#d8f0f7', glassEdge: '#9fd0e0', tapeA: '#f2c14e', tapeB: '#2a2135' }
 /** 전시관 덧그림: 받침대 위 유리 상자 + 물고기, 확장 전 구역은 노랑·검정 사선 테이프 테두리 */
 function drawGallery(ctx: CanvasRenderingContext2D, g: GalleryScene): void {
+  if (g.theme) {
+    drawThemeWalls(ctx, g.theme.id)
+    if (g.theme.floor) drawThemeFloor(ctx, g.theme.id)
+  }
   for (const e of g.exhibits) {
     const x = e.tx * TILE
     const y = e.ty * TILE
@@ -1332,6 +1418,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   // 바닥에 붙은 것(잠긴 문·배·얼음 구멍·뚫는 금)이 맨 먼저
   if (s.map.backdrop && s.fame) drawFame(ctx, s.fame)
   if (s.map.backdrop && s.gallery) drawGallery(ctx, s.gallery)
+  if (s.map.backdrop && s.gallery?.theme?.light) drawThemeLight(ctx, s.gallery.theme.id, t)
   drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
   drawHoles(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 
