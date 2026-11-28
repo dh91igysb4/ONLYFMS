@@ -1365,6 +1365,19 @@ function drawThemeLight(ctx: CanvasRenderingContext2D, id: ThemeId, tMs: number)
   }
 }
 const GALLERY_C = { glass: '#d8f0f7', glassEdge: '#9fd0e0', tapeA: '#f2c14e', tapeB: '#2a2135' }
+/**
+ * 받침대 칸(tx, ty) 위 유리 상자와 물고기 자리(논리 px). 물고기 그림(w×h, 왼쪽 위 기준)이 안쪽 유리에 딱 맞게 들어가고,
+ * 상자는 받침대 칸 가운데에 서서 위로 6px 솟는다. 16×16 물고기면 상자는 칸보다 양옆 1px 넓다(이웃 받침대는 2칸 이상 떨어져 있다).
+ */
+export function exhibitBox(tx: number, ty: number, w: number, h: number): { edge: Box; inner: Box; fish: { x: number; y: number } } {
+  const cx = tx * TILE + TILE / 2
+  const top = ty * TILE - 6
+  const iw = Math.max(w, TILE - 4)
+  const inner: Box = { x: cx - iw / 2, y: top + 1, w: iw, h: Math.max(h, TILE) }
+  const edge: Box = { x: inner.x - 1, y: top, w: inner.w + 2, h: inner.h + 2 }
+  const fish = { x: inner.x + Math.floor((inner.w - w) / 2), y: inner.y + Math.floor((inner.h - h) / 2) }
+  return { edge, inner, fish }
+}
 /** 전시관 덧그림: 받침대 위 유리 상자 + 물고기, 확장 전 구역은 노랑·검정 사선 테이프 테두리 */
 function drawGallery(ctx: CanvasRenderingContext2D, g: GalleryScene): void {
   if (g.theme) {
@@ -1372,11 +1385,11 @@ function drawGallery(ctx: CanvasRenderingContext2D, g: GalleryScene): void {
     if (g.theme.floor) drawThemeFloor(ctx, g.theme.id)
   }
   for (const e of g.exhibits) {
-    const x = e.tx * TILE
-    const y = e.ty * TILE
-    rect(ctx, x + 1, y - 6, TILE - 2, TILE + 2, GALLERY_C.glassEdge)
-    rect(ctx, x + 2, y - 5, TILE - 4, TILE, GALLERY_C.glass)
-    if (SPRITES[`fish-${e.species}`]) drawSprite(ctx, `fish-${e.species}`, x + TILE / 2, y - 6, 1)
+    const sp = SPRITES[`fish-${e.species}`]
+    const b = exhibitBox(e.tx, e.ty, sp?.w ?? 0, sp?.h ?? 0)
+    rect(ctx, b.edge.x, b.edge.y, b.edge.w, b.edge.h, GALLERY_C.glassEdge)
+    rect(ctx, b.inner.x, b.inner.y, b.inner.w, b.inner.h, GALLERY_C.glass)
+    if (sp) drawSprite(ctx, `fish-${e.species}`, b.fish.x, b.fish.y, 1)
   }
   for (const t of g.tape) {
     const x0 = t.tx * TILE
