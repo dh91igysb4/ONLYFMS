@@ -2,7 +2,8 @@
 // 블록은 꼭짓점 4개(질량 BLOCK_MASS, 바퀴 하나 = 1)와 막대 6개(변 4 + 대각선 2)로 묶은 상자다. 차와 같은 이동 단계로 움직인다.
 // 보정은 위치 기반(PBD)이다: 이동 단계에서 꼭짓점이 예측 위치에서 옮겨진 양 × SUBSTEPS를 그 꼭짓점 속도(u/틱)에 더한다.
 // 그래서 밀린 만큼 속도를 얻고, 땅에 막힌 만큼 속도를 잃는다.
-import { BLOCK_CORNER_R, BLOCK_FRICTION_PCT, BLOCK_MASS, BLOCK_WAKE, BODY_R, G, GROUND_TOL, HEAD_R, SUBSTEPS, V_TERMINAL, WHEEL_R } from './constants.ts'
+import type { CarDef } from './cars.ts'
+import { BLOCK_CORNER_R, BLOCK_FRICTION_PCT, BLOCK_MASS, BLOCK_WAKE, G, GROUND_TOL, SUBSTEPS, V_TERMINAL, WHEEL_R } from './constants.ts'
 import { candOf, candVel, chassisOf, collideWheel, divRound, divTrunc, type Body, type Box, type Cand } from './collide.ts'
 import type { Course } from './course.ts'
 import type { Seg } from './pieces.ts'
@@ -370,10 +371,10 @@ function circleQuad(x: number, y: number, r: number, bw: BlockWork): Hit | null 
 }
 
 /**
- * 바퀴 둘·차체 판정원·차대 캡슐과 블록의 겹침을 질량비대로 나눠 양쪽을 민다(설계 §7.2). 죽음은 판정하지 않는다.
+ * 바퀴 둘·차체 판정원·차대 캡슐(치수는 car)과 블록의 겹침을 질량비대로 나눠 양쪽을 민다(설계 §7.2). 죽음은 판정하지 않는다.
  * 차 쪽 질량: 바퀴 1. 판정원은 두 바퀴가 함께 움직이고(몫 반씩), 캡슐은 접점 위치 비율로 나눈다. 블록 꼭짓점 질량은 BLOCK_MASS.
  */
-export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: number; y: number }, bws: readonly BlockWork[]): void {
+export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: number; y: number }, bws: readonly BlockWork[], car: CarDef): void {
   for (const bw of bws) {
     const q = bw.c
     for (const w of [r, f]) {
@@ -381,10 +382,10 @@ export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: num
       if (h) hitCar(h, [{ b: w, w: D }])
     }
     const hd = headAt(r, f)
-    const h = circleQuad(hd.x, hd.y, HEAD_R, bw)
+    const h = circleQuad(hd.x, hd.y, car.headR, bw)
     if (h) hitCar(h, [{ b: r, w: D / 2 }, { b: f, w: D / 2 }])
-    // 차대 캡슐(두 바퀴 중심 선분을 윗방향으로 BODY_DY 올린 선분, BODY_R) 안에 들어온 꼭짓점.
-    const cap = chassisOf(r, f)
+    // 차대 캡슐(두 바퀴 중심 선분을 윗방향으로 bodyDY 올린 선분, bodyR) 안에 들어온 꼭짓점.
+    const cap = chassisOf(r, f, car.bodyDY)
     for (let i = 0; i < 4; i++) {
       const ax = f.x - r.x
       const ay = f.y - r.y
@@ -394,7 +395,7 @@ export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: num
       const px = cap.x0 + divRound(ax * along, len)
       const py = cap.y0 + divRound(ay * along, len)
       const d2 = (px - v.x) * (px - v.x) + (py - v.y) * (py - v.y)
-      if (d2 >= BODY_R * BODY_R) continue
+      if (d2 >= car.bodyR * car.bodyR) continue
       const dist = isqrt(d2)
       let nx = px - v.x
       let ny = py - v.y
@@ -409,7 +410,7 @@ export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: num
         nl = len
       }
       const t = divRound(along * D, len)
-      hitCar({ d: BODY_R - dist, nx, ny, nl, pts: [{ b: v, w: D }] }, [{ b: r, w: D - t }, { b: f, w: t }].filter((p) => p.w > 0))
+      hitCar({ d: car.bodyR - dist, nx, ny, nl, pts: [{ b: v, w: D }] }, [{ b: r, w: D - t }, { b: f, w: t }].filter((p) => p.w > 0))
     }
   }
 }

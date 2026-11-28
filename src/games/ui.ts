@@ -12,6 +12,7 @@ import { Avatar as FishingAvatar } from './fishing/Avatar.tsx'
 import { Preview as FishingPreview } from './fishing/Preview.tsx'
 import type { OnlinePeer } from '../platform/world/presence.ts'
 import { Game as NeonRiderGame } from './neon-rider/Game.tsx'
+import { CarPreview } from './neon-rider/CarPreview.tsx'
 import { Game as CareerQuizGame } from './career-quiz/Game.tsx'
 
 /** 게임 화면이 받는 props. 플랫폼(PlayRunner)이 상태를 쥐고, 화면은 그리기와 입력만 맡는다 (§4.2). */
@@ -115,4 +116,16 @@ const previewComponents: Record<string, ComponentType<WorldPreviewProps>> = {
 
 export function getWorldPreview(id: string): ComponentType<WorldPreviewProps> | undefined {
   return previewComponents[id]
+}
+
+/** 상점 품목 미리보기가 받는 props. itemId는 그 게임 상점의 품목 id, size는 가로 px. */
+export type ShopPreviewProps = { itemId: string; size: number }
+
+/** 상점 미리보기 등록부. 상점에 그림이 필요한 게임을 여기에 한 줄씩 등록한다. */
+const shopPreviews: Record<string, ComponentType<ShopPreviewProps>> = {
+  'neon-rider': CarPreview,
+}
+
+export function getShopPreview(gameId: string): ComponentType<ShopPreviewProps> | undefined {
+  return shopPreviews[gameId]
 }

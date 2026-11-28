@@ -1,4 +1,5 @@
 import { FREE_DAILY_CAP } from '../economy.ts'
+import { CARS, DEFAULT_CAR } from './cars.ts'
 import type { Manifest } from '../types.ts'
 
 export const manifest: Manifest = {
@@ -9,7 +10,10 @@ export const manifest: Manifest = {
   modes: { daily: false, contest: false, free: true },
   puzzleSource: 'generate',
   dailyTimeLimitSec: null,
-  options: [],
+  options: [
+    { key: 'car', label: '차', shop: true, choices: CARS.map((c) => ({ value: c.id, label: c.label })), default: DEFAULT_CAR },
+  ],
+  shop: { option: 'car', items: CARS.map((c) => ({ id: c.id, price: c.price })) },
   freeStats: 'score',
   freeBestOnly: true,
   scoreMax: 9999,

@@ -2,6 +2,8 @@
 
 작성: 2026-11-23. 플랫폼 설계(`2026-10-31-onlyfms-platform-design.md`)와 볼 런 설계(`2026-11-07-ball-run-design.md`)의 구조를 따른다. 1~2장은 사용자와 대화로 확정했고, 3장 이후는 사용자가 방법을 맡겨 이 문서에서 정했다("내 판단"으로 표시).
 
+> **갱신(자동차, `logic.version` 6):** 차는 이제 옵션 `car`(상점 품목, 여섯 종)로 고른다. 바퀴·축거·질량·가속·회전은 모든 차가 같고, 지붕 판정원(`headOffset`/`headR`)과 차대 캡슐(`bodyDY`/`bodyR`)만 차별 값이다(`cars.ts`). 아래 `HEAD_OFFSET`·`HEAD_R`·`BODY_DY`·`BODY_R`은 기본 차 쿠페의 값이고 쿠페로 달리면 v5와 같은 결과다. 자세한 내용은 `2026-11-24-neon-rider-cars-design.md`.
+
 ## 1. 의도
 
 Ketchapp의 Rider 무한 모드를 친구들과 최고 점수로 겨루고 싶다. 기준은 하나다: **원작과 최대한 비슷한 손맛.** 한 손가락으로 가속과 공중 회전을 하고, 착지 각도에 따라 살거나 터지는 그 느낌이 나와야 한다.
@@ -85,7 +87,7 @@ Ketchapp의 Rider 무한 모드를 친구들과 최고 점수로 겨루고 싶�
   description: '누르면 달리고, 공중에서 누르면 돈다. 바퀴로 착지하라',
   hidden: false,
   modes: { daily: false, contest: false, free: true },
-  puzzleSource: 'generate', dailyTimeLimitSec: null, options: [],
+  puzzleSource: 'generate', dailyTimeLimitSec: null, options: [car(상점 옵션, 기본 coupe — 자동차 설계 참고)],
   freeStats: 'score', freeBestOnly: true, scoreMax: 9999, scoreDecimals: 0,
 }
 ```
@@ -158,7 +160,7 @@ Ketchapp의 Rider 무한 모드를 친구들과 최고 점수로 겨루고 싶�
 | 항목 | 녹화에서 잰 것 | 상수 |
 |---|---|---|
 | 축척·화면 | 차 전체 길이 = 게임 화면 폭의 1/9 | `CAR_LEN` 2000 mm, `VIEW_CARS` 9 |
-| 차 모양 | 축간 = 전체 길이의 0.73, 바퀴 반지름 약 180 mm, 지붕 꼭대기 축 위 380 mm | `WHEELBASE` 1400 mm, `WHEEL_R` 180 mm, `HEAD_OFFSET` 200 mm, `HEAD_R` 180 mm |
+| 차 모양 | 축간 = 전체 길이의 0.73, 바퀴 반지름 약 180 mm, 지붕 꼭대기 축 위 380 mm | `WHEELBASE` 1400 mm, `WHEEL_R` 180 mm, `HEAD_OFFSET` 200 mm, `HEAD_R` 180 mm (쿠페. 다른 차는 `cars.ts`) |
 | 중력 | 포물선 0.209 px/프레임² (약 16.9 m/s²) | `G` 75 u/틱² |
 | 출발 가속 | 정지에서 최고 속도까지 약 0.5초(측정값 90 u/틱²) | `DRIVE_ACC` **135** u/틱² = 측정값의 1.5배(사용자 결정 2026-11-23). 정지 → `V_MAX` 22틱(측정값으로는 33틱) |
 | 최고 속도 | 평지 8.1 px/프레임 (약 10.9 m/s) | `V_MAX` 2900 u/틱 |
@@ -172,7 +174,7 @@ Ketchapp의 Rider 무한 모드를 친구들과 최고 점수로 겨루고 싶�
 
 사용자 결정(2026-11-23): "가속은 1.5배, 회전 속도는 1.2배". 최고 속도 `V_MAX`, 부스터 `BOOST_V`, 중력 `G`와 나머지 수치는 측정값 그대로다. `constants.ts` 주석에 측정값과 배율을 함께 적었다.
 
-재지 못한 값은 `FRICTION_PCT`(2)와 `ROLL_DRAG`의 정확한 크기이고, 손맛으로 정한 자리표시다. 녹화가 실제 속도로 재생됐는지는 확인할 수 없다(배속 편집이면 시간이 들어간 값이 함께 틀리고, 높이·거리·회전 대비 체공의 비율은 그대로다). 판정 수치(`COLLIDE_WINDOW` 40, `LAND_GRACE` 12, `PERFECT_TOL` 170, `FALL_DEPTH` 6 m, `GROUND_TOL` 16 mm, 차대 캡슐 `BODY_R` 190 mm·`BODY_DY` 150 mm, 끼임 `CRUSH_DEPTH` 1440 u)와 코스 수치(`START_LEN` 12 m, `START_BACK` 500 m, `REST_LEN` 1 m, `LEAD_FLAT_MAX` 2 m, `TAIL_FLAT_MAX` 4 m, `SEG_LEN` 250 mm)는 측정 대상이 아니며 통과 게이트(§8)와 손맛으로 정했다.
+재지 못한 값은 `FRICTION_PCT`(2)와 `ROLL_DRAG`의 정확한 크기이고, 손맛으로 정한 자리표시다. 녹화가 실제 속도로 재생됐는지는 확인할 수 없다(배속 편집이면 시간이 들어간 값이 함께 틀리고, 높이·거리·회전 대비 체공의 비율은 그대로다). 판정 수치(`COLLIDE_WINDOW` 40, `LAND_GRACE` 12, `PERFECT_TOL` 170, `FALL_DEPTH` 6 m, `GROUND_TOL` 16 mm, 차대 캡슐 `BODY_R` 190 mm·`BODY_DY` 150 mm(쿠페 값), 끼임 `CRUSH_DEPTH` 1440 u)와 코스 수치(`START_LEN` 12 m, `START_BACK` 500 m, `REST_LEN` 1 m, `LEAD_FLAT_MAX` 2 m, `TAIL_FLAT_MAX` 4 m, `SEG_LEN` 250 mm)는 측정 대상이 아니며 통과 게이트(§8)와 손맛으로 정했다.
 
 ### 5.8 위험물 (`motion.ts`, `hazards.ts`)
 
@@ -180,7 +182,7 @@ Ketchapp의 Rider 무한 모드를 친구들과 최고 점수로 겨루고 싶�
 
 - **모양 세 가지:** 원 `disc`(톱니), 도는 날 `blades`(안쪽 반지름 rIn ~ 바깥 반지름 rOut의 부채꼴 조각 n개, 조각 폭 w. 배럴·팩맨·환풍기·루프 안 빨간 호), 막대 `bar`(두 끝점과 반지름의 캡슐. 가시 띠·가시 바닥·레이저·창).
 - **움직임:** `none`(고정. 톱니가 화면에서만 돌아가 보인다), `rotate`(각속도 ω), `swing`(삼각파 왕복), `pop`(창: 숨음 → 솟음 → 섬 → 내려감, 숨어 있으면 판정 없음). 움직이는 길은 여기에 `keys`(시작 시각부터 키프레임 사이를 선형 보간하고 마지막 키에서 멈춤)와 `fall`(중력으로 떨어지며 조금 돎)을 더 쓴다(§5.9).
-- **판정 대상:** 바퀴 둘(`WHEEL_R`), 차체 판정원(`HEAD_R`), **차대 캡슐**(반지름 `BODY_R` 190 mm). 캡슐은 두 바퀴 중심 선분을 차의 윗방향으로 `BODY_DY`(150 mm) 올린 선분이다(`chassisOf`. 아래 끝은 축선 아래 40 mm, 위 끝은 축선 위 340 mm로 차 그림의 등·보닛 가장자리를 덮는다). 두 바퀴 사이를 지나는 가는 위험물(창·레이저)을 살아서 통과하지 못하게 하고, 그린 차에 닿은 톱니가 죽이게 하려는 것이다. 캡슐은 위험물과 블록에만 쓰고 지형 판정은 그대로다.
+- **판정 대상:** 바퀴 둘(`WHEEL_R`), 차체 판정원(`HEAD_R`, 쿠페 값. 차마다 다르다), **차대 캡슐**(반지름 `BODY_R` 190 mm). 캡슐은 두 바퀴 중심 선분을 차의 윗방향으로 `BODY_DY`(150 mm) 올린 선분이다(`chassisOf`. 아래 끝은 축선 아래 40 mm, 위 끝은 축선 위 340 mm로 차 그림의 등·보닛 가장자리를 덮는다). 두 바퀴 사이를 지나는 가는 위험물(창·레이저)을 살아서 통과하지 못하게 하고, 그린 차에 닿은 톱니가 죽이게 하려는 것이다. 캡슐은 위험물과 블록에만 쓰고 지형 판정은 그대로다.
 - **시점:** 이동 단계마다 막대 제약·충돌을 푼 뒤 그 단계 끝 시각으로 확인한다. 겹치면 `crash`. 지급 대기 중이거나 공중인 공중제비는 지급하지 않고, 앞서 지급된 점수와 `lastAward`는 남는다.
 - **빠른 날 조건:** 이동 단계 사이에 날 끝이 `WHEEL_R`보다 많이 움직이면 놓치므로, 모든 `rotate` 위험물과 움직이는 길의 끝 속도 ω × 도달 반지름 × 2π / `TURN` / `SUBSTEPS`를 `WHEEL_R`(2880 u) 아래로 둔다(`pieces.test.ts`가 모든 템플릿에 대해 확인한다).
 - **오차:** 화면 모양과 판정의 차이는 `WHEEL_R`의 1/4(45 mm) 안이다. 단, 창·가시 막대는 판정 캡슐의 반지름만큼 그림보다 두껍다.

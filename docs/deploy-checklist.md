@@ -667,6 +667,22 @@ DB 변경 없음.
 - [ ] 관리자가 아니면 숨김 게임 버튼이 없다.
 - [ ] 다른 탭으로 갔다 와도 미리보기가 다시 그려진다.
 
+## 네온 라이더 자동차·상점 배포 (`feat/neon-rider-cars`, 네온 라이더 logic.version 6)
+
+설계 `docs/superpowers/specs/2026-11-24-neon-rider-cars-design.md`. 새 마이그레이션(`*_shop.sql`: `shop_items`·`user_items`·`buy_item`·`equip_item`·`my_items`, 장부 reason `shop`)이 있다.
+
+순서와 이유:
+1. DB 반영: `npx -y supabase@2 db push` — 마이그레이션이 먼저 들어가야 화면의 상점 호출이 동작한다.
+2. `play`·`duel` 함수 재배포: `npx -y supabase@2 functions deploy play --no-verify-jwt`, `npx -y supabase@2 functions deploy duel --no-verify-jwt` — 두 함수가 `pinShopOptions`와 네온 라이더 로직(v6)을 함께 번들한다. Vercel만 배포하면 서버가 옛 코드로 남는다.
+3. PR 머지(Vercel).
+
+수동 확인 (승인된 계정, 지갑이 보이는 상태):
+- [ ] 네온 라이더 자유 플레이 옵션 줄의 차 선택 상자에 쿠페만 있고 `상점` 버튼이 보인다.
+- [ ] 상점에서 픽업을 확인창 뒤에 사면 잔액이 5,000 JWD 줄고 선택 상자에 픽업이 생긴다. 산 차는 상점에서 `사기` 대신 `고르기`로 보이고, 확인 버튼을 빠르게 두 번 눌러도 5,000 JWD는 한 번만 빠진다(두 탭에서 같은 차를 사면 한쪽은 "이미 가진 품목이에요").
+- [ ] 고른 차 모양으로 그려지고, 새로고침해도 마지막으로 고른 차가 첫 판에 쓰인다.
+- [ ] 낮은 차로 달리면 같은 코스의 낮은 위험물을 지나간다(쿠페는 죽는 자리).
+- [ ] 지갑·관리자 장부에 reason `상점` 지출 행이 보이고 "오늘 들어온 골드"에는 들어가지 않는다.
+
 ## 문제가 생기면
 아래를 그대로 보내 준다.
 - 어느 단계(번호와 항목)에서 막혔는지

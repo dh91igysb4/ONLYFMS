@@ -5,6 +5,7 @@
 import { wakeBlock } from './blocks.ts'
 import type { BlockState } from './blocks.ts'
 import { CAR_LEN, MM, PERFECT_MULT, SUBSTEPS, VIEW_CARS, WHEELBASE, WHEEL_R } from './constants.ts'
+import { carById } from './cars.ts'
 import type { Box } from './collide.ts'
 import type { Course } from './course.ts'
 import { bladeAngles, shapeAt } from './hazards.ts'
@@ -59,14 +60,35 @@ const PRAISE_MS = 800
 const DEATH_PARTICLES = 24
 const GEM_PARTICLES = 8
 
-// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 지붕 꼭대기 380 mm [M13].
-// 판정은 두 바퀴(반지름 180)·지붕 원(축 가운데 위 200, 반지름 180)·차대 캡슐(축선을 BODY_DY 올린 선분, 반지름 BODY_R)이다.
-// 그림의 모든 가장자리는 이 합집합에서 40 mm 안에 둔다(render.test가 변마다 표본을 잡아 확인한다).
-// 그래서 꼬리~앞끝은 녹화의 2000 mm(CAR_LEN, 화면 축척 단위)보다 짧은 약 1815 mm다.
-export const BODY: readonly (readonly [number, number])[] = [
-  [-215, 40], [-120, 170], [550, 330], [650, 380], [860, 300], [1320, 190], [1600, 70], [1560, 20],
-]
-const WINDOW: readonly (readonly [number, number])[] = [[420, 290], [620, 345], [800, 280], [450, 255]]
+// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 쿠페 지붕 꼭대기 380 mm [M13].
+// 판정은 두 바퀴(반지름 180)·지붕 원(축 가운데 위 headOffset, 반지름 headR)·차대 캡슐(축선을 bodyDY 올린 선분, 반지름 bodyR)이고 차마다 cars.ts 값이다.
+// 그림의 모든 가장자리는 그 차의 이 합집합에서 40 mm 안에 둔다(render.test가 차마다 변마다 표본을 잡아 확인한다).
+// 쿠페의 꼬리~앞끝은 녹화의 2000 mm(CAR_LEN, 화면 축척 단위)보다 짧은 약 1815 mm다.
+export type CarArt = readonly (readonly [number, number])[]
+export const CAR_ART: Record<string, CarArt> = {
+  coupe: [[-215, 40], [-120, 170], [550, 330], [650, 380], [860, 300], [1320, 190], [1600, 70], [1560, 20]],
+  // 픽업: 뒤 짐칸(평평) + 앞 운전석 + 짧은 보닛
+  pickup: [[-170, 70], [-160, 300], [-100, 335], [480, 340], [580, 420], [820, 420], [900, 340], [1500, 300], [1580, 150], [1540, 20]],
+  // 버기: 낮은 통 차체(지붕 없음). 롤케이지 막대는 CAR_BARS
+  buggy: [[-170, 60], [-155, 220], [430, 240], [1450, 200], [1560, 120], [1500, 20]],
+  // 스포츠카: 매끈한 쐐기에 꼬리 스포일러 립
+  sports: [[-150, 50], [-140, 170], [-90, 232], [-30, 205], [450, 225], [600, 265], [800, 265], [950, 215], [1450, 140], [1550, 70], [1500, 10]],
+  // F1: 얇은 차체, 조종석 둥근 턱, 뾰족한 코와 앞날개, 꼬리 뒷날개
+  f1: [[-110, 30], [-150, 110], [-150, 150], [-100, 190], [-30, 212], [10, 175], [150, 120], [500, 115], [600, 150], [640, 225], [740, 225], [780, 150], [900, 110], [1350, 70], [1560, 45], [1540, -10], [1440, -10]],
+  // 스케이트보드: 얇은 판과 위로 휜 양 끝
+  skate: [[-120, 70], [-110, 160], [1420, 160], [1520, 100], [1490, 40], [1400, 80], [0, 80], [-80, 40]],
+}
+// 롤케이지 막대(차 id → 꺾은선 목록). 굵은 선으로 그려 사이가 비어 보인다. 판정 합집합에서 40 mm 안.
+export const CAR_BARS: Record<string, readonly CarArt[]> = {
+  buggy: [[[520, 235], [590, 325], [810, 325], [880, 235]], [[700, 325], [700, 235]]],
+}
+// 유리창(차 id → 다각형). 없으면 안 그린다.
+export const CAR_WINDOW: Record<string, CarArt> = {
+  coupe: [[420, 290], [620, 345], [800, 280], [450, 255]],
+  pickup: [[580, 350], [640, 400], [780, 400], [840, 350]],
+  sports: [[610, 235], [690, 255], [790, 255], [890, 225]],
+  f1: [[660, 160], [670, 205], [720, 205], [730, 160]],
+}
 
 const PRAISE: readonly (readonly string[])[] = [
   ['nice!', 'clean!'],
@@ -231,6 +253,55 @@ export type Renderer = {
   resize(widthPx: number, heightPx: number, dpr: number): void
   render(prev: SimState, cur: SimState, alpha: number, course: Course, nowMs: number): void
   dispose(): void
+}
+
+/** 차 하나를 그린다(게임 화면·상점 미리보기 공용). R·F는 뒷·앞바퀴 중심 화면 좌표, len은 둘 사이 px, wr은 바퀴 반지름 px. */
+export function paintCar(c: CanvasRenderingContext2D, carId: string, R: { x: number; y: number }, F: { x: number; y: number }, len: number, wr: number): void {
+  const id = carById(carId).id
+  const ux = (F.x - R.x) / (len || 1)
+  const uy = (F.y - R.y) / (len || 1)
+  const k = (len / WHEELBASE) * MM // px / mm (바퀴 사이 실제 거리에 맞춘다)
+  const poly = (pts: CarArt) => {
+    c.beginPath()
+    pts.forEach(([a, b], i) => {
+      const x = R.x + (ux * a + uy * b) * k
+      const y = R.y + (uy * a - ux * b) * k
+      if (i === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    })
+    c.closePath()
+  }
+  c.lineJoin = 'round'
+  poly(CAR_ART[id])
+  c.fillStyle = CAR_BODY
+  c.fill()
+  for (const bar of CAR_BARS[id] ?? []) {
+    c.beginPath()
+    bar.forEach(([a, b], i) => {
+      const x = R.x + (ux * a + uy * b) * k
+      const y = R.y + (uy * a - ux * b) * k
+      if (i === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    })
+    c.strokeStyle = CAR_BODY
+    c.lineWidth = Math.max(1.5, 50 * k)
+    c.lineCap = 'round'
+    c.stroke()
+  }
+  if (CAR_WINDOW[id]) {
+    poly(CAR_WINDOW[id])
+    c.fillStyle = CAR_DARK
+    c.fill()
+  }
+  c.lineWidth = Math.max(1, wr * 0.32)
+  for (const p of [R, F]) {
+    c.beginPath()
+    c.arc(p.x, p.y, Math.max(1.5, wr - c.lineWidth / 2), 0, Math.PI * 2)
+    c.fillStyle = WHEEL_FILL
+    c.fill()
+    c.strokeStyle = WHITE
+    c.stroke()
+  }
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
@@ -638,39 +709,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   const drawCar = (c: CanvasRenderingContext2D, view: Camera, prev: SimState, cur: SimState, alpha: number) => {
+    const car = cur.car
     const R = toScreen(view, w, h, lerp(prev.rear.x, cur.rear.x, alpha), lerp(prev.rear.y, cur.rear.y, alpha))
     const F = toScreen(view, w, h, lerp(prev.front.x, cur.front.x, alpha), lerp(prev.front.y, cur.front.y, alpha))
     const len = Math.hypot(F.x - R.x, F.y - R.y) || 1
-    const ux = (F.x - R.x) / len
-    const uy = (F.y - R.y) / len
-    const k = (len / WHEELBASE) * MM // px / mm (바퀴 사이 실제 거리에 맞춘다)
-    const pt = (a: number, b: number): [number, number] => [R.x + (ux * a + uy * b) * k, R.y + (uy * a - ux * b) * k]
-    const poly = (pts: readonly (readonly [number, number])[]) => {
-      c.beginPath()
-      pts.forEach(([a, b], i) => {
-        const [x, y] = pt(a, b)
-        if (i === 0) c.moveTo(x, y)
-        else c.lineTo(x, y)
-      })
-      c.closePath()
-    }
-    c.lineJoin = 'round'
-    poly(BODY)
-    c.fillStyle = CAR_BODY
-    c.fill()
-    poly(WINDOW)
-    c.fillStyle = CAR_DARK
-    c.fill()
-    const wr = WHEEL_R * view.scale
-    c.lineWidth = Math.max(1, wr * 0.32)
-    for (const p of [R, F]) {
-      c.beginPath()
-      c.arc(p.x, p.y, Math.max(1.5, wr - c.lineWidth / 2), 0, Math.PI * 2)
-      c.fillStyle = WHEEL_FILL
-      c.fill()
-      c.strokeStyle = WHITE
-      c.stroke()
-    }
+    paintCar(c, car, R, F, len, WHEEL_R * view.scale)
   }
 
   const drawEffects = (c: CanvasRenderingContext2D, view: Camera, car: { x: number; y: number }, nowMs: number, dt: number) => {

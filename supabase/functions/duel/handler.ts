@@ -4,6 +4,7 @@
 import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { getDuel, walletEnabled } from '../../../src/games/index.ts'
+import { pinShopOptions } from '../../../src/games/options.ts'
 import { STAKE_MAX } from '../../../src/games/economy.ts'
 import type { DuelLogic, DuelModule, Manifest, Seat } from '../../../src/games/types.ts'
 import { hmacSeed, rngFromSeed } from '../../../src/shared/rng.ts'
@@ -612,16 +613,17 @@ async function join(
   // 판 준비 RPC가 있으면 같은 트랜잭션에서 불러 init에 넘긴다. 실패하면 PrepareFailed → run()이 409(판돈도 롤백)
   const prepare = game.manifest.duel?.prepare
   const prepared = prepare ? await prepareFor(tx, prepare, m.options) : undefined
+  const initOptions = pinShopOptions(game.manifest, m.options)
   if (prepare) {
     // RPC 결과 모양이 틀려 init이 던지면 판 준비 실패와 같다(트랜잭션 롤백 → 409 prepare_failed)
     try {
-      m.state = logic.init(rng, m.options, prepared)
+      m.state = logic.init(rng, initOptions, prepared)
     } catch (e) {
       console.error('duel: init rejected prepared', m.game_id, e)
       throw new PrepareFailed()
     }
   } else {
-    m.state = logic.init(rng, m.options, prepared)
+    m.state = logic.init(rng, initOptions, prepared)
   }
   // 상태는 지금 로직으로 만든다
   m.logic_version = logic.version

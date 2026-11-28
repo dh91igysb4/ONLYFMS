@@ -751,6 +751,48 @@ describe('위험물 판정', () => {
     expect(probe(my - mm(150)).dead).toBeNull() // 차대 아래(−40 mm 밖), 땅(−180 mm) 위
   })
 
+  // 평지 축선(바퀴 중심, 땅 위 WHEEL_R) 위 300 mm에 진행 방향으로 누운 가는 막대(반지름 20 mm): 아래 끝은 축선 위 280 mm.
+  // f1(지붕 230, 캡슐 위 끝 190)·skate(200, 160)는 그 아래로 지나가고, coupe(캡슐 위 끝 340, 지붕 380)·pickup(지붕 450)은 걸린다.
+  const BAR_X = mm(20000)
+  const BAR_LEN = mm(500)
+  const lowBar = courseFromTemplates([
+    {
+      id: 'bar',
+      tier: 1,
+      prims: [
+        { t: 'hazard', dx: BAR_X, dy: WHEEL_R + mm(300), h: { shape: { s: 'bar', x0: 0, y0: 0, x1: BAR_LEN, y1: 0, r: mm(20) }, motion: still, look: 'laser' } },
+        { t: 'line', dx: mm(400000), dy: 0 },
+      ],
+    },
+  ])
+  const driveCar = (c: Course, car?: string): SimState => run(initSimAt(c, TPL_X, V_MAX, car), 200, () => true, c)
+
+  it('차마다 지붕 높이대로 막대에 걸린다', () => {
+    for (const car of ['f1', 'skate']) {
+      const s = driveCar(lowBar, car)
+      expect(s.dead, car).toBeNull()
+      expect(Math.min(s.rear.x, s.front.x) - WHEEL_R, car).toBeGreaterThan(TPL_X + BAR_X + BAR_LEN) // 막대를 다 지났다
+    }
+    for (const car of ['coupe', 'pickup']) expect(driveCar(lowBar, car).dead, car).toBe('crash')
+  })
+
+  it("픽업으로 달린 상태의 car는 'pickup'이고 같은 입력에서 스케이트보드와 결과가 다르다", () => {
+    const pickup = driveCar(lowBar, 'pickup')
+    const skate = driveCar(lowBar, 'skate')
+    expect(pickup.car).toBe('pickup')
+    expect(skate.car).toBe('skate')
+    expect(pickup.dead).not.toBe(skate.dead)
+  })
+
+  it('차를 생략하면 쿠페, 모르는 id는 쿠페로 정규화한다', () => {
+    const c = courseFromTemplates([flatT])
+    expect(initSim(c).car).toBe('coupe')
+    expect(initSim(c, 'f1').car).toBe('f1')
+    expect(initSim(c, 'zzz').car).toBe('coupe')
+    expect(initSimAt(c, TPL_X, 0).car).toBe('coupe')
+    expect(initSimAt(c, TPL_X, 0, 'nope').car).toBe('coupe')
+  })
+
   it('같은 입력 600틱은 같은 결과(JSON)', () => {
     const c = withHazard({ shape: { s: 'disc', x: 0, y: mm(100), r: mm(300) }, motion: { k: 'swing', ax: 0, ay: mm(2000), period: 90, phase: 0 }, look: 'saw' }, mm(60000))
     const a = JSON.stringify(run(initSimAt(c, TPL_X, V_MAX), 600, () => true, c))
@@ -793,7 +835,7 @@ describe('움직이는 길', () => {
   const roadVx = (m: Motion, tick: number): number => poseAt(m, (tick + 1) * SUBSTEPS, null).dx - poseAt(m, tick * SUBSTEPS, null).dx
   const carVx = (s: SimState): number => Math.floor((vxOf(s.rear) + vxOf(s.front)) / 2)
 
-  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone·blocks·blocksDone과 gemFloor -1만 늘었다)', () => {
+  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone·blocks·blocksDone과 gemFloor -1, car "coupe"만 늘었다)', () => {
     // 움직이는 길을 넣기 전 코드로 만든 최종 상태(JSON). 앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱.
     const before = [
       '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
@@ -820,7 +862,7 @@ describe('움직이는 길', () => {
       const c = makeSeededCourse(seed, statics)
       after.push(JSON.stringify(run(initSim(c), 3000, (_, i) => i % 50 < 30, c)))
     }
-    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[],"gemFloor":-1}'))
+    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[],"gemFloor":-1,"car":"coupe"}'))
   })
 
   it('수평으로 왕복하는 길 위에 (길에 대해) 정지한 차는 방향이 네 번 바뀌는 동안 길과 함께 움직인다', () => {
@@ -1210,6 +1252,23 @@ describe('넘어지는 블록', () => {
     const s = run(s0, 300, () => true, c)
     expect(s.dead).toBeNull()
     expect(mid(s.blocks[0])[0] - x0).toBeGreaterThan(mm(2000))
+  })
+
+  it('낮은 차(스케이트보드)도 바퀴로 블록을 민다: 바퀴가 블록에 쿠페보다 깊이 파고들지 않는다', () => {
+    // 스케이트보드의 캡슐 여유(bodyDY + bodyR = 160 mm)는 바퀴 반지름(180 mm)보다 작다. 블록을 고르는 여유가 바퀴를 덮어야 한다.
+    const c = withBlocks([blk(mm(10000), mm(1000), mm(1000))])
+    const deepest = (car: string): number => {
+      let s = step(initSimAt(c, TPL_X, 0, car), true, c)
+      let d = -Infinity
+      for (let t = 0; t < 300 && !s.dead; t++) {
+        s = step(s, true, c)
+        if (s.blocks.length > 0) d = Math.max(d, inside(s.blocks[0], s.front.x + WHEEL_R, s.front.y))
+      }
+      return d
+    }
+    const coupe = deepest('coupe')
+    const skate = deepest('skate')
+    expect(skate).toBeLessThanOrEqual(coupe + mm(2))
   })
 
   it('키 큰 블록은 차가 밀면 넘어진다(각도 > 45°)', () => {

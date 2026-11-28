@@ -1,12 +1,13 @@
 // 네온 라이더 게임 로직. 시뮬(sim.ts)을 플랫폼 GameLogic 약속으로 감싼다. 시간은 ctx가 아니라 틱으로 센다.
 // 순수 함수만, 외부 의존 없음 (Deno 호환).
 import type { Ctx, GameLogic, PlatformAction } from '../types.ts'
+import { carById } from './cars.ts'
 import { getCourse } from './course.ts'
 import { decodeHold } from './input.ts'
 import { initSim, scoreOf, step } from './sim.ts'
 import type { SimState } from './sim.ts'
 
-export type Puzzle = { seed: string }
+export type Puzzle = { seed: string; car?: string }
 export type State = { seed: string; sim: SimState }
 export type Action = { type: 'i'; d: number[] }
 export type PublicState = State
@@ -17,12 +18,12 @@ const ERR_DONE = 'finished'
 const hex8 = (n: number): string => (n >>> 0).toString(16).padStart(8, '0')
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 5,
+  version: 6,
 
-  pickPuzzle(rng, _options) {
+  pickPuzzle(rng, options) {
     let seed = ''
     for (let k = 0; k < 4; k++) seed += hex8(Math.floor(rng() * 4294967296))
-    return { seed }
+    return { seed, car: carById(options?.car).id }
   },
 
   puzzleKey(puzzle) {
@@ -30,7 +31,7 @@ export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
   },
 
   initState(puzzle, _ctx: Ctx) {
-    return { seed: puzzle.seed, sim: initSim(getCourse(puzzle.seed)) }
+    return { seed: puzzle.seed, sim: initSim(getCourse(puzzle.seed), puzzle.car) }
   },
 
   apply(_puzzle, state, action: Action | PlatformAction, _ctx: Ctx) {
