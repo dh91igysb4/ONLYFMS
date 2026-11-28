@@ -66,8 +66,14 @@ export type Gallery = {
   goldBudget: number
   /** 전시관 확장 단계 0..5 */
   expansions: number
+  /** C단계 제작법으로 만든 병(포션마다, 마시면 20분) */
+  stock: Partial<Record<PotionId, number>>
+  /** 산 완료 후 목표(테마 부품·시설 id) */
+  projects: string[]
+  /** 적용한 테마(산 배경이 있는 테마만). null이면 기본 */
+  theme: ThemeId | null
 }
-export const newGallery = (): Gallery => ({ donated: {}, exhibits: [], mats: {}, potions: {}, goldBudget: 0, expansions: 0 })
+export const newGallery = (): Gallery => ({ donated: {}, exhibits: [], mats: {}, potions: {}, goldBudget: 0, expansions: 0, stock: {}, projects: [], theme: null })
 
 const speciesOf = (id: string): Species | undefined => SPECIES.find((s) => s.id === id)
 /** 첫 신화 영구 전시(B단계 해금) */
@@ -108,3 +114,50 @@ export function drainPotions(p: Gallery['potions'], activeMs: number): Gallery['
 export const potionOn = (g: Pick<Gallery, 'potions'>, id: PotionId): boolean => (g.potions[id] ?? 0) > 0
 /** 쓸 수 있는 땅 어종인가(AreaId 중 재료 지역) */
 export const matAreaOf = (a: AreaId): MatArea | null => (isMatArea(a) ? a : null)
+
+// ---------------------------------------------------------------- P3: C단계 포션 제작법(13종 전시 뒤)
+/** C단계 제작법: 1회 3병(보관함), 한 병 마시면 20분. 같은 포션은 최대 40분 */
+export const ADV_POTIONS: Readonly<Record<PotionId, Recipe>> = {
+  luck: { gold: 3000, mats: { forest: 1, river: 1, lake: 1 } },
+  gold: { gold: 4500, mats: { village: 1, tideflat: 1, cave: 1 } },
+  calm: { gold: 1500, mats: { swamp: 1 } },
+}
+export const ADV_CALM_ALT: Recipe = { gold: 1500, mats: { summit: 1 } }
+export const ADV_DOSES = 3
+export const ADV_DOSE_MS = 1_200_000
+export const ADV_MAX_MS = 2_400_000
+export const ADV_LUCK_RARE = 1.25
+export const ADV_GOLD_BUDGET = 6000
+/** 보관함 병 수 상한(포션마다) */
+export const STOCK_MAX = 99
+/** 지금 단계의 포션 최대 시간·행운 배율(C단계면 강해진다) */
+export const potionCap = (g: Pick<Gallery, 'exhibits'>): number => (stageC(g) ? ADV_MAX_MS : POTION_MAX_MS)
+export const luckRare = (g: Pick<Gallery, 'exhibits'>): number => (stageC(g) ? ADV_LUCK_RARE : LUCK_RARE)
+
+// ---------------------------------------------------------------- P4: 완료 후 목표(테마 18부품·시설 3, r4 가격: r3 골드 × 0.2·재료 × 0.5)
+export type ThemeId = 'sea' | 'forest' | 'volcano' | 'snow' | 'coral' | 'abyss'
+export const THEMES: readonly { id: ThemeId; name: string; areas: readonly [MatArea, MatArea] }[] = [
+  { id: 'sea', name: '바다', areas: ['village', 'tideflat'] },
+  { id: 'forest', name: '숲', areas: ['forest', 'river'] },
+  { id: 'volcano', name: '화산', areas: ['cave', 'lake'] },
+  { id: 'snow', name: '설원', areas: ['summit', 'swamp'] },
+  { id: 'coral', name: '산호', areas: ['island', 'village'] },
+  { id: 'abyss', name: '심해', areas: ['wreck', 'island'] },
+]
+export const THEME_PARTS = [
+  { part: 'bg', name: '배경', gold: 60_000, mats: 6 },
+  { part: 'floor', name: '바닥', gold: 160_000, mats: 15 },
+  { part: 'light', name: '조명·환경 연출', gold: 800_000, mats: 30 },
+] as const
+export const FACILITIES = [
+  { id: 'lighthouse', name: '등대', gold: 400_000, areas: ['village', 'island', 'tideflat'], mats: 20 },
+  { id: 'spring', name: '온천 정원', gold: 1_000_000, areas: ['summit', 'swamp', 'forest'], mats: 40 },
+  { id: 'observatory', name: '해저 관측실', gold: 2_000_000, areas: ['wreck', 'cave', 'lake'], mats: 60 },
+] as const
+export type Project = { id: string; name: string; gold: number; mats: Recipe['mats'] }
+/** 21개 목표: 테마 부품 `<테마>-<부품>` 18개 + 시설 3개 */
+export const PROJECTS: readonly Project[] = [
+  ...THEMES.flatMap((t) => THEME_PARTS.map((p) => ({ id: `${t.id}-${p.part}`, name: `${t.name} ${p.name}`, gold: p.gold, mats: Object.fromEntries(t.areas.map((a) => [a, p.mats])) }))),
+  ...FACILITIES.map((f) => ({ id: f.id, name: f.name, gold: f.gold, mats: Object.fromEntries(f.areas.map((a) => [a, f.mats])) })),
+]
+export const projectById = (id: string): Project | undefined => PROJECTS.find((p) => p.id === id)

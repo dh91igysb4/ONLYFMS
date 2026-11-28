@@ -7,7 +7,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
-import { ACTIVE_CAP_MS, EXPANSIONS, GOLD_BUDGET, POTION_MS, SPECIAL_IDS, newGallery, stageB, stageC, type Gallery } from './gallery.ts'
+import { ACTIVE_CAP_MS, ADV_DOSE_MS, EXPANSIONS, GOLD_BUDGET, POTION_MS, PROJECTS, SPECIAL_IDS, newGallery, stageB, stageC, type Gallery } from './gallery.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
 type R = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -122,12 +122,63 @@ describe('migrate v27 gallery', () => {
   it('발견한 13종만 전시·기증으로 남기고, 범위 밖 값은 자른다. 두 번 migrate해도 같다', () => {
     const raw = { ...logic.init(), legends: ['grouper', 'imugi'], gallery: { exhibits: ['imugi', 'imugi', 'anchovy', 'white-dragon'], donated: { grouper: 5, imugi: 1, x: 2 }, mats: { village: 3, hall: 4, river: -1 }, potions: { luck: 5_000_000, gold: 10 }, goldBudget: 99_999, expansions: 9 } }
     const m = logic.migrate(raw, 27)
-    expect(m.gallery).toEqual({ exhibits: ['imugi'], donated: { grouper: 2 }, mats: { village: 3 }, potions: { luck: 1_200_000, gold: 10 }, goldBudget: 6000, expansions: 5 })
+    expect(m.gallery).toEqual({ exhibits: ['imugi'], donated: { grouper: 2 }, mats: { village: 3 }, potions: { luck: 2_400_000, gold: 10 }, goldBudget: 12_000, expansions: 5, stock: {}, projects: [], theme: null })
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 27)).toEqual(m)
     expect(logic.migrate({ ...logic.init(), gallery: undefined }, 26).gallery).toEqual(newGallery())
   })
   it('잡을 때 붙은 금전 보너스는 v27 세이브에서 남는다', () => {
     const raw = { ...logic.init(), bag: [{ id: 1, origin: 'normal', species: 'anchovy', sizeCm: 10, perfect: false, bonus: 7 }, { id: 2, origin: 'normal', species: 'anchovy', sizeCm: 10, perfect: false, bonus: -3 }], nextFishId: 3 }
     expect(logic.migrate(raw, 27).bag.map((f) => f.bonus)).toEqual([7, undefined])
+  })
+})
+
+const C = { exhibits: [...SPECIAL_IDS] } // 13종 전시 = C단계
+const allMats = (n: number) => ({ village: n, river: n, forest: n, lake: n, cave: n, island: n, tideflat: n, swamp: n, summit: n, wreck: n })
+
+describe('C단계 제작법(P3)', () => {
+  it('13종 전시 전에는 안 되고, 뒤에는 행운 3,000G·숲1+강1+호수1 → 3병', () => {
+    expect(err(act(st({}, { ...B, mats: allMats(9) }), { type: 'brew', potion: 'luck', price: 3000, adv: true }))).toBe('need_all_exhibits')
+    const r = ok(act(st({}, { ...C, mats: allMats(9) }), { type: 'brew', potion: 'luck', price: 3000, adv: true }))
+    expect([r.gold, r.state.gallery.stock, r.state.gallery.mats.forest, r.state.gallery.potions]).toEqual([-3000, { luck: 3 }, 8, {}])
+  })
+  it('한 병 20분, 같은 포션 최대 40분(세 번째 병은 potion_full), 금전은 병당 6,000G 예산', () => {
+    const s = st({}, { ...C, stock: { luck: 3, gold: 1 } })
+    const one = ok(act(s, { type: 'drink', potion: 'luck' }))
+    const two = ok(act(one.state, { type: 'drink', potion: 'luck' }))
+    expect([two.state.gallery.potions.luck, two.state.gallery.stock.luck]).toEqual([2 * ADV_DOSE_MS, 1])
+    expect(err(act(two.state, { type: 'drink', potion: 'luck' }))).toBe('potion_full')
+    const g = ok(act(s, { type: 'drink', potion: 'gold' }))
+    expect([g.state.gallery.goldBudget, g.state.gallery.stock.gold]).toEqual([6000, undefined])
+    expect(err(act(st({}, C), { type: 'drink', potion: 'calm' }))).toBe('no_potion')
+  })
+  it('C단계 안정 대체(산정 1) 1,500G, 금전 4,500G', () => {
+    expect(ok(act(st({}, { ...C, mats: { summit: 1 } }), { type: 'brew', potion: 'calm', price: 1500, adv: true, alt: true })).state.gallery.stock).toEqual({ calm: 3 })
+    expect(ok(act(st({}, { ...C, mats: allMats(1) }), { type: 'brew', potion: 'gold', price: 4500, adv: true })).gold).toBe(-4500)
+  })
+})
+
+describe('완료 후 목표(P4)', () => {
+  it('21개: 테마 18(6 × 배경 6만·바닥 16만·조명 80만) + 시설 3(40만·100만·200만) = 952만 G', () => {
+    expect(PROJECTS).toHaveLength(21)
+    expect(PROJECTS.reduce((a, p) => a + p.gold, 0)).toBe(9_520_000)
+    expect(PROJECTS.find((p) => p.id === 'sea-light')!.mats).toEqual({ village: 30, tideflat: 30 })
+    expect(PROJECTS.find((p) => p.id === 'observatory')!.mats).toEqual({ wreck: 60, cave: 60, lake: 60 })
+  })
+  it('13종 전시 뒤에만, 재료·골드를 내고 영구 소유, 두 번은 안 된다', () => {
+    expect(err(act(st({}, { ...B, mats: allMats(99) }), { type: 'buyProject', id: 'sea-bg', price: 60_000 }))).toBe('need_all_exhibits')
+    const r = ok(act(st({}, { ...C, mats: allMats(9) }), { type: 'buyProject', id: 'sea-bg', price: 60_000 }))
+    expect([r.gold, r.state.gallery.projects, r.state.gallery.mats.village, r.state.gallery.mats.tideflat]).toEqual([-60_000, ['sea-bg'], 3, 3])
+    expect(err(act(r.state, { type: 'buyProject', id: 'sea-bg', price: 60_000 }))).toBe('already_owned')
+    expect(err(act(r.state, { type: 'buyProject', id: 'sea-floor', price: 160_000 }))).toBe('not_enough_mats')
+  })
+  it('테마 적용은 배경을 산 테마만, 무료, null이면 기본', () => {
+    const s = st({}, { ...C, projects: ['sea-bg'] })
+    expect(ok(act(s, { type: 'setTheme', theme: 'sea' })).state.gallery.theme).toBe('sea')
+    expect(err(act(s, { type: 'setTheme', theme: 'forest' }))).toBe('not_owned')
+    expect(ok(act({ ...s, gallery: { ...s.gallery, theme: 'sea' } }, { type: 'setTheme', theme: null })).state.gallery.theme).toBe(null)
+  })
+  it('C단계 행운은 ×1.25로 강해진다(집어 미끼와 ×1.5)', async () => {
+    const { luckRare } = await import('./gallery.ts')
+    expect([luckRare(B), luckRare(C)]).toEqual([1.2, 1.25])
   })
 })

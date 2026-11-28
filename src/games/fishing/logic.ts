@@ -20,7 +20,8 @@ import {
   type BaitKind, type Econ,
 } from './research.ts'
 import {
-  ACTIVE_CAP_MS, CALM_ALT, DONATE_NEED, EXPANSIONS, GOLD_BUDGET, GOLD_PCT, LUCK_RARE, MAT_AREAS, MAT_MAX, POTION_IDS, POTION_MAX_MS, POTION_MS, POTIONS, SPECIAL_IDS,
+  ACTIVE_CAP_MS, CALM_ALT, DONATE_NEED, EXPANSIONS, GOLD_BUDGET, GOLD_PCT, MAT_AREAS, MAT_MAX, POTION_IDS, POTION_MAX_MS, POTION_MS, POTIONS, SPECIAL_IDS,
+  ADV_CALM_ALT, ADV_DOSE_MS, ADV_DOSES, ADV_GOLD_BUDGET, ADV_POTIONS, STOCK_MAX, THEMES, luckRare, potionCap, projectById, stageC, type ThemeId,
   drainPotions, exhibitFee, expansionMats, extractYield, hasMats as hasAreaMats, minusMats as minusAreaMats, newGallery, potionOn, stageB, type Gallery, type MatArea, type PotionId,
 } from './gallery.ts'
 
@@ -301,7 +302,11 @@ export type Action =
   | { type: 'donate'; index: number; id?: number }
   | { type: 'exhibit'; species: string; price: number }
   | { type: 'extract'; items: { index: number; id?: number }[] }
-  | { type: 'brew'; potion: PotionId; price: number; alt?: boolean }
+  | { type: 'brew'; potion: PotionId; price: number; alt?: boolean; adv?: boolean }
+  // 경제 P3(C단계 제작법으로 만든 병 마시기)·P4(완료 후 목표 사기, 테마 적용)
+  | { type: 'drink'; potion: PotionId }
+  | { type: 'buyProject'; id: string; price: number }
+  | { type: 'setTheme'; theme: ThemeId | null }
   | { type: 'expand'; stage: number; price: number }
   | { type: 'hook' }
   | { type: 'resolve'; success: boolean; perfect: boolean }
@@ -461,7 +466,7 @@ function cast(state: State, a: Record<string, unknown>, ctx: Ctx): Out {
 
 /** 일반 rare 가중치 배율: 집어 미끼 ×1.2, 행운 포션 ×1.2(곱해 ×1.44). 1이면 넣지 않는다 */
 function rareMultOf(state: State, bait: BaitKind | undefined): { rareMult?: number } {
-  const m = (bait === 'attractor' ? ATTRACTOR_RARE : 1) * (featureOn('alchemy') && potionOn(state.gallery, 'luck') ? LUCK_RARE : 1)
+  const m = (bait === 'attractor' ? ATTRACTOR_RARE : 1) * (featureOn('alchemy') && potionOn(state.gallery, 'luck') ? luckRare(state.gallery) : 1)
   return m === 1 ? {} : { rareMult: m }
 }
 
@@ -940,8 +945,12 @@ function migrateGallery(raw: unknown, legends: readonly string[]): Gallery {
   const mats: Gallery['mats'] = {}
   if (isObj(raw.mats)) for (const a of MAT_AREAS) if (int(raw.mats[a], MAT_MAX) > 0) mats[a as MatArea] = int(raw.mats[a], MAT_MAX)
   const potions: Gallery['potions'] = {}
-  if (isObj(raw.potions)) for (const id of POTION_IDS) if (int(raw.potions[id], POTION_MAX_MS) > 0) potions[id] = int(raw.potions[id], POTION_MAX_MS)
-  return { donated, exhibits, mats, potions, goldBudget: int(raw.goldBudget, 2 * GOLD_BUDGET), expansions: int(raw.expansions, EXPANSIONS.length) }
+  if (isObj(raw.potions)) for (const id of POTION_IDS) if (int(raw.potions[id], 2 * POTION_MAX_MS) > 0) potions[id] = int(raw.potions[id], 2 * POTION_MAX_MS)
+  const stock: Gallery['stock'] = {}
+  if (isObj(raw.stock)) for (const id of POTION_IDS) if (int(raw.stock[id], STOCK_MAX) > 0) stock[id] = int(raw.stock[id], STOCK_MAX)
+  const projects = Array.isArray(raw.projects) ? [...new Set(raw.projects.filter((id): id is string => typeof id === 'string' && !!projectById(id)))] : []
+  const theme = typeof raw.theme === 'string' && projects.includes(`${raw.theme}-bg`) ? (raw.theme as ThemeId) : null
+  return { donated, exhibits, mats, potions, goldBudget: int(raw.goldBudget, 2 * ADV_GOLD_BUDGET), expansions: int(raw.expansions, EXPANSIONS.length), stock, projects, theme }
 }
 
 /** 경제 P1이 생긴 버전 */
@@ -1450,10 +1459,21 @@ function brew(state: State, a: Record<string, unknown>, gold: number): Out {
   if (typeof a.potion !== 'string' || !POTION_IDS.includes(a.potion as PotionId)) return { error: 'bad_action' }
   const id = a.potion as PotionId
   if (a.alt !== undefined && (a.alt !== true || id !== 'calm')) return { error: 'bad_action' }
+  if (a.adv !== undefined && a.adv !== true) return { error: 'bad_action' }
+  const g = state.gallery
+  // C단계 제작법(13종 전시 뒤): 3병을 보관함에 넣는다(마시기는 drink)
+  if (a.adv === true) {
+    if (!stageC(g)) return { error: 'need_all_exhibits' }
+    const r = a.alt === true ? ADV_CALM_ALT : ADV_POTIONS[id]
+    if (a.price !== r.gold) return { error: 'price_changed' }
+    if ((g.stock[id] ?? 0) + ADV_DOSES > STOCK_MAX) return { error: 'stock_full' }
+    if (!hasAreaMats(g.mats, r.mats)) return { error: 'not_enough_mats' }
+    if (gold < r.gold) return { error: 'not_enough_gold' }
+    return { state: { ...state, gallery: { ...g, mats: minusAreaMats(g.mats, r.mats), stock: { ...g.stock, [id]: (g.stock[id] ?? 0) + ADV_DOSES } } }, gold: -r.gold }
+  }
   const r = a.alt === true ? CALM_ALT : POTIONS[id]
   if (a.price !== r.gold) return { error: 'price_changed' }
-  const g = state.gallery
-  if ((g.potions[id] ?? 0) + POTION_MS > POTION_MAX_MS) return { error: 'potion_full' }
+  if ((g.potions[id] ?? 0) + POTION_MS > potionCap(g)) return { error: 'potion_full' }
   if (!hasAreaMats(g.mats, r.mats)) return { error: 'not_enough_mats' }
   if (gold < r.gold) return { error: 'not_enough_gold' }
   return {
@@ -1463,6 +1483,47 @@ function brew(state: State, a: Record<string, unknown>, gold: number): Out {
     },
     gold: -r.gold,
   }
+}
+
+/** C단계 병 마시기(P3): 20분, 같은 포션 최대 40분. 금전은 병당 예산 6,000G */
+function drink(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('alchemy')) return { error: 'feature_off' }
+  if (typeof a.potion !== 'string' || !POTION_IDS.includes(a.potion as PotionId)) return { error: 'bad_action' }
+  const id = a.potion as PotionId
+  const g = state.gallery
+  if ((g.stock[id] ?? 0) < 1) return { error: 'no_potion' }
+  if ((g.potions[id] ?? 0) + ADV_DOSE_MS > potionCap(g)) return { error: 'potion_full' }
+  const left = (g.stock[id] ?? 0) - 1
+  const { [id]: _s, ...rest } = g.stock
+  return {
+    state: {
+      ...state,
+      gallery: { ...g, stock: left > 0 ? { ...rest, [id]: left } : rest, potions: { ...g.potions, [id]: (g.potions[id] ?? 0) + ADV_DOSE_MS }, goldBudget: g.goldBudget + (id === 'gold' ? ADV_GOLD_BUDGET : 0) },
+    },
+  }
+}
+
+/** 완료 후 목표 사기(P4, 13종 전시 뒤): 테마 부품·시설, r4 가격·재료. 영구 소유 */
+function buyProject(state: State, a: Record<string, unknown>, gold: number): Out {
+  if (!featureOn('exhibit')) return { error: 'feature_off' }
+  if (!stageC(state.gallery)) return { error: 'need_all_exhibits' }
+  const p = typeof a.id === 'string' ? projectById(a.id) : undefined
+  if (!p) return { error: 'bad_action' }
+  const g = state.gallery
+  if (g.projects.includes(p.id)) return { error: 'already_owned' }
+  if (a.price !== p.gold) return { error: 'price_changed' }
+  if (!hasAreaMats(g.mats, p.mats)) return { error: 'not_enough_mats' }
+  if (gold < p.gold) return { error: 'not_enough_gold' }
+  return { state: { ...state, gallery: { ...g, mats: minusAreaMats(g.mats, p.mats), projects: [...g.projects, p.id] } }, gold: -p.gold }
+}
+
+/** 테마 적용(P4, 무료): 그 테마 배경을 가졌을 때. null이면 기본 */
+function setTheme(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('exhibit')) return { error: 'feature_off' }
+  if (a.theme !== null && !(typeof a.theme === 'string' && THEMES.some((t) => t.id === a.theme))) return { error: 'bad_action' }
+  const theme = a.theme as ThemeId | null
+  if (theme && !state.gallery.projects.includes(`${theme}-bg`)) return { error: 'not_owned' }
+  return { state: { ...state, gallery: { ...state.gallery, theme } } }
 }
 
 /** 전시관 확장(P2, r4 가격): 첫 신화 전시 뒤, 앞 단계 다음. 6지역 재료를 그 단계 양만큼 */
@@ -1556,6 +1617,12 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return brew(state, action, ctx.gold)
     case 'expand':
       return expand(state, action, ctx.gold)
+    case 'drink':
+      return drink(state, action)
+    case 'buyProject':
+      return buyProject(state, action, ctx.gold)
+    case 'setTheme':
+      return setTheme(state, action)
     default:
       return { error: 'bad_action' }
   }
