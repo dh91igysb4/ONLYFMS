@@ -23,7 +23,7 @@ import { CALM_BAR, potionOn, stageB } from './gallery.ts'
 import { galleryScene } from './scene.ts'
 import { facilityScene } from './facility.ts'
 import { HALL_ELEVATOR_ENTRY } from './maps/hall.ts'
-import { PREVIEW_ISLE_KEY, fishSellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
+import { PREVIEW_ISLE_KEY, fishSellPrice, kstDay, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
 import { drawWorld, releaseSceneCache, SCENE_H, SCENE_W, type Phase, type ScenePeer } from './scene.ts'
@@ -405,7 +405,7 @@ const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], 
   wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대', gallery: '전시관',
 }
 /** 개간 구역 나무·바위 앞 안내 */
-const ZONE_TREE_NOTICE = '작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요'
+const ZONE_TREE_NOTICE = '작업대에서 개간하면 치울 수 있어요. 사과나무·흰 줄무늬 바위·주황 광석 바위를 캐 주세요'
 /** 재료 이름(캐기 안내) */
 const MAT_NAMES = { wood: '나무', stone: '돌', iron: '철' } as const
 /** 지역 순간이동기가 켜져 있는가. 옛 서버 응답(challenges 없음)은 꺼진 것으로 본다 */
@@ -990,6 +990,12 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     startTransition('isle', isleArrival(shape.layout), owner && handle ? `${handle}의 섬` : undefined, { ...shape, owner })
   }
   /** 지금 있는(또는 갈) 섬·집의 맵 값: 남의 섬이면 구경 값, 아니면 내 서버 상태 */
+  /** 내 섬에서 오늘 아직 안 캔 자원 칸(맵에 드러난 칸만). 날짜는 서버와 같은 한국 시간 하루 */
+  const readyNodesHere = (now: number) => {
+    const g = viewRef.current?.isle?.gathered
+    const done = g && g.day === kstDay(now) ? g.ids : []
+    return rt.map.nodes.filter((n) => !done.includes(n.id))
+  }
   /** 지금 섬(내 섬 또는 구경하는 섬)의 시설 외형. 남의 섬은 publicView의 facilities(옛 서버면 없음) */
   const facilitiesHere = () => {
     if (rt.owner !== null) {
@@ -1283,6 +1289,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       fame: rt.map.id === 'hall' ? fameFramesRef.current : undefined,
       gallery: rt.map.id === 'hall2' && viewRef.current ? galleryScene(galleryOf(viewRef.current)) : undefined,
       facilities: rt.map.id === 'isle' ? facilitiesHere() : undefined,
+      readyNodes: rt.map.id === 'isle' && rt.owner === null ? readyNodesHere(now) : undefined,
     }, size)
   }
 
