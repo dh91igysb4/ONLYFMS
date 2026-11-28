@@ -62,7 +62,9 @@ export function buildRoad(c: Course): Mesh & { walls: Mesh } {
       const b = edges[i + 1][side]
       const k = wp.length / 3
       wp.push(a.x, a.y, a.z, b.x, b.y, b.z, a.x, a.y + WALL_HEIGHT, a.z, b.x, b.y + WALL_HEIGHT, b.z)
-      wi.push(k, k + 1, k + 2, k + 1, k + 3, k + 2)
+      // 법선이 도로 안쪽을 향하게: 왼쪽(+옆) 벽은 (a,b,a위), 오른쪽 벽은 반대로 감는다
+      if (side === 0) wi.push(k, k + 1, k + 2, k + 1, k + 3, k + 2)
+      else wi.push(k, k + 2, k + 1, k + 1, k + 2, k + 3)
     }
   }
   return { positions, indices, walls: { positions: new Float32Array(wp), indices: new Uint32Array(wi) } }

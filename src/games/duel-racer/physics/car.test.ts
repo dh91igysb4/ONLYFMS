@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'vitest'
 import { ACCEL_TIME, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../constants.ts'
-import { flatCourse, rampCourse } from '../course/testCourses.ts'
+import { flatCourse, rampCourse, walledCourse } from '../course/testCourses.ts'
 import type { Course } from '../course/types.ts'
 import { NO_CONTROLS, type Controls } from './controls.ts'
 import { carState, createCar, stepCar, type Car } from './car.ts'
@@ -157,4 +157,31 @@ test('without air input the car stays level over a jump and lands on its wheels'
     expect(r.minUpInAir).toBeGreaterThan(0.9)
     expect(r.endUp).toBeGreaterThan(0.95)
   }
+})
+
+function wallHit(deg: number, speed: number): { speed: number; headingDeg: number } {
+  const yaw = (-deg * Math.PI) / 180
+  const { w, car } = setup(walledCourse(), { pos: { x: 0, y: 1.1, z: 50 }, yaw })
+  run(w, car, NO_CONTROLS, 0.3)
+  car.body.setLinvel({ x: Math.sin(yaw) * speed, y: 0, z: Math.cos(yaw) * speed }, true)
+  run(w, car, GAS, 1.5)
+  const s = carState(car)
+  const q = s.quat
+  const fx = 2 * (q.x * q.z + q.w * q.y)
+  const fz = 1 - 2 * (q.x * q.x + q.y * q.y)
+  return { speed: s.speed, headingDeg: Math.abs((Math.atan2(fx, fz) * 180) / Math.PI) }
+}
+
+test('glancing a wall slides along it instead of stopping', () => {
+  for (const deg of [10, 25]) {
+    const r = wallHit(deg, 40)
+    expect(r.speed).toBeGreaterThan(25)
+    expect(r.headingDeg).toBeLessThan(12)
+  }
+})
+
+test('a steep wall hit loses speed but turns the car along the wall', () => {
+  const r = wallHit(45, 40)
+  expect(r.headingDeg).toBeLessThan(20)
+  expect(r.speed).toBeGreaterThan(10)
 })
