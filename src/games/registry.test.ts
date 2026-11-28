@@ -263,6 +263,76 @@ test('manifest gold는 자유 플레이 게임에만, dailyCap = FREE_DAILY_CAP 
   }
 })
 
+/**
+ * 마이그레이션 SQL을 파일 이름순으로 적용해 shop_items 최종 내용(게임 → 품목 → 가격)을 구한다 (네온 라이더 차 설계 §7.2, §10).
+ * 고정 형식 두 가지만 읽는다:
+ *   `insert into (public.)shop_items (game_id, item_id, price) values ('g', 'i', N), …;`
+ *   `update (public.)shop_items set price = N where game_id = 'g' and item_id = 'i';`
+ * shop_items에 쓰는 그 밖의 insert·update·delete 문장은 읽지 못하므로 던진다(형식을 지키게).
+ */
+function shopItemsFromMigrations(files: Record<string, string>): Record<string, Record<string, number>> {
+  const anyWrite = /\b(?:insert\s+into|update|delete\s+from)\s+(?:public\.)?shop_items\b[^;]*;/gi
+  const insert =
+    /^insert\s+into\s+(?:public\.)?shop_items\s*\(\s*game_id\s*,\s*item_id\s*,\s*price\s*\)\s*values\s*(\(\s*'[^']*'\s*,\s*'[^']*'\s*,\s*[0-9]+\s*\)(?:\s*,\s*\(\s*'[^']*'\s*,\s*'[^']*'\s*,\s*[0-9]+\s*\))*)\s*;$/i
+  const row = /\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*([0-9]+)\s*\)/g
+  const update =
+    /^update\s+(?:public\.)?shop_items\s+set\s+price\s*=\s*([0-9]+)\s+where\s+game_id\s*=\s*'([^']*)'\s+and\s+item_id\s*=\s*'([^']*)'\s*;$/i
+  const result: Record<string, Record<string, number>> = {}
+  for (const name of Object.keys(files).sort()) {
+    for (const [text] of files[name].matchAll(anyWrite)) {
+      const ins = text.match(insert)
+      const upd = text.match(update)
+      if (ins) {
+        for (const r of ins[1].matchAll(row)) (result[r[1]] ??= {})[r[2]] = Number(r[3])
+      } else if (upd && result[upd[2]]?.[upd[3]] !== undefined) {
+        result[upd[2]][upd[3]] = Number(upd[1])
+      } else if (!upd) {
+        throw new Error(`${name}: shop_items 문장이 고정 형식이 아니다: ${text}`)
+      }
+    }
+  }
+  return result
+}
+
+test('shopItemsFromMigrations applies inserts and later price updates in filename order', () => {
+  const files = {
+    '../../supabase/migrations/0012_price.sql':
+      "update public.shop_items set price = 7000 where game_id = 'a-game' and item_id = 'hat';\n" +
+      "update shop_items set price = 9 where game_id = 'zz-missing' and item_id = 'x';",
+    '../../supabase/migrations/0011_shop.sql':
+      "create table public.shop_items (game_id text, item_id text, price bigint);\n" +
+      "insert into public.shop_items (game_id, item_id, price) values ('a-game', 'cap', 0), ('a-game', 'hat', 5000), ('b-game', 'x', 1);",
+  }
+  expect(shopItemsFromMigrations(files)).toEqual({ 'a-game': { cap: 0, hat: 7000 }, 'b-game': { x: 1 } })
+})
+
+test('shopItemsFromMigrations rejects shop_items writes in another form', () => {
+  for (const sql of [
+    "insert into public.shop_items values ('a-game', 'hat', 5000);",
+    "insert into public.shop_items (game_id, item_id, price) select 'a-game', 'hat', 5000;",
+    "update public.shop_items set price = price + 1 where game_id = 'a-game' and item_id = 'hat';",
+    "update public.shop_items set price = 1 where game_id = 'a-game';",
+    "delete from public.shop_items where game_id = 'a-game';",
+  ]) {
+    expect(() => shopItemsFromMigrations({ '../../supabase/migrations/0011_x.sql': sql }), sql).toThrow(/고정 형식/)
+  }
+})
+
+test('shop_items in migrations match manifest shop.items (설계 §7.2)', () => {
+  const sqlFiles = import.meta.glob('../../supabase/migrations/*.sql', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }) as Record<string, string>
+  const fromRegistry = Object.fromEntries(
+    [...games, ...duels, ...worlds]
+      .filter((g) => g.manifest.shop)
+      .map((g) => [g.manifest.id, Object.fromEntries(g.manifest.shop!.items.map((i) => [i.id, i.price]))]),
+  )
+  expect(Object.keys(fromRegistry).length).toBeGreaterThan(0)
+  expect(shopItemsFromMigrations(sqlFiles)).toEqual(fromRegistry)
+})
+
 test('world previewData keys are not record, avatar or free_bonus keys', () => {
   for (const w of worlds) {
     const keys = Object.keys(w.logic.previewData?.(w.logic.init()) ?? {})

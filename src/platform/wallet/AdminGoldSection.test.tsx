@@ -14,7 +14,7 @@ vi.mock('../../games/index.ts', () => ({
 }))
 
 import { ApiError } from '../../lib/api.ts'
-import { AdminGoldSection, kstShort } from './AdminGoldSection.tsx'
+import { AdminGoldSection, kstShort, REASON_LABEL } from './AdminGoldSection.tsx'
 
 const row = (o: Record<string, unknown>) => ({
   id: 1, handle: 'kane', delta: 500, balance_after: 500, reason: 'admin', ref: 'r', game_id: null,
@@ -95,4 +95,21 @@ test.each(['1.5', '1e3', '0x10', '0', '+5', '9'.repeat(20)])('금액 %s는 보�
 
 test('kstShort', () => {
   expect(kstShort('2026-11-23T15:00:00Z')).toBe('11.24 00:00')
+})
+
+test('이유 라벨은 마이그레이션의 마지막 gold_ledger reason 검사와 같은 목록', () => {
+  const files = import.meta.glob('../../../supabase/migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<
+    string,
+    string
+  >
+  let reasons: string[] = []
+  for (const name of Object.keys(files).sort()) {
+    for (const m of files[name].matchAll(/reason\s+in\s*\(([^)]*)\)\s*\)/gi)) {
+      const list = [...m[1].matchAll(/'([^']*)'/g)].map((v) => v[1])
+      if (list.includes('admin')) reasons = list
+    }
+  }
+  expect(reasons).toContain('shop')
+  expect(Object.keys(REASON_LABEL).sort()).toEqual([...reasons].sort())
+  expect(REASON_LABEL.shop).toBe('상점')
 })

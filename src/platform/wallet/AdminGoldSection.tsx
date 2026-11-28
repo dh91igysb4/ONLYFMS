@@ -20,6 +20,7 @@ export const REASON_LABEL: Record<LedgerReason, string> = {
   contest_prize: '대회 상금',
   contest_refund: '참가비 환불',
   admin: '관리자 조정',
+  shop: '상점',
 }
 
 const ADJUST_ERRORS: Record<string, string> = {

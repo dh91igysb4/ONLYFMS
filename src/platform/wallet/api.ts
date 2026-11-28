@@ -7,7 +7,7 @@ export type MyWallet = { balance: number; today: Record<string, number>; earnedT
 
 export type LedgerReason =
   | 'migrate' | 'world' | 'free' | 'daily_prize' | 'duel_stake' | 'duel_payout' | 'duel_refund'
-  | 'contest_fee' | 'contest_prize' | 'contest_refund' | 'admin'
+  | 'contest_fee' | 'contest_prize' | 'contest_refund' | 'admin' | 'shop'
 
 export type LedgerRow = {
   id: number
