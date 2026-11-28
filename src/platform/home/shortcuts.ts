@@ -31,16 +31,48 @@ export function shortcutTarget(base: string, items: { id: string }[], pathOf: (i
   return items.length === 1 ? pathOf(items[0].id) : base
 }
 
-/** 오늘(KST, 서버 시계) 이 게임 데일리를 끝냈는가 */
-export async function loadDailyDone(gameId: string, userId: string): Promise<boolean> {
-  const rows = await rpc<{ user_id: string }[] | null>('lb_daily', { p_day: kstDate(now()), p_game: gameId })
-  return (rows ?? []).some((r) => r.user_id === userId)
+/** 오늘(KST, 서버 시계) 이 게임 데일리 내 점수. 안 끝냈으면 null */
+export async function loadDailyScore(gameId: string, userId: string): Promise<number | null> {
+  const rows = await rpc<{ user_id: string; score: number }[] | null>('lb_daily', { p_day: kstDate(now()), p_game: gameId })
+  return (rows ?? []).find((r) => r.user_id === userId)?.score ?? null
+}
+
+export type RankRow = { rank: number; user_id: string; handle: string; score: number }
+
+/** 오늘(KST) 전체 데일리 순위 위 3명과, 내가 4위 밖이면 내 줄(FM 개편 설계 §4.4 홈) */
+export async function loadTodayTop(userId: string): Promise<{ top: RankRow[]; me: RankRow | null }> {
+  const rows = (await rpc<RankRow[] | null>('lb_daily', { p_day: kstDate(now()), p_game: null })) ?? []
+  const pick = (r: RankRow): RankRow => ({ rank: r.rank, user_id: r.user_id, handle: r.handle, score: r.score })
+  const mine = rows.find((r) => r.user_id === userId)
+  return { top: rows.slice(0, 3).map(pick), me: mine && mine.rank > 3 ? pick(mine) : null }
+}
+
+let duelListPending: Promise<DuelList> | null = null
+
+/** duel_list를 동시에 여러 곳이 불러도 한 번만 부른다(홈의 내 대국 표시와 최근 대전 판). 끝나면 다음 호출은 새로 부른다 */
+export function loadDuelList(): Promise<DuelList> {
+  if (duelListPending) return duelListPending
+  const p = rpc<DuelList | null>('duel_list').then((r) => r ?? { lobby: [], mine: [], recent: [], due: [] })
+  duelListPending = p
+  const clear = () => { if (duelListPending === p) duelListPending = null }
+  p.then(clear, clear)
+  return p
 }
 
 /** 끝나지 않은 내 대국: 진행 중 + 상대를 기다리는 내 방(옛 홈 대전 블록이 바로 링크하던 범위, 설계 §2 클릭 수) */
 export async function loadMyOpenDuels(): Promise<DuelListItem[]> {
-  const r = await rpc<DuelList | null>('duel_list')
-  return (r?.mine ?? []).filter((d) => d.status === 'active' || d.status === 'waiting')
+  const r = await loadDuelList()
+  return r.mine.filter((d) => d.status === 'active' || d.status === 'waiting')
+}
+
+export type Chip = 'win' | 'draw' | 'loss'
+
+/** 최근 대국의 내 결과 칸. 무효는 빼고 최대 5개 */
+export function recentChips(recent: DuelListItem[], myId: string): Chip[] {
+  return recent.filter((d) => d.status === 'finished').slice(0, 5).map((d): Chip => {
+    if (d.winner === null) return 'draw'
+    return d.players[d.winner]?.id === myId ? 'win' : 'loss'
+  })
 }
 
 /** 공개이거나 내가 참가했고, 취소되지 않았으며 진행 중이거나 24시간 안에 시작하는 대회(옛 홈 대회 블록과 같은 범위) */

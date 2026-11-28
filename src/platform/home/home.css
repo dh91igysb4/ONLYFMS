@@ -1,26 +1,21 @@
-/* 메인 화면(메인 미리보기 설계 §4). 폰·넓은 화면 모두 세로 한 열, 최대 480px 가운데. 색은 theme 토큰만. */
-.home { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 480px; margin: 0 auto; }
-.home-valley-box { width: 100%; display: flex; justify-content: center; }
-.home-valley { position: relative; display: block; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--edge); background: var(--panel); }
-.home-valley:focus-visible { outline: 2px solid var(--accent-edge); outline-offset: 2px; }
-.home-valley-enter { position: absolute; right: 8px; bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--panel); color: var(--ink); font-size: 13px; box-shadow: inset 0 0 0 1px var(--edge); }
-.home-valley-fallback { width: 100%; }
-
-/* 메인 바로가기 버튼(메인 미리보기 설계 §4.2). 이름만, 오른쪽 끝에 할 일 표시. 폰 2열, 900px 이상 3열 */
-.home-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-@media (min-width: 900px) { .home-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.home-shortcut {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 48px; padding: 10px 14px;
-  border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); color: var(--ink);
-  text-decoration: none; font-weight: 600;
+/* 메인 화면(메인 미리보기 설계 §4, FM 개편 설계 §4.4 홈). 폰은 판 한 열.
+   900px 이상은 밸리 판(최대 480px)을 왼쪽, 나머지 판을 오른쪽 열에 쌓는다. 색은 theme 토큰만. */
+.home { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 480px; margin: 0 auto; }
+/* 밸리 판이 없으면(숨김·없는 지속형 게임) 한 열 그대로 */
+@media (min-width: 900px) {
+  .home--with-valley { display: grid; max-width: none; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); align-items: start; }
+  .home--with-valley > .home-valley-panel { grid-column: 1; grid-row: 1 / span 4; }
+  .home--with-valley > .fm-panel:not(.home-valley-panel) { grid-column: 2; }
 }
-.home-shortcut:hover, .home-shortcut:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-edge); }
-.home-shortcut-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-shortcut-mark { flex: none; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--lime); color: var(--on-accent); font-size: 13px; text-align: center; }
+.home-valley-box { width: 100%; display: flex; justify-content: center; }
+.home-valley { position: relative; display: block; overflow: hidden; border-radius: 0 0 4px 4px; background: var(--panel); }
+.home-valley:focus-visible { outline: 2px solid var(--accent-edge); outline-offset: -2px; }
+.home-valley-fallback { width: calc(100% - 24px); margin: 12px; }
+.home-duel-form { justify-content: space-between; }
 
 /* 미리보기 모서리의 접속 중 친구 요약(온라인 2단계-1). 한 줄, 넘치면 말줄임 */
 .home-valley-online {
-  position: absolute; left: 8px; top: 8px; right: 8px; margin: 0; padding: 2px 8px; border-radius: 999px;
+  position: absolute; left: 8px; top: 8px; right: 8px; margin: 0; padding: 2px 8px; border-radius: 4px;
   background: var(--panel); color: var(--ink); font-size: 12px; line-height: 18px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
 }

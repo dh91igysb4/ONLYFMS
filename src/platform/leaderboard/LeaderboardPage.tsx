@@ -7,7 +7,7 @@ import { kstDate, kstWeekStart } from '../../shared/kst.ts'
 import { formatFreeScore } from '../games/score.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { DuelBoard } from './DuelBoard.tsx'
-import { LbTable } from './LbTable.tsx'
+import { LbPanel, LbTable } from './LbTable.tsx'
 import './leaderboard.css'
 
 type Tab = 'daily' | 'week' | 'all' | 'contests' | 'free' | 'duel'
@@ -87,14 +87,16 @@ export function LeaderboardPage() {
   }, [tab, game, attempt])
 
   const ready = data && data.tab === tab ? data.rows : null
+  const tabLabel = TABS.find((t) => t.id === tab)!.label
+  const panelTitle = `${tabLabel} · ${game ? (getGame(game)?.manifest.name ?? game) : '전체 합계'}`
   const freeRows = useMemo(() => (tab === 'free' && Array.isArray(ready) ? sortFree(ready as FreeRow[], sort) : []), [tab, ready, sort])
 
   return (
     <div className="stack lb-page">
-      <h2 className="page-title">리더보드</h2>
-      <div className="lb-tabs" role="tablist" aria-label="기간">
+      <h2 className="page-title sr-only">순위</h2>
+      <div className="fm-tabs" role="tablist" aria-label="기간">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="lb-tab" onClick={() => setTab(t.id)}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
@@ -126,7 +128,7 @@ export function LeaderboardPage() {
       {tab !== 'duel' && !error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
       {tab !== 'duel' && !error && ready && (tab === 'daily' || tab === 'week' || tab === 'all') && (
         (ready as ScoreRow[]).length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
-          <div className="lb-panel">
+          <LbPanel title={panelTitle} count={(ready as ScoreRow[]).length}>
             <LbTable
               cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '점수', num: true, sorted: true }, { label: '행동', num: true }]}
               rows={(ready as ScoreRow[]).map((r) => ({
@@ -134,13 +136,13 @@ export function LeaderboardPage() {
                 cells: [r.rank, <Handle handle={r.handle} />, r.score, r.action_count],
               }))}
             />
-          </div>
+          </LbPanel>
         )
       )}
       {!error && ready && tab === 'contests' && <ContestsView data={ready as ContestsData} myId={myId} />}
       {!error && ready && tab === 'free' && (
         freeRows.length === 0 ? <p className="muted">아직 기록이 없어요</p> : (
-          <div className="lb-panel">
+          <LbPanel title={panelTitle} count={freeRows.length}>
             {isScoreGame(game) && getGame(game)?.manifest.freeBestOnly ? (
               <LbTable
                 cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '최고', num: true, sorted: true }]}
@@ -174,7 +176,7 @@ export function LeaderboardPage() {
                 }))}
               />
             )}
-          </div>
+          </LbPanel>
         )
       )}
     </div>
@@ -187,21 +189,19 @@ function ContestsView({ data, myId }: { data: ContestsData; myId?: string }) {
     <>
       <h3 className="section-title">공식 대회 시상대</h3>
       {data.contests.map((c) => (
-        <section key={c.contest_id} className="lb-panel">
-          <h4 className="lb-caption"><Link to={`/contests/${c.contest_id}`}>{c.title}</Link></h4>
+        <LbPanel key={c.contest_id} title={<Link to={`/contests/${c.contest_id}`}>{c.title}</Link>}>
           <LbTable
             cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '점수', num: true, sorted: true }]}
             rows={c.podium.map((p, i) => ({ id: p.handle, top: true, me: false, cells: [i + 1, <Handle handle={p.handle} />, p.score] }))}
           />
-        </section>
+        </LbPanel>
       ))}
-      <h3 className="section-title">누적 점수</h3>
-      <div className="lb-panel">
+      <LbPanel title="누적 점수" count={data.totals.length}>
         <LbTable
           cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '합계', num: true, sorted: true }]}
           rows={data.totals.map((t, i) => ({ id: t.user_id, top: i < 3, me: t.user_id === myId, cells: [i + 1, <Handle handle={t.handle} />, t.total] }))}
         />
-      </div>
+      </LbPanel>
     </>
   )
 }

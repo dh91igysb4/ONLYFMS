@@ -8,32 +8,39 @@ import { feeOf as rawFee } from './fee.ts'
 import { walletEnabled } from '../wallet/enabled.ts'
 import { formatGold } from '../wallet/format.ts'
 import '../wallet/wallet.css'
+import './contests.css'
 
 // 지갑이 보이기 전에는 참가비를 보이지 않는다
 const feeOf = (c: ContestRow) => (walletEnabled() ? rawFee(c) : 0)
-import { kindLabel, kstLabel, phaseOf } from './format.ts'
+import { kindLabel, kstShort, phaseOf } from './format.ts'
 
 function Section({ title, rows, empty, counts }: { title: string; rows: ContestRow[]; empty: string; counts: Map<string, number> }) {
   return (
-    <section className="stack" aria-label={title}>
-      <h3 className="section-title">{title}</h3>
-      {rows.length === 0 && <p className="muted">{empty}</p>}
-      {rows.map((c) => (
-        <Link key={c.id} to={`/contests/${c.id}`} className="card card-link">
-          <div className="row">
-            <span className={`badge badge-${c.kind}`}>{kindLabel(c.kind)}</span>
-            {c.visibility === 'invite' && <span className="badge">초대</span>}
-          </div>
-          <strong className="card-title">{c.title}</strong>
-          <span className="muted">{kstLabel(c.starts_at)}</span>
-          {feeOf(c) > 0 && (
-            <span className="contest-fee">
-              참가비 <strong>{formatGold(feeOf(c))}</strong>
-              {counts.has(c.id) && <> · 모인 돈 <strong>{formatGold(feeOf(c) * counts.get(c.id)!)}</strong></>}
-            </span>
-          )}
-        </Link>
-      ))}
+    <section className="fm-panel" aria-label={title}>
+      <h3 className="fm-panel-head">{title}{rows.length > 0 && <span className="fm-panel-aside">{rows.length}개</span>}</h3>
+      {rows.length === 0 ? <p className="fm-empty">{empty}</p> : (
+        <table className="fm-table">
+          <thead><tr><th>대회</th><th>종류</th><th>시작</th></tr></thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.id}>
+                <td>
+                  <Link to={`/contests/${c.id}`} className="contest-list-title">{c.title}</Link>
+                  {c.visibility === 'invite' && <span className="badge contest-list-invite">초대</span>}
+                  {feeOf(c) > 0 && (
+                    <div className="fm-row-sub contest-fee">
+                      참가비 <strong>{formatGold(feeOf(c))}</strong>
+                      {counts.has(c.id) && <> · 모인 돈 <strong>{formatGold(feeOf(c) * counts.get(c.id)!)}</strong></>}
+                    </div>
+                  )}
+                </td>
+                <td><span className={`badge badge-${c.kind}`}>{kindLabel(c.kind)}</span></td>
+                <td className="contest-list-time">{kstShort(c.starts_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </section>
   )
 }
@@ -69,9 +76,9 @@ export function ContestListPage() {
 
   return (
     <div className="stack">
-      <div className="row between">
-        <h2 className="page-title">대회</h2>
-        <Link className="btn btn-primary btn-link" to="/contests/new">대회 만들기</Link>
+      <h2 className="page-title sr-only">대회</h2>
+      <div className="row contest-list-top">
+        <Link className="btn btn-primary btn-sm btn-link" to="/contests/new">대회 만들기</Link>
       </div>
       {error && (
         <div className="stack" role="alert">

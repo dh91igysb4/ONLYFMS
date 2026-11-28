@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, duel, duelErrorMessage, rpc, type DuelCreated } from '../../lib/api.ts'
 import { duels, getDuel } from '../../games/index.ts'
@@ -11,6 +11,7 @@ import { formatGold } from '../wallet/format.ts'
 import { StakePicker } from './StakePicker.tsx'
 import { defaultOptions, OptionSelects } from './OptionSelects.tsx'
 import { parseStake, stakeOf, stakeProblem } from './stake.ts'
+import { recentChips } from '../home/shortcuts.ts'
 
 
 const gameName = (id: string) => getDuel(id)?.manifest.name ?? id
@@ -63,35 +64,55 @@ function CreateForm({ visible }: { visible: Manifest[] }) {
   if (!manifest) return <p className="muted">아직 열린 대전 게임이 없어요</p>
 
   return (
-    <form className="card" onSubmit={submit} noValidate aria-label="대국 만들기">
-      <h3 className="card-title">대국 만들기</h3>
-      <label className="field">
-        <span>게임</span>
-        <select className="input" value={manifest.id} onChange={(e) => pickGame(e.target.value)}>
-          {visible.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </label>
-      <OptionSelects manifest={manifest} value={options} onChange={setOptions} />
-      <fieldset className="field">
-        <legend>종류</legend>
-        <label className="radio"><input type="radio" name="duel-rated" checked={rated} onChange={() => setRated(true)} /> 랭크</label>
-        <label className="radio"><input type="radio" name="duel-rated" checked={!rated} onChange={() => setRated(false)} /> 친선</label>
-      </fieldset>
-      <fieldset className="field">
-        <legend>공개 범위</legend>
-        <label className="radio"><input type="radio" name="duel-vis" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> 공개</label>
-        <label className="radio"><input type="radio" name="duel-vis" checked={visibility === 'invite'} onChange={() => setVisibility('invite')} /> 초대 링크로만</label>
-      </fieldset>
-      <label className="field">
-        <span>턴 시간</span>
-        <select className="input" value={String(turn)} onChange={(e) => setTurn(Number(e.target.value))}>
-          {turnOf(manifest).choices.map((c) => <option key={c} value={String(c)}>{c}초</option>)}
-        </select>
-      </label>
-      {stakeOn && <StakePicker text={stakeText} onText={setStakeText} balance={balance} />}
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <button type="submit" className="btn btn-primary" disabled={busy || stakeIssue !== null}>대국 만들기</button>
+    <form className="fm-panel" onSubmit={submit} noValidate aria-label="대국 만들기">
+      <h3 className="fm-panel-head">새 대국</h3>
+      <div className="fm-form">
+        <label className="fm-form-row">
+          <span>게임</span>
+          <select className="input" value={manifest.id} onChange={(e) => pickGame(e.target.value)}>
+            {visible.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </label>
+        <OptionSelects manifest={manifest} value={options} onChange={setOptions} rowClass="fm-form-row" />
+        <Seg legend="종류" name="rated" value={rated ? 'rated' : 'friendly'}
+          choices={[['rated', '랭크'], ['friendly', '친선']]} onPick={(v) => setRated(v === 'rated')} />
+        <Seg legend="공개 범위" name="visibility" value={visibility}
+          choices={[['public', '공개'], ['invite', '초대 링크로만']]} onPick={(v) => setVisibility(v as 'public' | 'invite')} />
+        <label className="fm-form-row">
+          <span>턴 시간</span>
+          <select className="input" value={String(turn)} onChange={(e) => setTurn(Number(e.target.value))}>
+            {turnOf(manifest).choices.map((c) => <option key={c} value={String(c)}>{c}초</option>)}
+          </select>
+        </label>
+        {stakeOn && <StakePicker text={stakeText} onText={setStakeText} balance={balance} />}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button type="submit" className="btn btn-primary" disabled={busy || stakeIssue !== null}>대국 만들기</button>
+      </div>
     </form>
+  )
+}
+
+/** 구분 버튼(라디오 묶음). 화면에는 붙은 버튼, 접근성은 라디오 그대로 */
+function Seg({ legend, name, value, choices, onPick }: {
+  legend: string
+  name: string
+  value: string
+  choices: [string, string][]
+  onPick(v: string): void
+}) {
+  const id = useId()
+  return (
+    <div className="fm-form-row" role="radiogroup" aria-label={legend}>
+      <span aria-hidden="true">{legend}</span>
+      <span className="fm-seg">
+        {choices.map(([v, label]) => (
+          <Fragment key={v}>
+            <input type="radio" id={`${id}-${v}`} name={name} value={v} checked={value === v} onChange={() => onPick(v)} />
+            <label htmlFor={`${id}-${v}`}>{label}</label>
+          </Fragment>
+        ))}
+      </span>
+    </div>
   )
 }
 
@@ -101,16 +122,25 @@ function meta(m: DuelListItem): string {
   return `${gameName(m.game_id)} · ${m.rated ? '랭크' : '친선'} · 턴 ${m.turn_seconds}초${stake > 0 ? ` · 판돈 ${formatGold(stake)}` : ''}`
 }
 
-function resultText(m: DuelListItem, myId: string | undefined): string {
-  if (m.status === 'void') return '무효'
+const CHIP_TEXT = { win: '승', draw: '무', loss: '패' } as const
+
+/** 최근 결과 표 한 줄: 결과 칸(홈과 같은 recentChips 판정), 상대, 내 점수 : 상대 점수 */
+function ResultRow({ m, myId }: { m: DuelListItem; myId: string }) {
   const seat = m.players.findIndex((p) => p.id === myId)
   const opp = m.players[seat === 0 ? 1 : 0]?.handle ?? '알 수 없음'
-  let r = '무'
-  if (m.winner !== null) r = m.winner === seat ? '승' : '패'
-  const score = m.final_scores && seat >= 0
-    ? ` ${m.final_scores[seat]} : ${m.final_scores[seat === 0 ? 1 : 0]}`
-    : ''
-  return `${r} vs ${opp}${score}`
+  const chip = recentChips([m], myId)[0]
+  const score = m.status === 'void' ? '무효'
+    : m.final_scores && seat >= 0 ? `${m.final_scores[seat]} : ${m.final_scores[seat === 0 ? 1 : 0]}` : ''
+  return (
+    <tr>
+      <td>{chip && <span className={`fm-chip is-${chip}`}>{CHIP_TEXT[chip]}</span>}</td>
+      <td>
+        <Link to={`/duel/${m.id}`}>vs {opp}</Link>
+        <div className="fm-row-sub">{meta(m)}</div>
+      </td>
+      <td className="num">{score}</td>
+    </tr>
+  )
 }
 
 export function DuelHomePage() {
@@ -188,7 +218,11 @@ export function DuelHomePage() {
 
   return (
     <div className="stack">
-      <h2 className="page-title">대전</h2>
+      <h2 className="page-title sr-only">대전</h2>
+      <div className="fm-stats">
+        <div className="fm-stat"><span className="fm-stat-label">대기실</span><span className="fm-stat-value">{list ? list.lobby.length : '–'}</span></div>
+        <div className="fm-stat"><span className="fm-stat-label">내 대국</span><span className="fm-stat-value">{list ? list.mine.length : '–'}</span></div>
+      </div>
       {/* 넓은 화면: 왼쪽 대국 만들기·같은 화면, 오른쪽 대기실·내 대국·최근 결과 */}
       <div className="split">
         <div className="stack">
@@ -196,14 +230,15 @@ export function DuelHomePage() {
           <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
 
           {visible.some((m) => m.duel?.sameScreen) && (
-            <section className="card" aria-label="같은 화면">
-              <h3 className="card-title">같은 화면으로 둘이서</h3>
-              <p className="muted">한 기기를 번갈아 쓰는 대결이에요. 기록과 레이팅은 남지 않아요</p>
-              <div className="card-actions">
-                {visible.filter((m) => m.duel?.sameScreen).map((m) => (
-                  <Link key={m.id} className="btn btn-ghost" to={`/duel/local/${m.id}`}>{m.name} 시작</Link>
-                ))}
-              </div>
+            <section className="fm-panel" aria-label="같은 화면">
+              <h3 className="fm-panel-head">같은 화면으로 둘이서</h3>
+              <p className="fm-empty">한 기기를 번갈아 쓰는 대결이에요. 기록과 레이팅은 남지 않아요</p>
+              {visible.filter((m) => m.duel?.sameScreen).map((m) => (
+                <Link key={m.id} className="fm-row" to={`/duel/local/${m.id}`}>
+                  <span className="fm-row-main"><span className="fm-row-title">{m.name} 시작</span></span>
+                  <span className="fm-row-go" aria-hidden="true">›</span>
+                </Link>
+              ))}
             </section>
           )}
         </div>
@@ -212,53 +247,49 @@ export function DuelHomePage() {
           {!error && list === null && <p className="page-note" role="status">불러오는 중…</p>}
           {list && (
             <>
-              <section className="stack" aria-label="대기실">
-                <h3 className="section-title">대기실</h3>
+              <section className="fm-panel" aria-label="대기실">
+                <h3 className="fm-panel-head">대기실</h3>
                 {joinError && <p className="form-error" role="alert">{joinError}</p>}
-                {list.lobby.length === 0 && <p className="muted">기다리는 공개 대국이 없어요</p>}
-                <ul className="list">
-                  {list.lobby.map((m) => (
-                    <li key={m.id} className="list-row">
-                      <div className="row between">
-                        <span>{m.created_by_handle ?? '알 수 없음'} <span className="muted">({m.players[0]?.rating ?? 1000})</span></span>
-                        <button type="button" className="btn btn-primary" disabled={joining !== null} onClick={() => void join(m)}>
-                          {stakeOf(m) > 0 ? `${formatGold(stakeOf(m))} 걸고 참가` : '참가'}
-                        </button>
-                      </div>
-                      <span className="muted">{meta(m)}</span>
-                    </li>
-                  ))}
-                </ul>
+                {list.lobby.length === 0 && <p className="fm-empty">기다리는 공개 대국이 없어요</p>}
+                {list.lobby.map((m) => (
+                  <div key={m.id} className="fm-row">
+                    <span className="fm-row-main">
+                      <span className="fm-row-title">{m.created_by_handle ?? '알 수 없음'} <span className="muted">({m.players[0]?.rating ?? 1000})</span></span>
+                      <span className="fm-row-sub">{meta(m)}</span>
+                    </span>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={joining !== null} onClick={() => void join(m)}>
+                      {stakeOf(m) > 0 ? `${formatGold(stakeOf(m))} 걸고 참가` : '참가'}
+                    </button>
+                  </div>
+                ))}
               </section>
 
-              <section className="stack" aria-label="내 대국">
-                <h3 className="section-title">내 대국</h3>
-                {list.mine.length === 0 && <p className="muted">진행 중인 대국이 없어요</p>}
-                <ul className="list">
-                  {list.mine.map((m) => {
-                    const opp = m.players.find((p) => p.id !== myId)
-                    const label = m.status === 'waiting' ? '상대를 기다리는 중' : `vs ${opp?.handle ?? '알 수 없음'}`
-                    return (
-                      <li key={m.id} className="list-row">
-                        <Link to={`/duel/${m.id}`}>{label}</Link>
-                        <span className="muted">{meta(m)}{m.visibility === 'invite' ? ' · 초대' : ''}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
+              <section className="fm-panel" aria-label="내 대국">
+                <h3 className="fm-panel-head">내 대국</h3>
+                {list.mine.length === 0 && <p className="fm-empty">진행 중인 대국이 없어요</p>}
+                {list.mine.map((m) => {
+                  const opp = m.players.find((p) => p.id !== myId)
+                  const label = m.status === 'waiting' ? '상대를 기다리는 중' : `vs ${opp?.handle ?? '알 수 없음'}`
+                  return (
+                    <Link key={m.id} to={`/duel/${m.id}`} className="fm-row">
+                      <span className="fm-row-main">
+                        <span className="fm-row-title">{label}</span>
+                        <span className="fm-row-sub">{meta(m)}{m.visibility === 'invite' ? ' · 초대' : ''}</span>
+                      </span>
+                      <span className="fm-row-go" aria-hidden="true">›</span>
+                    </Link>
+                  )
+                })}
               </section>
 
-              <section className="stack" aria-label="최근 결과">
-                <h3 className="section-title">최근 결과</h3>
-                {list.recent.length === 0 && <p className="muted">아직 끝난 대국이 없어요</p>}
-                <ul className="list">
-                  {list.recent.map((m) => (
-                    <li key={m.id} className="list-row">
-                      <Link to={`/duel/${m.id}`}>{resultText(m, myId)}</Link>
-                      <span className="muted">{meta(m)}</span>
-                    </li>
-                  ))}
-                </ul>
+              <section className="fm-panel" aria-label="최근 결과">
+                <h3 className="fm-panel-head">최근 결과</h3>
+                {list.recent.length === 0 ? <p className="fm-empty">아직 끝난 대국이 없어요</p> : (
+                  <table className="fm-table">
+                    <thead><tr><th>결과</th><th>상대</th><th className="num">점수</th></tr></thead>
+                    <tbody>{list.recent.map((m) => <ResultRow key={m.id} m={m} myId={myId ?? ''} />)}</tbody>
+                  </table>
+                )}
               </section>
             </>
           )}

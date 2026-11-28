@@ -36,43 +36,71 @@ import { resetServerTime, syncFromView } from '../../lib/serverTime.ts'
 
 beforeEach(() => { rpcMock.mockReset(); playMock.mockReset(); admin = true; resetServerTime() })
 
-/** 홈 화면에서 숫자 맞히기 카드만 (등록부에 다른 게임이 있어도 이 카드로 검사한다) */
+/** 게임 목록에서 숫자 맞히기 줄만 (등록부에 다른 게임이 있어도 이 줄로 검사한다) */
 async function ngCard() {
-  return within((await screen.findByRole('heading', { name: '테스트 숫자 맞히기' })).closest('article') as HTMLElement)
+  return within(await screen.findByRole('group', { name: '테스트 숫자 맞히기' }))
 }
 
 test('home shows own daily score for admin-visible hidden game', async () => {
   rpcMock.mockResolvedValue([{ user_id: 'u2', score: 3 }, { user_id: 'u1', score: 8.5 }])
   render(<MemoryRouter><GamesPage /></MemoryRouter>)
   const card = await ngCard()
-  expect(await card.findByText('오늘 8.5점')).toBeInTheDocument()
+  expect(await card.findByText(/오늘 8\.5점/)).toBeInTheDocument()
   expect(rpcMock).toHaveBeenCalledWith('lb_daily', { p_day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), p_game: 'test-guess' })
-  expect(card.getByRole('link', { name: '데일리' })).toHaveAttribute('href', '/play/test-guess/daily')
-  expect(card.getByRole('link', { name: '자유 플레이' })).toHaveAttribute('href', '/play/test-guess/free')
+})
+
+test('데일리 게임 줄에 데일리·자유 링크와 오늘 상태', async () => {
+  rpcMock.mockResolvedValue([])
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  const card = await ngCard()
+  expect(await card.findByText(/아직 안 풀었어요/)).toBeInTheDocument()
+  const daily = card.getByRole('link', { name: '테스트 숫자 맞히기 데일리' })
+  expect(daily).toHaveAttribute('href', '/play/test-guess/daily')
+  expect(daily.className).toContain('btn-primary')
+  const free = card.getByRole('link', { name: '테스트 숫자 맞히기 자유 플레이' })
+  expect(free).toHaveAttribute('href', '/play/test-guess/free')
+  expect(free.className).toContain('btn-ghost')
+  expect(card.getByText('데일리')).toBeInTheDocument()
+  expect(card.getByText('자유')).toBeInTheDocument()
+})
+
+test('자유 플레이만 있는 게임은 줄 전체가 링크(이름으로 찾음)', async () => {
+  rpcMock.mockResolvedValue([])
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  const row = await screen.findByRole('link', { name: '볼 런' })
+  expect(row).toHaveAttribute('href', '/play/ball-run/free')
+  expect(row.className).toContain('fm-row')
 })
 
 test('home says not played yet, and hides hidden games from non-admins', async () => {
   rpcMock.mockResolvedValue([])
   const r = render(<MemoryRouter><GamesPage /></MemoryRouter>)
-  expect(await (await ngCard()).findByText('아직 안 풀었어요')).toBeInTheDocument()
+  expect(await (await ngCard()).findByText(/아직 안 풀었어요/)).toBeInTheDocument()
   r.unmount()
   admin = false
   render(<MemoryRouter><GamesPage /></MemoryRouter>)
-  expect(await screen.findByText('후알야')).toBeInTheDocument()
+  expect(await screen.findByRole('group', { name: '후알야' })).toBeInTheDocument()
   expect(screen.queryByText('테스트 숫자 맞히기')).toBeNull()
 })
 
-test('home lists world games with an enter link, hidden ones only for admins', async () => {
+test('지속형 게임 줄은 /world/:id 링크, 숨김은 관리자에게만', async () => {
   rpcMock.mockResolvedValue([])
   const r = render(<MemoryRouter><GamesPage /></MemoryRouter>)
-  const card = within((await screen.findByRole('heading', { name: '테스트 월드' })).closest('article') as HTMLElement)
-  expect(card.getByRole('link', { name: '들어가기' })).toHaveAttribute('href', '/world/test-world')
-  expect(screen.getByRole('heading', { name: '숨김 월드' })).toBeInTheDocument()
+  const row = await screen.findByRole('link', { name: '테스트 월드 입장' })
+  expect(row).toHaveAttribute('href', '/world/test-world')
+  expect(row.textContent).toContain('입장 ›')
+  expect(screen.getByRole('link', { name: '숨김 월드 입장' })).toBeInTheDocument()
   r.unmount()
   admin = false
   render(<MemoryRouter><GamesPage /></MemoryRouter>)
-  expect(await screen.findByRole('heading', { name: '테스트 월드' })).toBeInTheDocument()
-  expect(screen.queryByRole('heading', { name: '숨김 월드' })).toBeNull()
+  expect(await screen.findByRole('link', { name: '테스트 월드 입장' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: '숨김 월드 입장' })).toBeNull()
+})
+
+test('페이지 제목 "게임 목록"은 보이지 않게 남는다', () => {
+  rpcMock.mockResolvedValue([])
+  render(<MemoryRouter><GamesPage /></MemoryRouter>)
+  expect(screen.getByRole('heading', { name: '게임 목록' }).className).toContain('sr-only')
 })
 
 test('daily page with unknown game', () => {
@@ -202,11 +230,12 @@ test('home groups games into topic sections, world games first in each', async (
   rpcMock.mockResolvedValue([])
   render(<MemoryRouter><GamesPage /></MemoryRouter>)
   const football = await screen.findByRole('region', { name: '축구' })
-  expect(within(football).getByRole('heading', { name: '후알야' })).toBeInTheDocument()
-  expect(within(football).queryByRole('heading', { name: '테스트 숫자 맞히기' })).toBeNull()
+  expect(football.className).toContain('fm-panel')
+  expect(within(football).getByRole('group', { name: '후알야' })).toBeInTheDocument()
+  expect(within(football).queryByRole('group', { name: '테스트 숫자 맞히기' })).toBeNull()
   const other = screen.getByRole('region', { name: '다른 게임' })
-  const titles = within(other).getAllByRole('heading').map((h) => h.textContent)
-  expect(titles[0]).toBe('다른 게임')
-  expect(titles[1]).toBe('펨타듀 낚시') // 지속형 게임이 맨 위
-  expect(titles).toContain('테스트 숫자 맞히기')
+  expect(within(other).getByRole('heading').textContent).toBe('다른 게임')
+  const rows = [...other.querySelectorAll('.fm-row')]
+  expect(rows[0].textContent).toContain('펨타듀 낚시') // 지속형 게임이 맨 위
+  expect(rows.some((x) => x.textContent?.includes('테스트 숫자 맞히기'))).toBe(true)
 })

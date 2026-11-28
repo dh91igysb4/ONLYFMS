@@ -90,7 +90,7 @@ test('nav no longer has a 내 프로필 tab', () => {
   mount()
   const nav = screen.getByRole('navigation', { name: '주 메뉴' })
   expect(within(nav).queryByText('내 프로필')).toBeNull()
-  expect(within(nav).getByText('리더보드')).toBeTruthy()
+  expect(within(nav).getByText('순위')).toBeTruthy()
 })
 
 test('user menu opens and closes (Esc, outside click, toggle)', () => {
@@ -156,12 +156,27 @@ test('menu 로그아웃 signs out', () => {
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-test('main nav lists 홈, 게임, 대회, 대전, 리더보드, 제안 in order', () => {
+test('주 메뉴 탭은 홈·게임·대전·순위·대회·제안 순서', () => {
   mount()
   const links = within(screen.getByRole('navigation', { name: '주 메뉴' })).getAllByRole('link')
   expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-    ['홈', '/'], ['게임', '/games'], ['대회', '/contests'], ['대전', '/duel'], ['리더보드', '/leaderboard'], ['제안', '/suggest'],
+    ['홈', '/'], ['게임', '/games'], ['대전', '/duel'], ['순위', '/leaderboard'], ['대회', '/contests'], ['제안', '/suggest'],
   ])
+})
+
+test('관리자 링크는 주 메뉴가 아니라 계정 메뉴 안에 있다', async () => {
+  auth.isAdmin = true
+  mount()
+  expect(within(screen.getByRole('navigation', { name: '주 메뉴' })).queryByRole('link', { name: /관리자/ })).toBeNull()
+  fireEvent.click(menuButton())
+  fireEvent.click(screen.getByRole('menuitem', { name: /관리자/ }))
+  expect(where()).toBe('/admin')
+})
+
+test('관리자가 아니면 계정 메뉴에 관리자 항목이 없다', () => {
+  mount()
+  fireEvent.click(menuButton())
+  expect(screen.queryByRole('menuitem', { name: /관리자/ })).toBeNull()
 })
 
 test('관리자이고 대기 제안이 있으면 관리자 링크에 배지가 붙는다', async () => {
@@ -170,7 +185,9 @@ test('관리자이고 대기 제안이 있으면 관리자 링크에 배지가 �
   mount()
   const badge = await screen.findByLabelText('결정 대기 제안 3건')
   expect(badge.textContent).toBe('3')
-  expect(badge.closest('a')?.getAttribute('href')).toBe('/admin')
+  expect(menuButton().contains(badge)).toBe(true)
+  fireEvent.click(menuButton())
+  expect(within(screen.getByRole('menuitem', { name: /관리자/ })).getByText('3')).toBeTruthy()
   expect(pendingCount).toHaveBeenCalledTimes(1)
 })
 
@@ -194,7 +211,8 @@ test('대기 제안 수 조회가 실패해도 조용히 배지만 없다', asyn
   pendingCount.mockRejectedValue(new Error('boom'))
   mount()
   await vi.waitFor(() => expect(pendingCount).toHaveBeenCalledTimes(1))
-  expect(screen.getByRole('link', { name: '관리자' })).toBeTruthy()
+  fireEvent.click(menuButton())
+  expect(screen.getByRole('menuitem', { name: '관리자' })).toBeTruthy()
   expect(screen.queryByLabelText(/결정 대기 제안/)).toBeNull()
 })
 
@@ -272,4 +290,11 @@ test('지갑 게임이 없으면 상금 알림도 없다', async () => {
   setPrizes([{ id: 1, reason: 'daily_prize', contestId: 'c1', gameId: null, amount: 6150, note: '1등', at: '2026-11-25T00:00:00Z' }])
   mount()
   expect(screen.queryByText(/상금이 들어왔어요/)).toBeNull()
+})
+
+test('밸리 버튼: 미리보기가 있는 지속형 게임으로 가는 짧은 이름 버튼', () => {
+  mount()
+  const btn = screen.getByRole('link', { name: '펨타듀 낚시 들어가기' })
+  expect(btn.textContent).toContain('밸리')
+  expect(btn.getAttribute('href')).toBe('/world/fishing')
 })

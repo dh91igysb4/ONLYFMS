@@ -286,3 +286,61 @@ test('home_lobby_stake: not enough gold message', async () => {
   await flush()
   expect(screen.getByText('골드가 부족해요')).toBeInTheDocument()
 })
+
+test('종류·공개 범위는 라디오(구분 버튼)로 고르고 create 요청에 rated·visibility로 간다', async () => {
+  duelMock.mockResolvedValue({ match_id: 'm9', invite_code: 'abcde12345' })
+  renderHome()
+  await flush()
+  const friendly = screen.getByRole('radio', { name: '친선' })
+  const invite = screen.getByRole('radio', { name: '초대 링크로만' })
+  expect(friendly.closest('.fm-seg')).not.toBeNull()
+  expect(invite.closest('.fm-seg')).not.toBeNull()
+  expect((screen.getByRole('radio', { name: '랭크' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(friendly)
+  fireEvent.click(invite)
+  expect(screen.getByRole('form', { name: '대국 만들기' }).querySelector('.fm-form')).not.toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '대국 만들기' }))
+  await flush()
+  expect(calls('create')[0][0]).toMatchObject({ rated: false, visibility: 'invite' })
+})
+
+test('최근 결과 표: 승·무·패 칸과 점수, 무효는 칸 없이 "무효"', async () => {
+  const me = { id: 'u1', handle: 'kane', rating: 1000 }
+  const ji = { id: 'u4', handle: 'ji', rating: 980 }
+  rpcMock.mockResolvedValue({
+    ...empty,
+    recent: [
+      item({ id: 'r1', status: 'finished', winner: 1, final_scores: [150, 210], players: [ji, me] }),
+      item({ id: 'r2', status: 'finished', winner: 0, final_scores: [150, 210], players: [ji, me] }),
+      item({ id: 'r3', status: 'finished', winner: null, final_scores: [100, 100], players: [me, ji] }),
+      item({ id: 'r4', status: 'void', winner: null, final_scores: null, players: [me, ji] }),
+    ],
+  })
+  renderHome()
+  await flush()
+  const recent = screen.getByRole('region', { name: '최근 결과' })
+  const rows = [...recent.querySelectorAll('tbody tr')]
+  expect(rows).toHaveLength(4)
+  expect(rows.map((r) => r.querySelector('.fm-chip')?.textContent ?? null)).toEqual(['승', '패', '무', null])
+  expect(rows[0].querySelector('.fm-chip')!.className).toContain('is-win')
+  expect(rows[1].querySelector('.fm-chip')!.className).toContain('is-loss')
+  expect(rows[0].textContent).toContain('210 : 150')
+  expect(rows[3].textContent).toContain('무효')
+  expect(within(rows[0] as HTMLElement).getByRole('link', { name: /ji/ })).toHaveAttribute('href', '/duel/r1')
+})
+
+test('맨 위 숫자 칸: 대기실 n, 내 대국 n', async () => {
+  rpcMock.mockResolvedValue({
+    ...empty,
+    lobby: [item({ id: 'l1' })],
+    mine: [item({ id: 'w1' }), item({ id: 'a1', status: 'active' })],
+  })
+  renderHome()
+  await flush()
+  const stats = document.querySelector('.fm-stats')!
+  const pairs = [...stats.querySelectorAll('.fm-stat')].map((s) => [
+    s.querySelector('.fm-stat-label')!.textContent, s.querySelector('.fm-stat-value')!.textContent,
+  ])
+  expect(pairs).toEqual([['대기실', '1'], ['내 대국', '2']])
+  expect(screen.getByRole('heading', { name: '대전' }).className).toContain('sr-only')
+})

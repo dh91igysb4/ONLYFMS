@@ -4,7 +4,7 @@ import { ApiError, errorMessage, rpc } from '../../lib/api.ts'
 import { duels } from '../../games/index.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { duelRate } from './duelFormat.ts'
-import { LbTable } from './LbTable.tsx'
+import { LbPanel, LbTable } from './LbTable.tsx'
 
 type DuelRow = { handle: string; rating: number; rated_games: number; wins: number; draws: number; losses: number; placed: boolean }
 
@@ -31,6 +31,7 @@ export function DuelBoard() {
   const ready = rows && rows.game === game ? rows.rows : null
   const placed = ready?.filter((r) => r.placed) ?? []
   const pending = ready?.filter((r) => !r.placed) ?? []
+  // 배치 중 목록 줄(list-row)은 theme.css .list-row.me 규칙으로 강조한다(표의 is-me와 다름)
   const meCls = (h: string) => (h === profile?.handle ? 'me' : undefined)
 
   return (
@@ -51,7 +52,7 @@ export function DuelBoard() {
       {!error && !ready && <p className="page-note" role="status">불러오는 중…</p>}
       {!error && ready && ready.length === 0 && <p className="muted">아직 기록이 없어요</p>}
       {!error && placed.length > 0 && (
-        <div className="lb-panel">
+        <LbPanel title={`대전 · ${visible.find((d) => d.manifest.id === game)?.manifest.name ?? game}`} count={placed.length}>
           <LbTable
             cols={[{ label: '순위', rank: true }, { label: '아이디' }, { label: '레이팅', num: true, sorted: true }, { label: '판수', num: true }, { label: '승률', num: true }]}
             rows={placed.map((r, i) => ({
@@ -59,7 +60,7 @@ export function DuelBoard() {
               cells: [i + 1, <Link to={`/u/${r.handle}`}>{r.handle}</Link>, r.rating, r.rated_games, duelRate(r.wins, r.draws, r.losses)],
             }))}
           />
-        </div>
+        </LbPanel>
       )}
       {!error && pending.length > 0 && (
         <>

@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.ts'
 import { Avatar } from '../profile/Avatar.tsx'
 
-/** 오른쪽 위 아이디 메뉴: 내 프로필 · 화면 설정 · 로그아웃 */
-export function UserMenu({ handle }: { handle: string }) {
+/** 오른쪽 위 아이디 메뉴: 내 프로필 · 화면 설정 · (관리자) · 로그아웃. 관리자 결정 대기 숫자는 메뉴 버튼과 항목에 붙는다 */
+export function UserMenu({ handle, isAdmin = false, adminPending = 0 }: { handle: string; isAdmin?: boolean; adminPending?: number }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -54,12 +54,18 @@ export function UserMenu({ handle }: { handle: string }) {
         aria-controls={open ? menuId : undefined} onClick={() => setOpen((v) => !v)}>
         <Avatar handle={handle} size="sm" />
         <span className="user-menu-handle">{handle}</span>
+        {isAdmin && adminPending > 0 && <span className="badge user-menu-badge" aria-label={`결정 대기 제안 ${adminPending}건`}>{adminPending}</span>}
         <span className="user-menu-caret" aria-hidden="true" />
       </button>
       {open && (
         <div ref={menuRef} id={menuId} className="user-menu-list" role="menu" aria-label="계정" onKeyDown={onMenuKey}>
           <Link role="menuitem" tabIndex={-1} className="user-menu-item" to={profilePath} onClick={() => close(false)}>내 프로필</Link>
           <Link role="menuitem" tabIndex={-1} className="user-menu-item" to={`${profilePath}?tab=settings`} onClick={() => close(false)}>화면 설정</Link>
+          {isAdmin && (
+            <Link role="menuitem" tabIndex={-1} className="user-menu-item" to="/admin" onClick={() => close(false)}>
+              관리자{adminPending > 0 && <span className="badge user-menu-item-badge" aria-hidden="true">{adminPending}</span>}
+            </Link>
+          )}
           <button role="menuitem" tabIndex={-1} type="button" className="user-menu-item user-menu-logout"
             onClick={() => { close(false); void supabase.auth.signOut() }}>로그아웃</button>
         </div>

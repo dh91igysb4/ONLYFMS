@@ -49,17 +49,18 @@ export function UpcomingContests() {
   if (rows.length === 0) return null
   const t = now()
   return (
-    <section className="stack split-side" aria-label="진행 중·곧 시작 대회">
-      <h3 className="section-title">진행 중·곧 시작 대회</h3>
+    <section className="fm-panel split-side" aria-label="진행 중·곧 시작 대회">
+      <h3 className="fm-panel-head">진행 중·곧 시작 대회<Link to="/contests" aria-label="전체 대회">전체 ›</Link></h3>
       {rows.map((c) => (
-        <Link key={c.id} to={`/contests/${c.id}`} className="card card-link">
-          <div className="row">
-            <span className={`badge badge-${c.kind}`}>{kindLabel(c.kind)}</span>
-            <strong className="card-title">{c.title}</strong>
-          </div>
-          <span className="card-status">
-            {phaseOf(c, t) === 'live' ? '진행 중' : `시작까지 ${countdown(Date.parse(c.starts_at) - t)}`}
+        <Link key={c.id} to={`/contests/${c.id}`} className="fm-row">
+          <span className={`badge badge-${c.kind}`}>{kindLabel(c.kind)}</span>
+          <span className="fm-row-main">
+            <span className="fm-row-title">{c.title}</span>
+            <span className="fm-row-sub">
+              {phaseOf(c, t) === 'live' ? '진행 중' : `시작까지 ${countdown(Date.parse(c.starts_at) - t)}`}
+            </span>
           </span>
+          <span className="fm-row-go" aria-hidden="true">›</span>
         </Link>
       ))}
     </section>

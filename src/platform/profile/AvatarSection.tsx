@@ -36,8 +36,8 @@ export function AvatarSection({ handle }: { handle: string }) {
   if (shown.length === 0) return null
 
   return (
-    <div className="lb-panel">
-      <h3 className="lb-caption">캐릭터</h3>
+    <section className="fm-panel">
+      <h3 className="fm-panel-head">캐릭터</h3>
       <ul className="pf-avatars" aria-label="캐릭터">
         {shown.map(({ id, label, game, Comp, data }) => (
           <li key={id} className="pf-avatar-item">
@@ -49,6 +49,6 @@ export function AvatarSection({ handle }: { handle: string }) {
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }

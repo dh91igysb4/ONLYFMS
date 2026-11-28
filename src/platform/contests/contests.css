@@ -1,0 +1,4 @@
+/* 대회 목록(FM 개편 설계 §4.4 대회). 판·표 바탕은 theme.css .fm-panel/.fm-table. 색은 토큰만. */
+.contest-list-top { justify-content: flex-end; }
+.contest-list-invite { margin-left: 6px; }
+.contest-list-time { white-space: nowrap; }

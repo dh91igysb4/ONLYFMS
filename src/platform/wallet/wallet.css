@@ -8,7 +8,13 @@
   background: var(--bg); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--edge);
 }
 .wallet-badge-label { font-weight: 600; color: var(--muted); }
-@media (max-width: 360px) { .wallet-badge { font-size: 0.8rem; padding: 5px 8px; } }
+/* 좁은 폰: 머리글 첫 줄이 넘치지 않게 '지갑' 글자는 숨긴다(접근 이름 '지갑 …'은 그대로) */
+@media (max-width: 430px) {
+  .wallet-badge-label { display: none; }
+  .header-right { gap: 2px; }
+  /* 그래도 모자라면(아주 큰 잔액) 아바타가 화면 밖으로 밀리지 않게 잔액 쪽이 줄어든다 */
+  .wallet-badge { font-size: 0.8rem; padding: 5px 6px; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
 
 /* world 사이트 상한 알림: 게임 위에 겹치되 조작을 막지 않는다 */
 .wallet-cap-toast {
@@ -52,6 +58,10 @@
 /* 대전 판돈 (지갑 4단계, 설계 §9): 대국 만들기 입력, 대국·결과의 판돈 */
 .stake-picker { display: flex; flex-direction: column; gap: 6px; }
 .stake-label { font-weight: 600; }
+/* 대국 만들기 FM 양식 안(StakePicker): 왼쪽 이름 칸 + 오른쪽 입력 묶음 */
+.fm-form-row.stake-picker { display: grid; align-items: start; }
+.fm-form-row > .stake-label { padding-top: 8px; font-weight: 400; }
+.stake-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stake-presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .stake-chip { min-height: 36px; padding: 6px 10px; font-variant-numeric: tabular-nums; }
 .stake-chip.is-on { color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-edge); }

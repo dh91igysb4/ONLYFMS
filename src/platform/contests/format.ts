@@ -30,4 +30,13 @@ export function kstLabel(iso: string): string {
   return `${KST.format(new Date(iso))} (KST)`
 }
 
+const KST_PARTS = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+/** 표 칸용 짧은 KST 시각: `M/D (요일) HH:MM` */
+export function kstShort(iso: string): string {
+  const p = Object.fromEntries(KST_PARTS.formatToParts(new Date(iso)).map((x) => [x.type, x.value]))
+  return `${p.month}/${p.day} (${p.weekday}) ${p.hour}:${p.minute}`
+}
+
 export const kindLabel = (k: ContestRow['kind']) => (k === 'official' ? '공식' : '친선')

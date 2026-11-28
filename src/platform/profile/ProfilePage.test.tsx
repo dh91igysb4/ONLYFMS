@@ -33,6 +33,8 @@ const renderAt = (h: string, search = '') => render(
   </MemoryRouter>,
 )
 const where = () => screen.getByTestId('where').textContent
+/** 요약 탭 최근 기록 표의 몸통 줄 글자 */
+const summaryRows = () => [...screen.getByRole('table', { name: '최근 기록' }).querySelectorAll('tbody tr')].map((r) => r.textContent ?? '')
 
 beforeEach(() => { rpcMock.mockReset(); auth.handle = 'kane'; wallet.enabled = true })
 
@@ -76,7 +78,8 @@ test('profile_renders_sections', async () => {
   expect(screen.getByText('50%')).toBeTruthy()
   expect(screen.getByText('숫자 맞추기', { selector: 'td' })).toBeTruthy()
   fireEvent.click(screen.getByRole('tab', { name: '요약' }))
-  expect(screen.getByText(/숫자 맞추기 · 9점/)).toBeTruthy()
+  expect(summaryRows()[0]).toContain('숫자 맞추기')
+  expect(summaryRows()[0]).toContain('9점')
 })
 
 test('profile_duel_stats_toggle', async () => {
@@ -136,7 +139,10 @@ test('profile_h2h_default_me_vs_them', async () => {
   })
   renderAt('messi', '?tab=duel')
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('duel_h2h', { p_handle_a: 'kane', p_handle_b: 'messi', p_game: null }))
-  expect(await screen.findByText(/요트 다이스 · 2승 1무 4패/)).toBeTruthy()
+  // 머리 판의 '나와의 대전 전적' 줄에도 같은 글자가 있어 표 안의 칸을 고른다
+  const h2hRow = await waitFor(() => screen.getAllByText('2승 1무 4패').map((e) => e.closest('tr')).find(Boolean)!)
+  expect(h2hRow.textContent).toContain('요트 다이스')
+  expect(h2hRow.closest('table')!.className).toContain('fm-table')
   expect(screen.getByText(/300 : 280/)).toBeTruthy()
 })
 
@@ -316,9 +322,9 @@ test('profile_summary_merges_recent_newest_first', async () => {
     duel_stats: [duelStat],
   })
   renderAt('kane')
-  const list = await screen.findByRole('list', { name: '최근 기록' })
-  await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(5))
-  const rows = within(list).getAllByRole('listitem').map((li) => li.textContent ?? '')
+  await screen.findByRole('table', { name: '최근 기록' })
+  await waitFor(() => expect(summaryRows()).toHaveLength(5))
+  const rows = summaryRows()
   expect(rows[0]).toContain('데일리')         // 10-31 12:00
   expect(rows[1]).toContain('vs messi')       // 10-31 10:00
   expect(rows[2]).toContain('vs ronaldo')     // 10-30
@@ -331,9 +337,9 @@ test('profile_summary_caps_at_ten', async () => {
   const many = Array.from({ length: 12 }, (_, i) => ({ type: 'free', game_id: 'test-guess', score: i, at: `2026-10-${String(10 + i).padStart(2, '0')}T00:00:00Z` }))
   setup({ user_stats: { ...emptyStats, recent: many } })
   renderAt('kane')
-  const list = await screen.findByRole('list', { name: '최근 기록' })
-  expect(within(list).getAllByRole('listitem')).toHaveLength(10)
-  expect(within(list).getAllByRole('listitem')[0].textContent).toContain('11점')
+  await screen.findByRole('table', { name: '최근 기록' })
+  expect(summaryRows()).toHaveLength(10)
+  expect(summaryRows()[0]).toContain('11점')
 })
 
 test('profile_error_retry', async () => {
@@ -432,4 +438,25 @@ test('profile_prize: 0이거나 지갑 게임이 없으면 줄 없음', async ()
   renderAt('messi')
   await screen.findByRole('heading', { name: 'messi' })
   expect(rpcMock).not.toHaveBeenCalledWith('user_prize_total', expect.anything())
+})
+
+test('최근 기록은 표(구분·게임·점수·날짜 머리줄)', async () => {
+  setup({ user_stats: { ...emptyStats, recent: [{ type: 'daily', game_id: 'test-guess', score: 7, at: '2026-10-31T12:00:00Z' }] } })
+  renderAt('kane')
+  const table = await screen.findByRole('table', { name: '최근 기록' })
+  expect(table.className).toContain('fm-table')
+  expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['구분', '게임', '점수', '날짜'])
+  const cells = [...table.querySelectorAll('tbody tr td')].map((c) => c.textContent)
+  expect(cells.slice(0, 3)).toEqual(['데일리', '숫자 맞추기', '7점'])
+})
+
+test('숫자 칸 이름과 값 유지(fm-stats), 탭은 fm-tabs', async () => {
+  setup({ user_stats: { ...emptyStats, daily_by_game: [{ game_id: 'test-guess', days: 29, avg_score: 7 }] } })
+  renderAt('kane')
+  const chips = await screen.findByRole('list', { name: '요약 기록' })
+  expect(chips.className).toContain('fm-stats')
+  const first = chips.querySelector('.fm-stat')!
+  expect(first.querySelector('.fm-stat-label')!.textContent).toBe('데일리 참여')
+  expect(first.querySelector('.fm-stat-value')!.textContent).toBe('29')
+  expect(screen.getByRole('tablist', { name: '프로필 보기' }).className).toContain('fm-tabs')
 })
