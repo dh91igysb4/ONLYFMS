@@ -38,3 +38,19 @@ export const START_DELAY_SEC = 5
 export const REPORT_GRACE_SEC = 60
 /** 대국 마감(초) = 출발 지연 + 경주 + 보고 유예. manifest turnSeconds의 하나뿐인 선택지 */
 export const MATCH_SECONDS = START_DELAY_SEC + RACE_SECONDS + REPORT_GRACE_SEC
+/** 내 상태를 보내는 횟수(초당, 설계 §6.5) */
+export const NET_HZ = 20
+/** 상대 유령 몸체를 키우는 폭(m). 맞는 쪽도 접촉을 느끼게(때린 쪽은 자기 세계에서 먼저 튕겨 나간다) — 시험판 */
+export const GHOST_MARGIN = 0.35
+/** 상대 상태를 앞으로 외삽하는 최대 시간(ms, 설계 §6.5) */
+export const GHOST_EXTRAP_MAX_MS = 250
+/** 상대 소식이 이보다 오래 없으면 유령을 반투명으로, 충돌 없이(틱 = 1초) */
+export const GHOST_STALE_TICKS = TICK_HZ
+/** 같은 질량 충돌의 반발 계수 — 시험판 */
+export const HIT_RESTITUTION = 0.35
+/** 겹친 동안 매 틱 밀어내는 거리(m) — 시험판 */
+export const HIT_PUSH_OUT = 0.04
+/** 옆면을 이보다 빠르게(m/s) 맞으면 돈다 — 시험판 */
+export const SPIN_HIT_SPEED = 5
+/** 옆면을 세게 맞았을 때 더하는 yaw 각속도(rad/s) — 시험판 */
+export const SPIN_KICK = 3.2
