@@ -46,12 +46,21 @@ function nearest(c: Course, pos: Vec3, from: number, to: number): { index: numbe
 
 /**
  * pos에서 가장 가까운 중심선 점. hint 근처(±40점)에서 찾고, 그 점까지 거리가 그 점 도로 폭보다 멀면
- * (지름길 착지 등) 중심선 전체에서 다시 찾는다.
+ * (지름길 착지 등) 중심선 전체에서 다시 찾는다. global이면 전체 검색 결과이고, dist는 그 점까지 거리다.
+ * 전체 검색 결과는 차가 그 도로 위에 내려앉았을 때만 믿어야 한다(race.ts).
  */
-export function progressAt(c: Course, pos: Vec3, hint: number): { index: number; s: number } {
+export function progressAt(
+  c: Course,
+  pos: Vec3,
+  hint: number,
+): { index: number; s: number; dist: number; global: boolean } {
   const n = c.centerline.length
   const h = Math.min(n - 1, Math.max(0, Math.round(hint)))
   let r = nearest(c, pos, Math.max(0, h - WINDOW), Math.min(n - 1, h + WINDOW))
-  if (Math.sqrt(r.d2) > c.width[r.index]) r = nearest(c, pos, 0, n - 1)
-  return { index: r.index, s: arcLength(c)[r.index] }
+  let global = false
+  if (Math.sqrt(r.d2) > c.width[r.index]) {
+    r = nearest(c, pos, 0, n - 1)
+    global = true
+  }
+  return { index: r.index, s: arcLength(c)[r.index], dist: Math.sqrt(r.d2), global }
 }

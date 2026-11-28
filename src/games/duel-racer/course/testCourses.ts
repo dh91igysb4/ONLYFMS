@@ -37,3 +37,24 @@ export function rampCourse(): Course {
     boxes: [{ kind: 'ramp', center: { x: 0, y: lift, z: 400 }, half, rot: { pitch, yaw: 0, roll: 0 } }],
   }
 }
+
+/** 헤어핀 U자: x=0으로 600m 올라가 반지름 30m로 돌아 x=60으로 내려온다. 두 다리가 60m 떨어져 있다(전체 검색 시험용) */
+export function hairpinCourse(): Course {
+  const centerline: Vec3[] = []
+  for (let z = 0; z <= 600; z += 4) centerline.push({ x: 0, y: 0, z })
+  for (let a = 0; a <= Math.PI; a += 4 / 30) centerline.push({ x: 30 - 30 * Math.cos(a), y: 0, z: 600 + 30 * Math.sin(a) })
+  for (let z = 600; z >= 0; z -= 4) centerline.push({ x: 60, y: 0, z })
+  const n = centerline.length
+  const checkpoints = []
+  for (let i = 0; i < n - 1; i += 50) checkpoints.push(i)
+  return {
+    id: 'test-hairpin',
+    centerline,
+    width: centerline.map(() => 12),
+    bank: centerline.map(() => 0),
+    boxes: [],
+    checkpoints,
+    finish: n - 1,
+    start: { pos: { x: 0, y: 1.2, z: 8 }, yaw: 0 },
+  }
+}

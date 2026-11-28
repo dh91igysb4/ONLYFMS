@@ -115,6 +115,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
         if (!alive) return
         const r = raceRef.current
         if (!r) return
+        // 연습은 프레임당 250ms까지만 흘린다(숨긴 탭은 멈춤). 2단계 대국은 서버 시각 경과로 따라잡을 것(설계 §6.3)
         const ms = lastT === null ? 0 : Math.min(250, t - lastT) || 0
         lastT = t
         const pre = mod.snapshot(r.race)

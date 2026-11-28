@@ -1,5 +1,6 @@
 // 레이스 세션 (레이싱 설계 §5.4, §6.3): 고정 60Hz 틱, 카운트다운, 진행도·체크포인트, 복귀, 도착.
-// 기록은 출발 뒤 물리 틱 수다. 밀린 시간(탭 숨김)은 한 번에 몰아서 돌린다.
+// 기록은 출발 뒤 물리 틱 수다. advance는 받은 시간을 모두 틱으로 돌린다. 연습 화면(RacerGame)은 프레임당 250ms까지만
+// 넘겨서 탭을 숨기면 레이스가 멈춘다. 2단계 대국 화면은 서버 시각 기준 경과로 따라잡아야 한다(설계 §6.3, 2단계 차단 사항).
 import { FALL_Y, STUCK_SECONDS, TICK_HZ } from './constants.ts'
 import { arcLength, getCourse, progressAt } from './course/index.ts'
 import { tangentAt } from './course/road.ts'
@@ -110,11 +111,16 @@ function step(race: Race, input: Controls): void {
   if (!started || done) return
 
   const p = progressAt(race.course, s.pos, race.progressIndex)
-  race.progressIndex = p.index
-  for (const cp of race.course.checkpoints) if (cp <= p.index && cp > race.lastCheckpoint) race.lastCheckpoint = cp
-  if (p.index >= race.course.finish) {
-    race.finishTicks = race.elapsed - COUNTDOWN_TICKS
-    return
+  // 전체 검색 결과(코스의 먼 곳)는 그 도로 위에 접지했을 때만 받는다. 떨어지는 중에 다른 구간 옆을 지나면
+  // 진행도·체크포인트·도착이 앞으로 뛰어 코스 대부분을 건너뛴다(최종 리뷰 Important #1).
+  const trusted = !p.global || (s.grounded && p.dist <= race.course.width[p.index])
+  if (trusted) {
+    race.progressIndex = p.index
+    for (const cp of race.course.checkpoints) if (cp <= p.index && cp > race.lastCheckpoint) race.lastCheckpoint = cp
+    if (p.index >= race.course.finish) {
+      race.finishTicks = race.elapsed - COUNTDOWN_TICKS
+      return
+    }
   }
   // 뒤집힌 채 멈춤
   const still = Math.hypot(s.vel.x, s.vel.y, s.vel.z) < 2

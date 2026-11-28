@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'vitest'
 import { FALL_Y, STUCK_SECONDS, TICK_HZ } from './constants.ts'
-import { flatCourse, rampCourse } from './course/testCourses.ts'
+import { flatCourse, hairpinCourse, rampCourse } from './course/testCourses.ts'
 import { NITRO_START } from './nitro.ts'
 import { NO_CONTROLS, type Controls } from './physics/controls.ts'
 import { loadRapier, type Rapier } from './physics/rapier.ts'
@@ -125,4 +125,31 @@ test('nitro fills from a jump in a race', () => {
   pastCountdown(race)
   seconds(race, 13)
   expect(snapshot(race).nitro.gauge).toBeGreaterThan(NITRO_START.gauge)
+})
+
+test('falling past the other leg of a hairpin does not skip ahead', () => {
+  const c = hairpinCourse()
+  const race = createRace(R, c)
+  pastCountdown(race)
+  seconds(race, 2)
+  const before = race.lastCheckpoint
+  // 출발 다리 옆으로 날아가 반대쪽 다리(끝 근처) 아래로 떨어지는 중
+  race.car.body.setTranslation({ x: 60, y: -6, z: 40 }, true)
+  race.car.body.setLinvel({ x: 0, y: -8, z: 0 }, true)
+  for (let k = 0; k < 10; k++) advance(race, TICK_MS, GAS)
+  expect(race.lastCheckpoint).toBe(before)
+  expect(snapshot(race).finishTicks).toBeNull()
+  expect(snapshot(race).progress).toBeLessThan(0.5)
+})
+
+test('landing on another part of the road (shortcut) is accepted', () => {
+  const c = hairpinCourse()
+  const race = createRace(R, c)
+  pastCountdown(race)
+  seconds(race, 2)
+  // 반대쪽 다리 중간 노면 위에 바로 내려놓는다(지름길 착지)
+  race.car.body.setTranslation({ x: 60, y: 1.1, z: 300 }, true)
+  race.car.body.setLinvel({ x: 0, y: 0, z: -20 }, true)
+  for (let k = 0; k < 30; k++) advance(race, TICK_MS, GAS)
+  expect(snapshot(race).progress).toBeGreaterThan(0.6)
 })
