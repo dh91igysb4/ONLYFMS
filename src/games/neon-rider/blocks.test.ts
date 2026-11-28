@@ -10,7 +10,7 @@ import { TURN } from './trig.ts'
 const mm = (n: number): number => n * MM
 const corners = (p: number[]): [number, number][] => [0, 1, 2, 3].map((i) => [p[4 * i], p[4 * i + 1]])
 const body = (x: number, y: number, vx = 0, vy = 0): Body => ({ x, y, vx, vy })
-const noHead = (): { x: number; y: number } => ({ x: 1e9, y: 1e9 })
+const noHead = (): { x: number; y: number }[] => [{ x: 1e9, y: 1e9 }]
 const COUPE = carById('coupe')
 
 describe('넘어지는 블록: 상태와 도형', () => {

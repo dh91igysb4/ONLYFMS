@@ -400,7 +400,7 @@ describe('TEMPLATES', () => {
         n++
       }
     }
-    expect(n).toBeGreaterThanOrEqual(6)
+    expect(n).toBeGreaterThanOrEqual(5) // v8: blocks 막대 5개
   })
   it('spikepit: 구덩이에 바닥 길이 있고(끊김 없음), 가시 막대는 바닥 위에 얹혀 양 끝이 벽 안쪽이라 옆 길과 겹치지 않는다', () => {
     const b = buildTemplate(TEMPLATES.find((t) => t.id === 'spikepit')!)

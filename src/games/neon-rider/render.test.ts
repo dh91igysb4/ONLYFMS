@@ -23,24 +23,28 @@ function moved(s: SimState, dx: number, dy = 0): SimState {
   return { ...s, rear: w(s.rear), front: w(s.front) }
 }
 
+// 차 좌표(mm)의 점에서 판정 도형 합집합까지의 거리(안이면 음수).
+const carDist = (car: { headOffset: number; headR: number; headHalf: number; bodyDY: number; bodyR: number }, a: number, b: number): number => {
+  const wb = WHEELBASE / MM
+  const cx = Math.min(Math.max(a, 0), wb)
+  const hx = Math.min(Math.max(a, wb / 2 - car.headHalf / MM), wb / 2 + car.headHalf / MM)
+  return Math.min(
+    Math.hypot(a - cx, b - car.bodyDY / MM) - car.bodyR / MM,
+    Math.hypot(a - hx, b - car.headOffset / MM) - car.headR / MM,
+    Math.hypot(a, b) - WHEEL_R / MM,
+    Math.hypot(a - wb, b) - WHEEL_R / MM,
+  )
+}
+
 describe('차 그림', () => {
   it('CAR_ART의 키 집합은 CARS의 id 집합과 같다', () => {
     expect(Object.keys(CAR_ART).sort()).toEqual(CARS.map((c) => c.id).sort())
   })
 
-  it.each(CARS.map((c) => [c.id, c] as const))('%s: 그림의 가장자리(꼭짓점 사이 표본 포함) 모든 점이 판정 도형(두 바퀴·지붕 원·올린 차대 캡슐)에서 40 mm 안에 있다', (id, car) => {
-    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 판정원 (WHEELBASE/2, headOffset), 차대 캡슐 = 선분 (0, bodyDY)–(WHEELBASE, bodyDY), 반지름 bodyR.
+  it.each(CARS.map((c) => [c.id, c] as const))('%s: 그림의 가장자리(꼭짓점 사이 표본 포함) 모든 점이 판정 도형(두 바퀴·지붕 캡슐·올린 차대 캡슐)에서 40 mm 안에 있다', (id, car) => {
+    // 차 좌표(mm): 뒷바퀴 (0, 0), 앞바퀴 (WHEELBASE, 0), 지붕 캡슐 = 선분 (WHEELBASE/2 ± headHalf, headOffset), 반지름 headR, 차대 캡슐 = 선분 (0, bodyDY)–(WHEELBASE, bodyDY), 반지름 bodyR.
     const art = CAR_ART[id]
-    const circles = [
-      { x: 0, y: 0, r: WHEEL_R / MM },
-      { x: WHEELBASE / MM, y: 0, r: WHEEL_R / MM },
-      { x: WHEELBASE / MM / 2, y: car.headOffset / MM, r: car.headR / MM },
-    ]
-    const outside = (a: number, b: number): number => {
-      const cx = Math.min(Math.max(a, 0), WHEELBASE / MM)
-      const cap = Math.hypot(a - cx, b - car.bodyDY / MM) - car.bodyR / MM
-      return Math.min(cap, ...circles.map((c) => Math.hypot(a - c.x, b - c.y) - c.r))
-    }
+    const outside = (a: number, b: number): number => carDist(car, a, b)
     for (let i = 0; i < art.length; i++) {
       const [x0, y0] = art[i]
       const [x1, y1] = art[(i + 1) % art.length]
@@ -58,13 +62,7 @@ describe('차 그림', () => {
         for (let k = 0; k <= 50; k++) {
           const a = bar[i][0] + ((bar[i + 1][0] - bar[i][0]) * k) / 50
           const b = bar[i][1] + ((bar[i + 1][1] - bar[i][1]) * k) / 50
-          const cx = Math.min(Math.max(a, 0), WHEELBASE / MM)
-          const d = Math.min(
-            Math.hypot(a - cx, b - car.bodyDY / MM) - car.bodyR / MM,
-            Math.hypot(a - WHEELBASE / MM / 2, b - car.headOffset / MM) - car.headR / MM,
-            Math.hypot(a, b) - WHEEL_R / MM,
-            Math.hypot(a - WHEELBASE / MM, b) - WHEEL_R / MM,
-          )
+          const d = carDist(car, a, b)
           expect(d, `(${a.toFixed(0)}, ${b.toFixed(0)})`).toBeLessThanOrEqual(40)
         }
       }

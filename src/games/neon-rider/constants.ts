@@ -6,10 +6,11 @@
 export const TICK_HZ = 60 // 녹화도 60 fps [M1]
 export const MM = 16 // 1 mm = 16u
 export const WHEELBASE = 1400 * MM // 축간 65±3 px ≈ 1460 mm. 환산 기준이라 1400 유지 [M1][M13]
-export const WHEEL_R = 180 * MM // 바퀴 지름 ≈ 16~18 px → 반지름 8±1 px [M13]
+export const WHEEL_R = 220 * MM // 바퀴 반지름(v8에서 180 → 220 mm로 키움, 실제 차처럼 큰 바퀴)
 // 쿠페 값: 아래 HEAD_OFFSET·HEAD_R·BODY_DY·BODY_R은 cars.ts가 쿠페를 정의하는 출처로만 쓴다. 시뮬은 carById(s.car)의 차별 값을 쓴다.
-export const HEAD_OFFSET = 300 * MM // 쿠페 값. 두 바퀴 중점에서 차 윗방향. 지붕 꼭대기 = 축 위 580 mm = OFFSET + R (실제 승용차 비율: 땅에서 높이 ≈ 바퀴 지름의 2.1배)
-export const HEAD_R = 280 * MM // 쿠페 값. 지붕 판정원. 축선 위 20~580 mm를 덮는다
+export const HEAD_OFFSET = 460 * MM // 쿠페 값. 지붕 판정 캡슐(A~C필러)의 중심선 높이: 두 바퀴 중점에서 차 윗방향. 지붕 꼭대기 = OFFSET + R = 580 mm
+export const HEAD_R = 120 * MM // 쿠페 값. 지붕 판정 캡슐 반지름. 축선 위 340~580 mm(그 아래 차체·바닥은 땅에 닿아도 죽지 않는다)
+export const HEAD_HALF = 220 * MM // 쿠페 값. 지붕 캡슐 중심선의 반길이(가운데에서 앞뒤로). A~C필러 ≈ 축 가운데 ± (HEAD_HALF + HEAD_R)
 export const G = 75 // u/틱². 포물선 0.209 px/프레임² (≈ 16.9 m/s²) ±5% [M2]
 export const DRIVE_ACC = 135 // u/틱². 녹화 측정값(정지 출발 0.25±0.06 px/프레임² ≈ 90)의 1.5배, 사용자 결정 2026-11-23 [M3]
 export const WHEELIE_ACC = 0 // 평지 가속 중 앞 들림이 3° 미만이라 보이지 않음 → 0(코드 경로는 남김) [M11]
