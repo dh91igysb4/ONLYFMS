@@ -1,6 +1,7 @@
 // 마을회관 창: 명예의 전당(FamePanel), 엘리베이터(ElevatorPanel). 설계 docs/superpowers/specs/2026-11-25-village-hall-design.md §3·§4
 import { useState } from 'react'
 import type { FameBoard } from '../../platform/world/hallOfFame.ts'
+import type { AreaId } from './data.ts'
 
 type FameProps = { boards: readonly FameBoard[] | null; start: number; error: boolean }
 
@@ -38,16 +39,19 @@ export function FamePanel({ boards, start, error }: FameProps) {
   )
 }
 
-const FLOORS = [2, 3, 4] as const
+/** 층(회관 계단과 같은 층). area가 없는 층은 공사 중 */
+const FLOORS: readonly { n: number; area?: AreaId }[] = [{ n: 1, area: 'hall' }, { n: 2, area: 'hall2' }, { n: 3 }, { n: 4 }]
 
-/** 층 선택. 지금은 1층만 있고 2~4층은 공사 중 */
-export function ElevatorPanel() {
+/** 층 선택: 지금 층은 표시만, 열린 층은 누르면 그 층 엘리베이터 앞으로, 안 연 층(2층 전시관이 꺼져 있을 때 등)·3·4층은 공사 중 */
+export function ElevatorPanel({ here, canGo, onGo }: { here: AreaId; canGo: (a: AreaId) => boolean; onGo: (a: AreaId) => void }) {
   return (
     <section className="fish-panel-body fish-elevator" aria-label="엘리베이터">
-      <button type="button" className="btn btn-ghost btn-sm" disabled>1층 <span className="muted">지금 층</span></button>
-      {FLOORS.map((f) => (
-        <button key={f} type="button" className="btn btn-ghost btn-sm" disabled>{`${f}층 `}<span className="muted">공사 중</span></button>
-      ))}
+      {FLOORS.map((f) => {
+        const area = f.area
+        if (area === here) return <button key={f.n} type="button" className="btn btn-ghost btn-sm" disabled>{`${f.n}층 `}<span className="muted">지금 층</span></button>
+        if (!area || !canGo(area)) return <button key={f.n} type="button" className="btn btn-ghost btn-sm" disabled>{`${f.n}층 `}<span className="muted">공사 중</span></button>
+        return <button key={f.n} type="button" className="btn btn-ghost btn-sm" onClick={() => onGo(area)}>{`${f.n}층`}</button>
+      })}
     </section>
   )
 }
