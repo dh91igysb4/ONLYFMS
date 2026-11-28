@@ -322,3 +322,33 @@ test('leaderboard_duel_hidden_game_for_admin', async () => {
   await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('lb_duel', { p_game: 'secret-duel' }))
   expect(await screen.findByText('아직 기록이 없어요')).toBeTruthy()
 })
+
+test('표 제목 띠: 오늘 · 전체 합계, 2명. 게임을 고르면 그 게임 이름', async () => {
+  setup({ lb_daily: [row(1, 'u9', 'messi'), row(2, 'u1', 'kane')] })
+  renderPage()
+  await screen.findByText('kane')
+  const panel = screen.getByRole('table').closest('.fm-panel')!
+  const head = panel.querySelector('.fm-panel-head')!
+  expect(head.textContent).toBe('오늘 · 전체 합계2명')
+  expect(screen.getByRole('table').className).toContain('fm-table')
+  fireEvent.change(screen.getByRole('combobox', { name: '게임' }), { target: { value: 'who-are-ya' } })
+  await waitFor(() => expect(document.querySelector('.fm-panel-head')!.textContent).toBe('오늘 · 후알야2명'))
+})
+
+test('내 줄은 is-me 클래스, 보기 탭은 fm-tabs, 제목은 숨김', async () => {
+  setup({ lb_daily: [row(1, 'u9', 'messi'), row(2, 'u1', 'kane')] })
+  renderPage()
+  const me = (await screen.findByText('kane')).closest('tr')!
+  expect(me.classList.contains('is-me')).toBe(true)
+  expect(screen.getByText('messi').closest('tr')!.classList.contains('is-me')).toBe(false)
+  expect(screen.getByRole('tablist', { name: '기간' }).className).toContain('fm-tabs')
+  expect(screen.getByRole('heading', { name: '순위' }).className).toContain('sr-only')
+})
+
+test('대전 보기 표도 제목 띠(대전 · 게임, N명)', async () => {
+  setup({ lb_duel: [{ handle: 'kane', rating: 1010, rated_games: 5, wins: 3, draws: 0, losses: 2, placed: true }] })
+  renderPage()
+  tab('대전')
+  await screen.findByText('kane')
+  expect(screen.getByRole('table').closest('.fm-panel')!.querySelector('.fm-panel-head')!.textContent).toBe('대전 · 요트 다이스1명')
+})
