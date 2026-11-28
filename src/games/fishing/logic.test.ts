@@ -403,7 +403,7 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(27)
+    expect(logic.version).toBe(28)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(), gallery: newGallery(),
     })
@@ -2275,7 +2275,7 @@ describe('버리기', () => {
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
   it('version 27', () => {
-    expect(logic.version).toBe(27)
+    expect(logic.version).toBe(28)
   })
 })
 

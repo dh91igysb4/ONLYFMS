@@ -8,7 +8,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, sellPrice, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
-import { newEcon } from './research.ts'
+import { newEcon, researchChance } from './research.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
 type R = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -163,3 +163,29 @@ describe('migrate v27', () => {
     expect(logic.migrate(again, 27)).toEqual(again)
   })
 })
+
+describe('연구 낚시 확률(v28: 전설 1.5%·신화 0.75%)', () => {
+  it('대상 입질 확률, 호기심 찌 ×1.5, 보장 횟수에서 1', () => {
+    expect(researchChance('grouper', 0, false)).toBeCloseTo(0.015, 10)
+    expect(researchChance('grouper', 0, true)).toBeCloseTo(0.0225, 10)
+    expect(researchChance('imugi', 0, false)).toBeCloseTo(0.0075, 10)
+    expect(researchChance('imugi', 0, true)).toBeCloseTo(0.01125, 10)
+    expect(researchChance('grouper', 48, false)).toBeCloseTo(0.015, 10)
+    expect(researchChance('grouper', 49, false)).toBe(1)
+    expect(researchChance('imugi', 98, false)).toBeCloseTo(0.0075, 10)
+    expect(researchChance('imugi', 99, false)).toBe(1)
+  })
+  it('r0이 1.5% 이상이면 대상이 아니다(옛 3% 경계 사이 값)', () => {
+    const miss = ok(act(grouperReady(), researchCast, { rng: seq(0.02, 0.5, 0.5, 0.5, 0) }))
+    expect((miss.state.pending as { species: string }).species).not.toBe('grouper')
+    const hit = ok(act(grouperReady(), researchCast, { rng: seq(0.0149, 0.5, 0.5, 0.5, 0) }))
+    expect((hit.state.pending as { species: string }).species).toBe('grouper')
+  })
+  it('v27 세이브는 그대로 읽는다(형식 같음)', () => {
+    const raw = JSON.parse(JSON.stringify({ ...grouperReady(), econ: { ...newEcon(), license: true, pity: { grouper: 12 } } }))
+    const m = logic.migrate(raw, 27)
+    expect(m.econ.pity).toEqual({ grouper: 12 })
+    expect(m.econ.license).toBe(true)
+  })
+})
+
