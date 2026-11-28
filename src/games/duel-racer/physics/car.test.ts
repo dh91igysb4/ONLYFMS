@@ -185,3 +185,37 @@ test('a steep wall hit loses speed but turns the car along the wall', () => {
   expect(r.headingDeg).toBeLessThan(20)
   expect(r.speed).toBeGreaterThan(10)
 })
+
+function spinLanding(speed: number): { x: number; headingDeg: number; landHeading: number } {
+  const { w, car } = setup(rampCourse(), { pos: { x: 0, y: 1.1, z: 300 }, yaw: 0 })
+  run(w, car, NO_CONTROLS, 0.3)
+  car.body.setLinvel({ x: 0, y: 0, z: speed }, true)
+  let air = false
+  let landed = false
+  let landHeading = 0
+  const heading = () => {
+    const q = carState(car).quat
+    return (Math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)) * 180) / Math.PI
+  }
+  for (let k = 0; k < 60 * 7; k++) {
+    const s0 = carState(car)
+    if (!s0.grounded && s0.pos.z > 395) air = true
+    if (air && !landed && s0.grounded) {
+      landed = true
+      landHeading = heading()
+    }
+    // 공중에서 E로 돌다가 착지 1.2초 뒤까지
+    tick(w, car, { ...GAS, yaw: air && !landed ? 1 : 0 })
+    if (landed && --budget <= 0) break
+  }
+  return { x: carState(car).pos.x, headingDeg: Math.abs(heading()), landHeading }
+}
+let budget = 0
+
+test('landing sideways after an air spin keeps going down the road and straightens', () => {
+  budget = 72
+  const r = spinLanding(55)
+  expect(Math.abs(r.landHeading)).toBeGreaterThan(30)
+  expect(Math.abs(r.x)).toBeLessThan(5)
+  expect(r.headingDeg).toBeLessThan(15)
+})

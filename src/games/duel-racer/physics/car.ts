@@ -36,6 +36,12 @@ export type Car = {
   assistLeft: number
   /** 뒷바퀴 횡그립 배율 (핸드브레이크 뒤 서서히 회복) */
   rearGrip: number
+  /** 정렬 모드 중인지(옆 그립을 뺀다) */
+  spinning: boolean
+  /** 정렬 모드: 맞출 수평 방향, 남은 시간, 속도 방향을 지킬지(착지) */
+  align: { x: number; z: number; left: number; keepSpeed: boolean } | null
+  /** 공중에 있던 마지막 틱의 수평 진행 방향 */
+  lastAirDir: { x: number; z: number } | null
 }
 
 // ---- 조율값 (손맛) ----
@@ -57,6 +63,20 @@ const YAW_RATE_MAX = 1.9
 const YAW_GAIN = 12
 const DRIFT_YAW_BONUS = 1.5
 const REAR_GRIP_RECOVER_SEC = 0.3
+/** 이 각(rad)보다 크게 옆으로 미끄러지면 '돌고 있음'으로 보고 머리를 진행 방향으로 세운다 */
+const SPIN_SLIP = 0.35
+const SPIN_MIN_SPEED = 5
+const ALIGN_RATE = 6
+const ALIGN_GAIN = 8
+/** 돌고 있을 때 옆 속도 제거 강도(1/s). 작아야 속도가 옆으로 꺾이지 않는다 */
+const SPIN_SIDE_CANCEL = 0.6
+/** 착지 때 머리와 진행 방향이 이만큼(rad) 어긋나면 정렬 모드 */
+const LAND_ALIGN_MIN = 0.15
+/** 이만큼(rad) 안으로 맞으면 정렬 끝 */
+const ALIGN_DONE = 0.1
+const ALIGN_MAX_SEC = 1.2
+/** 돌고 있을 때 바퀴 옆 그립 배율 */
+const SPIN_TIRE_GRIP = 0.08
 const ROLL_DAMP = 6
 const AIR_RATE = 4.5
 const AIR_GAIN = 10
@@ -83,6 +103,13 @@ function rot(q: Quat, v: Vec3): Vec3 {
 const conj = (q: Quat): Quat => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w })
 const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z
 const scale = (a: Vec3, k: number): Vec3 => ({ x: a.x * k, y: a.y * k, z: a.z * k })
+
+/** 차 앞 방향(수평 길이 fh)과 단위 방향 (dx, dz) 사이 각 (rad, 0..π) */
+function slipTo(fwd: Vec3, fh: number, dx: number, dz: number): number {
+  const cross = (fwd.z * dx - fwd.x * dz) / fh
+  const d = (fwd.x * dx + fwd.z * dz) / fh
+  return Math.atan2(Math.abs(cross), d)
+}
 
 export function createCar(pw: PhysWorld, pose: { pos: Vec3; yaw: number }, roll = 0): Car {
   const { R, world } = pw
@@ -113,7 +140,7 @@ export function createCar(pw: PhysWorld, pose: { pos: Vec3; yaw: number }, roll 
     vc.setWheelFrictionSlip(i, FRICTION_SLIP)
     vc.setWheelSideFrictionStiffness(i, SIDE_STIFF)
   }
-  return { pw, body, vc, wasGrounded: false, assistLeft: 0, rearGrip: 1 }
+  return { pw, body, vc, wasGrounded: false, assistLeft: 0, rearGrip: 1, spinning: false, align: null, lastAirDir: null }
 }
 
 export function resetCar(car: Car, pose: { pos: Vec3; yaw: number }): void {
@@ -123,6 +150,8 @@ export function resetCar(car: Car, pose: { pos: Vec3; yaw: number }): void {
   car.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
   car.assistLeft = 0
   car.rearGrip = 1
+  car.align = null
+  car.lastAirDir = null
 }
 
 function contacts(car: Car): number {
@@ -170,6 +199,41 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
   const vmax = boost ? NITRO_SPEED : TOP_SPEED
   const v = s.speed
 
+  // 정렬 모드(공중에서 돌고 착지, 벽에 맞고 돎): 바퀴 그립이 속도를 차 머리 쪽으로 꺾으면 도로 밖으로 날아간다.
+  // 그래서 이 동안은 옆 그립을 빼고, 진행 방향(착지면 착지 직전 방향)을 지키며 머리를 그쪽으로 돌려 세운다.
+  const hv = Math.hypot(s.vel.x, s.vel.z)
+  const fh = Math.hypot(fwd.x, fwd.z) || 1
+  const touchdown = s.grounded && !car.wasGrounded
+  if (touchdown && hv > SPIN_MIN_SPEED && !c.handbrake) {
+    const d = car.lastAirDir
+    if (d && slipTo(fwd, fh, d.x, d.z) > LAND_ALIGN_MIN) car.align = { x: d.x, z: d.z, left: ALIGN_MAX_SEC, keepSpeed: true }
+  }
+  if (!car.align && s.grounded && !c.handbrake && hv > SPIN_MIN_SPEED && slipTo(fwd, fh, s.vel.x / hv, s.vel.z / hv) > SPIN_SLIP) {
+    car.align = { x: s.vel.x / hv, z: s.vel.z / hv, left: ALIGN_MAX_SEC, keepSpeed: false }
+  }
+  let alignTarget: number | null = null
+  if (car.align) {
+    const a = car.align
+    if (!a.keepSpeed && hv > 1) {
+      a.x = s.vel.x / hv
+      a.z = s.vel.z / hv
+    }
+    const err = slipTo(fwd, fh, a.x, a.z)
+    a.left -= dt
+    if (err < ALIGN_DONE || a.left <= 0 || c.handbrake || !s.grounded) {
+      car.align = null
+    } else {
+      const crossY = (fwd.z * a.x - fwd.x * a.z) / fh
+      alignTarget = Math.sign(crossY) * Math.min(ALIGN_RATE, err * ALIGN_GAIN)
+      if (a.keepSpeed && hv > 1) {
+        // 착지 직전 진행 방향을 지킨다(크기는 그대로)
+        body.setLinvel({ x: a.x * hv, y: s.vel.y, z: a.z * hv }, true)
+      }
+    }
+  }
+  const spinning = car.align !== null
+  car.spinning = spinning
+  if (!s.grounded && hv > 1) car.lastAirDir = { x: s.vel.x / hv, z: s.vel.z / hv }
   // 조향: 앞바퀴 각(오른쪽 = 음수). 고속일수록 작게.
   const k = Math.min(1, Math.max(0, v / TOP_SPEED))
   const steerAngle = c.steer * (STEER_LOW + (STEER_HIGH - STEER_LOW) * k)
@@ -178,8 +242,12 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
   // 드리프트: 뒷바퀴 횡그립
   if (c.handbrake && s.grounded) car.rearGrip = DRIFT_REAR_GRIP
   else car.rearGrip = Math.min(1, car.rearGrip + ((1 - DRIFT_REAR_GRIP) * dt) / REAR_GRIP_RECOVER_SEC)
-  vc.setWheelSideFrictionStiffness(2, SIDE_STIFF * car.rearGrip)
-  vc.setWheelSideFrictionStiffness(3, SIDE_STIFF * car.rearGrip)
+  // 크게 돌고 있으면(아래 spinning) 바퀴 옆 그립도 낮춰 속도가 옆으로 꺾이지 않게 한다
+  const spinGrip = car.spinning ? SPIN_TIRE_GRIP : 1
+  vc.setWheelSideFrictionStiffness(0, SIDE_STIFF * spinGrip)
+  vc.setWheelSideFrictionStiffness(1, SIDE_STIFF * spinGrip)
+  vc.setWheelSideFrictionStiffness(2, SIDE_STIFF * car.rearGrip * spinGrip)
+  vc.setWheelSideFrictionStiffness(3, SIDE_STIFF * car.rearGrip * spinGrip)
   for (let i = 0; i < 4; i++) {
     vc.setWheelEngineForce(i, 0)
     vc.setWheelBrake(i, 0)
@@ -197,17 +265,19 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
 
     // 조향 보조: 원하는 yaw 각속도로 끌어당긴다(오른쪽 = 로컬 y 음수)
     const speedK = Math.min(1, Math.abs(v) / 8)
-    const target = -c.steer * YAW_RATE_MAX * speedK * Math.sign(v || 1) * (c.handbrake ? DRIFT_YAW_BONUS : 1)
+    const target = alignTarget !== null
+      ? alignTarget
+      : -c.steer * YAW_RATE_MAX * speedK * Math.sign(v || 1) * (c.handbrake ? DRIFT_YAW_BONUS : 1)
     const yawErr = target - lw.y
     const upW = rot(q, { x: 0, y: 1, z: 0 })
-    if (c.steer !== 0 || Math.abs(lw.y) > 0.01) {
-      const gain = c.steer !== 0 ? YAW_GAIN : YAW_GAIN * 0.5
+    if (spinning || c.steer !== 0 || Math.abs(lw.y) > 0.01) {
+      const gain = spinning || c.steer !== 0 ? YAW_GAIN : YAW_GAIN * 0.5
       body.applyTorqueImpulse(scale(upW, 2336 * yawErr * gain * dt), true)
     }
     // 드리프트 뒤 회복: 그립이 돌아오면 미끄러짐(옆 속도)을 줄인다
     const side = dot(s.vel, right)
     if (!c.handbrake) {
-      const cancel = car.rearGrip * 6 * dt
+      const cancel = car.rearGrip * (spinning ? SPIN_SIDE_CANCEL : 6) * dt
       body.applyImpulse(scale(right, -side * m * Math.min(1, cancel)), true)
     }
     // 지상 롤 안정
