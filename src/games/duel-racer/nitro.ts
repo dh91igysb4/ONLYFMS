@@ -1,27 +1,21 @@
-// 니트로 게이지 (레이싱 설계 §5.3). 순수 함수.
-// 쌓기: 체공 시간, 착지 때 회전 수와 깔끔한 착지, 드리프트. 쓰기: 누르는 동안 일정 속도로 줄고 분사한다.
-import { NITRO_BURN_PER_SEC, NITRO_CLEAN_LANDING, NITRO_PER_AIR_SEC, NITRO_PER_DRIFT_SEC, NITRO_PER_FLIP } from './constants.ts'
-import type { Landing } from './stunt.ts'
+// 니트로 게이지 (레이싱 설계 §5.3, 2026-11-28 사용자 변경). 순수 함수.
+// 누르는 동안 일정 속도로 줄고 분사한다. 마지막으로 쓴 뒤(출발 포함) NITRO_REGEN_DELAY초가 지나면 자동으로 조금씩 찬다.
+import { NITRO_BURN_PER_SEC, NITRO_REGEN_DELAY, NITRO_REGEN_PER_SEC } from './constants.ts'
 
-export type Nitro = { gauge: number; burning: boolean }
+/** idle: 마지막으로 쓴(또는 누른) 뒤 지난 시간 (s) */
+export type Nitro = { gauge: number; burning: boolean; idle: number }
 
-export const NITRO_START: Nitro = { gauge: 0.3, burning: false }
+export const NITRO_START: Nitro = { gauge: 0, burning: false, idle: 0 }
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 
-export function stepNitro(
-  n: Nitro,
-  e: { want: boolean; airborne: boolean; drifting: boolean; landed: Landing | null },
-  dt: number,
-): Nitro {
-  let g = n.gauge
-  if (e.airborne) g += NITRO_PER_AIR_SEC * dt
-  if (e.drifting) g += NITRO_PER_DRIFT_SEC * dt
-  if (e.landed) g += e.landed.flips * NITRO_PER_FLIP + (e.landed.clean ? NITRO_CLEAN_LANDING : 0)
-  g = clamp01(g)
-  if (e.want && g > 0) {
-    g = clamp01(g - NITRO_BURN_PER_SEC * dt)
-    return { gauge: g, burning: g > 0 }
+export function stepNitro(n: Nitro, want: boolean, dt: number): Nitro {
+  if (want) {
+    // 누르고 있으면 충전 대기가 다시 시작된다(빈 게이지로 누르고 있어도)
+    const g = clamp01(n.gauge - NITRO_BURN_PER_SEC * dt)
+    return { gauge: g, burning: n.gauge > 0 && g > 0, idle: 0 }
   }
-  return { gauge: g, burning: false }
+  const idle = n.idle + dt
+  const g = idle >= NITRO_REGEN_DELAY ? clamp01(n.gauge + NITRO_REGEN_PER_SEC * dt) : n.gauge
+  return { gauge: g, burning: false, idle }
 }

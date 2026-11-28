@@ -1,7 +1,6 @@
 import { beforeAll, expect, test } from 'vitest'
-import { FALL_Y, STUCK_SECONDS, TICK_HZ } from './constants.ts'
-import { flatCourse, hairpinCourse, rampCourse } from './course/testCourses.ts'
-import { NITRO_START } from './nitro.ts'
+import { FALL_Y, NITRO_REGEN_DELAY, NITRO_REGEN_PER_SEC, STUCK_SECONDS, TICK_HZ, TOP_SPEED } from './constants.ts'
+import { flatCourse, hairpinCourse } from './course/testCourses.ts'
 import { NO_CONTROLS, type Controls } from './physics/controls.ts'
 import { loadRapier, type Rapier } from './physics/rapier.ts'
 import { quatYPR } from './physics/world.ts'
@@ -120,11 +119,27 @@ test('30 s hidden tab catches up exactly', () => {
   expect(snapshot(race).tick - t0).toBe(30 * TICK_HZ)
 })
 
-test('nitro fills from a jump in a race', () => {
-  const race = createRace(R, rampCourse())
+test('nitro starts refilling NITRO_REGEN_DELAY after GO, not during the countdown', () => {
+  const race = createRace(R, flatCourse())
   pastCountdown(race)
-  seconds(race, 13)
-  expect(snapshot(race).nitro.gauge).toBeGreaterThan(NITRO_START.gauge)
+  expect(snapshot(race).nitro.gauge).toBe(0)
+  seconds(race, NITRO_REGEN_DELAY - 0.2)
+  expect(snapshot(race).nitro.gauge).toBe(0)
+  seconds(race, 2.2)
+  expect(snapshot(race).nitro.gauge).toBeCloseTo(2 * NITRO_REGEN_PER_SEC, 1)
+})
+
+test('holding shift burns nitro and boosts past top speed', () => {
+  const race = createRace(R, flatCourse())
+  pastCountdown(race)
+  seconds(race, NITRO_REGEN_DELAY + 12)
+  const g = snapshot(race).nitro.gauge
+  expect(g).toBeGreaterThan(0.5)
+  seconds(race, 1, { ...GAS, nitro: true })
+  const s = snapshot(race)
+  expect(s.nitro.gauge).toBeLessThan(g)
+  expect(s.nitro.burning).toBe(true)
+  expect(s.car.speed).toBeGreaterThan(TOP_SPEED)
 })
 
 test('falling past the other leg of a hairpin does not skip ahead', () => {
@@ -152,4 +167,31 @@ test('landing on another part of the road (shortcut) is accepted', () => {
   race.car.body.setLinvel({ x: 0, y: 0, z: -20 }, true)
   for (let k = 0; k < 30; k++) advance(race, TICK_MS, GAS)
   expect(snapshot(race).progress).toBeGreaterThan(0.6)
+})
+
+test('snapshot exposes the pose one tick before the current one', () => {
+  const a = createRace(R, flatCourse())
+  const b = createRace(R, flatCourse())
+  pastCountdown(a)
+  pastCountdown(b)
+  const zs: number[] = []
+  for (let k = 0; k < 40; k++) {
+    advance(a, TICK_MS, GAS)
+    zs.push(snapshot(a).car.pos.z)
+  }
+  // 한 번에 두 틱씩 흘려도 prev는 '직전 틱' 자세여야 한다
+  for (let k = 0; k < 20; k++) advance(b, 2 * TICK_MS, GAS)
+  const s = snapshot(b)
+  expect(s.car.pos.z).toBeCloseTo(zs[39], 4)
+  expect(s.prev.pos.z).toBeCloseTo(zs[38], 4)
+})
+
+test('after a respawn prev equals the new pose (no blending across the teleport)', () => {
+  const race = createRace(R, flatCourse())
+  pastCountdown(race)
+  seconds(race, 10)
+  requestReset(race)
+  advance(race, TICK_MS, GAS)
+  const s = snapshot(race)
+  expect(Math.abs(s.prev.pos.z - s.car.pos.z)).toBeLessThan(1)
 })

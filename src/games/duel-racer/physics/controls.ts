@@ -6,12 +6,11 @@ export type Controls = {
   brake: number
   /** -1(왼쪽)..1(오른쪽) */
   steer: number
-  handbrake: boolean
   nitro: boolean
-  /** 공중 회전 -1..1. pitch +1 = 앞이 아래로(앞구르기), roll +1 = 오른쪽으로, yaw +1 = 오른쪽으로 */
+  /** 공중 기울기 -1..1. +1 = 앞이 아래로(W) */
   pitch: number
-  roll: number
+  /** 공중 방향 -1..1. +1 = 오른쪽으로(D) */
   yaw: number
 }
 
-export const NO_CONTROLS: Controls = { throttle: 0, brake: 0, steer: 0, handbrake: false, nitro: false, pitch: 0, roll: 0, yaw: 0 }
+export const NO_CONTROLS: Controls = { throttle: 0, brake: 0, steer: 0, nitro: false, pitch: 0, yaw: 0 }

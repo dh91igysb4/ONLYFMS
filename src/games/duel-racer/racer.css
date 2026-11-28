@@ -42,9 +42,52 @@
 .dr-progress { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 20%, transparent); display: flex; align-items: flex-end; }
 .dr-progress-fill { width: 100%; border-radius: 4px; background: var(--lime); }
 .dr-countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 120px; font-weight: 900; color: var(--ink); text-shadow: 0 2px 12px rgb(0 0 0 / 0.7); pointer-events: none; }
-.dr-toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); margin: 0; padding: 6px 14px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--ink); font-weight: 800; }
 .dr-result-title { margin: 0; font-size: 18px; }
 .dr-result-time { margin: 0; font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .dr-result-best { margin: 0; font-size: 14px; font-weight: 600; }
 .dr-result-actions { display: flex; gap: 8px; }
 .dr-help { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+
+/* 터치 기기: 위 2/3 게임, 아래 1/3 조작 버튼. 사이트 머리글 위에 화면 전체로 띄운다 */
+.dr-touch {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-rows: 2fr 1fr;
+  gap: 0;
+  background: var(--bg);
+  touch-action: none;
+}
+.dr-touch .dr-stage { aspect-ratio: auto; width: 100%; height: 100%; max-height: none; border-radius: 0; }
+.dr-corner { position: absolute; top: 8px; left: 28px; display: flex; gap: 6px; z-index: 2; }
+.dr-corner .btn { padding: 4px 10px; font-size: 13px; }
+.dr-pad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  grid-template-rows: 1fr 1fr 1.4fr;
+  grid-template-areas:
+    "left right nitro"
+    "left right brake"
+    "left right gas";
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  touch-action: none;
+}
+.dr-pad-btn {
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dr-pad-btn:active { background: color-mix(in srgb, var(--lime) 35%, var(--panel)); }
+.dr-pad-left { grid-area: left; font-size: 34px; }
+.dr-pad-right { grid-area: right; font-size: 34px; }
+.dr-pad-nitro { grid-area: nitro; color: var(--lime); }
+.dr-pad-brake { grid-area: brake; }
+.dr-pad-gas { grid-area: gas; background: color-mix(in srgb, var(--lime) 20%, var(--panel)); }

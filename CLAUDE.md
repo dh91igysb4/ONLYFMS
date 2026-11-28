@@ -53,7 +53,7 @@
 
 실시간 대전(레이싱, 설계 `docs/superpowers/specs/2026-11-28-duel-racer-design.md`)은 다음이 더 다르다:
 - manifest `duel.realtime: { raceSeconds }`가 있으면 실시간 대전이다. 플랫폼은 이 값으로만 가른다(게임 id 분기 금지). `turnSeconds`는 쓰지 않지만 타입 때문에 레이스 시간으로 채운다. `sameScreen: false`.
-- 화면은 `src/games/ui.ts`의 `getRealtimeComponent`(`RealtimeGameProps`, 지금은 `mode: 'practice'`만). 혼자 연습은 `/duel/practice/:game`(`DuelPracticePage`, 터치 전용 기기는 `isPcCapable`로 막음), 대전 홈의 "혼자 연습" 패널이 연다.
+- 화면은 `src/games/ui.ts`의 `getRealtimeComponent`(`RealtimeGameProps`, 지금은 `mode: 'practice'`만). 혼자 연습은 `/duel/practice/:game`(`DuelPracticePage`), 대전 홈의 "혼자 연습" 패널이 연다. 터치 기기(`pointer: coarse`)에서는 게임 화면이 위 2/3 화면·아래 1/3 버튼으로 바뀐다(레이싱 `RacerGame`).
 - 2단계(온라인 대국·결과 보고 `report`) 전까지 `duel` 함수 `create`가 409 `realtime_unsupported`를 돌려주고, 대국 만들기 목록에서도 뺀다.
 - `src/games/duel-racer/`: Deno가 번들하는 `manifest.ts`·`logic.ts`·`constants.ts`는 `three`·Rapier·`physics/`·`render/`를 import하지 않는다. 물리(Rapier, `physics/`)·장면(Three, `render/`)·레이스(`race.ts`)는 `RacerGame.tsx`가 동적 `import()`로만 불러 메인 번들에 들어가지 않는다. 수치는 `constants.ts` 한 곳. 코스는 `course/`(neon-1은 제어점을 펴서 3,400m로 맞춘 고가 도로).
 

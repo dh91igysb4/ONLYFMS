@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Controls } from './physics/controls.ts'
 
 type Snap = Record<string, unknown> & { car: Record<string, unknown>; nitro: { gauge: number; burning: boolean } }
@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   rapierFail: false,
 }))
 const baseSnap = (): Snap => ({
-  tick: -180, countdown: 3, progress: 0, finishTicks: null, lastLanding: null,
+  tick: -180, countdown: 3, progress: 0, finishTicks: null,
   car: { speed: 0, grounded: true, pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, quat: { x: 0, y: 0, z: 0, w: 1 } },
   nitro: { gauge: 0.3, burning: false },
 })
@@ -152,10 +152,68 @@ test('Escape exits and R resets', async () => {
   expect(onExit).toHaveBeenCalled()
 })
 
-test('landing toast names flips and clean landing', async () => {
-  h.snap = { ...baseSnap(), tick: 600, countdown: null, lastLanding: { flips: 1, clean: true, tick: 590 } }
+test('in the air the arrow keys turn and tilt instead of steering (tilt only for keys pressed after takeoff)', async () => {
+  h.snap = { ...baseSnap(), tick: 100, countdown: null }
   mount()
   await loaded()
+  // 땅에서 가속(W)을 누른 채 공중으로
+  fireEvent.keyDown(window, { code: 'KeyW' })
   await frame()
-  expect(screen.getByTestId('racer-toast').textContent).toBe('1회전 · 깔끔한 착지')
+  h.snap = { ...baseSnap(), tick: 120, countdown: null, car: { ...baseSnap().car, grounded: false } }
+  await frame()
+  await frame()
+  expect(h.advanced.at(-1)!.pitch).toBe(0)
+  expect(h.advanced.at(-1)!.throttle).toBe(1)
+  // 공중에서 다시 누르면 기울인다
+  fireEvent.keyUp(window, { code: 'KeyW' })
+  fireEvent.keyDown(window, { code: 'KeyW' })
+  fireEvent.keyDown(window, { code: 'KeyD' })
+  await frame()
+  const c = h.advanced.at(-1)!
+  expect(c.yaw).toBe(1)
+  expect(c.pitch).toBe(1)
+  expect(c.steer).toBe(0)
+})
+
+describe('touch pad', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('coarse'), media: q, addEventListener() {}, removeEventListener() {} }))
+  })
+
+  test('touch devices get on-screen buttons below the game', async () => {
+    mount()
+    await loaded()
+    for (const name of ['왼쪽', '오른쪽', '가속', '브레이크', '니트로']) expect(screen.getByRole('button', { name })).toBeTruthy()
+  })
+
+  test('holding gas and left drives; letting go stops', async () => {
+    h.snap = { ...baseSnap(), tick: 100, countdown: null }
+    mount()
+    await loaded()
+    fireEvent.pointerDown(screen.getByRole('button', { name: '가속' }), { pointerId: 1 })
+    fireEvent.pointerDown(screen.getByRole('button', { name: '왼쪽' }), { pointerId: 2 })
+    await frame()
+    expect(h.advanced.at(-1)!.throttle).toBe(1)
+    expect(h.advanced.at(-1)!.steer).toBe(-1)
+    fireEvent.pointerUp(screen.getByRole('button', { name: '왼쪽' }), { pointerId: 2 })
+    fireEvent.pointerCancel(screen.getByRole('button', { name: '가속' }), { pointerId: 1 })
+    await frame()
+    expect(h.advanced.at(-1)!.throttle).toBe(0)
+    expect(h.advanced.at(-1)!.steer).toBe(0)
+  })
+
+  test('nitro button boosts', async () => {
+    h.snap = { ...baseSnap(), tick: 100, countdown: null }
+    mount()
+    await loaded()
+    fireEvent.pointerDown(screen.getByRole('button', { name: '니트로' }), { pointerId: 3 })
+    await frame()
+    expect(h.advanced.at(-1)!.nitro).toBe(true)
+  })
+})
+
+test('mouse devices get no on-screen buttons', async () => {
+  mount()
+  await loaded()
+  expect(screen.queryByRole('button', { name: '가속' })).toBeNull()
 })
