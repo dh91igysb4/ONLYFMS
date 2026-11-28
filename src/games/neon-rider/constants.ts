@@ -7,8 +7,9 @@ export const TICK_HZ = 60 // 녹화도 60 fps [M1]
 export const MM = 16 // 1 mm = 16u
 export const WHEELBASE = 1400 * MM // 축간 65±3 px ≈ 1460 mm. 환산 기준이라 1400 유지 [M1][M13]
 export const WHEEL_R = 180 * MM // 바퀴 지름 ≈ 16~18 px → 반지름 8±1 px [M13]
-export const HEAD_OFFSET = 200 * MM // 두 바퀴 중점에서 차 윗방향. 지붕 꼭대기 ≈ 축 위 17 px(380 mm) = OFFSET + R [M13]
-export const HEAD_R = 180 * MM // 지붕 판정원. 축선 위 20~380 mm를 덮는다 [M13]
+// 쿠페 값: 아래 HEAD_OFFSET·HEAD_R·BODY_DY·BODY_R은 cars.ts가 쿠페를 정의하는 출처로만 쓴다. 시뮬은 carById(s.car)의 차별 값을 쓴다.
+export const HEAD_OFFSET = 200 * MM // 쿠페 값. 두 바퀴 중점에서 차 윗방향. 지붕 꼭대기 ≈ 축 위 17 px(380 mm) = OFFSET + R [M13]
+export const HEAD_R = 180 * MM // 쿠페 값. 지붕 판정원. 축선 위 20~380 mm를 덮는다 [M13]
 export const G = 75 // u/틱². 포물선 0.209 px/프레임² (≈ 16.9 m/s²) ±5% [M2]
 export const DRIVE_ACC = 135 // u/틱². 녹화 측정값(정지 출발 0.25±0.06 px/프레임² ≈ 90)의 1.5배, 사용자 결정 2026-11-23 [M3]
 export const WHEELIE_ACC = 0 // 평지 가속 중 앞 들림이 3° 미만이라 보이지 않음 → 0(코드 경로는 남김) [M11]
@@ -32,8 +33,8 @@ export const FALL_DEPTH = 6000 * MM // 측정 대상 아님
 export const LAND_GRACE = 12 // 측정 대상 아님
 export const PERFECT_TOL = 170 // ≈ 15°. 측정 대상 아님
 export const GEM_R = 250 * MM // 보석 줍기 반지름. 바퀴·차체 판정원과 GEM_R + 그 반지름 안이면 줍는다
-export const BODY_R = 190 * MM // 차대 캡슐 반지름. 캡슐은 두 바퀴 중심 선분을 차의 윗방향으로 BODY_DY 올린 선분이다. 아래 끝은 축선 아래 40 mm(바퀴 바닥 180 mm보다 위), 위 끝은 축선 위 340 mm로 차 그림(render.ts BODY)의 등·보닛 가장자리를 덮는다(render.test)
-export const BODY_DY = 150 * MM // 차대 캡슐을 차의 윗방향으로 올리는 양
+export const BODY_R = 190 * MM // 쿠페 값(cars.ts). 차대 캡슐 반지름. 캡슐은 두 바퀴 중심 선분을 차의 윗방향으로 BODY_DY 올린 선분이다. 아래 끝은 축선 아래 40 mm(바퀴 바닥 180 mm보다 위), 위 끝은 축선 위 340 mm로 차 그림(render.ts BODY)의 등·보닛 가장자리를 덮는다(render.test)
+export const BODY_DY = 150 * MM // 쿠페 값(cars.ts). 차대 캡슐을 차의 윗방향으로 올리는 양
 export const MOVER_MEMORY = 64 // 상태에 남기는 끝난 움직이는 길 id 수 상한. 넘치면 가장 오래된 것부터 버린다
 export const BLOCK_MASS = 1 // 블록 꼭짓점 하나의 질량(바퀴 하나 대비 정수 배). 블록 = 바퀴 4개 = 차 둘. 마찰(BLOCK_FRICTION_PCT 30%: 0.3 × 4G = 90)이 차 구동력(2 × DRIVE_ACC = 270)보다 작아 차가 블록을 밀고 갈 수 있다
 export const BLOCK_CORNER_R = 60 * MM // 블록 꼭짓점 판정 반지름(지형과는 이 반지름으로 둥글린 모서리로 닿는다)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BLOCK_MASS, BODY_DY, BODY_R, MM, SUBSTEPS, WHEEL_R } from './constants.ts'
+import { carById } from './cars.ts'
 import { blockBox, blockCands, blockSegs, blockWork, isBlockCand, pushCar, wakeBlock } from './blocks.ts'
 import type { Block } from './blocks.ts'
 import type { Body } from './collide.ts'
@@ -10,6 +11,7 @@ const mm = (n: number): number => n * MM
 const corners = (p: number[]): [number, number][] => [0, 1, 2, 3].map((i) => [p[4 * i], p[4 * i + 1]])
 const body = (x: number, y: number, vx = 0, vy = 0): Body => ({ x, y, vx, vy })
 const noHead = (): { x: number; y: number } => ({ x: 1e9, y: 1e9 })
+const COUPE = carById('coupe')
 
 describe('넘어지는 블록: 상태와 도형', () => {
   it('wakeBlock: 꼭짓점 4개(반시계, 0번 = 왼쪽 아래)를 정지 상태(px = x)로 놓는다. 너비는 x − floor(w/2) … x + (w − floor(w/2))', () => {
@@ -79,7 +81,7 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
     const left = -mm(500)
     const r = body(left - (WHEEL_R - d), 0) // 0번 꼭짓점(왼쪽 아래)의 바로 왼쪽
     const f = body(left - (WHEEL_R - d) - mm(1400), 0)
-    pushCar(r, f, noHead, [bw])
+    pushCar(r, f, noHead, [bw], COUPE)
     expect(r.x).toBe(left - (WHEEL_R - d) - Math.floor((d * BLOCK_MASS) / (1 + BLOCK_MASS)))
     expect(bw.c[0].x).toBe(left + Math.floor(d / (1 + BLOCK_MASS)))
     expect(bw.c[0].y).toBe(0)
@@ -92,7 +94,7 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
     const left = -mm(500)
     const r = body(left - (WHEEL_R - d), mm(500)) // 왼쪽 변(3 → 0) 가운데
     const f = body(left - (WHEEL_R - d) - mm(1400), mm(500))
-    pushCar(r, f, noHead, [bw])
+    pushCar(r, f, noHead, [bw], COUPE)
     const dw = left - (WHEEL_R - d) - r.x
     const d0 = bw.c[0].x - left
     const d3 = bw.c[3].x - left
@@ -106,7 +108,7 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
     const left = -mm(500)
     const r = body(left - WHEEL_R + 300, 0, 900, 0)
     const f = body(left - WHEEL_R + 300 - mm(1400), 0, 900, 0)
-    pushCar(r, f, noHead, [bw])
+    pushCar(r, f, noHead, [bw], COUPE)
     expect(r.vx).toBe(900 - Math.floor((900 * BLOCK_MASS) / (1 + BLOCK_MASS)))
     expect(f.vx).toBe(900)
   })
@@ -120,10 +122,28 @@ describe('넘어지는 블록: 차와 서로 미는 비율 (BLOCK_MASS)', () => 
     const y = vy + BODY_R - BODY_DY - 300 // 꼭짓점이 (윗방향으로 BODY_DY 올린) 캡슐 선분 아래 BODY_R − 300에 있다
     const r = body(vx - mm(700), y)
     const f = body(vx + mm(700), y)
-    pushCar(r, f, noHead, [bw])
+    pushCar(r, f, noHead, [bw], COUPE)
     expect(r.y - y).toBe(f.y - y)
     expect(r.y - y).toBe(Math.floor((300 * BLOCK_MASS) / (BLOCK_MASS + 2))) // 바퀴 둘(질량 2)이 함께 움직인다
     expect(bw.c[k].y).toBe(vy - Math.floor((300 * 2) / (BLOCK_MASS + 2)))
     expect(bw.c[k].x).toBe(vx)
+  })
+  it('차대 캡슐은 고른 차의 bodyDY·bodyR을 쓴다: 쿠페 캡슐 안·스케이트보드 캡슐 밖의 꼭짓점은 스케이트보드를 밀지 않는다', () => {
+    const D: Block = { id: 0, x: 0, y: 0, w: mm(400), h: mm(400), a: TURN / 8, endX: 0 }
+    const skate = carById('skate')
+    const at = (car: typeof COUPE) => {
+      const bw = blockWork(wakeBlock(D), D, [])
+      const k = [0, 1, 2, 3].reduce((m, i) => (bw.c[i].y > bw.c[m].y ? i : m), 0)
+      const { x: vx, y: vy } = { ...bw.c[k] }
+      const y = vy - mm(200) // 꼭짓점이 축선 위 200 mm: 스케이트보드 캡슐(위 끝 40 + 120 = 160 mm) 밖, 쿠페 캡슐(150 + 190 = 340 mm) 안
+      const r = body(vx - mm(700), y)
+      const f = body(vx + mm(700), y)
+      pushCar(r, f, noHead, [bw], car)
+      return { dy: r.y - y, moved: bw.c[k].y !== vy }
+    }
+    expect(at(skate)).toEqual({ dy: 0, moved: false })
+    const coupe = at(COUPE)
+    expect(coupe.moved).toBe(true)
+    expect(coupe.dy).toBeLessThan(0) // 캡슐 선분 위의 꼭짓점이 차를 아래로 민다
   })
 })

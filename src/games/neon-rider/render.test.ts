@@ -390,7 +390,7 @@ describe('위험물·움직이는 길·블록 그리기', () => {
       { ...px(cur.front.x, cur.front.y), r: WHEEL_R * view.scale },
       { ...px(mid.x, mid.y + HEAD_OFFSET), r: HEAD_R * view.scale },
     ]
-    const cap = chassisOf(cur.rear, cur.front)
+    const cap = chassisOf(cur.rear, cur.front, BODY_DY)
     const A = px(cap.x0, cap.y0)
     const B = px(cap.x1, cap.y1)
     const t = Math.min(1, Math.max(0, ((ox - A.x) * (B.x - A.x) + (oy - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2)))

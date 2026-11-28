@@ -16,10 +16,6 @@ import {
   GEM_MEMORY,
   GROUND_TOL,
   GEM_R,
-  HEAD_OFFSET,
-  BODY_DY,
-  BODY_R,
-  HEAD_R,
   LAND_GRACE,
   MOVER_MEMORY,
   PERFECT_MULT,
@@ -58,6 +54,7 @@ import {
   wakeNear,
 } from './blocks.ts'
 import type { BlockState, BlockWork } from './blocks.ts'
+import { CAR_REACH_MAX, DEFAULT_CAR, carById, type CarDef } from './cars.ts'
 import type { Course } from './course.ts'
 import { hazardHit } from './hazards.ts'
 import { motionDone, subtick } from './motion.ts'
@@ -95,14 +92,15 @@ export type SimState = {
   // takenGems에서 버린(충돌 창을 벗어났거나 GEM_MEMORY를 넘친) 보석 id의 최댓값(없으면 -1). 이 값 이하 id의 보석은 다시 줍지 않는다.
   // 보석이 점수에 들어가므로, 되굴러가서 같은 보석을 다시 줍는 것을 막는다
   gemFloor: number
+  car: string // 차 id(cars.ts). 지붕·차대·보석 판정 치수를 정한다. 없는(옛) 상태는 carById가 기본 차로 읽는다
 }
 
 // 한 틱 동안의 작업용 바퀴: 속도를 따로 들고, 이번 틱에 닿은 선분을 기록한다.
 // rode: 이번 틱에 닿은 움직이는 길 id.
 type Work = Body & { was: boolean; hit: Cand | null; top: number; scrubbed: boolean; rode: number[] }
 
-// 한 틱에 차와 그 판정원이 닿을 수 있는 범위(후보 선분을 고르는 상자 여백).
-const REACH = V_TERMINAL + HEAD_OFFSET + HEAD_R + 2 * WHEEL_R
+// 한 틱에 차와 그 판정원이 닿을 수 있는 범위(후보 선분을 고르는 상자 여백). 어느 차든 덮도록 모든 차의 최댓값을 쓴다.
+const REACH = V_TERMINAL + CAR_REACH_MAX + 2 * WHEEL_R
 
 function toWork(w: Wheel): Work {
   return { x: w.x, y: w.y, vx: w.x - w.px, vy: w.y - w.py, was: w.ground, hit: null, top: -1, scrubbed: false, rode: [] }
@@ -334,13 +332,14 @@ function union(a: Box, b: Box): Box {
   return { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) }
 }
 
-function headOf(r: Body, f: Body): { x: number; y: number } {
+// 지붕 판정원 중심: 두 바퀴 중점에서 차의 윗방향으로 off(차의 headOffset).
+function headOf(r: Body, f: Body, off: number): { x: number; y: number } {
   const dx = f.x - r.x
   const dy = f.y - r.y
   const dist = Math.max(1, rodLen(r, f))
   return {
-    x: Math.floor((r.x + f.x) / 2) + divRound(-dy * HEAD_OFFSET, dist),
-    y: Math.floor((r.y + f.y) / 2) + divRound(dx * HEAD_OFFSET, dist),
+    x: Math.floor((r.x + f.x) / 2) + divRound(-dy * off, dist),
+    y: Math.floor((r.y + f.y) / 2) + divRound(dx * off, dist),
   }
 }
 
@@ -377,8 +376,11 @@ export function scoreOf(s: SimState): number {
   return Math.min(SCORE_MAX, s.sectionScore + s.flipScore + s.gems)
 }
 
-/** 테스트·봇 전용: x의 지면 위에 뒷바퀴를 두고 지면 방향으로 앞바퀴를 둔다. 수평 속도 vx. x가 틈 위면 다음 선분 시작 높이에 둔다. */
-export function initSimAt(course: Course, x: number, vx: number): SimState {
+/**
+ * 테스트·봇 전용: x의 지면 위에 뒷바퀴를 두고 지면 방향으로 앞바퀴를 둔다. 수평 속도 vx. x가 틈 위면 다음 선분 시작 높이에 둔다.
+ * car는 차 id(생략하면 기본 차, 모르는 id도 기본 차로 바꾼다).
+ */
+export function initSimAt(course: Course, x: number, vx: number, car: string = DEFAULT_CAR): SimState {
   let i = 0
   while (Math.max(course.seg(i).x0, course.seg(i).x1) < x || course.seg(i).x0 === course.seg(i).x1) i++
   const g = course.seg(i)
@@ -414,17 +416,23 @@ export function initSimAt(course: Course, x: number, vx: number): SimState {
     blocks: [],
     blocksDone: [],
     gemFloor: -1,
+    car: carById(car).id,
   }
 }
 
-/** 시작 평지 위 정지 상태. */
-export function initSim(course: Course): SimState {
-  return initSimAt(course, WHEELBASE, 0)
+/** 시작 평지 위 정지 상태. car는 차 id(생략하면 기본 차). */
+export function initSim(course: Course, car?: string): SimState {
+  return initSimAt(course, WHEELBASE, 0, car)
 }
 
 /** 한 틱. 순수 함수: 새 객체를 돌려준다. 죽은 상태는 그대로 돌려준다. */
 export function step(s: SimState, hold: boolean, course: Course): SimState {
   if (s.dead) return s
+  const car: CarDef = carById(s.car)
+  const head = (a: Body, b: Body) => headOf(a, b, car.headOffset)
+  // pushCar에 넘길 블록을 고르는 여유: 바퀴는 바퀴 중심에서 WHEEL_R, 판정원은 그 중심에서 headR, 캡슐은 바퀴 중심에서 bodyDY + bodyR 안.
+  // 쿠페는 캡슐이 가장 멀다(340 mm). 낮은 차(스케이트보드 160 mm)는 바퀴가 더 멀어 WHEEL_R이 정한다.
+  const pushReach = Math.max(WHEEL_R, car.headR, car.bodyDY + car.bodyR)
   const r = toWork(s.rear)
   const f = toWork(s.front)
   const box = {
@@ -479,7 +487,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     for (let it = 0; it < CONSTRAINT_ITERS; it++) {
       rod(r, f)
       if (bws.length > 0) {
-        pushCar(r, f, headOf, blocksNearCar(bws, [r, f, headOf(r, f)], BODY_DY + BODY_R)) // 캡슐은 바퀴 중심에서 BODY_DY + BODY_R 안(판정원·바퀴는 그보다 가깝다)
+        pushCar(r, f, head, blocksNearCar(bws, [r, f, head(r, f)], pushReach), car)
         solveBlocks(bws)
         bc = blockWorkCands(blocksNearCar(bws, [r, f], WHEEL_R + GROUND_TOL + V_TERMINAL)) // 이번 반복에 바퀴가 더 움직여도 닿을 수 있는 것
       }
@@ -493,8 +501,8 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     }
     const all = bc.length > 0 ? sub.concat(bc) : sub
     // ⑤ 차체 판정원(이동 단계마다 확인해 빠른 회전에서도 놓치지 않는다). 블록에 닿는 것은 죽음이 아니다(설계 §7.2).
-    const h = headOf(r, f)
-    if (hitsCircle(h.x, h.y, HEAD_R, sub)) crashed = true
+    const h = head(r, f)
+    if (hitsCircle(h.x, h.y, car.headR, sub)) crashed = true
     const moving = runs.length > 0 || bws.length > 0
     if (!crashed && moving && (crushed(r, ox[0], oy[0], all) || crushed(f, ox[1], oy[1], all))) crashed = true
     // ⑤' 위험물: 바퀴 둘·차체 판정원·차대 캡슐을 그 이동 단계의 시각으로 확인한다.
@@ -503,9 +511,9 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
         circles: [
           { x: r.x, y: r.y, r: WHEEL_R },
           { x: f.x, y: f.y, r: WHEEL_R },
-          { x: h.x, y: h.y, r: HEAD_R },
+          { x: h.x, y: h.y, r: car.headR },
         ],
-        capsule: { ...chassisOf(r, f), r: BODY_R },
+        capsule: { ...chassisOf(r, f, car.bodyDY), r: car.bodyR },
       }
       for (const z of hazards) {
         if (hazardHit(z, T, probe)) {
@@ -583,14 +591,14 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     else gemFloor = Math.max(gemFloor, id)
   }
   const taken = new Set(takenGems)
-  const h = headOf(r, f)
+  const h = head(r, f)
   for (const g of list) {
     if (g.id <= gemFloor || taken.has(g.id)) continue
     if (
       near(r.x, r.y, g.x, g.y, WHEEL_R) ||
       near(f.x, f.y, g.x, g.y, WHEEL_R) ||
       near(cx, cy, g.x, g.y, WHEEL_R) ||
-      near(h.x, h.y, g.x, g.y, HEAD_R)
+      near(h.x, h.y, g.x, g.y, car.headR)
     ) {
       takenGems.push(g.id)
       gems++
