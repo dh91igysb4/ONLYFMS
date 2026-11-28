@@ -169,6 +169,14 @@ async function route(req: Request, deps: DuelDeps): Promise<Out> {
       if (size > MAX_PAYLOAD_CHARS) return bad('행동이 너무 커요')
       return await run(deps, (tx) => move(tx, deps, reg, me, id, ec, payload))
     }
+    case 'report': {
+      const id = matchId()
+      if (!id) return bad('match_id가 잘못됐어요')
+      const payload = b.payload
+      if (!isPlainObject(payload)) return bad('보고 형식이 잘못됐어요')
+      if (JSON.stringify(payload).length > MAX_PAYLOAD_CHARS) return bad('보고가 너무 커요')
+      return await run(deps, (tx) => report(tx, deps, reg, me, id, payload))
+    }
     default:
       return bad('알 수 없는 요청이에요')
   }
@@ -485,6 +493,51 @@ async function runTimeouts(tx: Tx, deps: DuelDeps, m: MatchRow, logic: Logic, no
   }
 }
 
+/** 실시간 대전인가(manifest `duel.realtime`, 레이싱 설계 §7) */
+const isRealtime = (game: DuelModule) => !!game.manifest.duel?.realtime
+
+/** 로직의 판정을 대국에 반영한다. void면 무효, 끝이면 종료 */
+function applyResult(m: MatchRow, logic: Logic, reason: EndReason, now: number): boolean {
+  const res = logic.result(m.state)
+  if (!res.over) return false
+  if (res.void) voidMatch(m, now)
+  else finish(m, res.winner, reason, now, res.scores)
+  return true
+}
+
+/**
+ * 실시간 대전의 마감(대국 마감 = 출발 지연 + 경주 + 보고 유예). 아직 보고하지 않은 좌석(moved = false)마다
+ * `reportTimeout`(미완주)을 대신 보고한다. 대신 보고한 좌석도 moved로 표시해 finish의 "첫 행동 전 무효"에
+ * 걸리지 않게 한다 — 출발 뒤 끊김·이탈은 미완주 패다(사용자 결정, 설계 §7). 로직이 판정을 못 내면 무효.
+ */
+async function runRealtimeDeadline(tx: Tx, m: MatchRow, logic: Logic, now: number): Promise<void> {
+  if (m.status !== 'active' || !m.turn_deadline || m.turn_deadline.getTime() > now) return
+  try {
+    for (const seat of [0, 1] as Seat[]) {
+      if (m.moved[seat]) continue
+      const payload = logic.reportTimeout!(m.state)
+      const r = logic.report!(m.state, seat, payload)
+      if ('error' in r) throw new Error(`timeout report rejected: ${r.error}`)
+      await recordMove(tx, m, seat, payload, true, now)
+      m.state = r.state
+      m.action_no += 1
+      m.moved = [...m.moved]
+      m.moved[seat] = true
+    }
+    m.turn_no = logic.turnNo(m.state)
+    if (!applyResult(m, logic, 'timeout', now)) throw new Error('result not over after both reports')
+  } catch (e) {
+    console.error('duel: realtime deadline broken, voiding match', m.id, e)
+    voidMatch(m, now)
+  }
+}
+
+/** 마감 처리: 실시간이면 보고 마감, 아니면 턴 시간 초과 */
+async function runDeadline(tx: Tx, deps: DuelDeps, m: MatchRow, game: DuelModule, now: number): Promise<void> {
+  if (isRealtime(game)) await runRealtimeDeadline(tx, m, game.logic, now)
+  else await runTimeouts(tx, deps, m, game.logic, now)
+}
+
 // ---------------------------------------------------------------- create
 function parseOptions(manifest: Manifest, raw: unknown): Record<string, string> | null {
   const defaults = Object.fromEntries(manifest.options.map((o) => [o.key, o.default]))
@@ -501,8 +554,6 @@ async function create(deps: DuelDeps, reg: Registry, me: Me, b: Record<string, u
   if (typeof b.game_id !== 'string') return bad('game_id가 필요해요')
   const game = reg.getDuel(b.game_id)
   if (!game) return err(404, 'unknown_game')
-  // 실시간 대전(레이싱 설계 §7)은 결과 보고 경로(2단계)가 생기기 전까지 대국을 만들 수 없다. 2단계에서 지운다.
-  if (game.manifest.duel?.realtime) return err(409, 'realtime_unsupported')
   const options = parseOptions(game.manifest, b.options)
   if (!options) return bad('설정이 잘못됐어요')
   if (typeof b.rated !== 'boolean') return bad('rated가 잘못됐어요')
@@ -686,6 +737,8 @@ async function move(
   const logic = game.logic
   const vc = await voidIfVersionChanged(tx, m, me, logic, now)
   if (vc) return vc
+  // 실시간 대전은 move 경로를 쓰지 않는다(결과는 report로)
+  if (isRealtime(game)) return { out: err(409, 'realtime_only', { view: await buildView(tx, m, me, logic, now) }) }
 
   // 마감이 지났으면 시간 초과를 먼저 처리하고, 이 행동은 늦은 것으로 거절한다
   if (m.turn_deadline && m.turn_deadline.getTime() <= now) {
@@ -743,9 +796,60 @@ async function tick(tx: Tx, deps: DuelDeps, reg: Registry, me: Me, id: string): 
   if (!m.turn_deadline || now < m.turn_deadline.getTime()) {
     return { out: err(409, 'not_due', { view: await buildView(tx, m, me, game.logic, now) }) }
   }
-  await runTimeouts(tx, deps, m, game.logic, now)
+  await runDeadline(tx, deps, m, game, now)
   await save(tx, m)
   return { out: out(200, await buildView(tx, m, me, game.logic, now)), signal: signalOf(m) }
+}
+
+// ---------------------------------------------------------------- report (실시간 대전)
+async function report(
+  tx: Tx,
+  deps: DuelDeps,
+  reg: Registry,
+  me: Me,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<TxResult> {
+  const now = deps.now()
+  const r = await loadMember(tx, reg, me, id)
+  if ('fail' in r) return { out: r.fail }
+  const { m, game } = r
+  if (m.status !== 'active') return await notActive(tx, m, me, game?.logic, now)
+  if (!game) return { out: err(404, 'unknown_game') }
+  const logic = game.logic
+  const vc = await voidIfVersionChanged(tx, m, me, logic, now)
+  if (vc) return vc
+  if (!isRealtime(game) || !logic.report || !logic.reportTimeout) {
+    return { out: err(409, 'not_realtime', { view: await buildView(tx, m, me, logic, now) }) }
+  }
+  // 마감이 지났으면 마감을 먼저 처리하고 이 보고는 늦은 것으로 거절한다
+  if (m.turn_deadline && m.turn_deadline.getTime() <= now) {
+    await runRealtimeDeadline(tx, m, logic, now)
+    await save(tx, m)
+    const code = m.status === 'active' ? 'stale' : 'finished'
+    return { out: err(409, code, { view: await buildView(tx, m, me, logic, now) }), signal: signalOf(m) }
+  }
+  const seat = seatOf(m, me.id)
+  if (seat === null) return { out: err(403, 'not_player') }
+
+  let res: { state: unknown } | { error: string }
+  try {
+    res = logic.report(m.state, seat, payload)
+  } catch (e) {
+    console.error('duel: logic.report threw', m.id, e)
+    return { out: bad('잘못된 보고예요') }
+  }
+  if ('error' in res) return { out: err(409, res.error, { view: await buildView(tx, m, me, logic, now) }) }
+
+  await recordMove(tx, m, seat, payload, false, now)
+  m.state = res.state
+  m.action_no += 1
+  m.moved = [...m.moved]
+  m.moved[seat] = true
+  m.turn_no = logic.turnNo(m.state)
+  applyResult(m, logic, 'normal', now)
+  await save(tx, m)
+  return { out: out(200, await buildView(tx, m, me, logic, now)), signal: signalOf(m) }
 }
 
 async function resign(tx: Tx, deps: DuelDeps, reg: Registry, me: Me, id: string): Promise<TxResult> {
@@ -760,6 +864,9 @@ async function resign(tx: Tx, deps: DuelDeps, reg: Registry, me: Me, id: string)
     const vc = await voidIfVersionChanged(tx, m, me, game.logic, now)
     if (vc) return vc
   }
+  // 실시간 대전은 출발 뒤 기권하면 패다(보고 전이라 moved가 비어 있어도 무효로 빠지지 않게, 설계 §7). 출발 전 기권은 무효
+  const delay = game?.manifest.duel?.realtime?.startDelaySec
+  if (delay !== undefined && m.started_at && now >= m.started_at.getTime() + delay * 1000) m.moved = [true, true]
   finish(m, seat === 0 ? 1 : 0, 'resign', now)
   await save(tx, m)
   return { out: out(200, await buildView(tx, m, me, game?.logic, now)), signal: signalOf(m) }

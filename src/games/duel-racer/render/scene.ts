@@ -9,14 +9,17 @@ import { CAR_HALF } from '../constants.ts'
 import { buildRoad } from '../course/road.ts'
 import type { Course } from '../course/types.ts'
 import { quatYPR } from '../physics/world.ts'
-import type { RaceSnapshot } from '../race.ts'
+import type { Pose, RaceSnapshot } from '../race.ts'
 import { chaseCamera, type CamPose } from './camera.ts'
 import { cityBlocks } from './city.ts'
 
+/** 상대 차(온라인 대국). prev → pose를 alpha로 보간한다. fresh가 아니면(소식 끊김) 반투명 */
+export type OpponentDraw = { pose: Pose; prev: Pose; fresh: boolean }
+
 export type Scene3D = {
   draw(snap: RaceSnapshot, alpha: number): void
-  /** 시험판: 상대 차(유령)를 그린다. null이면 숨김 */
-  setGhost(pose: { pos: { x: number; y: number; z: number }; quat: { x: number; y: number; z: number; w: number } } | null): void
+  /** 다음 draw에 그릴 상대 차. null이면 숨김 */
+  setOpponent(o: OpponentDraw | null, alpha: number): void
   resize(w: number, h: number, dpr: number): void
   dispose(): void
 }
@@ -45,7 +48,6 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
   const materials: Material[] = []
   const g = <T extends BufferGeometry>(x: T) => (geometries.push(x), x)
   const m = <T extends Material>(x: T) => (materials.push(x), x)
-  const m_ = m
 
   // ---- 도로·벽
   const road = buildRoad(course)
@@ -133,14 +135,49 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     flames.push(f)
   }
   scene.add(car)
-  // 시험판 상대 차: 같은 모양, 파란 차체
-  const ghost = car.clone(true)
-  ghost.traverse((o) => {
-    const m = o as Mesh
-    if (m.isMesh && m.material === body.material) m.material = m_(new MeshLambertMaterial({ color: '#2b7bff' }))
+  // 상대 차: 같은 모양, 파란 차체. 반투명을 따로 주려고 재질을 모두 복제한다
+  const opp = car.clone(true)
+  const oppMats: MeshLambertMaterial[] = []
+  opp.traverse((o) => {
+    const mesh = o as Mesh
+    // 상대 니트로 불꽃은 그리지 않는다
+    if (mesh.isMesh && mesh.material === flameMat) mesh.visible = false
+    if (!mesh.isMesh || !(mesh.material instanceof MeshLambertMaterial)) return
+    const mat = m(mesh.material.clone())
+    if (mesh.material === body.material) mat.color.set('#2b7bff')
+    mesh.material = mat
+    oppMats.push(mat)
   })
-  ghost.visible = false
-  scene.add(ghost)
+  opp.visible = false
+  scene.add(opp)
+  const oppPrev = new Vector3()
+  const oppCur = new Vector3()
+  const oppPrevQ = new Quaternion()
+  const oppCurQ = new Quaternion()
+  let oppFresh = true
+
+  function setOpponent(o: OpponentDraw | null, alpha: number): void {
+    if (!o) {
+      opp.visible = false
+      return
+    }
+    opp.visible = true
+    const a = Math.min(1, Math.max(0, alpha))
+    oppPrev.set(o.prev.pos.x, o.prev.pos.y, o.prev.pos.z)
+    oppCur.set(o.pose.pos.x, o.pose.pos.y, o.pose.pos.z)
+    oppPrevQ.set(o.prev.quat.x, o.prev.quat.y, o.prev.quat.z, o.prev.quat.w)
+    oppCurQ.set(o.pose.quat.x, o.pose.quat.y, o.pose.quat.z, o.pose.quat.w)
+    opp.position.lerpVectors(oppPrev, oppCur, a)
+    opp.quaternion.slerpQuaternions(oppPrevQ, oppCurQ, a)
+    if (oppFresh !== o.fresh) {
+      oppFresh = o.fresh
+      for (const mat of oppMats) {
+        mat.transparent = !o.fresh
+        mat.opacity = o.fresh ? 1 : 0.35
+        mat.needsUpdate = true
+      }
+    }
+  }
 
   // ---- 그리기: 직전 '틱' 자세(snap.prev)와 지금 틱 사이를 보간한다.
   // 직전 '프레임' 자세와 섞으면 한 프레임에 0틱·2틱이 번갈아 돌 때 차가 멈췄다 튀어 끊겨 보인다.
@@ -179,16 +216,6 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     renderer.render(scene, camera)
   }
 
-  function setGhost(pose: Parameters<Scene3D['setGhost']>[0]): void {
-    if (!pose) {
-      ghost.visible = false
-      return
-    }
-    ghost.visible = true
-    ghost.position.set(pose.pos.x, pose.pos.y, pose.pos.z)
-    ghost.quaternion.set(pose.quat.x, pose.quat.y, pose.quat.z, pose.quat.w)
-  }
-
   function resize(w: number, h: number, dpr: number): void {
     renderer.setPixelRatio(Math.min(dpr || 1, MAX_DPR))
     renderer.setSize(w, h, false)
@@ -208,5 +235,5 @@ export function createScene(canvas: HTMLCanvasElement, course: Course): Scene3D 
     renderer.dispose()
   }
 
-  return { draw, setGhost, resize, dispose }
+  return { draw, setOpponent, resize, dispose }
 }

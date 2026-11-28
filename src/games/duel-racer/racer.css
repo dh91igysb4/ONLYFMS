@@ -41,11 +41,21 @@
 .dr-nitro-burn span.on { box-shadow: 0 0 8px var(--lime); }
 .dr-progress { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 20%, transparent); display: flex; align-items: flex-end; }
 .dr-progress-fill { width: 100%; border-radius: 4px; background: var(--lime); }
+/* 상대 위치: 막대 옆 작은 점(내 막대와 겹쳐도 보이게 테두리) */
+.dr-progress-opp { position: absolute; left: 50%; width: 14px; height: 14px; margin: 0 0 -7px -7px; border-radius: 50%; background: var(--miss); border: 2px solid var(--ink); }
 .dr-countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 120px; font-weight: 900; color: var(--ink); text-shadow: 0 2px 12px rgb(0 0 0 / 0.7); pointer-events: none; }
 .dr-result-title { margin: 0; font-size: 18px; }
 .dr-result-time { margin: 0; font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .dr-result-best { margin: 0; font-size: 14px; font-weight: 600; }
 .dr-result-actions { display: flex; gap: 8px; }
+.dr-opp {
+  position: absolute; top: 12px; left: 32px; margin: 0; display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 700; color: var(--ink); text-shadow: 0 1px 4px rgb(0 0 0 / 0.6);
+}
+.dr-opp strong { font-size: 22px; font-weight: 900; color: var(--lime); }
+.dr-warn { padding: 2px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 12px; text-shadow: none; }
+.dr-wait { position: absolute; left: 0; right: 0; top: 30%; margin: 0; text-align: center; font-size: 18px; font-weight: 800; color: var(--ink); text-shadow: 0 1px 6px rgb(0 0 0 / 0.7); }
+.dr-match-time { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; margin-left: 6px; }
 .dr-help { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
 
 /* 터치 기기: 위 2/3 게임, 아래 1/3 조작 버튼. 사이트 머리글 위에 화면 전체로 띄운다 */

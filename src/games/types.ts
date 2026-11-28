@@ -79,14 +79,15 @@ export type Manifest = {
    * 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부.
    * prepare: 판 준비 RPC 이름(`^[a-z_]+$`). 있으면 대국을 시작할 때 `public.<prepare>(options jsonb)`를 불러
    * 결과를 `DuelLogic.init`의 세 번째 인자로 넘긴다(서버는 join 트랜잭션 안에서, 한 화면 대전은 브라우저에서 `p_options`로).
-   * realtime: 있으면 실시간 대전(레이싱 설계 §7). 턴 흐름 대신 브라우저가 실시간으로 진행하고 `turnSeconds`는 쓰지 않는다.
-   * 화면은 `getRealtimeComponent`, 연습은 `/duel/practice/:game`. 2단계 전까지 duel 함수가 대국 만들기를 막는다.
+   * realtime: 있으면 실시간 대전(레이싱 설계 §7). 턴 흐름 대신 브라우저가 실시간으로 진행하고, `turnSeconds`의 하나뿐인
+   * 선택지가 대국 마감이다(출발 = 시작 + startDelaySec). 결과는 duel 함수 `report`(로직 `report`·`reportTimeout`)로 판정한다.
+   * 화면은 `getRealtimeComponent`, 연습은 `/duel/practice/:game`.
    */
   duel?: {
     turnSeconds: { choices: number[]; default: number }
     sameScreen: boolean
     prepare?: string
-    realtime?: { raceSeconds: number }
+    realtime?: { raceSeconds: number; startDelaySec: number }
   }
   /**
    * 자유 플레이 기록을 보여 주는 방식. 생략하면 'solve'(정답·정답률·연속).
@@ -116,7 +117,8 @@ export type GameModule = { manifest: Manifest; logic: GameLogic<any, any, any, a
 
 export type Seat = 0 | 1
 
-export type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number] }
+/** void: 판정할 수 없는 끝(실시간 대전의 엇갈린 기록·둘 다 미완주). 핸들러가 무효(판돈 환불, Elo 없음)로 끝낸다 */
+export type DuelResult = { over: false } | { over: true; winner: Seat | null; scores?: [number, number]; void?: true }
 
 export interface DuelLogic<State, Action, View> {
   /** 규칙을 바꿀 때마다 1씩 올린다 */
@@ -145,6 +147,13 @@ export interface DuelLogic<State, Action, View> {
    * result가 아직 진행 중이어도 끝난 화면을 보여 줄 수 있다. 쓰지 않는 게임은 무시한다.
    */
   view(state: State, viewer: Seat | null, ended?: boolean): View
+  /**
+   * 실시간 대전(manifest `duel.realtime`)만: 한 좌석의 결과 보고를 적용한다. 차례·action_no 검사 없이 받는다.
+   * 같은 좌석의 두 번째 보고 같은 잘못된 보고는 error(영문 코드)를 돌려주고, 핸들러가 409 그 코드로 거절한다.
+   */
+  report?(state: State, seat: Seat, payload: unknown): { state: State } | { error: string }
+  /** 실시간 대전만: 대국 마감까지 보고하지 않은 좌석 대신 핸들러가 `report`에 넘길 값(미완주) */
+  reportTimeout?(state: State): unknown
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -30,6 +30,9 @@ export const POLL_MS = 5000
 const CLOCK_MS = 1000
 /** tick이 네트워크 오류 등으로 실패했을 때 다시 보내기까지 */
 const TICK_RETRY_MS = 5000
+/** 실시간 대전 보고 재시도 첫 간격과 최대 간격(ms) */
+const REPORT_RETRY_MS = 2000
+const REPORT_RETRY_MAX_MS = 10_000
 
 const RANK: Record<DuelView['status'], number> = { waiting: 0, active: 1, finished: 2, void: 2 }
 
@@ -53,6 +56,8 @@ export type DuelMatch = {
   fatal: string | null
   busy: boolean
   act(payload: unknown): void
+  /** 실시간 대전 결과 보고(duel report) */
+  report(payload: unknown): void
   resign(): void
   cancel(): void
 }
@@ -261,10 +266,37 @@ export function useDuelMatch(id: string): DuelMatch {
     },
     [send],
   )
+  /**
+   * 실시간 대전 결과 보고(레이싱 설계 §7). 차례·busy와 무관하게 보낸다(기권 버튼과 겹쳐도 버리지 않는다).
+   * 거절(409 already_reported·finished 등)은 실린 화면으로 맞춘다. 네트워크·5xx 실패는 대국 마감까지 간격을 늘려
+   * 가며 다시 보낸다(최종 리뷰 I5: 잠깐 끊긴 사이 보고를 잃으면 완주가 미완주 패가 된다). 화면을 떠나도 계속 보낸다.
+   */
+  const report = useCallback(
+    (payload: unknown) => {
+      const v = viewRef.current
+      if (!v || v.status !== 'active' || v.my_seat === null) return
+      const g = gen.current
+      const forId = v.match_id
+      const deadline = v.turn_deadline ? Date.parse(v.turn_deadline) : now() + REPORT_RETRY_MAX_MS
+      const attempt = (wait: number): void => {
+        duel({ action: 'report', match_id: forId, payload })
+          .then((r) => { if (current(g, forId)) apply(r) })
+          .catch((e) => {
+            const fresh = bodyView(e)
+            if (fresh) { if (current(g, forId)) apply(fresh); return }
+            const retryable = !(e instanceof ApiError) || e.status >= 500
+            if (retryable && now() + wait < deadline) setTimeout(() => attempt(Math.min(wait * 2, REPORT_RETRY_MAX_MS)), wait)
+            else if (current(g, forId)) void refresh()
+          })
+      }
+      attempt(REPORT_RETRY_MS)
+    },
+    [apply, current, refresh],
+  )
   const resign = useCallback(() => { void send({ action: 'resign' }) }, [send])
   const cancel = useCallback(() => { void send({ action: 'cancel' }) }, [send])
 
-  return { view, error, fatal, busy, act, resign, cancel }
+  return { view, error, fatal, busy, act, report, resign, cancel }
 }
 
 /** 남은 시간(ms). 서버 시계로 보정한다 */

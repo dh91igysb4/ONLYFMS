@@ -1,7 +1,7 @@
 import type { Manifest } from '../types.ts'
-import { RACE_SECONDS } from './constants.ts'
+import { MATCH_SECONDS, RACE_SECONDS, START_DELAY_SEC } from './constants.ts'
 
-// 실시간 대전(설계 §7): turnSeconds는 쓰지 않지만 타입 호환을 위해 레이스 시간으로 채운다.
+// 실시간 대전(설계 §7): turnSeconds의 하나뿐인 선택지가 대국 마감(출발 지연 + 경주 + 보고 유예)이다.
 export const manifest: Manifest = {
   id: 'duel-racer',
   // 화면 이름은 사용자가 정한다(설계 머리말). 정해지면 바꾼다.
@@ -14,8 +14,8 @@ export const manifest: Manifest = {
   dailyTimeLimitSec: null,
   options: [],
   duel: {
-    turnSeconds: { choices: [RACE_SECONDS], default: RACE_SECONDS },
+    turnSeconds: { choices: [MATCH_SECONDS], default: MATCH_SECONDS },
     sameScreen: false,
-    realtime: { raceSeconds: RACE_SECONDS },
+    realtime: { raceSeconds: RACE_SECONDS, startDelaySec: START_DELAY_SEC },
   },
 }
