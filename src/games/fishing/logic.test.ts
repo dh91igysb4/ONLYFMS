@@ -6,6 +6,9 @@ import { SEASON_ANCHOR_MS, conditionsAt, type Conditions, type Season, type Weat
 import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, BUFF_FX, CHALLENGES, DEFAULT_AREAS, HOOK_GRACE_MS, HOOK_WINDOW_MS, LEGEND_CHANCE, MIN_FIGHT_MS, MYTHIC_CHANCE, PIER_POWER_BONUS, ISLE_LAYOUTS, RODS, SPECIES, speciesAvailable, TACKLE_FX, TACKLES, UNLOCKS, type AreaId, type Species, type TackleId } from './data.ts'
 import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
 import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
+import { migrateStats, newStats } from './stats.ts'
+import { newDaily } from './daily.ts'
+import { DONE_ACHV, newAchv } from './achievements.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
 import { newEcon } from './research.ts'
 import { newGallery } from './gallery.ts'
@@ -319,7 +322,10 @@ const ctx = (now = T0, gold = 0) => ({ now, rng: fixedRng, gold })
  */
 type WS = State & { gold?: number }
 type Played = { state: WS; result?: unknown; gold?: number } | { error: string }
-const fresh = (over: Partial<WS> = {}): WS => ({ ...logic.init(), ...over })
+/** 시험용 상태. 이미 채운 업적은 받은 것으로 둔다(업적 골드가 행동 골드에 섞이지 않게. 업적은 achievements.test가 본다) */
+const fresh = (over: Partial<WS> = {}): WS => {
+  return { ...logic.init(), achv: DONE_ACHV, ...over }
+}
 function play(s: WS, action: Action | unknown, c: { now: number; rng: () => number; gold?: number }): Played {
   const { gold: inState, ...state } = s
   const gold = inState ?? c.gold ?? 0
@@ -349,7 +355,17 @@ function migrateW(raw: unknown, from: number): WS {
  * v27 econ 계약(옛 세이브는 빈 econ)을 확인한 뒤, 옛 migrate 시험이 v26 모양 그대로 비교하도록 econ을 지운다.
  * logic.init()으로 만든 fixture는 econ을 들고 있으니 그 값이면 남긴다.
  */
-function asNoEcon(raw: unknown, m: State, from: number): State {
+function asNoEcon(raw: unknown, m0: State, from: number): State {
+  let m = m0
+  if (from < 31) {
+    // v31 계약: 통계는 도감·기증·전시로 소급, 데일리·업적은 빈 값. 옛 시험은 v30 모양 그대로 비교한다
+    expect(m.stats).toEqual(migrateStats(undefined, m.dex, m.gallery))
+    expect(m.daily).toEqual(newDaily())
+    expect(m.achv).toEqual(newAchv())
+    const { stats: _s, daily: _d, achv: _a, ...rest } = m
+    const r = (raw ?? {}) as { stats?: unknown; daily?: unknown; achv?: unknown }
+    m = { ...rest, ...(r.stats !== undefined ? { stats: r.stats } : {}), ...(r.daily !== undefined ? { daily: r.daily } : {}), ...(r.achv !== undefined ? { achv: r.achv } : {}) } as State
+  }
   if (from >= 27) return m
   expect(m.econ).toEqual(newEcon())
   expect(m.gallery).toEqual(newGallery())
@@ -386,6 +402,8 @@ function asOldFish(raw: unknown, m: State): State {
 /** v9 이하 세이브가 v10 migrate에서 받는 옷장 기본값 */
 // v10 옷장 기본값 + v15 판매 마릿수(옛 세이브는 0마리)
 // + v20 신발(옛 세이브는 기본 장화)
+/** v31 통계·데일리·업적을 뺀 모양(옛 migrate 시험이 v30 모양으로 비교할 때) */
+const noGoals = (x: object) => { const { stats: _s, daily: _d, achv: _a, ...rest } = x as Record<string, unknown>; return rest }
 const W0 = { wardrobe: [] as string[], outfit: { ...DEFAULT_OUTFIT }, sold: { day: '', n: 0 }, fridge: [] as Fish[], shoesTier: 1, isle: null }
 const ok = (r: Played) => {
   if ('error' in r) throw new Error(`unexpected error ${r.error}`)
@@ -403,9 +421,10 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(30)
+    expect(logic.version).toBe(31)
     expect(logic.init()).toEqual({
       totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(), gallery: newGallery(),
+      stats: newStats(), daily: newDaily(), achv: newAchv(),
     })
   })
 
@@ -871,7 +890,7 @@ describe('fishing WorldLogic', () => {
 
   it('migrate fills missing fields and keeps gold/dex', () => {
     const m = migrateW({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
-    const { nextFishId: _n, econ: _e, gallery: _g, ...init0 } = logic.init()
+    const { nextFishId: _n, econ: _e, gallery: _g, stats: _st, daily: _dl, achv: _ac, ...init0 } = logic.init()
     expect(m).toEqual({ ...init0, gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
     expect(logic.migrate(null, 1)).toEqual(logic.init())
     expect(logic.migrate('x', 1)).toEqual(logic.init())
@@ -929,7 +948,7 @@ describe('fishing WorldLogic', () => {
       { key: 'challenges', value: 0, detail: '0/10' },
     ])
     const s = fresh({ totalEarned: 70, dex: { anchovy: { count: 1, maxCm: 12 }, grouper: { count: 1, maxCm: 100 } } })
-    expect(logic.records(s)).toEqual([
+    expect(logic.records(s).filter((r) => r.key !== 'achv')).toEqual([
       { key: 'total_earned', value: 70 },
       { key: 'biggest', value: 100, detail: '다금바리' },
       { key: 'dex', value: 2, detail: '2/169' },
@@ -1306,7 +1325,7 @@ describe('도전과제', () => {
   it('records: 도전과제 n/10', () => {
     expect(logic.records(logic.init()).at(-1)).toEqual({ key: 'challenges', value: 0, detail: '0/10' })
     const s = fresh({ challenges: { 'pier-perfect': { progress: 3, done: true }, 'river-rain': { progress: 2, done: false } } })
-    expect(logic.records(s).at(-1)).toEqual({ key: 'challenges', value: 1, detail: '1/10' })
+    expect(logic.records(s).find((r) => r.key === 'challenges')).toEqual({ key: 'challenges', value: 1, detail: '1/10' })
   })
 })
 
@@ -1927,7 +1946,7 @@ describe('산정 호수·난파선 도전과제·순간이동기 (낚시 5부 M3
 // 위 시험들은 play/migrateW 모의로 "세이브 + 지갑"을 함께 본다. 여기서는 계약 자체를 logic.apply·view·migrate·legacyGold로 직접 본다.
 describe('v14 지갑 계약', () => {
   const apply = (s: State, a: unknown, gold: number) => logic.apply(s, a as Action, { now: T0, rng: fixedRng, gold })
-  const base = (over: Partial<State> = {}): State => deepFreeze({ ...logic.init(), ...over })
+  const base = (over: Partial<State> = {}): State => deepFreeze({ ...logic.init(), achv: DONE_ACHV, ...over })
   /** 값을 내는 행동마다 [이름, 상태, 행동, 값] — 부족(값 − 1)이면 not_enough_gold, 딱 맞으면 gold: −값 */
   const DONE = { progress: 9, done: true }
   const allDone = Object.fromEntries(CHALLENGES.map((c) => [c.id, DONE]))
@@ -2065,7 +2084,7 @@ describe('v14 지갑 계약', () => {
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
     const legacyBag = rest.bag.map((f, i) => ({ ...f, id: i + 1, origin: 'legacy' }))
-    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon(), gallery: newGallery() })
+    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon(), gallery: newGallery(), stats: migrateStats(undefined, rest.dex, newGallery()), daily: newDaily(), achv: newAchv() })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2275,7 +2294,7 @@ describe('버리기', () => {
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
   it('version 27', () => {
-    expect(logic.version).toBe(30)
+    expect(logic.version).toBe(31)
   })
 })
 
@@ -2312,7 +2331,7 @@ describe('어종 확장 (logic.version 19)', () => {
   it('migrate: v18 세이브의 진행 중 낚시(pending)는 그대로 남아 v19에서 끝까지 낚인다', () => {
     const v18 = { ...hookedOn('mackerel', 40, 'village', 'shore'), bag: [{ id: 947, origin: 'normal' as const, species: 'koi', sizeCm: 50, perfect: false }] } as WS
     const m = logic.migrate(structuredClone(v18), 18)
-    expect(m).toEqual({ ...v18, bag: [{ ...v18.bag[0], id: 1, origin: 'legacy' }], nextFishId: 2 })
+    expect(noGoals(m)).toEqual(noGoals({ ...v18, bag: [{ ...v18.bag[0], id: 1, origin: 'legacy' }], nextFishId: 2 }))
     const r = ok(play({ ...m, gold: 0 } as WS, { type: 'resolve', success: true, perfect: false }, ctx(BITE + MIN_FIGHT_MS)))
     expect(r.state.bag).toEqual([{ id: 1, origin: 'legacy' as const, species: 'koi', sizeCm: 50, perfect: false }, { id: 2, origin: 'normal' as const, species: 'mackerel', sizeCm: 40, perfect: false }])
   })
@@ -2677,7 +2696,7 @@ describe('물고기 id·출처 (logic.version 26, 경제 설계 2026-11-27 §4.2
     expect(m.nextFishId).toBe(7)
     const { bag: _b, fridge: _f, nextFishId: _n, ...rest } = m
     const { bag: _rb, fridge: _rf, ...rawRest } = raw
-    expect(rest).toEqual(rawRest)
+    expect(noGoals(rest)).toEqual(noGoals(rawRest))
     // 저장 뒤 다시 읽어도(v26) 같다
     expect(logic.migrate(structuredClone(m), 26)).toEqual(m)
   })

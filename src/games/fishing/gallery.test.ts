@@ -7,6 +7,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
+import { DONE_ACHV } from './achievements.ts'
 import { ACTIVE_CAP_MS, ADV_DOSE_MS, EXPANSIONS, GOLD_BUDGET, POTION_MS, PROJECTS, SPECIAL_IDS, newGallery, stageB, stageC, type Gallery } from './gallery.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
@@ -16,7 +17,10 @@ const act = (s: State, a: unknown, o: { now?: number; gold?: number; rng?: () =>
 const ok = (r: R) => { if ('error' in r) throw new Error(r.error); return r }
 const err = (r: R) => ('error' in r ? r.error : null)
 const fish = (id: number, species: string, extra: Partial<Fish> = {}): Fish => ({ id, origin: 'normal', species, sizeCm: SPECIES.find((s) => s.id === species)!.minCm, perfect: false, ...extra })
-const st = (over: Partial<State> = {}, g: Partial<Gallery> = {}): State => ({ ...logic.init(), ...over, gallery: { ...newGallery(), ...g } })
+/** 시험 상태. 이미 채운 업적은 받은 것으로 둔다(업적 골드가 행동 골드에 섞이지 않게. 업적은 achievements.test가 본다) */
+const st = (over: Partial<State> = {}, g: Partial<Gallery> = {}): State => {
+  return { ...logic.init(), achv: DONE_ACHV, ...over, gallery: { ...newGallery(), ...g } }
+}
 const B = { exhibits: ['imugi'] } // 첫 신화(이무기) 전시 = B단계
 
 describe('기증·영구 전시', () => {

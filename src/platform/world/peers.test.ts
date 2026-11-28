@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  IDLE_SEND_MS, MAX_HANDLE, MAX_OUTFIT, MAX_SHOW, PEER_TIMEOUT_MS, markSent, moveIntervalMs, newSendClock, parsePeerState,
+  IDLE_SEND_MS, MAX_HANDLE, MAX_OUTFIT, MAX_SHOW, MAX_TAG, PEER_TIMEOUT_MS, markSent, moveIntervalMs, newSendClock, parsePeerState,
   peersAt, prunePeers, receivePeer, shouldSend, type PeerBook, type PeerState,
 } from './peers.ts'
 
@@ -25,6 +25,12 @@ describe('parsePeerState', () => {
       st({ moving: 'yes' as never }), st({ t: NaN }), { ...st(), id: undefined }, null, 'pos', 42,
     ]
     for (const b of bad) expect(parsePeerState(b), JSON.stringify(b)).toBeNull()
+  })
+  test('꼬리표(tag): 짧은 문자열만 받고, 잘못되면 그 칸만 버린다', () => {
+    expect(parsePeerState(st({ tag: '용을 낚은 자' }))).toEqual(st({ tag: '용을 낚은 자' }))
+    expect(parsePeerState(st({ tag: 'x'.repeat(MAX_TAG + 1) }))).toEqual(st())
+    expect(parsePeerState({ ...st(), tag: 3 })).toEqual(st())
+    expect(parsePeerState(st({ tag: '' }))).toEqual(st())
   })
 })
 

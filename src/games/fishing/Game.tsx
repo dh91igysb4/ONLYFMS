@@ -37,7 +37,11 @@ import { VILLAGE } from './maps/village.ts'
 import { cameraFor, feetBlocked, keysVector, stepWalk, type MoveInput, type Player } from './walk.ts'
 import { loadPosition, savePosition, startPosition } from './position.ts'
 import { Controls, type ActionLabel, type ActionState } from './Controls.tsx'
-import { BagPanel, ChallengePanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
+import { BagPanel, DexPanel, ShopPanel, TeleportPanel, UnlockPanel } from './Menus.tsx'
+import { GoalsPanel } from './GoalsPanel.tsx'
+import { rewardText, type Reward } from './daily.ts'
+import { ACHIEVEMENTS, titleText } from './achievements.ts'
+import { kstDayOf } from './stats.ts'
 import { DEFAULT_LAYERS, MapPanel, type MapLayers } from './MapPanel.tsx'
 import { WardrobePanel } from './WardrobePanel.tsx'
 import { ElevatorPanel, FamePanel } from './HallPanels.tsx'
@@ -131,6 +135,24 @@ const PANEL_PAD = 12
 type Outcome =
   | { kind: 'caught'; fish: Fish; isNew: boolean; buff?: BuffId; meal?: boolean }
   | { kind: 'lost'; early: boolean }
+/** 행동 응답 result.goals(logic GoalsResult) */
+type GoalsNote = { daily?: string[]; rewards?: Reward[]; allDone?: true; weekly?: true; achv?: { id: string; tier: number; gold: number }[] }
+const GOAL_NOTE_MS = 5000
+const MEDALS = ['동', '은', '금']
+/** 과제 완료·업적 알림 문구. 없으면 null */
+export function goalsText(g: GoalsNote | undefined): string | null {
+  if (!g) return null
+  const parts: string[] = []
+  const got = (g.rewards ?? []).map(rewardText).filter(Boolean).join(', ')
+  if (g.daily?.length) parts.push(`오늘의 과제 완료${g.allDone ? '(셋 다!)' : ''}${g.weekly ? ' · 주간 보너스' : ''}${got ? `: ${got}` : ''}`)
+  for (const a of g.achv ?? []) {
+    const d = ACHIEVEMENTS.find((x) => x.id === a.id)
+    if (!d) continue
+    const step = d.tiers.length === 1 ? '달성' : `${MEDALS[a.tier - 1]} 단계`
+    parts.push(`업적 ${step}: ${d.name} · +${a.gold.toLocaleString('ko-KR')} JWD${a.tier === d.tiers.length ? ` · 칭호 "${d.title}"` : ''}`)
+  }
+  return parts.length ? parts.join(' / ') : null
+}
 type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: 'info'; text: string }
 type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
 /** 누르기를 보낸 곳. 낚시 시작(충전·던지기)과 상점·문·선착장은 행동(버튼·스페이스)으로만, 챔·감기는 캔버스로도 된다. */
@@ -477,6 +499,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     setCastBaitState(b)
   }
   const [notice, setNotice] = useState<Notice | null>(null)
+  /** 데일리 완료·업적 단계 알림(행동 응답의 result.goals). 다른 알림을 덮지 않게 따로 둔다 */
+  const [goalNote, setGoalNote] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [fit, setFit] = useState<SceneFit>({ scale: 1, w: SCENE_W, h: SCENE_H })
   const [fullscreen, setFullscreen] = useState(false)
@@ -639,6 +663,11 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     try {
       const res = await world<View, R>(body)
       if (alive.current) {
+        const note = goalsText((res.result as { goals?: GoalsNote } | null)?.goals)
+        if (note) {
+          setGoalNote(note)
+          later(() => { if (alive.current) setGoalNote(null) }, GOAL_NOTE_MS)
+        }
         rt.offset = res.server_now - Date.now()
         // 첫 프레임(첫 view가 그려진 뒤 시작)보다 먼저 시작 자리를 잡는다
         if (!placed.current) place(res.view)
@@ -653,10 +682,30 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
   }
   const act = <R,>(payload: Action) => send<R>({ game: gameId, action: 'act', payload })
 
+  /** 오늘 과제가 아직 없으면 뽑게 한다(서버는 행동이 있어야 뽑는다). 실패해도 조용히 넘어간다 */
+  async function openDaily(v: View | null) {
+    if (!v || (v.daily?.day === kstDayOf(Date.now() + rt.offset) && (v.daily?.tasks.length ?? 0) > 0)) return
+    try {
+      await act({ type: 'dailyOpen' })
+    } catch {
+      // 다음 행동에 뽑힌다
+    }
+  }
+  async function goalAct(a: Action, done: string) {
+    setNotice(null)
+    try {
+      await act(a)
+      if (alive.current) setNotice({ kind: 'info', text: done })
+    } catch (e) {
+      if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
+    }
+  }
+
   async function load() {
     setLoadError(null)
     try {
-      await send({ game: gameId, action: 'load' })
+      const res = await send({ game: gameId, action: 'load' })
+      void openDaily(res.view)
     } catch (e) {
       if (alive.current) setLoadError(errorMessage(codeOf(e)))
     }
@@ -1317,7 +1366,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     const out: ScenePeer[] = []
     const mine = showRef.current
     /** 이름표 자리(머리 위, 자랑으로 든 물고기가 있으면 그 위)와 카드·이모트 */
-    const tagFor = (id: string, handle: string, x0: number, y0: number, show: Show | null): Tag => {
+    const tagFor = (id: string, handle: string, x0: number, y0: number, show: Show | null, title?: string): Tag => {
       const fish = show?.kind === 'brag' ? SPRITES[`fish-${show.species}`] : undefined
       const x = (Math.round(x0) - Math.round(camera.x)) * fit.scale
       const y = (Math.round(y0) - PEER_H - (fish ? fish.h * 2 + 4 : 0) - Math.round(camera.y)) * fit.scale
@@ -1325,10 +1374,12 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       if (show?.kind === 'brag') t.card = bragCard(show)
       if (show?.kind === 'emote') t.emote = show.char
       if (show?.kind === 'chat') t.say = show.text
+      if (title) t.title = title
       return t
     }
+    const myTitle = titleText(viewRef.current?.achv?.title ?? null) ?? undefined
     // 내 자랑·이모트는 친구가 없어도 내 화면에 보인다(이름표도 그동안만)
-    if (mine && profile?.id && profile.handle && !rt.trans) tags.push(tagFor(profile.id, profile.handle, rt.player.pos.x, rt.player.pos.y, mine.show))
+    if (mine && profile?.id && profile.handle && !rt.trans) tags.push(tagFor(profile.id, profile.handle, rt.player.pos.x, rt.player.pos.y, mine.show, myTitle))
     if (room && profile?.id && profile.handle) {
       const t = Date.now()
       const p = rt.player
@@ -1338,6 +1389,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         id: profile.id, handle: profile.handle, x: p.pos.x, y: p.pos.y, facing: p.facing, moving: p.moving, act,
         outfit: JSON.stringify(outfitOf(viewRef.current)),
         ...(mine ? { show: mine.code } : {}),
+        ...(myTitle ? { tag: myTitle } : {}),
       })
       const memo = peerOutfits.current
       for (const o of room.peers(t)) {
@@ -1350,7 +1402,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
         const show = parseShow(o.show)
         const holding = show?.kind === 'brag' ? show.species : null
         out.push({ pos: { x: o.x, y: o.y }, facing: o.facing, moving: o.moving, walkMs: o.moving ? t : 0, act: o.act, outfit, holding })
-        tags.push(tagFor(o.id, o.handle, o.x, o.y, show))
+        tags.push(tagFor(o.id, o.handle, o.x, o.y, show, o.tag))
       }
     }
     if (tagsRef.current) syncTags(tagsRef.current, tags)
@@ -1917,6 +1969,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
 
   const toggleMenu = (m: Menu) => {
     focusGame()
+    if (m === 'challenges' && menuRef.current !== m && !rt.busy) void openDaily(viewRef.current)
     setMenu(menuRef.current === m ? null : m)
   }
   const closeMenu = () => {
@@ -1967,13 +2020,14 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     return <p className="muted">불러오는 중…</p>
   }
 
-  const notices = notice && (
+  const notices = (notice || goalNote) && (
     <>
-      {notice.kind === 'bag_full' && (
+      {goalNote && <p className="fish-info fish-goal" role="status">{goalNote}</p>}
+      {notice?.kind === 'bag_full' && (
         <p className="notice" role="alert">가방이 가득 찼어요. 상점에 가서 팔아 주세요</p>
       )}
-      {notice.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
-      {notice.kind === 'info' && <p className="fish-info">{notice.text}</p>}
+      {notice?.kind === 'error' && <p className="notice" role="alert">{notice.text}</p>}
+      {notice?.kind === 'info' && <p className="fish-info">{notice.text}</p>}
     </>
   )
   const menuLocked = phase === 'charging' || phase === 'waiting' || phase === 'bite' || phase === 'fighting'
@@ -2001,7 +2055,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    gallery: '전시관', bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    gallery: '전시관', bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -2203,7 +2257,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                 <UnlockPanel view={view} area={unlockTarget} busy={busy} onUnlock={() => void unlock(unlockTarget)} />
               )}
               {menu === 'dex' && <DexPanel view={view} currentArea={rt.map.id} />}
-              {menu === 'challenges' && <ChallengePanel view={view} />}
+              {menu === 'challenges' && <GoalsPanel view={view} busy={busy} now={Date.now() + rt.offset} onReroll={(i) => void goalAct({ type: 'dailyReroll', index: i }, '과제를 바꿨어요')} onTitle={(id) => void goalAct({ type: 'setTitle', id }, id ? '칭호를 바꿨어요' : '칭호를 숨겼어요')} />}
               {menu === 'map' && (
                 <MapPanel
                   view={view}

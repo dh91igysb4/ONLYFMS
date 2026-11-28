@@ -13,7 +13,7 @@
 - `src/games/index.ts` 게임 등록부(Deno Edge Function이 import하므로 React 등 화면 코드를 import하지 않는다). `src/games/ui.ts` 화면 컴포넌트 등록(`getGameComponent`). `src/games/<game-id>/` 에 `manifest.ts`, `logic.ts`, `logic.test.ts`, `Game.tsx`
 - `src/test-fixtures/` 테스트 전용 게임(`test-guess`, 숫자 맞히기)과 등록부 래퍼. 운영 등록부에 넣지 않는다. 플랫폼 테스트는 `vi.mock`으로 `withTestGame`/`withTestGameUi`를 끼워 쓴다
 - `src/platform/games/freeLogQueue.ts` + 테이블 `free_play_logs`: 자유 플레이의 시드와 행동 기록. `free_plays` 행 저장 뒤에 올린다
-- 월드 위치 메시지(`src/platform/world/peers.ts`)의 `show`는 게임이 해석하는 짧은 문자열(128자 이하, 플랫폼은 내용을 모른다). 낚시는 `src/games/fishing/show.ts`(자랑·이모트)
+- 월드 위치 메시지(`src/platform/world/peers.ts`)의 `show`는 게임이 해석하는 짧은 문자열(128자 이하, 플랫폼은 내용을 모른다). 낚시는 `src/games/fishing/show.ts`(자랑·이모트). `tag`는 이름 아래 붙는 짧은 꼬리표(24자 이하, 플랫폼은 내용을 모른다). 낚시는 고른 칭호
 - `src/platform/world/` 지속형(world) 게임 화면 `WorldPage`(라우트 `/world/:game`). 게임 화면은 `getWorldComponent`로 찾고, 상태는 서버(Edge Function `world`)가 쥔다. 같은 지역 친구 보이기는 실시간 방 `room.ts`(Supabase Realtime 공개 채널 `world:<gameId>:<areaId>`, 프레즌스 + 브로드캐스트 `pos`)와 순수 로직 `peers.ts`(보내기 간격·보간·정리). 위치는 그리기 전용이고 서버 판정에 쓰지 않는다. 설계 `docs/superpowers/specs/2026-11-24-fishing-online-design.md`. 다른 지역 친구 위치는 게임 전체 프레즌스 `presence.ts`(채널 `world:<gameId>`, 상태 {지역·하는 일·칸}, 메인 화면은 듣기만). 설계 `docs/superpowers/specs/2026-11-24-fishing-online-2a-design.md`
 - `src/platform/chat/` 데일리 채팅(데이터 계층·화면). 권한은 화면이 아니라 DB `can_chat`(RLS·RPC·Storage 정책)이 정한다. 사진은 비공개 Storage 버킷 `daily-chat`에 올리고 서명 주소로만 연다
 - `src/platform/suggest/` 제안 게시판(데이터 계층·화면). 읽기는 RLS, 쓰기는 RPC. 분류·진행 기록은 워커가 `supabase/functions/suggest/`로만 쓴다
@@ -73,6 +73,7 @@
 3. `world` Edge Function을 다시 배포한다 (`npx supabase@2 functions deploy world --no-verify-jwt`, `docs/deploy-checklist.md` "낚시 배포"). 함수가 `src/games/**` 로직·데이터를 함께 번들하므로 Vercel만 배포하면 서버 판정은 옛 데이터로 남는다 (후알야 데이터와 `play`의 관계와 같다).
 4. 새 물·땅 칸 종류나 키 큰 물체(나무 등)를 더하면 `src/games/fishing/shore.ts`의 분류(고정·walkwet)와 발밑 표(`footprintAt`)도 함께 고친다. 물가 그림과 걷기 판정이 같은 물 정도 값을 쓴다(`shoreWalk.test.ts`가 모든 맵의 걷는 칸을 본다). 건물(`B`)은 외관 그림(`buildingSprite`)의 불투명 픽셀로 막으므로, 건물 그림을 바꾸면 걷는 범위도 바뀐다.
 4. 장비·해금 가격이나 판매가를 바꾸면 진행 속도(하루 1시간 약 25일, 21~31일, 설계 `2026-11-25-fishing-species-expansion-design.md`)를 다시 잰다: `src/games/fishing/econSim.ts`가 판매 마릿수 감쇠(`data.ts` `SELL_DECAY`)로 재고, `fishing/gold.test.ts`의 기록 값·날짜 검사가 통과해야 한다. 낚시 수입(`world`)은 사이트 하루 상한을 받지 않는다(상한은 미니게임 `free`만).
+7. 데일리 과제·업적(v31, 설계 `2026-11-28-fishing-daily-achievements-design.md`): 사건 추출 `goalEvents.ts`(행동 전후 차이만 본다, 행동 함수는 건드리지 않는다), 통계 `stats.ts`, 데일리 `daily.ts`(보상은 어분·미끼·재료만, 뽑기는 행동 뒤에 서버 난수로), 업적 `achievements.ts`(골드는 행동 `gold`에 합쳐 한 번에 장부로). 새 행동의 사건이 필요하면 `goalEvents`에 더한다. 업적 표를 바꾸면 `goals.test.ts`의 골드 합계도 고친다. 기존 시험은 업적을 다 받은 상태(`DONE_ACHV`)로 돌려 업적 골드가 행동 골드에 섞이지 않게 한다.
 6. 경제 기능(경제 설계 `2026-11-27-fishing-economy-design.md`, v27~): 규칙·가격은 `src/games/fishing/research.ts`, 새 행동은 `ECONOMY_FLAGS`가 켜져야 동작한다(2026-11-28부터 운영 값 모두 true, `econOn.test.ts`가 지키고 끄는 길은 `econOff.test.ts`가 본다). 값을 바꾸면 `world`를 다시 배포한다.
 5. 골드는 지갑에 있다(logic.version 14부터, `wallet: true`). 새 골드 행동은 `ctx.gold`로 검사하고 `apply`의 `gold`로 증감을 돌려준다. 세이브(`State`)에 골드를 두지 않는다. `world`를 v14 아래로 되돌리지 않는다(`docs/deploy-checklist.md` "지갑 켜기").
 

@@ -8,6 +8,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, sellPrice, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
+import { DONE_ACHV } from './achievements.ts'
 import { AUTO_MEAL_MAX, MAX_BAIT_BATCH, maxBait, newEcon, researchChance } from './research.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
@@ -18,7 +19,10 @@ const act = (s: State, a: unknown, o: { now?: number; rng?: () => number; gold?:
 const ok = (r: R) => { if ('error' in r) throw new Error(r.error); return r }
 const err = (r: R) => ('error' in r ? r.error : null)
 const fish = (id: number, species: string, extra: Partial<Fish> = {}): Fish => ({ id, origin: 'normal', species, sizeCm: SPECIES.find((s) => s.id === species)!.minCm, perfect: false, ...extra })
-const base = (over: Partial<State> = {}): State => ({ ...logic.init(), ...over })
+/** 시험 상태. 이미 채운 업적은 받은 것으로 둔다(업적 골드가 행동 골드에 섞이지 않게. 업적은 achievements.test가 본다) */
+const base = (over: Partial<State> = {}): State => {
+  return { ...logic.init(), achv: DONE_ACHV, ...over }
+}
 // 다금바리: 마을 부두, 낚싯대 3, 힘 0.95, 겨울만(연구 낚시는 계절을 완화한다)
 const grouperReady = (over: Partial<State> = {}): State =>
   base({ rodTier: 3, legends: ['grouper'], econ: { ...newEcon(), license: true, baits: { attractor: 0, legend: 3, mythic: 0 } }, ...over })

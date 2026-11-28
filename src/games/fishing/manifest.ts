@@ -21,5 +21,7 @@ export const manifest: Manifest = {
     { key: 'isle_cleared', label: '섬 개간', unit: '구역' },
     { key: 'house', label: '집', unit: '단계' },
     { key: 'deco', label: '섬 꾸미기', unit: '개' },
+    // 데일리 과제·업적(v31): 받은 업적 단계의 점수 합
+    { key: 'achv', label: '업적 점수', unit: '점' },
   ],
 }

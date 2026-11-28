@@ -493,3 +493,10 @@
 .fish-workbench-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 /* 내 섬 C: 가구 놓기 창 */
 .fish-furn-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 과제 창(데일리·업적) */
+.fish-goal-bar { width: 100%; height: 6px; accent-color: var(--accent-strong); }
+.fish-goal-title { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.fish-goal-title select { flex: 1; min-width: 0; }
+.fish-info.fish-goal { border: 1px solid var(--accent-strong); }
+.fish-peer-title { padding: 0 4px; border-radius: 4px; background: var(--panel); color: var(--accent-strong); font-size: 10px; line-height: 14px; font-weight: 600; }

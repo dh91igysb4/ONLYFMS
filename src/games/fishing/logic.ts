@@ -10,6 +10,10 @@ import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 import { canDecorate, isleNodes } from './isle.ts'
 import { ownedFacilities } from './facility.ts'
+import { applyStats, migrateStats, newStats, type Stats } from './stats.ts'
+import { goalEvents } from './goalEvents.ts'
+import { ensureDaily, migrateDaily, newDaily, progressDaily, rerollDaily, type Daily, type Reward } from './daily.ts'
+import { achvScore, grantAchievements, hasTitle, migrateAchv, newAchv, titleText, type Achv } from './achievements.ts'
 import { DECOS, DECO_MAX, isDecoId, type DecoId, type DecoPlaced } from './deco.ts'
 import { HOUSE_MAX, ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
 import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } from './home.ts'
@@ -290,6 +294,12 @@ export type State = {
   econ: Econ
   /** 경제 P2(v27): 기증·전시·지역 재료·포션·전시관 확장 */
   gallery: Gallery
+  /** 통계(v31, 데일리 과제·업적 설계 2026-11-28): 사건으로만 갱신 */
+  stats: Stats
+  /** 오늘의 데일리 과제(v31) */
+  daily: Daily
+  /** 업적 단계·고른 칭호(v31) */
+  achv: Achv
 }
 /** 버리는 곳(v18): 가방(어디서나, 50%)·마을회관 쓰레기통(5%) */
 export type DiscardAt = 'bag' | 'trash'
@@ -307,6 +317,10 @@ export type Action =
   | { type: 'brew'; potion: PotionId; price: number; alt?: boolean; adv?: boolean }
   // 경제 P3(C단계 제작법으로 만든 병 마시기)·P4(완료 후 목표 사기, 테마 적용)
   | { type: 'drink'; potion: PotionId }
+  // 데일리·업적(v31)
+  | { type: 'dailyOpen' }
+  | { type: 'dailyReroll'; index: number }
+  | { type: 'setTitle'; id: string | null }
   | { type: 'buyProject'; id: string; price: number }
   | { type: 'setTheme'; theme: ThemeId | null }
   | { type: 'expand'; stage: number; price: number }
@@ -378,7 +392,7 @@ export const newIsle = (layout: IsleLayoutId): IsleState => ({
   house: 0, furniture: {}, placed: [], decoBox: {}, deco: [],
 })
 // econ은 v27 서버부터 나간다: 옛 서버 응답에는 없으니 화면은 없으면 newEcon()으로 본다.
-export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId' | 'econ' | 'gallery'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; econ?: Econ; gallery?: Gallery; gold: number }
+export type View = Omit<State, 'pending' | 'buffs' | 'sold' | 'fridge' | 'shoesTier' | 'isle' | 'nextFishId' | 'econ' | 'gallery' | 'stats' | 'daily' | 'achv'> & { pending: PendingView | null; buffs?: BuffId[]; sold?: Sold; fridge?: Fish[]; shoesTier?: ShoeTier; isle?: State['isle']; econ?: Econ; gallery?: Gallery; stats?: Stats; daily?: Daily; achv?: Achv; gold: number }
 
 type Out = { state: State; result?: unknown; gold?: number } | { error: string }
 type Ctx = { now: number; rng: () => number; gold: number }
@@ -419,6 +433,9 @@ const init = (): State => ({
   nextFishId: 1,
   econ: newEcon(),
   gallery: newGallery(),
+  stats: newStats(),
+  daily: newDaily(),
+  achv: newAchv(),
 })
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -915,6 +932,7 @@ function migrate(raw: unknown, fromVersion: number): State {
   }
   const buffs = migrateBuffs(raw.buffs, legends)
   const numbered = numberFish(bag.slice(0, bagSize(bagTier)), fridge, fromVersion >= FISH_ID_VERSION ? raw.nextFishId : undefined)
+  const gallery = fromVersion >= ECON_VERSION ? migrateGallery(raw.gallery, legends) : newGallery()
   return {
     totalEarned: nonNeg(raw.totalEarned, base.totalEarned),
     rodTier,
@@ -937,7 +955,11 @@ function migrate(raw: unknown, fromVersion: number): State {
     pending: migratePending(raw.pending, fromVersion),
     nextFishId: numbered.nextFishId,
     econ: fromVersion >= ECON_VERSION ? migrateEcon(raw.econ, legends) : newEcon(),
-    gallery: fromVersion >= ECON_VERSION ? migrateGallery(raw.gallery, legends) : newGallery(),
+    gallery,
+    // v30 이하는 도감·기증·전시로 소급(stats.ts migrateStats), 데일리는 다음 행동에 뽑힌다, 업적은 다음 행동에 소급 지급
+    stats: migrateStats(fromVersion >= GOALS_VERSION ? raw.stats : undefined, dex, gallery),
+    daily: fromVersion >= GOALS_VERSION ? migrateDaily(raw.daily) : newDaily(),
+    achv: fromVersion >= GOALS_VERSION ? migrateAchv(raw.achv) : newAchv(),
   }
 }
 
@@ -962,6 +984,8 @@ function migrateGallery(raw: unknown, legends: readonly string[]): Gallery {
 
 /** 경제 P1이 생긴 버전 */
 const ECON_VERSION = 27
+/** 통계·데일리·업적이 세이브에 들어간 버전 */
+const GOALS_VERSION = 31
 
 /** v27 이상 econ: 알려진 칸만, 음이 아닌 정수만. 보장 카운터는 발견한 전설·신화만 */
 function migrateEcon(raw: unknown, legends: readonly string[]): Econ {
@@ -1125,6 +1149,11 @@ function records(state: State): WorldRecord[] {
     ...(state.isle && (state.isle.deco.length > 0 || Object.keys(state.isle.decoBox).length > 0) ? [{ key: 'deco', value: state.isle.deco.length }] : []),
     ...(state.isle && state.isle.house > 0 ? [{ key: 'house', value: state.isle.house, detail: `${state.isle.house}/${HOUSE_MAX}` }] : []),
     ...(state.isle && state.isle.cleared > 0 ? [{ key: 'isle_cleared', value: state.isle.cleared, detail: `${state.isle.cleared}/${ISLE_ZONES}` }] : []),
+    // 업적 점수(v31): 한 단계라도 받은 사람만(명예의 전당 0점 줄을 만들지 않게)
+    ...((): WorldRecord[] => {
+      const a = achvScore(state.achv)
+      return a.count > 0 ? [{ key: 'achv', value: a.score, detail: `${a.count}단계` }] : []
+    })(),
   ]
 }
 
@@ -1132,6 +1161,42 @@ function records(state: State): WorldRecord[] {
 export const PREVIEW_AREAS_KEY = 'areas'
 /** 섬이 있는 사람 기록의 키(game_records, detail = 섬 모양). 고른 뒤에만 쓴다. 친구 섬 목록(world_players)이 읽는다. 내 섬 설계 §5.4 */
 export const PREVIEW_ISLE_KEY = 'isle'
+
+/** 칭호 고르기(v31): 가진 칭호의 업적 id 또는 null(안 보이기) */
+function setTitle(state: State, a: Record<string, unknown>): Out {
+  if (a.id === null) return { state: { ...state, achv: { ...state.achv, title: null } } }
+  if (typeof a.id !== 'string' || !hasTitle(state.achv, a.id)) return { error: 'no_title' }
+  return { state: { ...state, achv: { ...state.achv, title: a.id } } }
+}
+
+/** 행동 결과에 붙는 데일리·업적 알림(없으면 결과에 넣지 않는다) */
+export type GoalsResult = { daily?: string[]; rewards?: Reward[]; allDone?: true; weekly?: true; achv?: { id: string; tier: number; gold: number }[] }
+
+/**
+ * 데일리·업적 처리(설계 §4): 사건 → 통계 → 오늘 과제 진행·보상 → 업적 단계 지급(골드는 행동 gold에 합친다) → 오늘 과제가 없으면 뽑기.
+ * 뽑기를 맨 뒤에 서버 난수로 해서 행동의 낚시 판정 난수 순서를 바꾸지 않는다.
+ */
+function withGoals(prev: State, r: { state: State; result?: unknown; gold?: number }, action: unknown, ctx: Ctx): { state: State; result?: unknown; gold?: number } {
+  const events = goalEvents(prev, r.state, action, r.result, ctx.now)
+  // 세이브는 migrate를 거쳐 들어오지만, 칸이 없는 상태(옛 시험 상태)도 빈 값으로 다룬다
+  const s0: State = { ...r.state, econ: r.state.econ ?? newEcon(), gallery: r.state.gallery ?? newGallery(), stats: r.state.stats ?? newStats(), daily: r.state.daily ?? newDaily(), achv: r.state.achv ?? newAchv() }
+  let state: State = events.length > 0 ? { ...s0, stats: applyStats(s0.stats, events, ctx.now) } : s0
+  const d = progressDaily(state, events, ctx.now)
+  state = d.state
+  const a = grantAchievements(state)
+  state = ensureDaily(a.state, ctx.now, ctx.rng)
+  const goals: GoalsResult = {
+    ...(d.done.length > 0 ? { daily: d.done } : {}),
+    ...(d.rewards.length > 0 ? { rewards: d.rewards } : {}),
+    ...(d.allDone ? { allDone: true as const } : {}),
+    ...(d.weekly ? { weekly: true as const } : {}),
+    ...(a.got.length > 0 ? { achv: a.got } : {}),
+  }
+  const gold = (r.gold ?? 0) + a.gold
+  const hasGoals = Object.keys(goals).length > 0
+  const result = hasGoals ? { ...(isObj(r.result) ? r.result : {}), goals } : r.result
+  return { state, ...(result !== undefined ? { result } : {}), ...(gold !== 0 ? { gold } : r.gold !== undefined ? { gold: r.gold } : {}) }
+}
 
 export const logic: WorldLogic<State, Action, View> = {
   // 9: 고급 장비(5·6단계 낚싯대, 50·60칸 가방). 세이브 형식은 8과 같다
@@ -1159,7 +1224,9 @@ export const logic: WorldLogic<State, Action, View> = {
   // 29: makeBait의 count(미끼 여러 개 한 번에, 최대 MAX_BAIT_BATCH). count 없으면 1개로 28과 같다. 세이브 형식은 28과 같다
   // 30: 자동 어분(econ.autoMeal, setAutoMeal). 기준 판매가 이하 일반 물고기는 잡는 순간 어분, 처음 잡은 어종·최대 크기 갱신은 가방에.
   //     autoMeal이 없는 v29 세이브는 그대로(꺼짐)
-  version: 30,
+  // 31: 데일리 과제·업적(stats·daily·achv, dailyOpen·dailyReroll·setTitle, 업적 골드). v30 세이브는 도감·기증·전시로 통계를 소급하고
+  //     다음 행동에 업적 단계를 한꺼번에 지급한다(설계 2026-11-28-fishing-daily-achievements-design.md)
+  version: 31,
   wallet: true,
   init,
   migrate,
@@ -1167,8 +1234,10 @@ export const logic: WorldLogic<State, Action, View> = {
   // action은 네트워크에서 온 JSON이라 unknown으로 다루고 필드마다 검증한다.
   apply(state, action: unknown, ctx) {
     const r = applyAction(state, action, ctx)
+    if ('error' in r) return r
+    const g = withGoals(state, r, action, ctx)
     // 행동으로 업적 조건을 채웠으면(잡기·과제 깨기 등) 그 자리에서 옷을 저장한다
-    return 'error' in r ? r : { ...r, state: grantEarned(r.state) }
+    return { ...g, state: grantEarned(g.state) }
   },
   view: (state, ctx): View => {
     // 다음 물고기 번호는 화면에 필요 없다
@@ -1177,7 +1246,8 @@ export const logic: WorldLogic<State, Action, View> = {
   },
   records,
   // 프로필 캐릭터(설계 옷장 §7): 입은 옷 JSON. 화면 Avatar가 읽는다
-  avatar: (state) => JSON.stringify(state.outfit),
+  // 칭호(v31)가 있으면 함께 넣는다. decodeOutfit은 부위만 읽는다
+  avatar: (state) => JSON.stringify(state.achv?.title ? { ...state.outfit, title: titleText(state.achv.title) } : state.outfit),
   previewData: (state) => ({
     [PREVIEW_AREAS_KEY]: state.areas.join(','),
     // 섬 모양:치운 구역 수(v23). 옛 값은 모양만이고 화면은 0으로 읽는다
@@ -1653,6 +1723,13 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return buyProject(state, action, ctx.gold)
     case 'setTheme':
       return setTheme(state, action)
+    case 'dailyOpen':
+      // 오늘 과제 뽑기는 apply 감싸기(withGoals)가 한다. 이 행동은 아무것도 바꾸지 않는다
+      return { state }
+    case 'dailyReroll':
+      return rerollDaily(state, action.index, ctx.now, ctx.rng)
+    case 'setTitle':
+      return setTitle(state, action)
     default:
       return { error: 'bad_action' }
   }
