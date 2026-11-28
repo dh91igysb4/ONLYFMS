@@ -7,7 +7,7 @@ import { releaseMinimapCache } from './minimap.ts'
 import { barResult } from './minigame.ts'
 import { HOOK_WINDOW_MS, MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { conditionsAt } from './clock.ts'
-import { BagPanel, conditionLabel, DexPanel } from './Menus.tsx'
+import { BagPanel, conditionLabel, DexPanel, dexOrder } from './Menus.tsx'
 import { discardFee, kstDay, newIsle, price, type Fish, type PendingView, type View } from './logic.ts'
 import { DEFAULT_OUTFIT } from './wardrobe.ts'
 import { TILE, exitAt, interactionAt, pierEnd, tileOf, type Facing, type MapDef, type Vec } from './map.ts'
@@ -2483,6 +2483,22 @@ describe('찌 상점·장비', () => {
     render(<DexPanel view={view} />)
     expect(screen.getByRole('region', { name: '도감' })).toBeInTheDocument()
     expect(screen.getByText(`1/${SPECIES.length}종`)).toBeInTheDocument()
+  })
+
+  test('도감: 지역 탭 안은 희귀도 순(흔함 → 신화), 같은 희귀도는 기본가 낮은 것부터', () => {
+    const rank = ['common', 'uncommon', 'rare', 'legend', 'mythic']
+    for (const area of new Set(SPECIES.map((s) => s.area))) {
+      const list = dexOrder(SPECIES.filter((s) => s.area === area))
+      for (let i = 1; i < list.length; i++) {
+        const [a, b] = [list[i - 1], list[i]]
+        const d = rank.indexOf(b.rarity) - rank.indexOf(a.rarity)
+        expect(d >= 0 && (d > 0 || b.basePrice >= a.basePrice), `${area} ${a.id} → ${b.id}`).toBe(true)
+      }
+    }
+    const dex = Object.fromEntries(SPECIES.filter((s) => s.area === 'village').map((s) => [s.id, { count: 1, maxCm: s.minCm }]))
+    render(<DexPanel view={makeView({ dex })} currentArea="village" />)
+    const names = screen.getAllByRole('listitem').map((li) => li.querySelector('strong')?.firstChild?.textContent)
+    expect(names).toEqual(dexOrder(SPECIES.filter((s) => s.area === 'village')).map((s) => s.name))
   })
 
   test('가방: 장비 구역이 가방 칸보다 위, 찌를 사기 전에도 칸과 안내가 보인다', () => {

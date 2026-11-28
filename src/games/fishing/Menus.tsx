@@ -610,12 +610,18 @@ export function conditionLabel(s: Species): string {
 }
 
 /** currentArea: 처음 열 탭. 어종이 없는 지역이면 첫 탭으로 연다. */
+const RARITY_RANK: Record<Species['rarity'], number> = { common: 0, uncommon: 1, rare: 2, legend: 3, mythic: 4 }
+/** 도감 순서: 희귀도(흔함 → 신화), 같은 희귀도는 기본가 낮은 것부터, 같으면 데이터 순서 */
+export function dexOrder(list: readonly Species[]): Species[] {
+  return list.map((s, i) => ({ s, i })).sort((a, b) => RARITY_RANK[a.s.rarity] - RARITY_RANK[b.s.rarity] || a.s.basePrice - b.s.basePrice || a.i - b.i).map((x) => x.s)
+}
+
 export function DexPanel({ view, currentArea }: { view: View; currentArea?: AreaId }) {
   const tabs = AREAS.filter((a) => areaHasSpecies(a.id))
   const [picked, setPicked] = useState<AreaId | undefined>(currentArea)
   const active = tabs.find((a) => a.id === picked) ?? tabs[0]
   const found = SPECIES.filter((s) => view.dex[s.id]).length
-  const inArea = (id: AreaId) => SPECIES.filter((s) => s.area === id)
+  const inArea = (id: AreaId) => dexOrder(SPECIES.filter((s) => s.area === id))
   return (
     <section className="fish-panel-body" aria-label="도감">
       <p className="muted">
