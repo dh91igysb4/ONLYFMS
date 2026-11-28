@@ -76,6 +76,8 @@ export type MatchSession = {
   /** 그리기 전용: 그린 위치 - 실제 유령 위치(패킷 보정 때 생겨 줄어든다) */
   glide: { x: number; y: number; z: number }
   glideFor: StatePacketRef
+  /** 상대 위치를 코스에서 찾을 때 쓰는 단서(상대 쪽 진행 점). 내 단서와 따로 둬야 겹친 구간에서 엉뚱한 곳에 붙지 않는다 */
+  oppHint: number
 }
 
 type StatePacketRef = object | null
@@ -95,7 +97,7 @@ export function createMatch(R: Rapier, opts: MatchOpts): MatchSession {
   const s: MatchSession = {
     race, opp: createOpponent(race.pw), opts, version: opts.version ?? logic.version, unsub: () => {},
     peerVersion: null, heard: false, oppFinish: undefined, myFinish: undefined, doneAt: null, reported: false,
-    mismatch: false, stale: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0, glide: { x: 0, y: 0, z: 0 }, glideFor: null,
+    mismatch: false, stale: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0, glide: { x: 0, y: 0, z: 0 }, glideFor: null, oppHint: 0,
   }
   s.unsub = opts.link.onMessage((d) => onPacket(s, d))
   return s
@@ -225,6 +227,8 @@ export type MatchView = {
   myFinish: number | null | undefined
   oppFinish: number | null | undefined
   alpha: number
+  /** 그리기 전용 상대 진행도(0..1, 진행 막대). 소식이 없으면 null, 상대가 도착했으면 1 */
+  oppProgress: number | null
 }
 
 export function matchView(s: MatchSession): MatchView {
@@ -235,20 +239,27 @@ export function matchView(s: MatchSession): MatchView {
   else if (s.race.elapsed === 0) phase = 'waiting'
   else if (snap.countdown !== null) phase = 'countdown'
   else phase = 'racing'
-  return { phase, stale: s.stale, snap, opponent: s.oppView, rank: rankOf(s, snap), heard: s.heard, myFinish: s.myFinish, oppFinish: s.oppFinish, alpha: s.alpha }
+  const oppProgress = oppProgressOf(s)
+  return { phase, stale: s.stale, snap, opponent: s.oppView, oppProgress, rank: rankOf(s, snap, oppProgress), heard: s.heard, myFinish: s.myFinish, oppFinish: s.oppFinish, alpha: s.alpha }
 }
 
-function rankOf(s: MatchSession, snap: RaceSnapshot): 1 | 2 | null {
+function oppProgressOf(s: MatchSession): number | null {
+  if (typeof s.oppFinish === 'number') return 1
+  if (!s.oppView) return null
+  const c = s.race.course
+  const arc = arcLength(c)
+  const p = progressAt(c, s.oppView.pose.pos, s.oppHint)
+  s.oppHint = p.index
+  return Math.min(1, Math.max(0, arc[p.index] / arc[c.finish]))
+}
+
+function rankOf(s: MatchSession, snap: RaceSnapshot, opp: number | null): 1 | 2 | null {
   const mine = s.myFinish
   const theirs = s.oppFinish
   if (typeof mine === 'number' && typeof theirs === 'number') return mine <= theirs ? 1 : 2
   if (typeof mine === 'number') return 1
   if (typeof theirs === 'number') return 2
-  if (!s.oppView) return null
-  const c = s.race.course
-  const arc = arcLength(c)
-  const p = progressAt(c, s.oppView.pose.pos, s.race.progressIndex)
-  const opp = Math.min(1, arc[p.index] / arc[c.finish])
+  if (opp === null) return null
   return snap.progress >= opp ? 1 : 2
 }
 

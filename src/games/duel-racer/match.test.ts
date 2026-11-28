@@ -84,6 +84,10 @@ test('each side receives the other at NET_HZ and places the opponent', () => {
   expect(v.opponent!.fresh).toBe(true)
   const bz = snapshot(b.race).car.pos.z
   expect(Math.abs(v.opponent!.pose.pos.z - bz)).toBeLessThan(3)
+  // 진행 막대에 쓸 상대 진행도(0..1)
+  expect(v.oppProgress).not.toBeNull()
+  expect(v.oppProgress!).toBeGreaterThan(0)
+  expect(Math.abs(v.oppProgress! - snapshot(b.race).progress)).toBeLessThan(0.02)
   disposeMatch(a)
   disposeMatch(b)
 })
@@ -99,6 +103,7 @@ test('reports the moment it finishes; the later finisher carries the earlier tim
   expect(reports[0]).toEqual([{ my: fa, opp: null, met: true }])
   expect(reports[1]).toEqual([{ my: fb, opp: fa, met: true }])
   expect(matchView(a).phase).toBe('done')
+  expect(matchView(b).oppProgress).toBe(1)
   disposeMatch(a)
   disposeMatch(b)
 })

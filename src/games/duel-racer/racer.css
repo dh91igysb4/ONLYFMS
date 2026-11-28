@@ -41,6 +41,8 @@
 .dr-nitro-burn span.on { box-shadow: 0 0 8px var(--lime); }
 .dr-progress { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 20%, transparent); display: flex; align-items: flex-end; }
 .dr-progress-fill { width: 100%; border-radius: 4px; background: var(--lime); }
+/* 상대 위치: 막대 옆 작은 점(내 막대와 겹쳐도 보이게 테두리) */
+.dr-progress-opp { position: absolute; left: 50%; width: 14px; height: 14px; margin: 0 0 -7px -7px; border-radius: 50%; background: var(--miss); border: 2px solid var(--ink); }
 .dr-countdown { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 120px; font-weight: 900; color: var(--ink); text-shadow: 0 2px 12px rgb(0 0 0 / 0.7); pointer-events: none; }
 .dr-result-title { margin: 0; font-size: 18px; }
 .dr-result-time { margin: 0; font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; }

@@ -242,12 +242,15 @@ function PracticeGame({ onExit }: Extract<RealtimeGameProps, { mode: 'practice' 
 }
 
 /** 진행 막대·시간·속도·니트로·카운트다운(연습과 대국 공용) */
-function RaceHud({ snap }: { snap: RaceSnapshot }) {
+function RaceHud({ snap, oppProgress = null }: { snap: RaceSnapshot; oppProgress?: number | null }) {
   const filled = Math.floor(snap.nitro.gauge * NITRO_CELLS + 1e-9)
   return (
     <>
       <div className="dr-progress" aria-label="진행">
         <div className="dr-progress-fill" style={{ height: `${Math.round(snap.progress * 100)}%` }} />
+        {oppProgress !== null && (
+          <span className="dr-progress-opp" data-testid="racer-progress-opp" aria-label="상대 위치" style={{ bottom: `${Math.round(oppProgress * 100)}%` }} />
+        )}
       </div>
       <p className="dr-time" data-testid="racer-time">{formatTicks(Math.max(0, snap.tick))}</p>
       <div className="dr-meter">
@@ -430,7 +433,7 @@ function MatchGame(props: MatchProps) {
             </div>
           ) : (
             <>
-              <RaceHud snap={view.snap} />
+              <RaceHud snap={view.snap} oppProgress={view.oppProgress} />
               <div className="dr-opp" aria-label="상대">
                 {view.rank !== null && <strong data-testid="racer-rank">{view.rank}위</strong>}
                 <span>{`상대 ${names[other]}`}</span>

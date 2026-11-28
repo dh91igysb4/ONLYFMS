@@ -52,7 +52,7 @@ import type { RealtimeLink } from '../../platform/duel/realtime/peer.ts'
 
 function matchViewOf(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    phase: 'waiting', stale: false, snap: baseSnap(), opponent: null, rank: null, heard: false, myFinish: undefined, oppFinish: undefined,
+    phase: 'waiting', stale: false, snap: baseSnap(), opponent: null, rank: null, oppProgress: null, heard: false, myFinish: undefined, oppFinish: undefined,
     alpha: 0, ...over,
   }
 }
@@ -272,6 +272,11 @@ describe('match mode', () => {
     h.view = matchViewOf({ phase: 'racing', heard: true, rank: 1, snap: { ...baseSnap(), countdown: null, tick: 600 } })
     await frame()
     expect(screen.getByTestId('racer-rank').textContent).toBe('1위')
+    // 상대 표시가 없으면 진행 막대에 상대 점도 없다
+    expect(screen.queryByTestId('racer-progress-opp')).toBeNull()
+    h.view = matchViewOf({ phase: 'racing', heard: true, rank: 2, oppProgress: 0.42, snap: { ...baseSnap(), countdown: null, tick: 660 } })
+    await frame()
+    expect((screen.getByTestId('racer-progress-opp') as HTMLElement).style.bottom).toBe('42%')
     expect(screen.getByText(/son/)).toBeTruthy()
     // 서버 시각으로 진행한다
     serverTime += 5000
