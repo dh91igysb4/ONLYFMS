@@ -402,9 +402,11 @@ function MatchGame(props: MatchProps) {
   const view = hud?.view ?? null
   const other = mySeat === 0 ? 1 : 0
   const done = view?.phase === 'done' || !!result
+  // 판정이 나면 화면 전체 터치 배치를 풀어 플랫폼 결과 카드(판돈·레이팅·재대결)가 보이게 한다(최종 리뷰 I6)
+  const full = touch && !result
 
   return (
-    <div className={touch ? 'dr dr-touch' : 'dr'}>
+    <div className={full ? 'dr dr-touch' : 'dr'}>
       <div className="dr-stage">
         <canvas ref={canvasRef} className="dr-canvas" aria-label="레이스 화면" />
         {phase === 'loading' && <p className="dr-overlay" role="status">불러오는 중…</p>}
@@ -417,8 +419,14 @@ function MatchGame(props: MatchProps) {
         {phase === 'ready' && view && (
           view.phase === 'version_mismatch' ? (
             <div className="dr-overlay" role="alert">
-              <p>게임이 새로 바뀌었어요. 새로고침해 주세요</p>
-              <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>새로고침</button>
+              {view.stale ? (
+                <>
+                  <p>게임이 새로 바뀌었어요. 새로고침해 주세요</p>
+                  <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>새로고침</button>
+                </>
+              ) : (
+                <p>상대 화면이 옛 버전이라 이 대국은 무효가 돼요</p>
+              )}
             </div>
           ) : (
             <>
@@ -436,7 +444,7 @@ function MatchGame(props: MatchProps) {
           )
         )}
       </div>
-      {touch && phase === 'ready' && (
+      {full && phase === 'ready' && (
         <>
           <div className="dr-corner">
             <button type="button" className="btn btn-ghost" onClick={reset}>복귀</button>

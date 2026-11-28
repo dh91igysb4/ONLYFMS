@@ -52,7 +52,7 @@ import type { RealtimeLink } from '../../platform/duel/realtime/peer.ts'
 
 function matchViewOf(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    phase: 'waiting', snap: baseSnap(), opponent: null, rank: null, heard: false, myFinish: undefined, oppFinish: undefined,
+    phase: 'waiting', stale: false, snap: baseSnap(), opponent: null, rank: null, heard: false, myFinish: undefined, oppFinish: undefined,
     alpha: 0, ...over,
   }
 }
@@ -313,11 +313,34 @@ describe('match mode', () => {
     expect(screen.getByTestId('racer-my-time').textContent).toBe('01:11.00')
   })
 
-  test('version mismatch shows 새로고침 안내', async () => {
-    h.view = matchViewOf({ phase: 'version_mismatch' })
-    mountMatch()
+  test('version mismatch shows 새로고침 안내 on the stale side and 무효 안내 on the other', async () => {
+    h.view = matchViewOf({ phase: 'version_mismatch', stale: true })
+    const r = mountMatch()
     await loaded()
     expect(screen.getByText('게임이 새로 바뀌었어요. 새로고침해 주세요')).toBeTruthy()
     expect(screen.getByRole('button', { name: '새로고침' })).toBeTruthy()
+    r.unmount()
+    h.view = matchViewOf({ phase: 'version_mismatch', stale: false })
+    mountMatch()
+    await loaded()
+    expect(screen.getByText('상대 화면이 옛 버전이라 이 대국은 무효가 돼요')).toBeTruthy()
+  })
+
+  test('on touch devices the full-screen layer steps aside once the server result is in (최종 리뷰 I6)', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('coarse'), media: q, addEventListener() {}, removeEventListener() {} }))
+    h.view = matchViewOf({ phase: 'racing', heard: true, snap: { ...baseSnap(), countdown: null } })
+    const r = mountMatch()
+    await loaded()
+    expect(r.container.querySelector('.dr-touch')).not.toBeNull()
+    r.rerender(
+      <RacerGame
+        gameId="duel-racer" mode="match" onExit={onExit} matchId="m1" mySeat={0} names={['kane', 'son']}
+        startAt={1_005_000} serverNow={() => serverTime} link={link} result={{ winner: 0, void: false, scores: [10, 20] }} report={report}
+      />,
+    )
+    await frame()
+    // 판돈·레이팅·재대결이 있는 플랫폼 결과 카드가 가려지지 않게 보통 배치로 돌아간다
+    expect(r.container.querySelector('.dr-touch')).toBeNull()
+    expect(screen.queryByRole('button', { name: '가속' })).toBeNull()
   })
 })

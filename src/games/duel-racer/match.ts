@@ -1,8 +1,9 @@
 // 온라인 대국 세션(레이싱 설계 §4, §6). 각자 자기 차만 물리로 돌리고 상대 차는 받은 상태의 유령으로 둔다(3번 구조).
 // 시간은 서버 시각 기준: 레이스 틱 0 = 출발 시각 - 카운트다운. 화면이 늦게 열리거나 탭이 숨었다 돌아오면
 // 그 사이 틱을 한 번에 돌려 따라잡는다(연습과 달리 프레임 상한 없음, 설계 §6.3).
-// 도착(또는 제한 시간 미완주)하면 finish를 알리고, 상대 finish를 받거나 보고 유예의 절반이 지나면 report를 한 번 부른다.
-import { NET_HZ, RACE_SECONDS, REPORT_GRACE_SEC, TICK_HZ } from './constants.ts'
+// 도착(또는 제한 시간 미완주)하면 바로 report를 한 번 부르고(아는 상대 기록과 함께) finish를 되풀이해 알린다.
+// 먼저 들어온 쪽이 상대를 기다리면 그 사이 창을 닫을 때 기록을 잃는다(최종 리뷰 C2). 맞대 보기는 늦게 들어온 쪽의 opp가 한다.
+import { NET_HZ, RACE_SECONDS, TICK_HZ } from './constants.ts'
 import { arcLength, progressAt } from './course/index.ts'
 import { sideAt } from './course/road.ts'
 import type { Course } from './course/types.ts'
@@ -59,7 +60,10 @@ export type MatchSession = {
   /** 내가 끝난 서버 시각 */
   doneAt: number | null
   reported: boolean
+  /** 출발 전 상대와 화면 버전이 달라 멈췄다(둘 다 멈추고 무효로 보고) */
   mismatch: boolean
+  /** 멈춘 이유가 내 화면이 옛 버전이라서(새로고침할 쪽) */
+  stale: boolean
   lastSlot: number
   lastUrgent: number
   oppView: { pose: Pose; prev: Pose; fresh: boolean } | null
@@ -82,7 +86,7 @@ export function createMatch(R: Rapier, opts: MatchOpts): MatchSession {
   const s: MatchSession = {
     race, opp: createOpponent(race.pw), opts, version: opts.version ?? logic.version, unsub: () => {},
     peerVersion: null, heard: false, oppFinish: undefined, myFinish: undefined, doneAt: null, reported: false,
-    mismatch: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0,
+    mismatch: false, stale: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0,
   }
   s.unsub = opts.link.onMessage((d) => onPacket(s, d))
   return s
@@ -96,8 +100,14 @@ function onPacket(s: MatchSession, d: ArrayBuffer): void {
   else if (p.kind === 'finish') s.oppFinish = p.ticks
   else if (p.kind === 'hello') {
     s.peerVersion = p.version
-    // 버전은 오르기만 하므로 낮은 쪽이 옛 화면이다. 출발 전에만 막는다(달리는 중에 끊지 않는다)
-    if (p.version > s.version && s.race.elapsed <= COUNTDOWN_TICKS) s.mismatch = true
+    // 출발 전에만 막는다(달리는 중에 끊지 않는다). 둘 다 멈추고 무효로 보고한다(최종 리뷰 I2).
+    // 버전은 오르기만 하므로 낮은 쪽이 옛 화면(새로고침할 쪽)이다
+    if (p.version !== s.version && s.race.elapsed <= COUNTDOWN_TICKS && !s.mismatch && s.myFinish === undefined) {
+      s.mismatch = true
+      s.stale = p.version > s.version
+      s.reported = true
+      s.opts.report({ my: null, opp: null, met: true, abort: true })
+    }
   }
 }
 
@@ -120,7 +130,14 @@ function finishRace(s: MatchSession, ticks: number | null, now: number): void {
  * 내 상태는 NET_HZ 칸을 넘을 때 한 번(따라잡는 동안 여러 칸을 넘어도 마지막 상태 하나만) 보낸다.
  */
 export function stepMatch(s: MatchSession, serverNow: number, controls: Controls): void {
-  if (s.mismatch) return
+  if (s.mismatch) {
+    // 멈춘 쪽도 버전을 계속 알려 상대가 멈추게 한다
+    if (serverNow - s.lastUrgent >= URGENT_EVERY_MS) {
+      s.lastUrgent = serverNow
+      s.opts.link.send(encode({ kind: 'hello', version: s.version }), true)
+    }
+    return
+  }
   const { race } = s
   const origin = s.opts.startAt - COUNTDOWN_TICKS * TICK_MS
   // 1/60 ms 나눗셈의 부동소수 오차로 한 틱 모자라지 않게
@@ -151,12 +168,11 @@ export function stepMatch(s: MatchSession, serverNow: number, controls: Controls
     if (s.myFinish !== undefined) s.opts.link.send(encode({ kind: 'finish', ticks: s.myFinish }), true)
   }
 
-  if (!s.reported && s.myFinish !== undefined && s.doneAt !== null) {
-    const waited = serverNow - s.doneAt >= (REPORT_GRACE_SEC / 2) * 1000
-    if (s.oppFinish !== undefined || waited) {
-      s.reported = true
-      s.opts.report({ my: s.myFinish, opp: s.oppFinish ?? null })
-    }
+  if (!s.reported && s.myFinish !== undefined) {
+    s.reported = true
+    const r: RacerReport = { my: s.myFinish, opp: s.oppFinish ?? null }
+    if (s.heard) r.met = true
+    s.opts.report(r)
   }
 }
 
@@ -169,6 +185,8 @@ function placeIt(s: MatchSession): void {
 
 export type MatchView = {
   phase: MatchPhase
+  /** version_mismatch일 때 내 화면이 옛 버전인지 */
+  stale: boolean
   snap: RaceSnapshot
   opponent: { pose: Pose; prev: Pose; fresh: boolean } | null
   /** 그리기 전용 순위(진행도 비교). 상대 소식이 없으면 null */
@@ -187,7 +205,7 @@ export function matchView(s: MatchSession): MatchView {
   else if (s.race.elapsed === 0) phase = 'waiting'
   else if (snap.countdown !== null) phase = 'countdown'
   else phase = 'racing'
-  return { phase, snap, opponent: s.oppView, rank: rankOf(s, snap), heard: s.heard, myFinish: s.myFinish, oppFinish: s.oppFinish, alpha: s.alpha }
+  return { phase, stale: s.stale, snap, opponent: s.oppView, rank: rankOf(s, snap), heard: s.heard, myFinish: s.myFinish, oppFinish: s.oppFinish, alpha: s.alpha }
 }
 
 function rankOf(s: MatchSession, snap: RaceSnapshot): 1 | 2 | null {

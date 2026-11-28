@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from 'vitest'
-import { NET_HZ, RACE_SECONDS, REPORT_GRACE_SEC, TICK_HZ } from './constants.ts'
+import { NET_HZ, RACE_SECONDS, TICK_HZ } from './constants.ts'
 import { flatCourse } from './course/testCourses.ts'
 import type { RacerReport } from './logic.ts'
 import { createMatch, disposeMatch, matchView, stepMatch, type LinkLike, type MatchSession } from './match.ts'
@@ -88,33 +88,28 @@ test('each side receives the other at NET_HZ and places the opponent', () => {
   disposeMatch(b)
 })
 
-test('finishing sends finish and reports once with the opponent time', () => {
+test('reports the moment it finishes; the later finisher carries the earlier time (최종 리뷰 C2)', () => {
   const { a, b, reports } = duo({ course: flatCourse(300) })
-  run([a, b], START - 100, START + 25_000, [GAS, GAS], 50)
-  const fa = snapshot(a.race).finishTicks
-  const fb = snapshot(b.race).finishTicks
+  run([a, b], START - 100, START + 25_000, [GAS, { ...GAS, throttle: 0.6 }], 50)
+  const fa = snapshot(a.race).finishTicks!
+  const fb = snapshot(b.race).finishTicks!
   expect(fa).not.toBeNull()
-  expect(fb).not.toBeNull()
-  expect(reports[0]).toEqual([{ my: fa, opp: fb }])
-  expect(reports[1]).toEqual([{ my: fb, opp: fa }])
+  expect(fb).toBeGreaterThan(fa)
+  // 먼저 들어온 쪽은 기다리지 않고 바로 보고한다(나가도 기록이 남게)
+  expect(reports[0]).toEqual([{ my: fa, opp: null, met: true }])
+  expect(reports[1]).toEqual([{ my: fb, opp: fa, met: true }])
   expect(matchView(a).phase).toBe('done')
   disposeMatch(a)
   disposeMatch(b)
 })
 
-test('opponent never finishing → report after half the grace with opp null', () => {
+test('opponent never finishing → reports once at the finish with opp null', () => {
   const { a, b, reports } = duo({ course: flatCourse(300) })
   run([a, b], START - 100, START + 20_000, [GAS, NO_CONTROLS], 50)
   const fa = snapshot(a.race).finishTicks!
   expect(fa).not.toBeNull()
-  expect(reports[0]).toEqual([])
-  const doneAt = START + (fa / TICK_HZ) * 1000
-  const half = (REPORT_GRACE_SEC / 2) * 1000
-  stepMatch(a, doneAt + half - 500, NO_CONTROLS)
-  expect(reports[0]).toEqual([])
-  stepMatch(a, doneAt + half + 500, NO_CONTROLS)
-  expect(reports[0]).toEqual([{ my: fa, opp: null }])
-  stepMatch(a, doneAt + half + 5000, NO_CONTROLS)
+  expect(reports[0]).toEqual([{ my: fa, opp: null, met: true }])
+  stepMatch(a, START + 60_000, NO_CONTROLS)
   expect(reports[0]).toHaveLength(1)
   disposeMatch(a)
   disposeMatch(b)
@@ -130,20 +125,22 @@ test('opening long after the race ended is a DNF without simulating the whole ra
   expect(matchView(s).phase).toBe('done')
   expect(matchView(s).myFinish).toBeNull()
   expect(l.sent).toContain('finish')
-  stepMatch(s, START + (RACE_SECONDS + 40 + REPORT_GRACE_SEC / 2 + 1) * 1000, NO_CONTROLS)
+  // 상대 소식을 한 번도 못 들었다(met 없음)
   expect(reports).toEqual([{ my: null, opp: null }])
   disposeMatch(s)
 })
 
-test('version mismatch in hello stops the outdated side before the start', () => {
+test('version mismatch in hello stops both sides before the start and reports abort (최종 리뷰 I2)', () => {
   const { a, b, reports } = duo({ versions: [2, 1] })
   run([a, b], START - COUNTDOWN_MS - 1000, START + 1000, [GAS, GAS], 50)
   expect(matchView(b).phase).toBe('version_mismatch')
+  expect(matchView(a).phase).toBe('version_mismatch')
+  // 새로고침할 쪽은 옛 버전
+  expect(matchView(b).stale).toBe(true)
+  expect(matchView(a).stale).toBe(false)
   expect(b.race.elapsed).toBe(0)
-  // 새 버전 쪽은 그대로 달린다
-  expect(matchView(a).phase).toBe('racing')
-  expect(snapshot(a.race).tick).toBeGreaterThan(0)
-  expect(reports[1]).toEqual([])
+  expect(a.race.elapsed).toBe(0)
+  for (const r of reports) expect(r).toEqual([{ my: null, opp: null, met: true, abort: true }])
   disposeMatch(a)
   disposeMatch(b)
 })
