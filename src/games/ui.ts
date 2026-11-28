@@ -71,6 +71,19 @@ export function getDuelComponent(id: string): ComponentType<DuelGameProps> | und
 }
 
 /**
+ * 실시간 대전 화면이 받는 props (레이싱 설계 §7). manifest `duel.realtime`이 있는 게임만.
+ * 1단계는 혼자 연습(`practice`)만 있다. 온라인 대국(`match`)은 2단계가 더한다.
+ */
+export type RealtimeGameProps = { gameId: string; mode: 'practice'; onExit(): void }
+
+/** 실시간 대전 화면 등록부. 화면 코드는 레이스 화면에서만 무거운 모듈(물리·3D)을 불러온다. */
+const realtimeComponents: Record<string, ComponentType<RealtimeGameProps>> = {}
+
+export function getRealtimeComponent(id: string): ComponentType<RealtimeGameProps> | undefined {
+  return realtimeComponents[id]
+}
+
+/**
  * 지속형(world) 게임 화면이 받는 props. 저장·행동 요청은 화면이 플랫폼 데이터 계층으로 직접 한다.
  * onOpenGames: 플랫폼의 게임 목록 화면으로 간다(게임 안의 출구, 예: 낚시 마을회관 노트북).
  */

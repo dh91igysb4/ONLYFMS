@@ -147,6 +147,9 @@ export function DuelHomePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const visible = duels.map((d) => d.manifest).filter((m) => !m.hidden || !!profile?.is_admin)
+  // 실시간 대전은 2단계 전까지 대국을 만들 수 없다(서버도 realtime_unsupported). 혼자 연습만 연다
+  const creatable = visible.filter((m) => !m.duel?.realtime)
+  const practice = visible.filter((m) => m.duel?.realtime)
   const [list, setList] = useState<DuelList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [joining, setJoining] = useState<string | null>(null)
@@ -227,7 +230,20 @@ export function DuelHomePage() {
       <div className="split">
         <div className="stack">
           {/* 관리자 프로필이 늦게 오면 보이는 게임이 바뀌므로 기본값을 다시 잡는다 */}
-          <CreateForm key={visible.map((m) => m.id).join()} visible={visible} />
+          <CreateForm key={creatable.map((m) => m.id).join()} visible={creatable} />
+
+          {practice.length > 0 && (
+            <section className="fm-panel" aria-label="혼자 연습">
+              <h3 className="fm-panel-head">혼자 연습</h3>
+              <p className="fm-empty">혼자 달려 보는 연습이에요. 기록은 남지 않아요</p>
+              {practice.map((m) => (
+                <Link key={m.id} className="fm-row" to={`/duel/practice/${m.id}`}>
+                  <span className="fm-row-main"><span className="fm-row-title">{m.name} 연습</span></span>
+                  <span className="fm-row-go" aria-hidden="true">›</span>
+                </Link>
+              ))}
+            </section>
+          )}
 
           {visible.some((m) => m.duel?.sameScreen) && (
             <section className="fm-panel" aria-label="같은 화면">

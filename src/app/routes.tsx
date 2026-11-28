@@ -19,6 +19,7 @@ import { JoinPage } from '../platform/contests/JoinPage.tsx'
 import { DuelHomePage } from '../platform/duel/DuelHomePage.tsx'
 import { DuelMatchPage } from '../platform/duel/DuelMatchPage.tsx'
 import { DuelLocalPage } from '../platform/duel/DuelLocalPage.tsx'
+import { DuelPracticePage } from '../platform/duel/DuelPracticePage.tsx'
 import { WorldPage } from '../platform/world/WorldPage.tsx'
 import { DuelJoinPage } from '../platform/duel/DuelJoinPage.tsx'
 
@@ -40,6 +41,7 @@ export function AppRoutes() {
         <Route path="/duel" element={<DuelHomePage />} />
         <Route path="/duel/join/:code" element={<DuelJoinPage />} />
         <Route path="/duel/local/:game" element={<DuelLocalPage />} />
+        <Route path="/duel/practice/:game" element={<DuelPracticePage />} />
         <Route path="/duel/:id" element={<DuelMatchPage />} />
         <Route path="/world/:game" element={<WorldPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
