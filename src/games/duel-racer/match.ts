@@ -21,6 +21,10 @@ const SEND_EVERY = Math.round(TICK_HZ / NET_HZ)
 const LIMIT_TICKS = COUNTDOWN_TICKS + RACE_SECONDS * TICK_HZ
 /** hello·finish(꼭 닿아야 하는 드문 메시지)를 되풀이해 보내는 간격(ms) */
 const URGENT_EVERY_MS = 500
+/** 그리기 보정: 새 패킷으로 위치가 바뀌면 그 차이를 틱마다 이만큼 남기며 줄인다(약 0.1초에 1/3) */
+const GLIDE_KEEP = 0.85
+/** 이보다 크게 바뀌면(복귀 등 순간이동) 미끄러지지 않고 바로 옮긴다(m) */
+const GLIDE_SNAP = 5
 /** 출발 칸: 중심선에서 옆으로 */
 const GRID_SIDE = 3
 
@@ -69,7 +73,12 @@ export type MatchSession = {
   oppView: { pose: Pose; prev: Pose; fresh: boolean } | null
   /** 서버 시각이 지금 틱과 다음 틱 사이 어디쯤인지(그리기 보간, 0..1) */
   alpha: number
+  /** 그리기 전용: 그린 위치 - 실제 유령 위치(패킷 보정 때 생겨 줄어든다) */
+  glide: { x: number; y: number; z: number }
+  glideFor: StatePacketRef
 }
+
+type StatePacketRef = object | null
 
 export function createMatch(R: Rapier, opts: MatchOpts): MatchSession {
   const race = createRace(R, opts.course ?? 'neon-1')
@@ -86,7 +95,7 @@ export function createMatch(R: Rapier, opts: MatchOpts): MatchSession {
   const s: MatchSession = {
     race, opp: createOpponent(race.pw), opts, version: opts.version ?? logic.version, unsub: () => {},
     peerVersion: null, heard: false, oppFinish: undefined, myFinish: undefined, doneAt: null, reported: false,
-    mismatch: false, stale: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0,
+    mismatch: false, stale: false, lastSlot: -1, lastUrgent: -Infinity, oppView: null, alpha: 0, glide: { x: 0, y: 0, z: 0 }, glideFor: null,
   }
   s.unsub = opts.link.onMessage((d) => onPacket(s, d))
   return s
@@ -176,11 +185,32 @@ export function stepMatch(s: MatchSession, serverNow: number, controls: Controls
   }
 }
 
+/**
+ * 유령을 이번 틱에 놓고 그릴 자세를 정한다. 충돌은 실제 위치(placeOpponent)로, 그리기는 새 패킷이 와서 위치가 바뀐
+ * 만큼을 남겨 두었다가 줄여 미끄러지듯 따라가게 한다(사용자 시험: 상대 차가 끊겨 보임).
+ */
 function placeIt(s: MatchSession): void {
   const p = placeOpponent(s.opp, s.race.elapsed)
   if (!p) return
-  const prev = s.oppView?.pose ?? p.pose
-  s.oppView = { pose: p.pose, prev, fresh: p.fresh }
+  const raw = p.pose.pos
+  const g = s.glide
+  const packet = s.opp.latest?.p ?? null
+  if (packet !== s.glideFor && s.oppView) {
+    // 새 패킷: 직전에 그린 자리와 새 실제 자리의 차이를 보정으로 남긴다
+    const drawn = s.oppView.pose.pos
+    const dx = drawn.x - raw.x
+    const dy = drawn.y - raw.y
+    const dz = drawn.z - raw.z
+    if (Math.hypot(dx, dy, dz) > GLIDE_SNAP) { g.x = 0; g.y = 0; g.z = 0 } else { g.x = dx; g.y = dy; g.z = dz }
+  } else {
+    g.x *= GLIDE_KEEP
+    g.y *= GLIDE_KEEP
+    g.z *= GLIDE_KEEP
+  }
+  s.glideFor = packet
+  const pose: Pose = { pos: { x: raw.x + g.x, y: raw.y + g.y, z: raw.z + g.z }, quat: p.pose.quat }
+  const prev = s.oppView?.pose ?? pose
+  s.oppView = { pose, prev, fresh: p.fresh }
 }
 
 export type MatchView = {

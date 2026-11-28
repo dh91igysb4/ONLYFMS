@@ -64,16 +64,18 @@ test('a side hit above SPIN_HIT_SPEED spins me; a slow side touch does not', () 
   expect(Math.abs(carState(b.race.car).angVel.y)).toBeLessThan(1)
 })
 
-test('extrapolation adds one tick and caps at GHOST_EXTRAP_MAX_MS', () => {
+test('extrapolation counts from when the packet arrived (not the sender tick) and caps at GHOST_EXTRAP_MAX_MS', () => {
   const { opp } = setup()
-  receiveState(opp, pkt(10, { x: 50, y: 1, z: 100 }, { x: 0, y: 0, z: 30 }), 12)
+  // 보낸 쪽 시계가 앞서 있어도(보낸 틱 100 > 내 틱 13) 받은 뒤 흐른 만큼 앞으로 간다 — 두 기기 시계 차이와 무관
+  receiveState(opp, pkt(100, { x: 50, y: 1, z: 100 }, { x: 0, y: 0, z: 30 }), 12)
   const p = placeOpponent(opp, 13)!
   expect(p.fresh).toBe(true)
-  expect(p.pose.pos.z).toBeCloseTo(100 + 30 * (4 / TICK_HZ), 5) // (13 - 10 + 1)틱
+  expect(p.pose.pos.z).toBeCloseTo(100 + 30 * (2 / TICK_HZ), 5) // (13 - 12 + 1)틱
+  expect(placeOpponent(opp, 14)!.pose.pos.z).toBeCloseTo(100 + 30 * (3 / TICK_HZ), 5)
   const capped = placeOpponent(opp, 40)!
   expect(capped.pose.pos.z).toBeCloseTo(100 + 30 * GHOST_EXTRAP_MAX_MS / 1000, 5)
   // 늦게 온 옛 패킷은 무시한다(순서 없는 전송)
-  receiveState(opp, pkt(5, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 0 }), 41)
+  receiveState(opp, pkt(50, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 0 }), 41)
   expect(placeOpponent(opp, 41)!.pose.pos.x).toBe(50)
 })
 

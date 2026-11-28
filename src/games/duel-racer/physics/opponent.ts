@@ -44,15 +44,16 @@ export function receiveState(o: Opponent, p: StatePacket, atTick: number): void 
 }
 
 /**
- * 유령을 이번 틱 위치로 옮긴다. 보낸 상태는 그 틱 물리 전이므로 (지금 - 보낸 틱 + 1)틱만큼 속도로 외삽하고,
- * GHOST_EXTRAP_MAX_MS에서 멈춘다. 소식이 GHOST_STALE_TICKS보다 오래 없으면 fresh=false: 그리기는 반투명,
+ * 유령을 이번 틱 위치로 옮긴다. 받은 뒤 흐른 만큼(지금 - 받은 틱 + 1틱) 속도로 외삽하고 GHOST_EXTRAP_MAX_MS에서 멈춘다.
+ * 보낸 틱은 쓰지 않는다: 두 기기의 서버 시각 추정이 수십 ms 어긋나면 보낸 쪽이 앞설 때 유령이 패킷 사이에 멈췄다
+ * 튀었다(사용자 시험). 대신 편도 지연만큼(왕복 30ms면 약 15ms) 뒤처져 보인다. 소식이 GHOST_STALE_TICKS보다 오래 없으면 fresh=false: 그리기는 반투명,
  * 몸체는 치워서 충돌하지 않는다(보이지 않는 차에 부딪히지 않게).
  */
 export function placeOpponent(o: Opponent, nowTick: number): { pose: Pose; fresh: boolean } | null {
   const l = o.latest
   if (!l) return null
   const m = l.p
-  const ageMs = Math.min(GHOST_EXTRAP_MAX_MS, Math.max(1, nowTick - m.tick + 1) * TICK_MS)
+  const ageMs = Math.min(GHOST_EXTRAP_MAX_MS, Math.max(1, nowTick - l.atTick + 1) * TICK_MS)
   const age = ageMs / 1000
   const pos = { x: m.pos.x + m.vel.x * age, y: m.pos.y + m.vel.y * age, z: m.pos.z + m.vel.z * age }
   const fresh = nowTick - l.atTick <= GHOST_STALE_TICKS

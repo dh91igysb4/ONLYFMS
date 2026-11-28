@@ -3,7 +3,7 @@ import { NET_HZ, RACE_SECONDS, TICK_HZ } from './constants.ts'
 import { flatCourse } from './course/testCourses.ts'
 import type { RacerReport } from './logic.ts'
 import { createMatch, disposeMatch, matchView, stepMatch, type LinkLike, type MatchSession } from './match.ts'
-import { decode } from './net/codec.ts'
+import { decode, encode } from './net/codec.ts'
 import { NO_CONTROLS, type Controls } from './physics/controls.ts'
 import { loadRapier, type Rapier } from './physics/rapier.ts'
 import { COUNTDOWN_TICKS, snapshot } from './race.ts'
@@ -143,4 +143,28 @@ test('version mismatch in hello stops both sides before the start and reports ab
   for (const r of reports) expect(r).toEqual([{ my: null, opp: null, met: true, abort: true }])
   disposeMatch(a)
   disposeMatch(b)
+})
+
+test('drawn opponent glides to a corrected position instead of jumping; big jumps (respawn) snap', () => {
+  const [la, lb] = links()
+  const a = createMatch(R, { mySeat: 0, startAt: START, link: la, report: () => {}, course: flatCourse() })
+  let seq = 0
+  const at = (z: number) => encode({ kind: 'state', tick: ++seq, pos: { x: 20, y: 1, z }, quat: { x: 0, y: 0, z: 0, w: 1 }, vel: { x: 0, y: 0, z: 0 }, nitro: false })
+  let t = START + 1000
+  const tick = (n = 1) => { for (let i = 0; i < n; i++) { t += 1000 / 60; stepMatch(a, t, NO_CONTROLS) } }
+  stepMatch(a, t, NO_CONTROLS)
+  lb.send(at(100))
+  tick()
+  expect(matchView(a).opponent!.pose.pos.z).toBeCloseTo(100, 3)
+  lb.send(at(101)) // 1m 보정
+  tick()
+  expect(matchView(a).opponent!.pose.pos.z).toBeLessThan(100.4)
+  tick(40)
+  expect(matchView(a).opponent!.pose.pos.z).toBeCloseTo(101, 1)
+  // 충돌용 실제 위치는 보정 즉시 새 값
+  expect(a.opp.pos!.z).toBeCloseTo(101, 3)
+  lb.send(at(300)) // 복귀 같은 큰 순간이동
+  tick()
+  expect(matchView(a).opponent!.pose.pos.z).toBeCloseTo(300, 3)
+  disposeMatch(a)
 })
