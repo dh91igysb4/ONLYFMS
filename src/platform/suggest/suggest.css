@@ -16,6 +16,8 @@
 .suggest-draft-target { flex: none; width: auto; max-width: 40%; }
 .suggest-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 
+.suggest-field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+
 /* 글 목록 판 */
 .suggest-list { list-style: none; margin: 0; padding: 0; }
 .suggest-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; border-top: 1px solid var(--fm-line); scroll-margin-top: 80px; }
