@@ -30,3 +30,11 @@ export const NITRO_BURN_PER_SEC = 0.25
 /** 레이스 최대 시간 (s) = manifest duel.realtime.raceSeconds */
 export const RACE_SECONDS = 180
 export const COURSE_IDS = ['neon-1'] as const
+
+// ---- 온라인 대국(2단계, 설계 §6·§7)
+/** 대국 시작(참가) 뒤 출발까지(초) */
+export const START_DELAY_SEC = 5
+/** 경주 끝 뒤 결과 보고를 기다리는 시간(초) */
+export const REPORT_GRACE_SEC = 60
+/** 대국 마감(초) = 출발 지연 + 경주 + 보고 유예. manifest turnSeconds의 하나뿐인 선택지 */
+export const MATCH_SECONDS = START_DELAY_SEC + RACE_SECONDS + REPORT_GRACE_SEC

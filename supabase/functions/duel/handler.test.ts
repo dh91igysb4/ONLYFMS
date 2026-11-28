@@ -134,7 +134,7 @@ const rtLogic: DuelLogic<RtState, unknown, RtState> = {
 }
 const RT_SECONDS = 245
 extra.set('rt', {
-  manifest: { ...coinManifest('rt', false), duel: { turnSeconds: { choices: [RT_SECONDS], default: RT_SECONDS }, sameScreen: false, realtime: { raceSeconds: 180 } } },
+  manifest: { ...coinManifest('rt', false), duel: { turnSeconds: { choices: [RT_SECONDS], default: RT_SECONDS }, sameScreen: false, realtime: { raceSeconds: 180, startDelaySec: 5 } } },
   logic: rtLogic,
 })
 const registry = { getDuel: (id: string) => extra.get(id) ?? getDuel(id) }

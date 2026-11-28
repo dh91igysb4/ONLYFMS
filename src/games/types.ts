@@ -79,14 +79,15 @@ export type Manifest = {
    * 대전 게임 설정: 턴 시간 선택지(초)와 한 화면 대전 지원 여부.
    * prepare: 판 준비 RPC 이름(`^[a-z_]+$`). 있으면 대국을 시작할 때 `public.<prepare>(options jsonb)`를 불러
    * 결과를 `DuelLogic.init`의 세 번째 인자로 넘긴다(서버는 join 트랜잭션 안에서, 한 화면 대전은 브라우저에서 `p_options`로).
-   * realtime: 있으면 실시간 대전(레이싱 설계 §7). 턴 흐름 대신 브라우저가 실시간으로 진행하고 `turnSeconds`는 쓰지 않는다.
-   * 화면은 `getRealtimeComponent`, 연습은 `/duel/practice/:game`. 2단계 전까지 duel 함수가 대국 만들기를 막는다.
+   * realtime: 있으면 실시간 대전(레이싱 설계 §7). 턴 흐름 대신 브라우저가 실시간으로 진행하고, `turnSeconds`의 하나뿐인
+   * 선택지가 대국 마감이다(출발 = 시작 + startDelaySec). 결과는 duel 함수 `report`(로직 `report`·`reportTimeout`)로 판정한다.
+   * 화면은 `getRealtimeComponent`, 연습은 `/duel/practice/:game`.
    */
   duel?: {
     turnSeconds: { choices: number[]; default: number }
     sameScreen: boolean
     prepare?: string
-    realtime?: { raceSeconds: number }
+    realtime?: { raceSeconds: number; startDelaySec: number }
   }
   /**
    * 자유 플레이 기록을 보여 주는 방식. 생략하면 'solve'(정답·정답률·연속).

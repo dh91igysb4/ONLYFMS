@@ -55,7 +55,7 @@ export function realtimeDuelOf(base: DuelModule): DuelModule {
   const duel = {
     turnSeconds: { choices: [REALTIME_MATCH_SECONDS], default: REALTIME_MATCH_SECONDS },
     sameScreen: false,
-    realtime: { raceSeconds: 180 },
+    realtime: { raceSeconds: 180, startDelaySec: REALTIME_START_DELAY_SEC },
   }
   return { manifest: { ...base.manifest, id: REALTIME_DUEL_ID, name: '실시간 대전', hidden: true, options: [], duel }, logic: rtLogic }
 }
