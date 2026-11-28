@@ -1,0 +1,32 @@
+// 1대1 레이싱 대전 로직. 레이스는 브라우저에서 실시간으로 돌고, 서버는 2단계에서 결과 보고(report)만 판정한다(설계 §7).
+// 1단계에서는 대국 만들기가 막혀 있어(duel 함수 realtime_unsupported) 이 로직은 등록용 최소 형태다.
+// 순수 함수만, 외부 의존 없음 (Deno 호환). three·rapier·physics/·render/를 import하지 않는다.
+import type { DuelLogic } from '../types.ts'
+import { COURSE_IDS } from './constants.ts'
+
+export type RacerState = { course: string }
+
+export const logic: DuelLogic<RacerState, never, RacerState> = {
+  version: 1,
+  init() {
+    return { course: COURSE_IDS[0] }
+  },
+  toMove() {
+    return 0
+  },
+  apply() {
+    return { error: 'realtime_only' }
+  },
+  timeoutAction() {
+    return {} as never
+  },
+  turnNo() {
+    return 0
+  },
+  result() {
+    return { over: false }
+  },
+  view(state) {
+    return state
+  },
+}

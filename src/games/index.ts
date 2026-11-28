@@ -17,6 +17,8 @@ import { manifest as neonRiderManifest } from './neon-rider/manifest.ts'
 import { logic as neonRiderLogic } from './neon-rider/logic.ts'
 import { manifest as careerQuizManifest } from './career-quiz/manifest.ts'
 import { logic as careerQuizLogic } from './career-quiz/logic.ts'
+import { manifest as duelRacerManifest } from './duel-racer/manifest.ts'
+import { logic as duelRacerLogic } from './duel-racer/logic.ts'
 
 /** 게임 등록부. 새 게임은 여기에 한 줄 추가한다. */
 export const games: GameModule[] = [
@@ -36,6 +38,7 @@ export function getGame(id: string): GameModule | undefined {
 export const duels: DuelModule[] = [
   { manifest: yachtManifest, logic: yachtLogic },
   { manifest: tttManifest, logic: tttLogic },
+  { manifest: duelRacerManifest, logic: duelRacerLogic },
 ]
 
 export function getDuel(id: string): DuelModule | undefined {
