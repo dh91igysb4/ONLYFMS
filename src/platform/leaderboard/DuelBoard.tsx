@@ -31,7 +31,8 @@ export function DuelBoard() {
   const ready = rows && rows.game === game ? rows.rows : null
   const placed = ready?.filter((r) => r.placed) ?? []
   const pending = ready?.filter((r) => !r.placed) ?? []
-  const meCls = (h: string) => (h === profile?.handle ? 'is-me' : undefined)
+  // 배치 중 목록 줄(list-row)은 theme.css .list-row.me 규칙으로 강조한다(표의 is-me와 다름)
+  const meCls = (h: string) => (h === profile?.handle ? 'me' : undefined)
 
   return (
     <>

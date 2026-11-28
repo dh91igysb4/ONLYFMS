@@ -1,10 +1,11 @@
 /* 메인 화면(메인 미리보기 설계 §4, FM 개편 설계 §4.4 홈). 폰은 판 한 열.
    900px 이상은 밸리 판(최대 480px)을 왼쪽, 나머지 판을 오른쪽 열에 쌓는다. 색은 theme 토큰만. */
 .home { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 480px; margin: 0 auto; }
+/* 밸리 판이 없으면(숨김·없는 지속형 게임) 한 열 그대로 */
 @media (min-width: 900px) {
-  .home { display: grid; max-width: none; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); align-items: start; }
-  .home > .home-valley-panel { grid-column: 1; grid-row: 1 / span 4; }
-  .home > .fm-panel:not(.home-valley-panel) { grid-column: 2; }
+  .home--with-valley { display: grid; max-width: none; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); align-items: start; }
+  .home--with-valley > .home-valley-panel { grid-column: 1; grid-row: 1 / span 4; }
+  .home--with-valley > .fm-panel:not(.home-valley-panel) { grid-column: 2; }
 }
 .home-valley-box { width: 100%; display: flex; justify-content: center; }
 .home-valley { position: relative; display: block; overflow: hidden; border-radius: 0 0 4px 4px; background: var(--panel); }

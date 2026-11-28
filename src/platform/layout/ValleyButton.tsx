@@ -12,7 +12,7 @@ export function ValleyButton() {
   const m = target.manifest
   return (
     <Link className="btn btn-primary btn-sm valley-btn" to={`/world/${m.id}`} aria-label={`${m.name} 들어가기`}>
-      {m.shortName ?? m.name}
+      <span className="valley-btn-text">{m.shortName ?? m.name}</span>
       <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l5 4-5 4" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
     </Link>
   )

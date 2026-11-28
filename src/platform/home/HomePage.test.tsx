@@ -274,6 +274,17 @@ describe('HomePage: 판', () => {
   })
 })
 
+describe('HomePage: 넓은 화면 두 열', () => {
+  test('밸리 판이 있을 때만 home--with-valley(두 열 배치)', () => {
+    const { container, unmount } = view()
+    expect(container.querySelector('.home')!.classList.contains('home--with-valley')).toBe(true)
+    unmount()
+    fishingHidden = true
+    const r = view()
+    expect(r.container.querySelector('.home')!.classList.contains('home--with-valley')).toBe(false)
+  })
+})
+
 describe('HomePage: 접속 중 친구', () => {
   test('미리보기 게임의 전체 방을 듣기만 하고, 바뀐 목록을 미리보기에 넘긴다', async () => {
     view()

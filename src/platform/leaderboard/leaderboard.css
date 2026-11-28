@@ -38,6 +38,8 @@
 .lb-table th[aria-sort] { color: var(--ink); font-weight: 700; }
 .lb-table td.rank { width: 1%; font-weight: 700; color: var(--muted); }
 .lb-table tr.top td.rank { color: var(--accent-strong); }
+/* 내 줄 바탕(fm-me) 위 흐린 글자는 일부 팔레트에서 4.5 아래 */
+.lb-table tr.is-me td.rank { color: var(--ink); }
 .lb-table td.key { font-weight: 800; }
 .lb-table a { color: var(--ink); font-weight: 700; text-decoration: none; }
 .lb-table a:hover { text-decoration: underline; }

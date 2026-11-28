@@ -1,6 +1,8 @@
 // FM 스타일 파생 색(theme.css :root의 color-mix)이 모든 팔레트에서 읽히는지 본다(설계 2026-11-28-fm-ui §4.1).
 import { describe, expect, it } from 'vitest'
 import css from './theme.css?raw'
+import walletCss from '../platform/wallet/wallet.css?raw'
+import lbCss from '../platform/leaderboard/leaderboard.css?raw'
 import { PALETTES, PALETTE_IDS, type Mode } from './palettes.ts'
 
 function lum(hex: string): number {
@@ -43,5 +45,17 @@ describe('fm contrast', () => {
     expect(css).toContain('--fm-head: color-mix(in srgb, var(--panel), var(--ink) 6%)')
     expect(css).toContain('--fm-line: color-mix(in srgb, var(--panel), var(--ink) 12%)')
     expect(css).toContain('--fm-me: color-mix(in srgb, var(--panel), var(--accent-strong) 12%)')
+  })
+
+  it('내 줄 바탕(fm-me) 위에는 흐린 글자를 두지 않는다: 순위 칸·줄 hover 보조 글자는 ink로', () => {
+    expect(lbCss.replace(/\s+/g, ' ')).toContain('.lb-table tr.is-me td.rank { color: var(--ink); }')
+    expect(css.replace(/\s+/g, ' ')).toContain('a.fm-row:hover .fm-row-sub, a.fm-row:hover .fm-row-go { color: var(--ink); }')
+  })
+
+  it('머리글이 좁은 폰에서 넘치지 않게: 430px 이하에서 지갑 글자·밸리 글자를 숨긴다', () => {
+    const flat = (x: string) => x.replace(/\s+/g, ' ')
+    expect(flat(walletCss)).toMatch(/@media \(max-width: 430px\) \{[^}]*\.wallet-badge-label \{ display: none; \}/)
+    expect(flat(css)).toMatch(/@media \(max-width: 430px\) \{[^}]*\.valley-btn-text \{ display: none; \}/)
+    expect(flat(css)).toContain('@media (max-width: 374px) { .valley-btn { display: none; } }')
   })
 })

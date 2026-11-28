@@ -352,3 +352,11 @@ test('대전 보기 표도 제목 띠(대전 · 게임, N명)', async () => {
   await screen.findByText('kane')
   expect(screen.getByRole('table').closest('.fm-panel')!.querySelector('.fm-panel-head')!.textContent).toBe('대전 · 요트 다이스1명')
 })
+
+test('배치 중 목록에서 내 줄은 me(목록 줄 강조 규칙)', async () => {
+  setup({ lb_duel: [duelRow('kane', 1000, 2, 1, 0, 1, false)] })
+  renderPage()
+  tab('대전')
+  const li = (await screen.findByText('kane')).closest('li')!
+  expect(li.classList.contains('me')).toBe(true)
+})

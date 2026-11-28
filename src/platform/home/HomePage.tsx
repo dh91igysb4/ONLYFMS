@@ -96,7 +96,7 @@ export function HomePage() {
   ) : null
 
   return (
-    <div className="home">
+    <div className={target ? 'home home--with-valley' : 'home'}>
       <h2 className="sr-only">홈</h2>
       {target && (
         <section className="fm-panel home-valley-panel" aria-label={target.manifest.name}>

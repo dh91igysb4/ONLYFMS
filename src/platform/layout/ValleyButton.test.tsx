@@ -36,3 +36,10 @@ test('미리보기가 없는 지속형 게임만 있으면 버튼이 없다', ()
   mount()
   expect(screen.queryByRole('link')).toBeNull()
 })
+
+test('글자는 .valley-btn-text 안(좁은 폰에서는 CSS가 글자를 숨기고 화살표만 남긴다)', () => {
+  reg.worlds = [m('w1', { shortName: '밸리' })]
+  mount()
+  const a = screen.getByRole('link', { name: '월드 w1 들어가기' })
+  expect(a.querySelector('.valley-btn-text')!.textContent).toBe('밸리')
+})
