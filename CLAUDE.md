@@ -60,7 +60,8 @@
 - 접속 방·프레즌스의 장소 값은 지역 id 또는 주인 있는 장소 `isle-<주인 id 하이픈 없는 32자>`(48자 이하, `src/platform/world/presence.ts`의 규칙). 낚시는 `src/games/fishing/isle.ts`의 `placeKey`·`placeName`.
 
 ## 마을회관 그림 (`fishing`)
-- 회관 외관·1층 실내 배경은 `python3 scripts/build-hall-art.py`가 `scripts/hall-art/{exterior,interior}.py`로 그려 `src/games/fishing/hallArt.ts`를 만든다(생성 파일, 직접 고치지 않는다). 그림을 바꾸면 이 명령을 다시 돌린다.
+- 회관 외관·1층 실내·2층 전시관 배경은 `python3 scripts/build-hall-art.py`가 `scripts/hall-art/{exterior,interior,gallery}.py`로 그려 `src/games/fishing/hallArt.ts`를 만든다(생성 파일, 직접 고치지 않는다). 그림을 바꾸면 이 명령을 다시 돌린다.
+- 2층 전시관(`maps/hall2.ts`, 지역 `hall2`)은 서버 areas에 없고 화면 `openedOf`가 기능 플래그 exhibit로 연다. 받침대·확장 구역 좌표(`HALL2_PEDESTALS`·`HALL2_WINGS`)는 그림(gallery.py)과 함께 맞추고, 전시 물고기·공사 테이프는 `scene.ts` `drawGallery`가 덧그린다.
 - 회관 맵(`maps/hall.ts`)은 행으로 걷기만 정하고(F 바닥, Y 벽·가구), 방 유리벽은 `walls`(칸 사이 모서리), 상호작용은 `fixtures`로 둔다. 그림과 좌표를 함께 맞춘다.
 - 명예의 전당 데이터는 RPC `hall_of_fame`과 플랫폼 `src/platform/world/hallOfFame.ts`(게시판). 지속형 게임 화면은 `WorldGameProps.onOpenGames`로 게임 목록에 갈 수 있다.
 
