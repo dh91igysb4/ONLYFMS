@@ -3,7 +3,7 @@ import { ACCEL_TIME, LANDING_ASSIST_MAX_DEG, NITRO_SPEED, TOP_SPEED } from '../c
 import { flatCourse, rampCourse, walledCourse } from '../course/testCourses.ts'
 import type { Course } from '../course/types.ts'
 import { NO_CONTROLS, type Controls } from './controls.ts'
-import { carState, createCar, stepCar, type Car } from './car.ts'
+import { AIR_YAW_RATE, STEER_YAW_RATE, carState, createCar, stepCar, type Car } from './car.ts'
 import { loadRapier, type Rapier } from './rapier.ts'
 import { createWorld, type PhysWorld } from './world.ts'
 
@@ -193,6 +193,7 @@ function spinLanding(speed: number): { x: number; headingDeg: number; landHeadin
   let air = false
   let landed = false
   let landHeading = 0
+  let airTicks = 0
   const heading = () => {
     const q = carState(car).quat
     return (Math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)) * 180) / Math.PI
@@ -204,8 +205,9 @@ function spinLanding(speed: number): { x: number; headingDeg: number; landHeadin
       landed = true
       landHeading = heading()
     }
-    // 공중에서 E로 돌다가 착지 1.2초 뒤까지
-    tick(w, car, { ...GAS, yaw: air && !landed ? 1 : 0 })
+    // 공중에서 E를 0.7초(약 90°) 누르고, 착지 1.2초 뒤까지
+    if (air && !landed) airTicks++
+    tick(w, car, { ...GAS, yaw: air && !landed && airTicks <= 42 ? 1 : 0 })
     if (landed && --budget <= 0) break
   }
   return { x: carState(car).pos.x, headingDeg: Math.abs(heading()), landHeading }
@@ -218,4 +220,29 @@ test('landing sideways after an air spin keeps going down the road and straighte
   expect(Math.abs(r.landHeading)).toBeGreaterThan(30)
   expect(Math.abs(r.x)).toBeLessThan(5)
   expect(r.headingDeg).toBeLessThan(15)
+})
+
+test('full steer turns at most STEER_YAW_RATE (not twitchy)', () => {
+  const { w, car } = setup(flatCourse())
+  settle(w, car)
+  run(w, car, GAS, 1.5)
+  let maxRate = 0
+  run(w, car, { ...GAS, steer: 1 }, 1, false, () => { maxRate = Math.max(maxRate, Math.abs(carState(car).angVel.y)) })
+  expect(maxRate).toBeLessThanOrEqual(STEER_YAW_RATE * 1.1)
+  expect(maxRate).toBeGreaterThan(STEER_YAW_RATE * 0.7)
+})
+
+test('Q/E air spin is slower than flips (AIR_YAW_RATE)', () => {
+  const { w, car } = setup(rampCourse())
+  settle(w, car)
+  let maxRate = 0
+  run(w, car, GAS, 14, false, () => {
+    const s = carState(car)
+    if (!s.grounded && s.pos.y > 2) {
+      tick(w, car, { ...GAS, yaw: 1 })
+      maxRate = Math.max(maxRate, Math.abs(carState(car).localAngVel.y))
+    }
+  })
+  expect(maxRate).toBeGreaterThan(AIR_YAW_RATE * 0.7)
+  expect(maxRate).toBeLessThanOrEqual(AIR_YAW_RATE * 1.1)
 })

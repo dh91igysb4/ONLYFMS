@@ -59,7 +59,8 @@ const REVERSE_SPEED = 10
 const STEER_LOW = 0.5
 const STEER_HIGH = 0.12
 /** 조향 보조 yaw 각가속도 목표 (rad/s): 속도에 따라 */
-const YAW_RATE_MAX = 1.9
+/** 조향 최대 yaw 각속도 (rad/s) */
+export const STEER_YAW_RATE = 1.2
 const YAW_GAIN = 12
 const DRIFT_YAW_BONUS = 1.5
 const REAR_GRIP_RECOVER_SEC = 0.3
@@ -79,6 +80,8 @@ const ALIGN_MAX_SEC = 1.2
 const SPIN_TIRE_GRIP = 0.08
 const ROLL_DAMP = 6
 const AIR_RATE = 4.5
+/** 공중 Q/E 제자리 돌기 각속도 (rad/s). 앞·옆구르기(AIR_RATE)보다 느리게 */
+export const AIR_YAW_RATE = 2.4
 const AIR_GAIN = 10
 /** 공중에서 입력 없는 축의 회전 감쇠(1/s)와 수평 복원 강도 */
 const AIR_HOLD_DAMP = 3
@@ -267,7 +270,7 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
     const speedK = Math.min(1, Math.abs(v) / 8)
     const target = alignTarget !== null
       ? alignTarget
-      : -c.steer * YAW_RATE_MAX * speedK * Math.sign(v || 1) * (c.handbrake ? DRIFT_YAW_BONUS : 1)
+      : -c.steer * STEER_YAW_RATE * speedK * Math.sign(v || 1) * (c.handbrake ? DRIFT_YAW_BONUS : 1)
     const yawErr = target - lw.y
     const upW = rot(q, { x: 0, y: 1, z: 0 })
     if (spinning || c.steer !== 0 || Math.abs(lw.y) > 0.01) {
@@ -285,7 +288,7 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
     body.applyTorqueImpulse(scale(fw, -lw.z * ROLL_DAMP * 900 * dt), true)
   } else {
     // 공중 회전: 입력 각속도로 끌어당긴다
-    const want = { x: c.pitch * AIR_RATE, y: -c.yaw * AIR_RATE, z: -c.roll * AIR_RATE }
+    const want = { x: c.pitch * AIR_RATE, y: -c.yaw * AIR_YAW_RATE, z: -c.roll * AIR_RATE }
     const err = { x: want.x - lw.x, y: want.y - lw.y, z: want.z - lw.z }
     const active = { x: c.pitch !== 0, y: c.yaw !== 0, z: c.roll !== 0 }
     // 입력이 없는 축은 자세를 지킨다: 회전을 줄이고 수평 쪽으로 천천히 되돌린다(점프대에서 앞이 처박히지 않게)
