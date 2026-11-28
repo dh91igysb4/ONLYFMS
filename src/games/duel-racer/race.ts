@@ -19,11 +19,15 @@ const STUCK_TICKS = STUCK_SECONDS * TICK_HZ
 /** 드리프트로 볼 미끄러짐 각 (도) */
 const DRIFT_SLIP_DEG = 10
 
+export type Pose = { pos: { x: number; y: number; z: number }; quat: { x: number; y: number; z: number; w: number } }
+
 export type RaceSnapshot = {
   /** 출발 뒤 틱. 카운트다운 중 음수, 도착 뒤 finishTicks에서 멈춘다 */
   tick: number
   countdown: number | null
   car: CarState
+  /** 직전 틱의 자세(그리기 보간용). 복귀 직후에는 새 자세와 같다 */
+  prev: Pose
   nitro: Nitro
   /** 0..1 */
   progress: number
@@ -47,6 +51,8 @@ export type Race = {
   resetRequested: boolean
   finishTicks: number | null
   lastLanding: RaceSnapshot['lastLanding']
+  /** 직전 틱 자세 */
+  prevPose: Pose
 }
 
 function poseAt(c: Course, i: number) {
@@ -59,7 +65,9 @@ export function createRace(R: Rapier, course: string | Course): Race {
   const c = typeof course === 'string' ? getCourse(course) : course
   const pw = createWorld(R, c)
   const car = createCar(pw, c.start)
+  const s0 = carState(car)
   return {
+    prevPose: { pos: s0.pos, quat: s0.quat },
     pw, course: c, car, elapsed: 0, acc: 0, nitro: NITRO_START, air: AIR_IDLE,
     progressIndex: 0, lastCheckpoint: 0, stuck: 0, resetRequested: false, finishTicks: null, lastLanding: null,
   }
@@ -74,6 +82,8 @@ function respawn(race: Race): void {
   race.progressIndex = race.lastCheckpoint
   race.air = AIR_IDLE
   race.stuck = 0
+  const s = carState(race.car)
+  race.prevPose = { pos: s.pos, quat: s.quat }
 }
 
 function finite(s: CarState): boolean {
@@ -90,6 +100,7 @@ function step(race: Race, input: Controls): void {
   // 카운트다운 중에는 묶어 두고, 도착 뒤에는 서서히 멈춘다
   const c: Controls = !started ? NO_CONTROLS : done ? { ...NO_CONTROLS, brake: 0.5 } : input
   const before = carState(race.car)
+  race.prevPose = { pos: before.pos, quat: before.quat }
   const airborne = !before.grounded
   const drifting = c.handbrake && before.grounded && before.slipDeg > DRIFT_SLIP_DEG
   race.nitro = stepNitro(race.nitro, { want: c.nitro, airborne, drifting, landed: null }, DT)
@@ -145,6 +156,7 @@ export function snapshot(race: Race): RaceSnapshot {
     tick: race.finishTicks ?? race.elapsed - COUNTDOWN_TICKS,
     countdown: rem > 0 ? Math.ceil(rem / TICK_HZ) : null,
     car: carState(race.car),
+    prev: race.prevPose,
     nitro: race.nitro,
     progress,
     finishTicks: race.finishTicks,

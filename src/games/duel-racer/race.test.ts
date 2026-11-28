@@ -153,3 +153,30 @@ test('landing on another part of the road (shortcut) is accepted', () => {
   for (let k = 0; k < 30; k++) advance(race, TICK_MS, GAS)
   expect(snapshot(race).progress).toBeGreaterThan(0.6)
 })
+
+test('snapshot exposes the pose one tick before the current one', () => {
+  const a = createRace(R, flatCourse())
+  const b = createRace(R, flatCourse())
+  pastCountdown(a)
+  pastCountdown(b)
+  const zs: number[] = []
+  for (let k = 0; k < 40; k++) {
+    advance(a, TICK_MS, GAS)
+    zs.push(snapshot(a).car.pos.z)
+  }
+  // 한 번에 두 틱씩 흘려도 prev는 '직전 틱' 자세여야 한다
+  for (let k = 0; k < 20; k++) advance(b, 2 * TICK_MS, GAS)
+  const s = snapshot(b)
+  expect(s.car.pos.z).toBeCloseTo(zs[39], 4)
+  expect(s.prev.pos.z).toBeCloseTo(zs[38], 4)
+})
+
+test('after a respawn prev equals the new pose (no blending across the teleport)', () => {
+  const race = createRace(R, flatCourse())
+  pastCountdown(race)
+  seconds(race, 10)
+  requestReset(race)
+  advance(race, TICK_MS, GAS)
+  const s = snapshot(race)
+  expect(Math.abs(s.prev.pos.z - s.car.pos.z)).toBeLessThan(1)
+})
