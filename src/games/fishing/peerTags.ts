@@ -16,6 +16,8 @@ export type Tag = {
   emote?: string
   /** 말풍선(맨 위) */
   say?: string
+  /** 칭호(이름 바로 아래) */
+  title?: string
 }
 
 /** 자식 하나를 있으면 맞추고 없으면 지운다. 새로 만들 때는 before 앞(없으면 맨 끝)에 넣는다 */
@@ -47,10 +49,11 @@ export function syncTags(container: HTMLElement, tags: Tag[]): void {
       el.dataset.id = t.id
       container.appendChild(el)
     }
-    // 위에서 아래로: 말풍선 · 이모트 · 이름 · 자랑 카드
+    // 위에서 아래로: 말풍선 · 이모트 · 이름 · 칭호 · 자랑 카드
     const name = part(el, 'fish-peer-name', t.handle, null)!
     const emote = part(el, 'fish-peer-emote', t.emote, name)
     part(el, 'fish-peer-say', t.say, emote ?? name)
+    part(el, 'fish-peer-title', t.title, name.nextElementSibling)
     const card = part(el, 'fish-peer-card', t.card?.text, null)
     if (card && t.card && card.dataset.tone !== t.card.tone) card.dataset.tone = t.card.tone
     el.style.transform = `translate(${Math.round(t.x)}px, ${Math.round(t.y)}px)`

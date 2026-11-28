@@ -2587,7 +2587,8 @@ describe('도전과제·순간이동기', () => {
   test('과제 버튼 → 도전과제 10개(지역 순서), 진행 n/count, 완료 과제는 완료 표시, 깬 과제 n/10', async () => {
     await mount(makeView({ challenges: { 'pier-perfect': { progress: 1, done: false }, 'river-rain': { progress: 5, done: true } } }), SAND)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
-    const panel = screen.getByRole('region', { name: '도전과제' })
+    fireEvent.click(screen.getByRole('tab', { name: '지역 과제' }))
+    const panel = screen.getByRole('region', { name: '지역 과제' })
     const items = within(panel).getAllByRole('listitem')
     expect(items).toHaveLength(10)
     expect(items[6]).toHaveTextContent('갯벌 · 물때를 아는 사람')
@@ -2733,6 +2734,7 @@ describe('도전과제·순간이동기', () => {
     await advance(50)
     expect(lastScene().teleporterOn).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: '과제' }))
+    fireEvent.click(screen.getByRole('tab', { name: '지역 과제' }))
     expect(screen.getByText('깬 과제 0/10')).toBeInTheDocument()
   })
 })
@@ -2776,7 +2778,7 @@ describe('큰 지도', () => {
     expect(screen.getByRole('region', { name: '도감' })).toBeInTheDocument()
     key('KeyQ', 'q')
     key('KeyG', 'ㅎ')
-    expect(screen.getByText('깬 과제 0/10')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '과제' })).toBeInTheDocument()
   })
 
   test('단축키: T는 말 입력칸을 열고 초점을 주며(글자는 안 들어감), 입력칸에서 친 Q·E는 창을 열지 않는다. Y는 이모트', async () => {

@@ -506,7 +506,7 @@ export function ChallengePanel({ view }: { view: View }) {
   const progress = progressOf(view)
   const done = CHALLENGES.filter((c) => progress[c.id]?.done).length
   return (
-    <section className="fish-panel-body" aria-label="도전과제">
+    <section className="fish-panel-body" aria-label="지역 과제">
       <p className="muted">{`깬 과제 ${done}/${CHALLENGES.length}`}</p>
       <p className="muted">과제를 깨면 그 지역 순간이동기가 켜지고, 미니게임(자유 플레이) JWD가 영구히 늘어요</p>
       <p className="fish-bonus-now">{`지금 미니게임 JWD ${bonusMultiplier(freeBonus({ challenges: progress }))}`}</p>

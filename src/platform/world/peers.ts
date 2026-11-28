@@ -7,6 +7,8 @@ export type PeerState = {
   id: string; handle: string; x: number; y: number; facing: Facing; moving: boolean; act: PeerAct; outfit: string; t: number
   /** 게임이 해석하는 짧은 문자열(자랑·이모트 등). 플랫폼은 내용을 모른다 */
   show?: string
+  /** 이름 아래 붙는 짧은 꼬리표(칭호 등). 플랫폼은 내용을 모른다 */
+  tag?: string
 }
 
 /** 멈춰 있을 때 보내는 간격(ms, 사용자 결정) */
@@ -16,6 +18,7 @@ export const PEER_TIMEOUT_MS = 10_000
 export const MAX_HANDLE = 32
 export const MAX_OUTFIT = 512
 export const MAX_SHOW = 128
+export const MAX_TAG = 24
 
 const FACINGS: readonly string[] = ['up', 'down', 'left', 'right']
 const ACTS: readonly string[] = ['walk', 'fish']
@@ -48,6 +51,7 @@ export function parsePeerState(raw: unknown): PeerState | null {
   }
   // 잘못된 show는 그 칸만 버린다(위치는 받는다)
   if (typeof r.show === 'string' && r.show.length <= MAX_SHOW) out.show = r.show
+  if (typeof r.tag === 'string' && r.tag.length > 0 && r.tag.length <= MAX_TAG) out.tag = r.tag
   return out
 }
 
