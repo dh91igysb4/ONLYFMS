@@ -3,7 +3,7 @@
 import { SPECIES, type AreaId, type Species } from './data.ts'
 
 /** 경제 기능 플래그. 꺼져 있으면 새 행동은 feature_off. 켜려면 이 값을 바꾸고 world를 다시 배포한다 */
-export const ECONOMY_FLAGS = { bait: false, research: false, exhibit: false, alchemy: false } as const
+export const ECONOMY_FLAGS = { bait: true, research: true, exhibit: true, alchemy: true } as const
 export type EconomyFeature = keyof typeof ECONOMY_FLAGS
 export function featureOn(f: EconomyFeature, flags: Readonly<Record<EconomyFeature, boolean>> = ECONOMY_FLAGS): boolean {
   return flags[f] === true
