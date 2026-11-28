@@ -4,6 +4,7 @@ import { rpc } from '../../lib/api.ts'
 import { kstDate } from '../../shared/kst.ts'
 import { now } from '../../lib/serverTime.ts'
 import { games, worlds } from '../../games/index.ts'
+import type { Manifest } from '../../games/types.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { UpcomingContests } from './UpcomingContests.tsx'
 import { gameSections } from './sections.ts'
@@ -44,44 +45,67 @@ export function GamesPage() {
 
   return (
     <div className="stack">
-      <h2 className="page-title">게임 목록</h2>
+      <h2 className="page-title sr-only">게임 목록</h2>
       {/* 넓은 화면: 왼쪽 게임 구역, 오른쪽 좁은 열에 대회 */}
       <div className="split split-aside">
         <UpcomingContests />
-        {/* 주제별 구역(manifest topic): 넓은 화면은 좌우 두 칸, 본문 칸이 충분히 넓으면 3단(게임이 많은 구역이 2칸),
-            휴대폰은 위아래. 구역이 하나뿐이면 제목 없이 한 칸. 3단 기준은 theme.css .games-sections 컨테이너 쿼리 */}
+        {/* 주제별 구역(manifest topic)마다 판 하나: 넓은 화면은 좌우 두 칸, 본문 칸이 충분히 넓으면 3단(게임이 많은 구역이 2칸),
+            휴대폰은 위아래. 3단 기준은 theme.css .games-sections 컨테이너 쿼리 */}
         <div className="split-main games-sections">
           <div className="split split-even">
             {sections.length === 0 && <p className="muted">아직 열린 게임이 없어요</p>}
             {sections.map((sec) => (
-              <section key={sec.key} className={sec.wide ? 'stack games-sec-wide' : 'stack'} aria-label={sec.title}>
-                {sections.length > 1 && <h3 className="section-title">{sec.title}</h3>}
-                <div className="grid-cards">
-                  {sec.games.map((m) => (m.category === 'world' ? (
-                    <article key={m.id} className="card">
-                      <h3 className="card-title">{m.name}</h3>
-                      <p className="muted">{m.description}</p>
-                      <div className="card-actions">
-                        <Link className="btn btn-primary" to={`/world/${m.id}`}>들어가기</Link>
-                      </div>
-                    </article>
-                  ) : (
-                    <article key={m.id} className="card">
-                      <h3 className="card-title">{m.name}</h3>
-                      <p className="muted">{m.description}</p>
-                      {m.modes.daily && <p className="card-status">{statusText(status[m.id])}</p>}
-                      <div className="card-actions">
-                        {m.modes.daily && <Link className="btn btn-primary" to={`/play/${m.id}/daily`}>데일리</Link>}
-                        {m.modes.free && <Link className="btn btn-ghost" to={`/play/${m.id}/free`}>자유 플레이</Link>}
-                      </div>
-                    </article>
-                  )))}
+              <section key={sec.key} className={sec.wide ? 'fm-panel games-sec-wide' : 'fm-panel'} aria-label={sec.title}>
+                <h3 className="fm-panel-head">{sec.title}</h3>
+                <div className="games-rows">
+                  {sec.games.map((m) => <GameRow key={m.id} m={m} status={status[m.id]} />)}
                 </div>
               </section>
             ))}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** 게임 한 줄: 지속형·자유 플레이만 있는 게임은 줄 전체가 링크, 데일리 게임은 오른쪽에 데일리·자유 버튼 */
+function GameRow({ m, status }: { m: Manifest; status: Status | undefined }) {
+  if (m.category === 'world') {
+    return (
+      <Link to={`/world/${m.id}`} className="fm-row" aria-label={`${m.name} 입장`}>
+        <span className="fm-row-main">
+          <span className="fm-row-title">{m.name}</span>
+          <span className="fm-row-sub">{m.description}</span>
+        </span>
+        <span className="fm-row-go">입장 ›</span>
+      </Link>
+    )
+  }
+  if (!m.modes.daily && m.modes.free) {
+    return (
+      <Link to={`/play/${m.id}/free`} className="fm-row" aria-label={m.name}>
+        <span className="fm-row-main">
+          <span className="fm-row-title">{m.name}</span>
+          <span className="fm-row-sub">{m.description}</span>
+        </span>
+        <span className="fm-row-go" aria-hidden="true">›</span>
+      </Link>
+    )
+  }
+  return (
+    <div className="fm-row" role="group" aria-label={m.name}>
+      <span className="fm-row-main">
+        <span className="fm-row-title">{m.name}</span>
+        <span className="fm-row-sub">
+          {m.description}
+          {m.modes.daily && <> · <span className="games-status">{statusText(status)}</span></>}
+        </span>
+      </span>
+      <span className="fm-row-actions">
+        {m.modes.daily && <Link className="btn btn-primary btn-sm" to={`/play/${m.id}/daily`} aria-label={`${m.name} 데일리`}>데일리</Link>}
+        {m.modes.free && <Link className="btn btn-ghost btn-sm" to={`/play/${m.id}/free`} aria-label={`${m.name} 자유 플레이`}>자유</Link>}
+      </span>
     </div>
   )
 }

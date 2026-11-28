@@ -272,19 +272,19 @@ select.input { padding-right: 8px; }
 /* 게임 탭 구역 (GamesPage). 본문 칸(대회 열 제외)이 700px 이상이면 3단:
    주제 구역 1칸, 게임이 많은 구역(.games-sec-wide)은 2칸에 걸쳐 카드 2열 */
 .games-sections { container-type: inline-size; }
+.games-rows { display: grid; grid-template-columns: minmax(0, 1fr); }
+.games-rows > .fm-row:first-child { border-top: 0; }
+.games-status { color: var(--ink); }
 @container (min-width: 700px) {
   .games-sections > .split { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .games-sections .grid-cards { grid-template-columns: minmax(0, 1fr); }
   .games-sections .games-sec-wide { grid-column: span 2; }
-  .games-sections .games-sec-wide > .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* 3단은 칸이 좁아(약 220px) 카드를 낮춘다: 안쪽 여백·간격을 줄이고 버튼은 btn-sm 크기(버튼 두 개가 한 줄에 든다).
-     휴대폰·2단은 그대로(누르기 좋은 44px) */
-  .games-sections .grid-cards { gap: 10px; }
-  .games-sections .card { padding: 12px 14px; gap: 6px; }
-  .games-sections .card-actions { gap: 6px; }
-  .games-sections .card-actions .btn { min-height: 34px; padding: 0 12px; font-size: 14px; }
-  /* 구역이 하나뿐이면 3단 칸 전체에 카드 3열 */
-  .games-sections > .split > :only-child > .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* 넓은 구역은 줄을 두 열로. 두 번째 줄도 위 테두리를 없앤다 */
+  .games-sections .games-sec-wide > .games-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
+  .games-sections .games-sec-wide > .games-rows > .fm-row:nth-child(2) { border-top: 0; }
+  /* 구역이 하나뿐이면 3단 칸 전체에 줄 3열 */
+  .games-sections > .split > :only-child { grid-column: 1 / -1; }
+  .games-sections > .split > :only-child > .games-rows { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; }
+  .games-sections > .split > :only-child > .games-rows > .fm-row:nth-child(-n+3) { border-top: 0; }
 }
 
 /* 헤더 로고 옆 글자 회전 (Brand.tsx). 두 줄을 같은 칸에 겹쳐 위로 밀어 올린다 */
