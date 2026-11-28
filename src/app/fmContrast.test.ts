@@ -55,7 +55,14 @@ describe('fm contrast', () => {
   it('머리글이 좁은 폰에서 넘치지 않게: 430px 이하에서 지갑 글자·밸리 글자를 숨긴다', () => {
     const flat = (x: string) => x.replace(/\s+/g, ' ')
     expect(flat(walletCss)).toMatch(/@media \(max-width: 430px\) \{[^}]*\.wallet-badge-label \{ display: none; \}/)
-    expect(flat(css)).toMatch(/@media \(max-width: 430px\) \{[^}]*\.valley-btn-text \{ display: none; \}/)
-    expect(flat(css)).toContain('@media (max-width: 374px) { .valley-btn { display: none; } }')
+    // 폰에서는 머리글 밸리 버튼을 빼고(홈의 밸리 판이 같은 입구) 잔액이 잘리지 않게 한다
+    expect(flat(css)).toContain('@media (max-width: 430px) { .valley-btn { display: none; } }')
+  })
+
+  it('버튼 글자는 가운데: 링크로 된 .btn도 가로·세로 가운데, 밑줄 없음', () => {
+    const btn = css.replace(/\s+/g, ' ').match(/\.btn \{([^}]*)\}/)![1]
+    for (const rule of ['display: inline-flex;', 'align-items: center;', 'justify-content: center;', 'text-decoration: none;']) {
+      expect(btn).toContain(rule)
+    }
   })
 })

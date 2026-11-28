@@ -85,7 +85,7 @@ export function getWorldComponent(id: string): ComponentType<WorldGameProps> | u
 }
 
 /** 프로필 캐릭터 화면이 받는 props. data는 서버 `WorldLogic.avatar` 문자열(game_records 키 avatar의 detail) */
-export type AvatarProps = { data: string; scale: number }
+export type AvatarProps = { data: string; scale: number; /** 'head'면 얼굴 부분만(머리글 동그라미용) */ crop?: 'head' }
 
 /** 프로필 캐릭터 등록부(manifest `avatar`가 있는 지속형 게임). 새 게임은 여기에 한 줄씩 등록한다. */
 const avatarComponents: Record<string, ComponentType<AvatarProps>> = {

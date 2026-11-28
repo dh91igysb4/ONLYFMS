@@ -14,6 +14,12 @@
 .suggest-compose .input { box-sizing: border-box; }
 .suggest-compose textarea.input { flex: 1; min-width: 0; resize: vertical; font-family: inherit; min-height: 38px; }
 .suggest-draft-target { flex: none; width: auto; max-width: 40%; }
+/* 폰: 올릴 대상은 윗줄, 입력칸은 한 줄 전체(자리표시 글이 잘리지 않게) */
+@media (max-width: 480px) {
+  .suggest-compose { flex-wrap: wrap; }
+  .suggest-draft-target { max-width: 100%; }
+  .suggest-compose textarea.input { flex-basis: 100%; }
+}
 .suggest-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 
 .suggest-field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }

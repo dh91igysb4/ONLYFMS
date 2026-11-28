@@ -15,3 +15,11 @@ test('옷차림 JSON을 앞모습으로 그리고, 깨진 값은 기본 옷차�
   render(<Avatar data="{oops" scale={2} />)
   expect(screen.getAllByRole('img')[1].getAttribute('aria-label')).toContain('모자 청록 비니')
 })
+
+test('crop="head"면 머리 부분(12×12칸)만 그린다', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({ fillRect: vi.fn() }) as unknown as CanvasRenderingContext2D)
+  render(<Avatar data="" scale={2} crop="head" />)
+  const img = screen.getAllByRole('img').at(-1)!
+  expect(img.getAttribute('width')).toBe('24')
+  expect(img.getAttribute('height')).toBe('24')
+})
