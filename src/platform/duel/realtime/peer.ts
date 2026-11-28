@@ -1,7 +1,8 @@
 // 실시간 대국 연결(레이싱 설계 §6.2). 두 브라우저가 Supabase Realtime 채널로 WebRTC 연결 정보를 주고받아
 // DataChannel(순서 없음·재전송 없음)로 바이트를 보낸다. CONNECT_TIMEOUT_MS 안에 열리지 않으면 같은 채널의
 // 브로드캐스트로 대신 보낸다(RELAY_HZ 상한, 넘친 것은 마지막 것만 다음 슬롯에). 나중에 열리면 직접 연결로 바꾼다.
-// 게임은 내용을 모른다: 바이트만 나른다. 대체 경로는 최신 것만 남기므로 꼭 닿아야 하는 메시지는 게임이 되풀이해 보낸다.
+// 게임은 내용을 모른다: 바이트만 나른다. 직접 연결은 재전송이 없고 대체 경로는 최신 것만 남기므로,
+// 꼭 닿아야 하는 드문 메시지는 게임이 urgent로 되풀이해 보낸다.
 
 /** 이 안에 DataChannel이 안 열리면 대체 경로 */
 export const CONNECT_TIMEOUT_MS = 4000
@@ -12,7 +13,8 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 export type LinkStatus = 'connecting' | 'direct' | 'relay' | 'closed'
 
 export type RealtimeLink = {
-  send(data: ArrayBuffer): void
+  /** urgent: 대체 경로의 보내기 상한을 건너뛰고 바로 보낸다(드문 중요 메시지용, 기다리는 일반 패킷은 그대로) */
+  send(data: ArrayBuffer, urgent?: boolean): void
   onMessage(cb: (data: ArrayBuffer) => void): () => void
   status(): LinkStatus
   onStatus(cb: (s: LinkStatus) => void): () => void
@@ -194,12 +196,16 @@ export function openLink(opts: LinkOpts): RealtimeLink {
   const timeout = setTimeout(() => { if (status === 'connecting') setStatus('relay') }, CONNECT_TIMEOUT_MS)
 
   return {
-    send(d) {
+    send(d, urgent = false) {
       if (status === 'closed') return
       if (status === 'direct' && dc && dc.readyState === 'open') {
         try { dc.send(d); return } catch { /* 닫히는 중이면 대체 경로로 */ }
       }
       if (status === 'connecting') return // 아직 아무 길도 없다: 상태는 곧 다시 보낸다
+      if (urgent) {
+        void channel.send({ type: 'broadcast', event: 's', payload: { from: mySeat, b: toB64(d) } }).catch(() => {})
+        return
+      }
       const wait = lastRelay + gap - Date.now()
       if (wait <= 0 && !relayTimer) { relayNow(d); return }
       pending = d

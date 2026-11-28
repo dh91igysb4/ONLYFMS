@@ -202,3 +202,18 @@ test('close unsubscribes the channel and closes the peer', async () => {
   vi.advanceTimersByTime(CONNECT_TIMEOUT_MS)
   expect(a.status()).toBe('closed')
 })
+
+test('urgent packets skip the relay limit and do not replace the pending one', async () => {
+  const { a, b } = pair(false)
+  await flush()
+  vi.advanceTimersByTime(CONNECT_TIMEOUT_MS)
+  const fromA = got(b)
+  a.send(bytes(1))
+  a.send(bytes(2)) // 다음 슬롯을 기다린다
+  a.send(bytes(42), true) // 바로 나간다
+  await flush()
+  expect(fromA).toEqual([[1], [42]])
+  vi.advanceTimersByTime(1000 / RELAY_HZ)
+  await flush()
+  expect(fromA).toEqual([[1], [42], [2]])
+})

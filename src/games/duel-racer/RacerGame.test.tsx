@@ -10,6 +10,9 @@ const h = vi.hoisted(() => ({
   races: 0,
   sceneFail: false,
   rapierFail: false,
+  view: null as unknown as Record<string, unknown>,
+  stepped: [] as number[],
+  matchOpts: null as unknown as Record<string, unknown> | null,
 }))
 const baseSnap = (): Snap => ({
   tick: -180, countdown: 3, progress: 0, finishTicks: null,
@@ -33,11 +36,26 @@ vi.mock('./race.ts', () => ({
 vi.mock('./render/scene.ts', () => ({
   createScene: () => {
     if (h.sceneFail) throw new Error('webgl')
-    return { draw: () => {}, resize: () => {}, dispose: () => {} }
+    return { draw: () => {}, setOpponent: () => {}, resize: () => {}, dispose: () => {} }
   },
+}))
+vi.mock('./match.ts', () => ({
+  createMatch: (_R: unknown, o: Record<string, unknown>) => { h.matchOpts = o; return { race: { acc: 0 } } },
+  stepMatch: (_s: unknown, now: number) => { h.stepped.push(now) },
+  matchView: () => h.view,
+  disposeMatch: () => {},
 }))
 
 import { RacerGame } from './RacerGame.tsx'
+import type { RealtimeResult } from '../ui.ts'
+import type { RealtimeLink } from '../../platform/duel/realtime/peer.ts'
+
+function matchViewOf(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    phase: 'waiting', snap: baseSnap(), opponent: null, rank: null, heard: false, myFinish: undefined, oppFinish: undefined,
+    alpha: 0, ...over,
+  }
+}
 
 let frames: ((t: number) => void)[] = []
 let now = 0
@@ -60,6 +78,9 @@ beforeEach(() => {
   h.races = 0
   h.sceneFail = false
   h.rapierFail = false
+  h.view = matchViewOf()
+  h.stepped = []
+  h.matchOpts = null
   onExit.mockReset()
   frames = []
   now = 0
@@ -216,4 +237,87 @@ test('mouse devices get no on-screen buttons', async () => {
   mount()
   await loaded()
   expect(screen.queryByRole('button', { name: '가속' })).toBeNull()
+})
+
+// ---------------------------------------------------------------- 온라인 대국 화면
+describe('match mode', () => {
+  let linkStatus = 'direct'
+  const statusCbs: ((s: string) => void)[] = []
+  const link = {
+    send: () => {}, onMessage: () => () => {}, close: () => {},
+    status: () => linkStatus as 'direct',
+    onStatus: (cb: (s: string) => void) => { statusCbs.push(cb); return () => {} },
+  } as unknown as RealtimeLink
+  const report = vi.fn()
+  let serverTime = 1_000_000
+  const mountMatch = (result: RealtimeResult | null = null) =>
+    render(
+      <RacerGame
+        gameId="duel-racer" mode="match" onExit={onExit} matchId="m1" mySeat={0} names={['kane', 'son']}
+        startAt={1_005_000} serverNow={() => serverTime} link={link} result={result} report={report}
+      />,
+    )
+  beforeEach(() => { linkStatus = 'direct'; statusCbs.length = 0; report.mockReset(); serverTime = 1_000_000 })
+
+  test('shows waiting, countdown, opponent name and rank', async () => {
+    const r = mountMatch()
+    await loaded()
+    expect(h.matchOpts).toMatchObject({ mySeat: 0, startAt: 1_005_000 })
+    expect(h.stepped.at(-1)).toBe(serverTime)
+    expect(screen.getByText('상대 기다리는 중')).toBeTruthy()
+    h.view = matchViewOf({ phase: 'countdown', heard: true, snap: { ...baseSnap(), countdown: 2 } })
+    await frame()
+    expect(screen.getByTestId('racer-countdown').textContent).toBe('2')
+    expect(screen.queryByText('상대 기다리는 중')).toBeNull()
+    h.view = matchViewOf({ phase: 'racing', heard: true, rank: 1, snap: { ...baseSnap(), countdown: null, tick: 600 } })
+    await frame()
+    expect(screen.getByTestId('racer-rank').textContent).toBe('1위')
+    expect(screen.getByText(/son/)).toBeTruthy()
+    // 서버 시각으로 진행한다
+    serverTime += 5000
+    await frame()
+    expect(h.stepped.at(-1)).toBe(serverTime)
+    r.unmount()
+  })
+
+  test('relay link shows 연결이 느려요', async () => {
+    linkStatus = 'relay'
+    mountMatch()
+    await loaded()
+    expect(screen.getByText('연결이 느려요')).toBeTruthy()
+  })
+
+  test('server result shows win/lose and both times; void shows 무효', async () => {
+    h.view = matchViewOf({ phase: 'done', heard: true, myFinish: 4260, oppFinish: 4500 })
+    const r = mountMatch({ winner: 0, void: false, scores: [4260, 4500] })
+    await loaded()
+    expect(screen.getByText('이겼어요')).toBeTruthy()
+    expect(screen.getByTestId('racer-my-time').textContent).toBe('01:11.00')
+    expect(screen.getByTestId('racer-opp-time').textContent).toBe('01:15.00')
+    r.unmount()
+    const r2 = mountMatch({ winner: 1, void: false, scores: [0, 4500] })
+    await loaded()
+    expect(screen.getByText('졌어요')).toBeTruthy()
+    expect(screen.getByTestId('racer-my-time').textContent).toBe('미완주')
+    r2.unmount()
+    mountMatch({ winner: null, void: true, scores: null })
+    await loaded()
+    expect(screen.getByText('무효가 된 대국이에요')).toBeTruthy()
+  })
+
+  test('done before the server result waits for the result', async () => {
+    h.view = matchViewOf({ phase: 'done', heard: true, myFinish: 4260 })
+    mountMatch()
+    await loaded()
+    expect(screen.getByText('결과를 기다리는 중…')).toBeTruthy()
+    expect(screen.getByTestId('racer-my-time').textContent).toBe('01:11.00')
+  })
+
+  test('version mismatch shows 새로고침 안내', async () => {
+    h.view = matchViewOf({ phase: 'version_mismatch' })
+    mountMatch()
+    await loaded()
+    expect(screen.getByText('게임이 새로 바뀌었어요. 새로고침해 주세요')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '새로고침' })).toBeTruthy()
+  })
 })
