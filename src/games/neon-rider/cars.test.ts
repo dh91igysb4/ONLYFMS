@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CARS, CAR_REACH_MAX, DEFAULT_CAR, carById } from './cars.ts'
-import { BODY_DY, BODY_R, HEAD_OFFSET, HEAD_R, MM, WHEELBASE, WHEEL_R } from './constants.ts'
+import { CARS, CAR_REACH_MAX, DEFAULT_CAR, carById, headStops } from './cars.ts'
+import { BODY_DY, BODY_R, HEAD_HALF, HEAD_OFFSET, HEAD_R, MM, WHEELBASE, WHEEL_R } from './constants.ts'
 import { courseOf } from './course.ts'
 import { TEMPLATES } from './pieces.ts'
 
@@ -8,19 +8,20 @@ const roof = (c: { headOffset: number; headR: number }): number => c.headOffset 
 
 describe('차 정의 (설계 §5)', () => {
   it('표의 6대: 순서·이름·가격·판정 치수(mm)', () => {
-    expect(CARS.map((c) => [c.id, c.label, c.price, c.headOffset / MM, c.headR / MM, c.bodyDY / MM, c.bodyR / MM])).toEqual([
-      ['coupe', '쿠페', 0, 300, 280, 170, 190],
-      ['pickup', '픽업', 5000, 360, 340, 210, 190],
-      ['buggy', '버기', 15000, 270, 250, 130, 170],
-      ['sports', '스포츠카', 30000, 250, 230, 150, 150],
-      ['f1', 'F1', 60000, 180, 160, 60, 130],
-      ['skate', '스케이트보드', 100000, 110, 90, 40, 120],
+    expect(CARS.map((c) => [c.id, c.label, c.price, c.headOffset / MM, c.headR / MM, c.headHalf / MM, c.bodyDY / MM, c.bodyR / MM])).toEqual([
+      ['coupe', '쿠페', 0, 460, 120, 220, 170, 190],
+      ['pickup', '픽업', 5000, 570, 130, 200, 210, 190],
+      ['buggy', '버기', 15000, 410, 110, 200, 130, 170],
+      ['sports', '스포츠카', 30000, 380, 100, 190, 150, 150],
+      ['f1', 'F1', 60000, 320, 45, 60, 70, 130],
+      ['skate', '스케이트보드', 100000, 340, 40, 0, 40, 120],
     ])
-    for (const c of CARS) for (const v of [c.headOffset, c.headR, c.bodyDY, c.bodyR]) expect(v % MM).toBe(0)
+    for (const c of CARS) for (const v of [c.headOffset, c.headR, c.headHalf, c.bodyDY, c.bodyR]) expect(v % MM).toBe(0)
   })
 
-  it('지붕 높이 순서: pickup > coupe > buggy > sports > f1 > skate', () => {
-    const order = ['pickup', 'coupe', 'buggy', 'sports', 'f1', 'skate']
+  // 스케이트보드는 지붕이 없어 판정원이 보드 위 빈 자리(서 있는 사람 높이)에 있다: 바닥(보드·바퀴 사이)은 닿아도 죽지 않는다.
+  it('지붕 높이 순서: pickup > coupe > buggy > sports > f1', () => {
+    const order = ['pickup', 'coupe', 'buggy', 'sports', 'f1']
     for (let i = 1; i < order.length; i++) expect(roof(carById(order[i - 1]))).toBeGreaterThan(roof(carById(order[i])))
   })
 
@@ -33,7 +34,7 @@ describe('차 정의 (설계 §5)', () => {
 
   it('쿠페는 지금 상수와 같다', () => {
     const c = carById('coupe')
-    expect([c.headOffset, c.headR, c.bodyDY, c.bodyR]).toEqual([HEAD_OFFSET, HEAD_R, BODY_DY, BODY_R])
+    expect([c.headOffset, c.headR, c.headHalf, c.bodyDY, c.bodyR]).toEqual([HEAD_OFFSET, HEAD_R, HEAD_HALF, BODY_DY, BODY_R])
     expect(DEFAULT_CAR).toBe('coupe')
   })
 
@@ -43,9 +44,9 @@ describe('차 정의 (설계 §5)', () => {
     expect(carById('skate').id).toBe('skate')
   })
 
-  it('CAR_REACH_MAX는 모든 차의 판정이 축선에서 닿는 최대 거리(픽업 지붕 700 mm)', () => {
-    expect(CAR_REACH_MAX).toBe(700 * MM)
-    for (const c of CARS) expect(Math.max(roof(c), c.bodyDY + c.bodyR)).toBeLessThanOrEqual(CAR_REACH_MAX)
+  it('CAR_REACH_MAX는 모든 차의 판정이 축선에서 닿는 최대 거리(픽업 지붕 캡슐 끝 900 mm)', () => {
+    expect(CAR_REACH_MAX).toBe(900 * MM)
+    for (const c of CARS) expect(Math.max(roof(c) + c.headHalf, c.bodyDY + c.bodyR)).toBeLessThanOrEqual(CAR_REACH_MAX)
   })
 })
 
@@ -115,11 +116,16 @@ describe('차 지붕과 지형 (기하 검사)', () => {
         const dy = f.y - r.y
         const dist = Math.hypot(dx, dy)
         const clearance = (car: (typeof CARS)[number]): number => {
-          const h = {
-            x: (r.x + f.x) / 2 - (dy * car.headOffset) / dist,
-            y: (r.y + f.y) / 2 + (dx * car.headOffset) / dist,
+          // 지붕 캡슐(A~C 필러)을 시뮬과 같은 원들로 본다.
+          let best = Infinity
+          for (const t of headStops(car)) {
+            const h = {
+              x: (r.x + f.x) / 2 + (-dy * car.headOffset + dx * t) / dist,
+              y: (r.y + f.y) / 2 + (dx * car.headOffset + dy * t) / dist,
+            }
+            best = Math.min(best, ...loc.map((g) => distSeg(h, g)))
           }
-          return Math.min(...loc.map((g) => distSeg(h, g))) - car.headR
+          return best - car.headR
         }
         // 쿠페가 닿는 자세는 지금도 받아들이는 동작이라 단언하지 않는다.
         if (clearance(carById('coupe')) <= 0) continue
@@ -139,8 +145,8 @@ describe('차 지붕과 지형 (기하 검사)', () => {
     expect(fails.slice(0, 10)).toEqual([])
   })
 
-  it('검사가 실제로 잡는다: 지붕 바닥이 쿠페보다 낮은 차(옛 스포츠카 130/150)는 걸린다', () => {
-    const low = { ...carById('sports'), headOffset: 130 * MM, headR: 150 * MM }
+  it('검사가 실제로 잡는다: 지붕 바닥이 쿠페보다 낮은 차(스포츠카 지붕 160/150)는 걸린다', () => {
+    const low = { ...carById('sports'), headOffset: 160 * MM, headR: 150 * MM }
     expect(compareToCoupe([low]).fails.length).toBeGreaterThan(0)
   })
 })

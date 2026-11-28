@@ -374,16 +374,17 @@ function circleQuad(x: number, y: number, r: number, bw: BlockWork): Hit | null 
  * 바퀴 둘·차체 판정원·차대 캡슐(치수는 car)과 블록의 겹침을 질량비대로 나눠 양쪽을 민다(설계 §7.2). 죽음은 판정하지 않는다.
  * 차 쪽 질량: 바퀴 1. 판정원은 두 바퀴가 함께 움직이고(몫 반씩), 캡슐은 접점 위치 비율로 나눈다. 블록 꼭짓점 질량은 BLOCK_MASS.
  */
-export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: number; y: number }, bws: readonly BlockWork[], car: CarDef): void {
+export function pushCar(r: Body, f: Body, headAt: (r: Body, f: Body) => { x: number; y: number }[], bws: readonly BlockWork[], car: CarDef): void {
   for (const bw of bws) {
     const q = bw.c
     for (const w of [r, f]) {
       const h = circleQuad(w.x, w.y, WHEEL_R, bw)
       if (h) hitCar(h, [{ b: w, w: D }])
     }
-    const hd = headAt(r, f)
-    const h = circleQuad(hd.x, hd.y, car.headR, bw)
-    if (h) hitCar(h, [{ b: r, w: D / 2 }, { b: f, w: D / 2 }])
+    for (const hd of headAt(r, f)) {
+      const h = circleQuad(hd.x, hd.y, car.headR, bw)
+      if (h) hitCar(h, [{ b: r, w: D / 2 }, { b: f, w: D / 2 }])
+    }
     // 차대 캡슐(두 바퀴 중심 선분을 윗방향으로 bodyDY 올린 선분, bodyR) 안에 들어온 꼭짓점.
     const cap = chassisOf(r, f, car.bodyDY)
     for (let i = 0; i < 4; i++) {

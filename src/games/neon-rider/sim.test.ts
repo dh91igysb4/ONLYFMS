@@ -835,16 +835,15 @@ describe('움직이는 길', () => {
   const roadVx = (m: Motion, tick: number): number => poseAt(m, (tick + 1) * SUBSTEPS, null).dx - poseAt(m, tick * SUBSTEPS, null).dx
   const carVx = (s: SimState): number => Math.floor((vxOf(s.rear) + vxOf(s.front)) / 2)
 
-  it('움직이는 것이 없는 지형: v7 기준 결과 고정(실제 차 비율 쿠페)', () => {
-    // v7(2026-11-28)에서 쿠페 지붕·차대가 실제 차 비율로 커져(지붕 380 → 580 mm) 이 기능 전(eadbecc) 값과는 같을 수 없다.
-    // 그래서 같은 시나리오의 v7 결과를 고정한다(앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱).
-    // 다섯 판 모두 v6보다 1~3틱 일찍 끝난다(커진 지붕이 먼저 땅에 닿음).
+  it('움직이는 것이 없는 지형: v8 기준 결과 고정(큰 바퀴·지붕 캡슐 쿠페)', () => {
+    // v7(2026-11-28)에서 쿠페가 실제 차 비율로 커지고, v8에서 바퀴(220 mm)·지붕 캡슐(A~C 필러)·바닥 무사가 바뀌어 이 기능 전(eadbecc) 값과는 같을 수 없다.
+    // 그래서 같은 시나리오의 v8 결과를 고정한다(앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱).
     const expected = [
-      "{\"tick\":174,\"rear\":{\"x\":426277,\"y\":-34213,\"px\":423096,\"py\":-30153,\"ground\":false},\"front\":{\"x\":439242,\"y\":-15943,\"px\":438362,\"py\":-13518,\"ground\":false},\"progress\":18,\"nextSection\":0,\"sectionScore\":0,\"flipScore\":0,\"airAngle\":4636,\"pending\":null,\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
-      "{\"tick\":376,\"rear\":{\"x\":931879,\"y\":52969,\"px\":929713,\"py\":53401,\"ground\":true},\"front\":{\"x\":914344,\"y\":66910,\"px\":913648,\"py\":69187,\"ground\":false},\"progress\":88,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":1,\"airAngle\":1565,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":11},\"lastAward\":{\"tick\":195,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
-      "{\"tick\":499,\"rear\":{\"x\":1308820,\"y\":-43118,\"px\":1305908,\"py\":-43447,\"ground\":false},\"front\":{\"x\":1286543,\"y\":-40754,\"px\":1283930,\"py\":-38271,\"ground\":false},\"progress\":209,\"nextSection\":2,\"sectionScore\":2,\"flipScore\":1,\"airAngle\":1952,\"pending\":null,\"lastAward\":{\"tick\":291,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
-      "{\"tick\":248,\"rear\":{\"x\":477591,\"y\":-69976,\"px\":476411,\"py\":-67331,\"ground\":false},\"front\":{\"x\":455326,\"y\":-72447,\"px\":454117,\"py\":-69528,\"ground\":false},\"progress\":8,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":2117,\"pending\":null,\"lastAward\":null,\"gems\":1,\"takenGems\":[3],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
-      "{\"tick\":230,\"rear\":{\"x\":657339,\"y\":9235,\"px\":653792,\"py\":7748,\"ground\":true},\"front\":{\"x\":635317,\"y\":13340,\"px\":632499,\"py\":15763,\"ground\":false},\"progress\":75,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":1813,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":5},\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":174,\"rear\":{\"x\":426974,\"y\":-34375,\"px\":423765,\"py\":-30329,\"ground\":false},\"front\":{\"x\":439511,\"y\":-15811,\"px\":438640,\"py\":-13347,\"ground\":false},\"progress\":18,\"nextSection\":0,\"sectionScore\":0,\"flipScore\":0,\"airAngle\":4651,\"pending\":null,\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":374,\"rear\":{\"x\":929011,\"y\":54386,\"px\":926766,\"py\":54651,\"ground\":true},\"front\":{\"x\":911819,\"y\":68750,\"px\":910910,\"py\":70612,\"ground\":false},\"progress\":87,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":1,\"airAngle\":1554,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":10},\"lastAward\":{\"tick\":194,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":501,\"rear\":{\"x\":1308136,\"y\":-42285,\"px\":1305417,\"py\":-42589,\"ground\":false},\"front\":{\"x\":1285765,\"y\":-41122,\"px\":1283194,\"py\":-38606,\"ground\":false},\"progress\":209,\"nextSection\":2,\"sectionScore\":2,\"flipScore\":1,\"airAngle\":1960,\"pending\":null,\"lastAward\":{\"tick\":284,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":249,\"rear\":{\"x\":481339,\"y\":-72369,\"px\":480058,\"py\":-69736,\"ground\":false},\"front\":{\"x\":459066,\"y\":-69970,\"px\":457816,\"py\":-67066,\"ground\":false},\"progress\":8,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":1973,\"pending\":null,\"lastAward\":null,\"gems\":1,\"takenGems\":[3],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":230,\"rear\":{\"x\":654939,\"y\":8981,\"px\":651164,\"py\":7568,\"ground\":true},\"front\":{\"x\":633551,\"y\":15642,\"px\":630953,\"py\":18002,\"ground\":false},\"progress\":74,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":1813,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":5},\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
     ]
     const PRE_HAZARD_IDS = [
       'hill', 'waves', 'bowl', 'boostflat', 'spikes', 'valley', 'cliff', 'ledge', 'bigdrop', 'rampflat', 'ramp',
@@ -1139,8 +1138,8 @@ describe('움직이는 길', () => {
     }
     expect(s.dead).toBe('crash')
     expect(lowest).toBeGreaterThan(0) // 바퀴 중심이 지면(y = 0) 아래로 간 적이 없다
-    // 막대가 닿기 전에는 끼임으로 죽지 않는다(차체 판정원이 아니라 끼임으로 죽었다: 차체는 막대 끝보다 뒤에 있다).
-    expect(s.tick).toBeGreaterThan(15)
+    // 막대가 닿기 전에는 끼임으로 죽지 않는다(차체 판정원이 아니라 끼임으로 죽었다: 차체는 막대 끝보다 뒤에 있다). v8 바퀴(220 mm)는 막대에 더 일찍 닿는다.
+    expect(s.tick).toBeGreaterThan(10)
   })
 
   it('끼임 규칙은 고정 지형끼리는 걸지 않는다: 바퀴가 길 위에만 깊게 눌려도 crash 아님(길만 있는 곳)', () => {

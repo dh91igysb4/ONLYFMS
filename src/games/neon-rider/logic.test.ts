@@ -26,8 +26,8 @@ describe('neon-rider logic', () => {
     expect(logic.puzzleKey(p)).toBe(p.seed)
   })
 
-  it('has version 7 and the spec manifest', () => {
-    expect(logic.version).toBe(7)
+  it('has version 8 and the spec manifest', () => {
+    expect(logic.version).toBe(8)
     expect(manifest).toMatchObject({
       id: 'neon-rider', name: '네온 라이더', description: '누르면 달리고, 공중에서 누르면 돈다. 바퀴로 착지하라', hidden: false,
       freeStats: 'score', freeBestOnly: true, scoreMax: 9999, scoreDecimals: 0,
