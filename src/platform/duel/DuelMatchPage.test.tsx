@@ -35,10 +35,42 @@ vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: true } }),
 }))
 
+// ---- 등록부: 테스트용 실시간 대전(realtime-duel)을 끼운다
+vi.mock('../../games/index.ts', async (orig) =>
+  (await import('../../test-fixtures/duel.ts')).withRealtimeDuel(await orig<typeof import('../../games/index.ts')>()))
+
+// ---- 가짜 실시간 연결
+type FakeLink = { close: ReturnType<typeof vi.fn>; status(): string; send(): void; onMessage(): () => void; onStatus(): () => void }
+const links: FakeLink[] = []
+const openLinkMock = vi.fn((o: { matchId: string; mySeat: number; channel: unknown }) => {
+  void o
+  const l: FakeLink = { close: vi.fn(), status: () => 'connecting', send: () => {}, onMessage: () => () => {}, onStatus: () => () => {} }
+  links.push(l)
+  return l
+})
+vi.mock('./realtime/peer.ts', async (orig) => ({
+  ...(await orig<typeof import('./realtime/peer.ts')>()),
+  openLink: (o: { matchId: string; mySeat: number; channel: unknown }) => openLinkMock(o),
+}))
+
+// ---- 가짜 실시간 화면: 받은 props를 기록한다
+type RtProps = {
+  mode: string; matchId?: string; mySeat?: number; names?: [string, string]; startAt?: number
+  link?: FakeLink; result?: { winner: number | null; void: boolean; scores: [number, number] | null } | null
+  report?(r: unknown): void; serverNow?(): number
+}
+let rtProps: RtProps | null = null
+function FakeRealtime(p: RtProps) {
+  rtProps = p
+  return <div>실시간 화면 {p.result ? (p.result.void ? '무효' : `승자 ${String(p.result.winner)}`) : '진행'}</div>
+}
+
 // ---- 가짜 게임 화면
 let boardMissing = false
 vi.mock('../../games/ui.ts', () => ({
-  getDuelComponent: () =>
+  getRealtimeComponent: (id: string) => (id === 'realtime-duel' ? FakeRealtime : undefined),
+  getDuelComponent: (id: string) =>
+    id === 'realtime-duel' ? undefined :
     boardMissing
       ? undefined
       : (p: { onAction(a: unknown): void; toMove: number | null; error?: string | null; header?: ReactNode; footer?: ReactNode }) => (
@@ -115,6 +147,9 @@ beforeEach(() => {
   channelThrows = false
   boardMissing = false
   refreshMock.mockClear()
+  links.length = 0
+  openLinkMock.mockClear()
+  rtProps = null
   current = dv()
   duelMock.mockImplementation(async (b: { action: string }) => {
     if (b.action === 'view') return current
@@ -502,4 +537,90 @@ test('match_stake_result: uses server ledger amounts when present', async () => 
   await flush()
   expect(screen.getByText('판돈을 돌려받았어요')).toBeInTheDocument()
   expect(screen.queryByText('−1,000 JWD')).toBeNull()
+})
+
+// ---------------------------------------------------------------- 실시간 대전 (레이싱 설계 §6·§7)
+const RT_MATCH = 245
+function rt(over: Partial<DuelView> = {}): DuelView {
+  const started = Date.now() - 2000
+  return dv({
+    game_id: 'realtime-duel', turn_seconds: RT_MATCH, to_move: 0,
+    turn_deadline: new Date(started + RT_MATCH * 1000).toISOString(), ...over,
+  })
+}
+
+test('active realtime match mounts the realtime component in match mode with startAt from the deadline', async () => {
+  current = rt()
+  renderAt()
+  await flush()
+  expect(screen.getByText(/실시간 화면 진행/)).toBeInTheDocument()
+  expect(rtProps!.mode).toBe('match')
+  expect(rtProps!.matchId).toBe('m1')
+  expect(rtProps!.mySeat).toBe(0)
+  expect(rtProps!.names).toEqual(['kane', 'son'])
+  // 출발 = 마감 - 대국 시간 + 출발 지연(5초)
+  expect(rtProps!.startAt).toBe(Date.parse(current.turn_deadline!) - RT_MATCH * 1000 + 5000)
+  expect(rtProps!.result).toBeNull()
+  expect(typeof rtProps!.serverNow!()).toBe('number')
+  expect(openLinkMock).toHaveBeenCalledTimes(1)
+  expect(openLinkMock.mock.calls[0][0]).toMatchObject({ matchId: 'm1', mySeat: 0 })
+  expect(channelMock).toHaveBeenCalledWith('duel-rt:m1')
+  expect(rtProps!.link).toBe(links[0])
+  // 턴 게임의 차례 표시는 없다
+  expect(screen.queryByText('내 차례')).toBeNull()
+  expect(screen.queryByText('상대 차례')).toBeNull()
+})
+
+test('report() calls duel report and the finished view reaches the component as result', async () => {
+  current = rt()
+  renderAt()
+  await flush()
+  const done = rt({ status: 'finished', winner: 0, end_reason: 'normal', final_scores: [4300, 4500], turn_deadline: null })
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'report') { current = done; return done }
+    if (b.action === 'view') return current
+    throw new Error(`unexpected ${b.action}`)
+  })
+  act(() => rtProps!.report!({ my: 4300, opp: 4500 }))
+  await flush()
+  expect(calls('report')).toEqual([[{ action: 'report', match_id: 'm1', payload: { my: 4300, opp: 4500 } }]])
+  expect(rtProps!.result).toEqual({ winner: 0, void: false, scores: [4300, 4500] })
+  expect(screen.getByText(/실시간 화면 승자 0/)).toBeInTheDocument()
+  // 플랫폼 결과 카드(레이팅·판돈·재대결)도 나온다
+  expect(screen.getByText('이겼어요')).toBeInTheDocument()
+  // 대국이 끝나면 연결을 닫는다
+  expect(links[0].close).toHaveBeenCalled()
+})
+
+test('void match passes result.void', async () => {
+  current = rt({ status: 'void', end_reason: 'void', turn_deadline: null })
+  renderAt()
+  await flush()
+  expect(rtProps!.result).toEqual({ winner: null, void: true, scores: null })
+  expect(openLinkMock).not.toHaveBeenCalled()
+})
+
+test('spectators and waiting matches do not open a link', async () => {
+  current = rt({ my_seat: null })
+  const r = renderAt()
+  await flush()
+  expect(openLinkMock).not.toHaveBeenCalled()
+  expect(rtProps).toBeNull()
+  expect(screen.getByText('실시간 대국은 관전할 수 없어요')).toBeInTheDocument()
+  r.unmount()
+  rpcMock.mockResolvedValue('abcde12345')
+  current = rt({ status: 'waiting', turn_deadline: null })
+  renderAt()
+  await flush()
+  expect(openLinkMock).not.toHaveBeenCalled()
+  expect(rtProps).toBeNull()
+})
+
+test('unmount closes the link', async () => {
+  current = rt()
+  const r = renderAt()
+  await flush()
+  expect(links).toHaveLength(1)
+  r.unmount()
+  expect(links[0].close).toHaveBeenCalled()
 })

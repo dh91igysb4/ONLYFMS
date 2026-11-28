@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, duel, duelErrorMessage, rpc, type DuelCreated, type DuelView } from '../../lib/api.ts'
 import { getDuel } from '../../games/index.ts'
-import { getDuelComponent } from '../../games/ui.ts'
+import { getDuelComponent, getRealtimeComponent, type RealtimeResult } from '../../games/ui.ts'
+import { supabase } from '../../lib/supabase.ts'
+import { now as serverNow } from '../../lib/serverTime.ts'
+import { linkChannelName, openLink, type ChannelLike, type RealtimeLink } from './realtime/peer.ts'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useGameScreen } from '../games/useGameScreen.ts'
 import { InviteLink } from '../contests/InviteLink.tsx'
@@ -24,12 +27,13 @@ function endReasonText(r: string | null): string | null {
   return null
 }
 
-function Players({ v }: { v: DuelView }) {
-  const ms = remainingMs(v)
+function Players({ v, realtime = false }: { v: DuelView; realtime?: boolean }) {
+  // 실시간 대전에는 차례가 없다(마감은 대국 마감)
+  const ms = realtime ? null : remainingMs(v)
   return (
     <div className="duel-players">
       {v.players.map((p, i) => {
-        const turn = v.status === 'active' && v.to_move === i
+        const turn = !realtime && v.status === 'active' && v.to_move === i
         return (
           <div key={p.id} className={`duel-player${turn ? ' duel-turn' : ''}${v.my_seat === i ? ' duel-me' : ''}`}>
             <strong>{p.handle ?? '알 수 없음'}{v.my_seat === i && ' (나)'}</strong>
@@ -91,8 +95,9 @@ function StakeLine({ v }: { v: DuelView }) {
   return <p className={`stake-amount ${o.kind === 'won' ? 'stake-won' : 'stake-lost'}`}>{`${signedGold(n)} JWD`}</p>
 }
 
-function Result({ v, onRematch, rematchBusy, rematchError }: {
+function Result({ v, onRematch, rematchBusy, rematchError, realtime = false }: {
   v: DuelView
+  realtime?: boolean
   onRematch(): void
   rematchBusy: boolean
   rematchError: string | null
@@ -118,7 +123,8 @@ function Result({ v, onRematch, rematchBusy, rematchError }: {
       <p className="duel-headline">{headline}</p>
       {reason && <p className="muted">{reason}</p>}
       <StakeLine v={v} />
-      {v.final_scores && (
+      {/* 실시간 대전의 점수(완주 틱)는 게임 화면이 기록으로 보여 준다 */}
+      {v.final_scores && !realtime && (
         <p className="duel-score">{`${v.final_scores[0]} : ${v.final_scores[1]}`}</p>
       )}
       {rc && (
@@ -140,12 +146,75 @@ function Result({ v, onRematch, rematchBusy, rematchError }: {
   )
 }
 
+/** 닫힌 연결: 끝난 대국을 처음 열었을 때(연결이 필요 없을 때) 화면에 넘긴다 */
+const CLOSED_LINK: RealtimeLink = {
+  send: () => {},
+  onMessage: () => () => {},
+  status: () => 'closed',
+  onStatus: () => () => {},
+  close: () => {},
+}
+
+function realtimeResult(v: DuelView): RealtimeResult | null {
+  if (v.status === 'void') return { winner: null, void: true, scores: null }
+  if (v.status === 'finished') return { winner: v.winner, void: false, scores: v.final_scores }
+  return null
+}
+
+/**
+ * 실시간 대전 화면(레이싱 설계 §6·§7). 진행 중이고 내가 참가자일 때만 연결을 열고, 끝나거나 화면을 떠나면 닫는다.
+ * 출발 = 대국 마감 - 대국 시간 + 출발 지연(manifest duel.realtime.startDelaySec).
+ */
+function RealtimeMatch({ v, report, onExit }: { v: DuelView; report(r: unknown): void; onExit(): void }) {
+  const Screen = getRealtimeComponent(v.game_id)
+  const delay = getDuel(v.game_id)?.manifest.duel?.realtime?.startDelaySec ?? 0
+  const startRef = useRef<{ id: string; at: number } | null>(null)
+  if (v.turn_deadline && v.status === 'active') {
+    const at = Date.parse(v.turn_deadline) - v.turn_seconds * 1000 + delay * 1000
+    if (startRef.current?.id !== v.match_id || startRef.current.at !== at) startRef.current = { id: v.match_id, at }
+  }
+  const startAt = startRef.current?.id === v.match_id ? startRef.current.at : 0
+  const [link, setLink] = useState<{ id: string; link: RealtimeLink } | null>(null)
+  const active = v.status === 'active'
+  const seat = v.my_seat
+  useEffect(() => {
+    if (!active || seat === null) return
+    const channel = supabase.channel(linkChannelName(v.match_id))
+    const l = openLink({ matchId: v.match_id, mySeat: seat, channel: channel as unknown as ChannelLike })
+    setLink({ id: v.match_id, link: l })
+    return () => {
+      l.close()
+      try { void supabase.removeChannel(channel) } catch { /* ignore */ }
+    }
+  }, [active, seat, v.match_id])
+  if (!Screen || seat === null) return null
+  const mine = link?.id === v.match_id ? link.link : null
+  const result = realtimeResult(v)
+  // 진행 중인데 아직 연결 객체가 없으면 다음 렌더(효과 직후)에 그린다
+  if (!mine && !result) return null
+  return (
+    <Screen
+      gameId={v.game_id}
+      mode="match"
+      onExit={onExit}
+      matchId={v.match_id}
+      mySeat={seat}
+      names={[nameOf(v, 0), nameOf(v, 1)]}
+      startAt={startAt}
+      serverNow={serverNow}
+      link={mine ?? CLOSED_LINK}
+      result={result}
+      report={report}
+    />
+  )
+}
+
 export function DuelMatchPage() {
   const { id = '' } = useParams()
   const loc = useLocation()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { view: v, error, fatal, busy, act, resign, cancel } = useDuelMatch(id)
+  const { view: v, error, fatal, busy, act, report, resign, cancel } = useDuelMatch(id)
   const [rematchBusy, setRematchBusy] = useState(false)
   const [rematchError, setRematchError] = useState<string | null>(null)
   const rematching = useRef(false)
@@ -162,10 +231,13 @@ export function DuelMatchPage() {
     void refreshWallet()
   }, [settled, v])
 
-  const boardShown = !fatal && !!v && v.status !== 'waiting' && v.status !== 'void'
+  const realtime = !!v && !!getDuel(v.game_id)?.manifest.duel?.realtime
+  const realtimeShown = !fatal && !!v && realtime && v.status !== 'waiting' && v.my_seat !== null
+    && !!getRealtimeComponent(v.game_id)
+  const boardShown = !fatal && !!v && !realtime && v.status !== 'waiting' && v.status !== 'void'
     && !!getDuelComponent(v.game_id) && v.view !== null && v.view !== undefined
   // 게임 화면이 떠 있을 때만 글자 선택을 막는다(대기 중 초대 링크는 고를 수 있게)
-  useGameScreen(boardShown)
+  useGameScreen(boardShown || realtimeShown)
 
   async function rematch() {
     if (!v || rematching.current) return
@@ -214,15 +286,17 @@ export function DuelMatchPage() {
   // 선수·차례·결과·기권. 게임 화면이 있으면 화면 안(넓은 화면에서는 조작 열)에 넣는다. 폰에서는 순서가 같다
   const head = (
     <>
-      <Players v={v} />
-      {v.status === 'active' && mine && (
+      <Players v={v} realtime={realtime} />
+      {v.status === 'active' && mine && !realtime && (
         <p className={myTurn ? 'duel-status duel-status-me' : 'duel-status'} role="status">
           {myTurn ? '내 차례' : '상대 차례'}
         </p>
       )}
     </>
   )
-  const result = finished && <Result v={v} onRematch={() => void rematch()} rematchBusy={rematchBusy} rematchError={rematchError} />
+  const result = finished && (
+    <Result v={v} realtime={realtime} onRematch={() => void rematch()} rematchBusy={rematchBusy} rematchError={rematchError} />
+  )
   const resignBtn = v.status === 'active' && mine && <ResignButton onResign={resign} disabled={busy} />
 
   return (
@@ -231,7 +305,7 @@ export function DuelMatchPage() {
         <h2 className="page-title">{gameName}</h2>
         <div className="row">
           <span className="badge">{v.rated ? '랭크' : '친선'}</span>
-          <span className="badge">턴 {v.turn_seconds}초</span>
+          {!realtime && <span className="badge">턴 {v.turn_seconds}초</span>}
           {stakeOf(v) > 0 && <span className="badge">판돈 {formatGold(stakeOf(v))}</span>}
         </div>
       </div>
@@ -239,7 +313,17 @@ export function DuelMatchPage() {
       {/* 게임 화면이 있으면 오류는 화면이 보여 준다 */}
       {error && !boardShown && <p className="notice" role="alert">{error}</p>}
 
-      {v.status === 'waiting' ? (
+      {realtime && v.status !== 'waiting' ? (
+        <>
+          {v.my_seat === null && <p className="muted">실시간 대국은 관전할 수 없어요</p>}
+          {realtimeShown && (
+            <section aria-label="게임 화면">
+              <RealtimeMatch v={v} report={report} onExit={() => navigate('/duel')} />
+            </section>
+          )}
+          {result}
+        </>
+      ) : v.status === 'waiting' ? (
         <section className="card" aria-label="대기">
           <p className="card-title">상대를 기다리는 중</p>
           <p className="muted">10분 안에 아무도 들어오지 않으면 자동으로 취소돼요</p>

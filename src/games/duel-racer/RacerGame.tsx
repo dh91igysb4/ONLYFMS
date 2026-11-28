@@ -22,7 +22,13 @@ export function formatTicks(ticks: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
 }
 
-export function RacerGame({ onExit }: RealtimeGameProps) {
+export function RacerGame(props: RealtimeGameProps) {
+  // 온라인 대국 화면은 Task 6에서 붙인다
+  if (props.mode !== 'practice') return <p className="muted">준비 중이에요</p>
+  return <PracticeGame {...props} />
+}
+
+function PracticeGame({ onExit }: Extract<RealtimeGameProps, { mode: 'practice' }>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [phase, setPhase] = useState<'loading' | 'error' | 'ready'>('loading')
   const [hud, setHud] = useState<RaceSnapshot | null>(null)

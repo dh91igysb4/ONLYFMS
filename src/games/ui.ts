@@ -12,6 +12,7 @@ import { Game as FishingGame } from './fishing/Game.tsx'
 import { Avatar as FishingAvatar } from './fishing/Avatar.tsx'
 import { Preview as FishingPreview } from './fishing/Preview.tsx'
 import type { OnlinePeer } from '../platform/world/presence.ts'
+import type { RealtimeLink } from '../platform/duel/realtime/peer.ts'
 import { Game as NeonRiderGame } from './neon-rider/Game.tsx'
 import { CarPreview } from './neon-rider/CarPreview.tsx'
 import { Game as CareerQuizGame } from './career-quiz/Game.tsx'
@@ -75,7 +76,30 @@ export function getDuelComponent(id: string): ComponentType<DuelGameProps> | und
  * 실시간 대전 화면이 받는 props (레이싱 설계 §7). manifest `duel.realtime`이 있는 게임만.
  * 1단계는 혼자 연습(`practice`)만 있다. 온라인 대국(`match`)은 2단계가 더한다.
  */
-export type RealtimeGameProps = { gameId: string; mode: 'practice'; onExit(): void }
+/** 서버가 판정한 실시간 대국 결과. void: 무효(판돈 환불) */
+export type RealtimeResult = { winner: 0 | 1 | null; void: boolean; scores: [number, number] | null }
+
+/**
+ * 실시간 대전 화면 props. practice: 혼자 연습. match: 대국 화면(DuelMatchPage)이 연결과 서버 판정을 넘긴다.
+ * startAt·serverNow는 서버 시각(ms). report는 duel 함수 report를 부르고, 판정이 나면 result가 채워진다.
+ */
+export type RealtimeGameProps =
+  | { gameId: string; mode: 'practice'; onExit(): void }
+  | {
+      gameId: string
+      mode: 'match'
+      onExit(): void
+      matchId: string
+      mySeat: 0 | 1
+      names: [string, string]
+      /** 출발 시각(서버 시각 ms) */
+      startAt: number
+      /** 서버 시각 지금(ms) */
+      serverNow(): number
+      link: RealtimeLink
+      result: RealtimeResult | null
+      report(r: unknown): void
+    }
 
 /** 실시간 대전 화면 등록부. 화면 코드는 레이스 화면에서만 무거운 모듈(물리·3D)을 불러온다. */
 const realtimeComponents: Record<string, ComponentType<RealtimeGameProps>> = {

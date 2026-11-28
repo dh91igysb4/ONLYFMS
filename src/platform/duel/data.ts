@@ -53,6 +53,8 @@ export type DuelMatch = {
   fatal: string | null
   busy: boolean
   act(payload: unknown): void
+  /** 실시간 대전 결과 보고(duel report) */
+  report(payload: unknown): void
   resign(): void
   cancel(): void
 }
@@ -261,10 +263,35 @@ export function useDuelMatch(id: string): DuelMatch {
     },
     [send],
   )
+  /**
+   * 실시간 대전 결과 보고(레이싱 설계 §7). 차례·busy와 무관하게 보낸다(기권 버튼과 겹쳐도 버리지 않는다).
+   * 거절(409 already_reported·finished 등)은 실린 화면으로 맞추고, 네트워크 실패는 한 번 더 보낸다.
+   */
+  const report = useCallback(
+    (payload: unknown) => {
+      const v = viewRef.current
+      if (!v || v.status !== 'active' || v.my_seat === null) return
+      const g = gen.current
+      const forId = v.match_id
+      const attempt = (left: number): void => {
+        duel({ action: 'report', match_id: forId, payload })
+          .then((r) => { if (current(g, forId)) apply(r) })
+          .catch((e) => {
+            if (!current(g, forId)) return
+            const fresh = bodyView(e)
+            if (fresh) apply(fresh)
+            else if (left > 0 && !(e instanceof ApiError && e.status < 500)) setTimeout(() => attempt(left - 1), TICK_RETRY_MS)
+            else void refresh()
+          })
+      }
+      attempt(1)
+    },
+    [apply, current, refresh],
+  )
   const resign = useCallback(() => { void send({ action: 'resign' }) }, [send])
   const cancel = useCallback(() => { void send({ action: 'cancel' }) }, [send])
 
-  return { view, error, fatal, busy, act, resign, cancel }
+  return { view, error, fatal, busy, act, report, resign, cancel }
 }
 
 /** 남은 시간(ms). 서버 시계로 보정한다 */
