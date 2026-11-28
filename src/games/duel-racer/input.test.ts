@@ -48,3 +48,15 @@ test('ground: no air controls', () => {
   expect(c.yaw).toBe(0)
   expect(c.steer).toBe(1)
 })
+
+test('air: W held since the ground does not tilt; pressing it again in the air does', () => {
+  // airKeys = 공중에 뜬 뒤 새로 누른 키
+  expect(controlsFrom(keys('KeyW'), true, keys()).pitch).toBe(0)
+  expect(controlsFrom(keys('KeyW'), true, keys()).throttle).toBe(1)
+  expect(controlsFrom(keys('KeyW'), true, keys('KeyW')).pitch).toBe(1)
+  expect(controlsFrom(keys('ArrowDown'), true, keys('ArrowDown')).pitch).toBe(-1)
+})
+
+test('air: A/D turn even if held since the ground', () => {
+  expect(controlsFrom(keys('KeyD'), true, keys()).yaw).toBe(1)
+})

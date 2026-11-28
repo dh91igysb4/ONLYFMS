@@ -152,12 +152,22 @@ test('Escape exits and R resets', async () => {
   expect(onExit).toHaveBeenCalled()
 })
 
-test('in the air the arrow keys turn and tilt instead of steering', async () => {
-  h.snap = { ...baseSnap(), tick: 100, countdown: null, car: { ...baseSnap().car, grounded: false } }
+test('in the air the arrow keys turn and tilt instead of steering (tilt only for keys pressed after takeoff)', async () => {
+  h.snap = { ...baseSnap(), tick: 100, countdown: null }
   mount()
   await loaded()
-  fireEvent.keyDown(window, { code: 'KeyD' })
+  // 땅에서 가속(W)을 누른 채 공중으로
   fireEvent.keyDown(window, { code: 'KeyW' })
+  await frame()
+  h.snap = { ...baseSnap(), tick: 120, countdown: null, car: { ...baseSnap().car, grounded: false } }
+  await frame()
+  await frame()
+  expect(h.advanced.at(-1)!.pitch).toBe(0)
+  expect(h.advanced.at(-1)!.throttle).toBe(1)
+  // 공중에서 다시 누르면 기울인다
+  fireEvent.keyUp(window, { code: 'KeyW' })
+  fireEvent.keyDown(window, { code: 'KeyW' })
+  fireEvent.keyDown(window, { code: 'KeyD' })
   await frame()
   const c = h.advanced.at(-1)!
   expect(c.yaw).toBe(1)

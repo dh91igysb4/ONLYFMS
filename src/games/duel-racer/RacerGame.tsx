@@ -29,6 +29,9 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
   const [best, setBest] = useState<number | null>(null)
   const [round, setRound] = useState(0)
   const keys = useRef(new Set<string>())
+  // 공중에 뜬 뒤 새로 누른 키(기울기용). 땅에 닿으면 비운다
+  const airKeys = useRef(new Set<string>())
+  const airborneRef = useRef(false)
   const raceRef = useRef<{ mod: RaceMod; race: Race } | null>(null)
   const exitRef = useRef(onExit)
   exitRef.current = onExit
@@ -47,11 +50,18 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
       }
       if (GAME_KEYS.has(e.code)) {
         e.preventDefault()
+        if (!e.repeat && airborneRef.current) airKeys.current.add(e.code)
         keys.current.add(e.code)
       }
     }
-    const up = (e: KeyboardEvent) => { keys.current.delete(e.code) }
-    const release = () => keys.current.clear()
+    const up = (e: KeyboardEvent) => {
+      keys.current.delete(e.code)
+      airKeys.current.delete(e.code)
+    }
+    const release = () => {
+      keys.current.clear()
+      airKeys.current.clear()
+    }
     const vis = () => { if (document.visibilityState === 'hidden') release() }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -112,7 +122,9 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
         lastT = t
         // 공중이면 방향키가 차 방향·기울기를 조절한다
         const airborne = !mod.snapshot(r.race).car.grounded
-        mod.advance(r.race, ms, controlsFrom(keys.current, airborne))
+        if (!airborne) airKeys.current.clear()
+        airborneRef.current = airborne
+        mod.advance(r.race, ms, controlsFrom(keys.current, airborne, airKeys.current))
         const snap = mod.snapshot(r.race)
         scene?.draw(snap, r.race.acc ?? 0)
         if (snap.finishTicks !== null && !finished) {
