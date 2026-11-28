@@ -41,6 +41,8 @@ export type ManifestOption = {
   label: string
   choices: { value: string; label: string }[]
   default: string
+  /** 상점 품목을 고르는 옵션. 경쟁 모드(데일리·대회·대전)는 값을 default로 고정한다(`pinShopOptions`) */
+  shop?: true
 }
 
 /** 게임 목록 구역 주제. 새 주제는 여기와 `src/platform/games/sections.ts`의 TOPIC_TITLES에 함께 더한다 */
@@ -61,6 +63,8 @@ export type Manifest = {
    */
   dailyTimeLimitSec: number | null
   options: ManifestOption[]
+  /** 상점에서 파는 품목. option은 `shop: true` 옵션의 key, items는 그 choices와 같은 id 집합 */
+  shop?: { option: string; items: { id: string; price: number }[] }
   /** 생략하면 'solo'. 대전 게임은 'duel' (대전 설계 §3), 저장이 이어지는 지속형 게임은 'world' */
   category?: 'solo' | 'duel' | 'world'
   /** 게임 목록에서 묶는 주제(`src/platform/games/sections.ts`). 생략하면 "다른 게임" */

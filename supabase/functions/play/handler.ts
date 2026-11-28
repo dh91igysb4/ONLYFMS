@@ -5,6 +5,7 @@ import type { Sql, Tx } from '../_shared/db.ts'
 import { txOn } from '../_shared/db.ts'
 import { normalizeScore, pickFresh, step } from './engine.ts'
 import { registry as defaultRegistry, type Registry } from './registry.ts'
+import { pinShopOptions } from '../../../src/games/options.ts'
 import type { Ctx, GameModule } from '../../../src/games/types.ts'
 import { kstDate, kstDayRange } from '../../../src/shared/kst.ts'
 import { hmacSeed, rngFromSeed } from '../../../src/shared/rng.ts'
@@ -302,7 +303,7 @@ async function ensurePuzzle(
        where game_id = ${item.game_id} and puzzle_key is not null and generated_at > ${since}`
     const picked = await pickFresh(
       game.logic,
-      item.options,
+      pinShopOptions(game.manifest, item.options),
       seedFor,
       new Set(recent.map((r) => r.puzzle_key)),
     )

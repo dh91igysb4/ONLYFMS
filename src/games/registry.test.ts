@@ -18,6 +18,24 @@ test('every game has unique id, valid id format, and options defaults in choices
   expect(getGame('nope')).toBeUndefined()
 })
 
+test('manifest shop declarations match shop options', () => {
+  for (const g of [...games, ...duels, ...worlds]) {
+    const m = g.manifest
+    const shopOpts = m.options.filter((o) => o.shop)
+    if (!m.shop) {
+      expect(shopOpts.map((o) => o.key), `${m.id}: shop 옵션이 있으면 shop 선언이 필요`).toEqual([])
+      continue
+    }
+    const opt = shopOpts.find((o) => o.key === m.shop!.option)
+    expect(opt, `${m.id}: shop.option은 shop: true 옵션의 key`).toBeDefined()
+    const ids = m.shop.items.map((i) => i.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect([...ids].sort()).toEqual(opt!.choices.map((c) => c.value).sort())
+    for (const i of m.shop.items) expect(Number.isInteger(i.price) && i.price >= 0).toBe(true)
+    expect(m.shop.items.find((i) => i.id === opt!.default)?.price).toBe(0)
+  }
+})
+
 /**
  * 마이그레이션 SQL을 파일 이름순, 파일 안에서는 글 순서대로 적용해 hidden_games 최종 집합을 구한다.
  * `insert into hidden_games … values (...)`는 추가, `delete from hidden_games where game_id = '…'`
