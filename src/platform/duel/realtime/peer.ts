@@ -62,7 +62,18 @@ export type LinkOpts = {
   rtc?: () => RTCPeerConnectionLike
 }
 
-type Sig = { from: 0 | 1; kind: 'hi' | 'offer' | 'answer' | 'ice'; data?: unknown }
+/**
+ * 신호. hi: 링크마다 새 sid(새로고침하면 바뀐다). offer·answer·ice는 offer id로 짝을 맞춰, 옛 offer에 대한 답·후보를
+ * 새 연결에 넣지 않는다(최종 리뷰 I4).
+ */
+type Sig =
+  | { from: 0 | 1; kind: 'hi'; sid: string }
+  | { from: 0 | 1; kind: 'offer' | 'answer'; id: string; data: unknown }
+  | { from: 0 | 1; kind: 'ice'; id: string; data: unknown }
+
+type SigBody = Sig extends infer T ? (T extends Sig ? Omit<T, 'from'> : never) : never
+
+const newId = () => Math.random().toString(36).slice(2, 12)
 
 function toB64(buf: ArrayBuffer): string {
   let s = ''
@@ -87,7 +98,6 @@ export function openLink(opts: LinkOpts): RealtimeLink {
   const statusCbs = new Set<(s: LinkStatus) => void>()
   let pc: RTCPeerConnectionLike | null = null
   let dc: DataChannelLike | null = null
-  let pendingIce: unknown[] = []
   let remoteSet = false
   // 대체 경로 보내기 조절
   const gap = 1000 / RELAY_HZ
@@ -95,84 +105,126 @@ export function openLink(opts: LinkOpts): RealtimeLink {
   let pending: ArrayBuffer | null = null
   let relayTimer: ReturnType<typeof setTimeout> | null = null
 
+  const sid = newId()
+  // 좌석 0: 지금 offer id, 그 offer에 답을 받았는지, 누구(sid)에게 냈는지. 좌석 1: 받아서 답한 offer id
+  let offerId: string | null = null
+  let answered = false
+  let peerSid: string | null = null
+  // 아직 짝이 될 연결이 없는 후보(offer id별)
+  let earlyIce: { id: string; c: unknown }[] = []
+
   const setStatus = (s: LinkStatus) => {
     if (status === s || status === 'closed') return
     status = s
     for (const cb of statusCbs) cb(s)
   }
   const deliver = (d: ArrayBuffer) => { for (const cb of msgCbs) cb(d) }
-  const signal = (kind: Sig['kind'], data?: unknown) => {
+  const signal = (msg: SigBody) => {
     if (status === 'closed') return
-    void channel.send({ type: 'broadcast', event: 'sig', payload: { from: mySeat, kind, data } satisfies Sig }).catch(() => {})
+    void channel.send({ type: 'broadcast', event: 'sig', payload: { ...msg, from: mySeat } }).catch(() => {})
   }
+  const dcOpen = () => !!dc && dc.readyState === 'open'
 
   const attach = (ch: DataChannelLike) => {
     dc = ch
     ch.binaryType = 'arraybuffer'
     ch.onmessage = (e) => { if (e.data instanceof ArrayBuffer) deliver(e.data) }
-    ch.onopen = () => setStatus('direct')
-    ch.onclose = () => { if (dc === ch) { dc = null; setStatus('relay') } }
+    ch.onopen = () => { if (dc === ch) setStatus('direct') }
+    ch.onclose = () => {
+      if (dc !== ch) return
+      dc = null
+      setStatus('relay')
+      // 좌석 1은 다시 연결해 달라고 인사한다(좌석 0이 새 offer를 낸다)
+      if (mySeat === 1) signal({ kind: 'hi', sid })
+    }
     if (ch.readyState === 'open') setStatus('direct')
   }
 
   const resetPc = (): RTCPeerConnectionLike | null => {
-    try { dc?.close() } catch { /* ignore */ }
-    try { pc?.close() } catch { /* ignore */ }
+    // 내가 닫는 옛 연결의 닫힘 알림이 상태를 바꾸지 않게 먼저 떼어 낸다
+    const oldDc = dc
+    const oldPc = pc
     dc = null
-    pendingIce = []
+    pc = null
+    if (oldDc) { oldDc.onclose = null; oldDc.onopen = null; oldDc.onmessage = null; try { oldDc.close() } catch { /* ignore */ } }
+    if (oldPc) { oldPc.onicecandidate = null; oldPc.ondatachannel = null; try { oldPc.close() } catch { /* ignore */ } }
     remoteSet = false
+    let p: RTCPeerConnectionLike
     try {
-      pc = makeRtc()
+      p = makeRtc()
     } catch (e) {
       // WebRTC를 못 쓰는 브라우저: 바로 대체 경로
       console.warn('duel: rtc unavailable', e)
-      pc = null
       setStatus('relay')
       return null
     }
-    pc.onicecandidate = (e) => { if (e.candidate) signal('ice', e.candidate) }
-    pc.ondatachannel = (e) => attach(e.channel)
-    return pc
+    pc = p
+    p.onicecandidate = (e) => { if (e.candidate && pc === p) signal({ kind: 'ice', id: (mySeat === 0 ? offerId : peerOffer) ?? '', data: e.candidate }) }
+    p.ondatachannel = (e) => { if (pc === p) attach(e.channel) }
+    return p
   }
+  // 좌석 1이 지금 답한 offer
+  let peerOffer: string | null = null
 
-  const flushIce = async (p: RTCPeerConnectionLike) => {
-    const list = pendingIce
-    pendingIce = []
-    for (const c of list) await p.addIceCandidate(c).catch(() => {})
+  const flushIce = async (p: RTCPeerConnectionLike, id: string) => {
+    const mine = earlyIce.filter((x) => x.id === id)
+    earlyIce = earlyIce.filter((x) => x.id !== id)
+    for (const x of mine) await p.addIceCandidate(x.c).catch(() => {})
   }
 
   const offer = async () => {
+    const id = newId()
+    offerId = id
+    answered = false
     const p = resetPc()
     if (!p) return
     attach(p.createDataChannel('race', { ordered: false, maxRetransmits: 0 }))
     const o = await p.createOffer()
+    if (offerId !== id) return
     await p.setLocalDescription(o)
-    signal('offer', o)
+    if (offerId !== id) return
+    signal({ kind: 'offer', id, data: o })
   }
 
   const onSig = async (s: Sig) => {
     if (status === 'closed' || s.from === mySeat) return
     try {
       if (s.kind === 'hi') {
-        // 좌석 0이 연결을 연다. 좌석 1은 아직 offer를 못 받았으면 인사로 답한다(늦게 들어온 쪽을 위해)
-        if (mySeat === 0) { if (status !== 'direct') await offer() }
-        else if (!pc) signal('hi')
+        if (mySeat === 0) {
+          // 같은 상대에게 낸 offer가 답을 기다리는 중이거나 이미 이어졌으면 그대로 둔다. 새로고침한 상대(sid가 다름)나
+          // 답을 받고도 열리지 않은 연결이면 새 offer
+          if (s.sid === peerSid && (!answered || dcOpen())) return
+          peerSid = s.sid
+          await offer()
+        } else if (!dcOpen()) {
+          // 좌석 1은 연결이 열리지 않았으면 언제든 인사로 답한다(늦게 들어오거나 새로고침한 좌석 0을 위해)
+          signal({ kind: 'hi', sid })
+        }
       } else if (s.kind === 'offer' && mySeat === 1) {
+        peerOffer = s.id
         const p = resetPc()
         if (!p) return
         await p.setRemoteDescription(s.data)
+        if (pc !== p) return
         remoteSet = true
-        await flushIce(p)
+        await flushIce(p, s.id)
         const a = await p.createAnswer()
+        if (pc !== p) return
         await p.setLocalDescription(a)
-        signal('answer', a)
-      } else if (s.kind === 'answer' && mySeat === 0 && pc) {
-        await pc.setRemoteDescription(s.data)
+        signal({ kind: 'answer', id: s.id, data: a })
+      } else if (s.kind === 'answer' && mySeat === 0) {
+        // 옛 offer에 대한 답은 버린다
+        if (s.id !== offerId || answered || !pc) return
+        answered = true
+        const p = pc
+        await p.setRemoteDescription(s.data)
+        if (pc !== p) return
         remoteSet = true
-        await flushIce(pc)
+        await flushIce(p, s.id)
       } else if (s.kind === 'ice') {
-        if (pc && remoteSet) await pc.addIceCandidate(s.data).catch(() => {})
-        else pendingIce.push(s.data)
+        const current = mySeat === 0 ? offerId : peerOffer
+        if (pc && remoteSet && s.id === current) await pc.addIceCandidate(s.data).catch(() => {})
+        else earlyIce.push({ id: s.id, c: s.data })
       }
     } catch (e) {
       console.warn('duel: rtc signaling failed', e)
@@ -191,7 +243,7 @@ export function openLink(opts: LinkOpts): RealtimeLink {
       if (status === 'closed' || p.from === mySeat || typeof p.b !== 'string') return
       try { deliver(fromB64(p.b)) } catch { /* 깨진 값은 버린다 */ }
     })
-    .subscribe((s) => { if (s === 'SUBSCRIBED') signal('hi') })
+    .subscribe((st) => { if (st === 'SUBSCRIBED') signal({ kind: 'hi', sid }) })
 
   const timeout = setTimeout(() => { if (status === 'connecting') setStatus('relay') }, CONNECT_TIMEOUT_MS)
 

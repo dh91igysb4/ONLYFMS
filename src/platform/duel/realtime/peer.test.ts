@@ -30,8 +30,12 @@ function channelHub() {
     send(msg: { type: 'broadcast'; event: string; payload: unknown }) {
       sent.push({ event: msg.event, payload: msg.payload })
       for (const c of all) {
-        if (c === this || !c.subscribed || c.unsubscribed) continue
-        for (const l of c.listeners) if (l.event === msg.event) queueMicrotask(() => l.cb({ payload: msg.payload }))
+        if (c === this) continue
+        for (const l of c.listeners) {
+          if (l.event !== msg.event) continue
+          // 받는 순간 구독 중인 채널에만(Supabase처럼 놓친 메시지는 다시 오지 않는다)
+          queueMicrotask(() => { if (c.subscribed && !c.unsubscribed) l.cb({ payload: msg.payload }) })
+        }
       }
       return Promise.resolve('ok')
     }
@@ -55,40 +59,58 @@ function rtcHub(works = true) {
       if (this.readyState !== 'open' || !p) throw new Error('not open')
       queueMicrotask(() => p.onmessage?.({ data: d }))
     }
-    close() { this.readyState = 'closed'; this.onclose?.() }
+    close() {
+      if (this.readyState === 'closed') return
+      this.readyState = 'closed'
+      this.onclose?.()
+      // 한쪽이 닫히면 다른 쪽도 곧 닫힌다
+      const p = this.peer
+      if (p) queueMicrotask(() => p.close())
+    }
   }
+  let seq = 0
+  type Desc = { type: string; sdp: string; for?: string }
   class FakePC implements RTCPeerConnectionLike {
     onicecandidate: ((e: { candidate: unknown }) => void) | null = null
     ondatachannel: ((e: { channel: DataChannelLike }) => void) | null = null
-    local: unknown = null
-    remote: unknown = null
+    local: Desc | null = null
+    remote: Desc | null = null
     dc: FakeDC | null = null
     closed = false
     opts: unknown
     constructor() { pcs.push(this) }
     createDataChannel(_label: string, opts: unknown) { this.opts = opts; this.dc = new FakeDC(); return this.dc }
-    async createOffer() { return { type: 'offer', sdp: 'o' } }
-    async createAnswer() { return { type: 'answer', sdp: 'a' } }
-    async setLocalDescription(d: unknown) { this.local = d; queueMicrotask(() => this.onicecandidate?.({ candidate: { c: 1 } })) }
-    async setRemoteDescription(d: unknown) { this.remote = d; this.tryLink() }
+    async createOffer() { return { type: 'offer', sdp: `o${++seq}` } }
+    async createAnswer() { return { type: 'answer', sdp: `a${++seq}`, for: this.remote?.sdp } }
+    async setLocalDescription(d: unknown) { this.local = d as Desc; queueMicrotask(() => this.onicecandidate?.({ candidate: { c: 1 } })) }
+    async setRemoteDescription(d: unknown) {
+      const desc = d as Desc
+      if (this.closed) throw new Error('InvalidStateError: closed')
+      // 진짜 RTCPeerConnection처럼: 이미 답을 받았거나, 내 offer가 아닌 답이면 거절한다
+      if (desc.type === 'answer' && (this.remote || this.local?.sdp !== desc.for)) throw new Error('InvalidStateError')
+      this.remote = desc
+      this.tryLink()
+    }
     async addIceCandidate() {}
-    close() { this.closed = true }
+    close() { this.closed = true; if (this.dc) this.dc.close() }
     tryLink() {
       if (!works) return
-      const offerer = pcs.find((p) => p.dc && p.remote)
-      const answerer = pcs.find((p) => !p.dc && p.remote && p.local)
-      if (!offerer || !answerer || offerer.dc!.peer) return
-      const mine = offerer.dc!
-      const theirs = new FakeDC()
-      mine.peer = theirs
-      theirs.peer = mine
-      queueMicrotask(() => {
-        answerer.ondatachannel?.({ channel: theirs })
-        mine.readyState = 'open'
-        theirs.readyState = 'open'
-        mine.onopen?.()
-        theirs.onopen?.()
-      })
+      for (const offerer of pcs) {
+        if (offerer.closed || !offerer.dc || !offerer.remote || offerer.dc.peer) continue
+        const answerer = pcs.find((p) => !p.closed && !p.dc && p.local?.sdp === offerer.remote!.sdp)
+        if (!answerer) continue
+        const mine = offerer.dc
+        const theirs = new FakeDC()
+        mine.peer = theirs
+        theirs.peer = mine
+        queueMicrotask(() => {
+          answerer.ondatachannel?.({ channel: theirs })
+          mine.readyState = 'open'
+          theirs.readyState = 'open'
+          mine.onopen?.()
+          theirs.onopen?.()
+        })
+      }
     }
   }
   return { make: () => new FakePC(), pcs }
@@ -216,4 +238,35 @@ test('urgent packets skip the relay limit and do not replace the pending one', a
   vi.advanceTimersByTime(1000 / RELAY_HZ)
   await flush()
   expect(fromA).toEqual([[1], [42], [2]])
+})
+
+test('both sides subscribing at the same moment still reach direct (최종 리뷰 I4a)', async () => {
+  const { a, b } = pair()
+  await flush(60)
+  expect(a.status()).toBe('direct')
+  expect(b.status()).toBe('direct')
+  const fromA = got(b)
+  a.send(bytes(5))
+  await flush()
+  expect(fromA).toEqual([[5]])
+})
+
+test('a refreshed seat reconnects directly (최종 리뷰 I4b)', async () => {
+  for (const seat of [0, 1] as const) {
+    const ch = channelHub()
+    const rtc = rtcHub()
+    const links = [openLink({ matchId: 'm1', mySeat: 0, channel: ch.make(), rtc: rtc.make }), openLink({ matchId: 'm1', mySeat: 1, channel: ch.make(), rtc: rtc.make })]
+    await flush(60)
+    expect(links.map((l) => l.status())).toEqual(['direct', 'direct'])
+    links[seat].close()
+    const again = openLink({ matchId: 'm1', mySeat: seat, channel: ch.make(), rtc: rtc.make })
+    await flush(80)
+    const other = links[1 - seat]
+    expect(again.status()).toBe('direct')
+    expect(other.status()).toBe('direct')
+    const got2 = got(again)
+    other.send(bytes(seat + 1))
+    await flush()
+    expect(got2).toEqual([[seat + 1]])
+  }
 })
