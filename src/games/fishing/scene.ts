@@ -3,7 +3,7 @@
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
-import { HALL2_PEDESTALS, HALL2_THEME_FLOOR, HALL2_WINGS } from './maps/hall2.ts'
+import { HALL2_GALLERY_RIGHT, HALL2_PEDESTALS, HALL2_THEME_FLOOR, HALL2_WINGS } from './maps/hall2.ts'
 import type { FacilityId } from './facility.ts'
 import { THEME_LOOK, themeLook, type Gallery, type ThemeId } from './gallery.ts'
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
@@ -1288,17 +1288,17 @@ const THEME_MOTIF: Readonly<Record<ThemeId, readonly string[]>> = {
   coral: ['#.#', '###', '.#.'],
   abyss: ['.#.', '#.#', '.#.'],
 }
-/** 회관 2층 벽 구획(gallery.py): 위 벽 창 x(16px 단위 2칸 폭), 옆 벽 액자 줄 */
-const HALL2_W = 26 * TILE
-const HALL2_H = 16 * TILE
-const HALL2_WINDOWS = [2, 7, 12, 17, 22].map((k) => k * TILE)
-const HALL2_FRAME_ROWS = [3, 8]
+/** 회관 2층 벽 구획(gallery.py): 전시관(x0~34) 폭·높이, 위 벽 창 x(2칸 폭), 왼쪽 벽 액자 줄. 오른쪽 엘리베이터·계단 구역은 칠하지 않는다 */
+const HALL2_W = (HALL2_GALLERY_RIGHT + 1) * TILE - 4
+const HALL2_H = 18 * TILE
+const HALL2_WINDOWS = [2, 7, 12, 17, 22, 27].map((k) => k * TILE)
+const HALL2_FRAME_ROWS = [3, 8, 12]
 /** 테마 배경: 위 벽 면(창 사이)과 옆·아래 벽을 테마 색으로, 위 벽 아래 띠에 무늬 */
 function drawThemeWalls(ctx: CanvasRenderingContext2D, id: ThemeId): void {
   const L = THEME_LOOK[id]
   rect(ctx, 0, 0, HALL2_W, 4, L.wall)
   let x = 0
-  for (const wx of HALL2_WINDOWS.filter((v) => v < HALL2_W - 2 * TILE)) {
+  for (const wx of HALL2_WINDOWS) {
     rect(ctx, x, 4, wx - x, TILE - 4, L.wallDark)
     x = wx + 2 * TILE + 1
   }
@@ -1308,14 +1308,12 @@ function drawThemeWalls(ctx: CanvasRenderingContext2D, id: ThemeId): void {
     if (HALL2_WINDOWS.some((wx) => mx + 3 > wx && mx < wx + 2 * TILE + 1)) continue
     motif.forEach((row, yy) => [...row].forEach((ch, xx) => ch === '#' && rect(ctx, mx + xx, 9 + yy, 1, 1, L.motif)))
   }
-  for (const sx of [0, HALL2_W - TILE]) {
-    let y = TILE
-    for (const fr of HALL2_FRAME_ROWS) {
-      rect(ctx, sx, y, TILE, fr * TILE - y, L.wall)
-      y = fr * TILE + TILE + 5
-    }
-    rect(ctx, sx, y, TILE, HALL2_H - TILE - y, L.wall)
+  let y = TILE
+  for (const fr of HALL2_FRAME_ROWS) {
+    rect(ctx, 0, y, TILE, fr * TILE - y, L.wall)
+    y = fr * TILE + TILE + 5
   }
+  rect(ctx, 0, y, TILE, HALL2_H - TILE - y, L.wall)
   rect(ctx, 0, HALL2_H - TILE, HALL2_W, TILE, L.wall)
   rect(ctx, 0, HALL2_H - TILE, HALL2_W, 4, L.wallDark)
 }
@@ -1329,7 +1327,7 @@ export function themeParticles(id: ThemeId, tMs: number): { x: number; y: number
   const fx = THEME_LOOK[id].fx
   const top = TILE
   const h = HALL2_H - 2 * TILE
-  const w = HALL2_W - 2 * TILE
+  const w = HALL2_GALLERY_RIGHT * TILE
   return Array.from({ length: 24 }, (_, i) => {
     const x0 = TILE + 6 + ((i * 97) % (w - 12))
     const y0 = top + 4 + ((i * 53) % (h - 8))

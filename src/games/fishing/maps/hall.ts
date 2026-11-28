@@ -8,6 +8,10 @@ import { defineMap, type Fixture, type FixtureAct, type Facing } from '../map.ts
 const at = (tx: number, ty: number, facing: Facing, act: FixtureAct): Fixture => ({ front: { tx, ty, facing }, act })
 const many = (cells: readonly (readonly [number, number])[], facing: Facing, act: FixtureAct): Fixture[] => cells.map(([tx, ty]) => at(tx, ty, facing, act))
 
+/** 회관 층마다 같은 자리(1·2층 공용): 계단 입구 칸과 다른 층에서 계단으로 오면 서는 칸, 엘리베이터에서 내리면 서는 칸 */
+export const HALL_STAIRS = { at: { tx: 38, ty: 11, w: 1, h: 3 }, entry: { tx: 37, ty: 12, facing: 'left' } } as const
+export const HALL_ELEVATOR_ENTRY = { tx: 37, ty: 4, facing: 'left' } as const
+
 const FIXTURES: Fixture[] = [
   // 자판기 = 상점(왼쪽 벽, 오른쪽을 본다)
   ...many([[2, 1], [2, 2], [2, 3]], 'left', { kind: 'shop' }),
@@ -28,11 +32,8 @@ const FIXTURES: Fixture[] = [
   // 잠긴 6·8번 문(방은 복도 아래쪽이라 문을 아래로 본다)
   ...many([[11, 10], [12, 10]], 'down', { kind: 'notice', text: '곤의 라면가게 · 준비 중이에요' }),
   ...many([[21, 10], [22, 10]], 'down', { kind: 'notice', text: '들어갈 수 없어요' }),
-  // 엘리베이터(문은 왼쪽 벽) · 계단(왼쪽 위가 열림)
+  // 엘리베이터(문은 왼쪽 벽). 계단은 fixture가 아니라 출구(exits)
   ...many([[37, 3], [37, 4], [37, 5]], 'right', { kind: 'elevator' }),
-  // 계단 → 2층 전시관(maps/hall2.ts 계단 앞). 기능 플래그 exhibit가 꺼져 있으면 화면이 "2층은 공사 중이에요"를 띄운다
-  ...many([[37, 11], [37, 12]], 'right', { kind: 'stairs', target: 'hall2', entry: { tx: 21, ty: 13, facing: 'left' } }),
-  ...many([[38, 10], [39, 10], [40, 10]], 'down', { kind: 'stairs', target: 'hall2', entry: { tx: 21, ty: 13, facing: 'left' } }),
 ]
 
 export const HALL = defineMap('hall', [
@@ -47,9 +48,9 @@ export const HALL = defineMap('hall', [
   'YFFFYYYFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFY',
   'YFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFY',
   'YFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFY',
-  'YFFFFFFFFYFFFFFFFFFFFFFFFFFFFFFFFFFFFFYYYY',
-  'YFFFFFFFFYFFFFFFYYYFYYYYYYYYYFYFFFFFFFYYYY',
-  'YFFFFFFFFYFFFFFFYYYFYYYYYYYYYFYFFFFFFFYYYY',
+  'YFFFFFFFFYFFFFFFFFFFFFFFFFFFFFFFFFFFFFFYYY',
+  'YFFFFFFFFYFFFFFFYYYFYYYYYYYYYFYFFFFFFFFYYY',
+  'YFFFFFFFFYFFFFFFYYYFYYYYYYYYYFYFFFFFFFFYYY',
   'YFFFFFFFFYFFFFFFFFFFFFFFFYYYYFYFFFFFFFYYYY',
   'YYFFFFFFYYFFFFFFYYYFYYYYYYYYYYYFFFFFFFYYYY',
   'YFFFFFFFFYFFFFFFYYYFYYYYYFFFFYYFFFFFFFYYYY',
@@ -63,12 +64,14 @@ export const HALL = defineMap('hall', [
   // 왼쪽 벽 로비 이동기(과제 없이 켜진다, logic.version 18). 도착하면 앞 칸에서 오른쪽을 본다
   teleporter: { tiles: { tx: 1, ty: 8, w: 2, h: 2 }, front: { tx: 3, ty: 8, facing: 'right' } },
   exits: [
+    // 계단(x38~40 y11~16, 왼쪽 위가 열림): 열린 칸(x38 y11~13)에 들어서면 바로 2층 같은 자리 계단 앞(HALL_STAIRS)
+    { at: HALL_STAIRS.at, target: 'hall2', entry: HALL_STAIRS.entry },
     { edge: 's', from: 3, to: 5, target: 'village', entry: { tx: 13, ty: 8, facing: 'down' } },
     { edge: 's', from: 31, to: 33, target: 'village', entry: { tx: 13, ty: 8, facing: 'down' } },
   ],
   walls: {
     v: [[8, 1, 6], [10, 1, 6], [15, 1, 6], [35, 1, 13], [10, 11, 16], [15, 11, 16], [20, 11, 16], [25, 11, 16], [31, 11, 16]],
-    h: [[7, 10, 10], [7, 13, 14], [11, 10, 15], [11, 18, 28]],
+    h: [[7, 10, 10], [7, 13, 14], [11, 10, 15], [11, 18, 28], [11, 38, 40]],
   },
   fixtures: FIXTURES,
 })

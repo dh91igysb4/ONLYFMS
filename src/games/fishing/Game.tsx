@@ -22,6 +22,7 @@ import { GalleryPanel, galleryOf } from './GalleryPanel.tsx'
 import { CALM_BAR, potionOn, stageB } from './gallery.ts'
 import { galleryScene } from './scene.ts'
 import { facilityScene } from './facility.ts'
+import { HALL_ELEVATOR_ENTRY } from './maps/hall.ts'
 import { PREVIEW_ISLE_KEY, fishSellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -401,7 +402,7 @@ function interactionKey(i: Interaction): string {
 }
 /** 마을회관 고정물 앞 행동 버튼 이름 */
 const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], ActionLabel>>> = {
-  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대', stairs: '계단', gallery: '전시관',
+  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대', gallery: '전시관',
 }
 /** 개간 구역 나무·바위 앞 안내 */
 const ZONE_TREE_NOTICE = '작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요'
@@ -856,10 +857,6 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       } else if (at.kind === 'elevator') {
         setNotice(null)
         setMenu('elevator')
-      } else if (at.kind === 'stairs') {
-        // 2층 전시관은 기능 플래그 exhibit가 켜져야 열린다
-        if (!opened.has(at.target)) flashInfo('2층은 공사 중이에요', TIDE_NOTICE_MS)
-        else startTransition(at.target, at.entry)
       } else if (at.kind === 'gallery') {
         setNotice(null)
         setMenu('gallery')
@@ -2143,7 +2140,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   error={hofError}
                 />
               )}
-              {menu === 'elevator' && <ElevatorPanel />}
+              {menu === 'elevator' && <ElevatorPanel here={rt.map.id} canGo={(a) => opened.has(a)} onGo={(a) => { closeMenu(); startTransition(a, HALL_ELEVATOR_ENTRY) }} />}
               {menu === 'boat' && (
                 <BoatPanel
                   busy={busy}

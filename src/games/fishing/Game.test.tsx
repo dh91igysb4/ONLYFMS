@@ -75,7 +75,7 @@ vi.mock('../index.ts', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../index.ts')>()
   return { ...orig, getWorld: (id: string) => { const w = orig.getWorld(id); return w && { ...w, manifest: { ...w.manifest, hidden: roomGate.hidden } } } }
 })
-vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), SCENE_W: 160, SCENE_H: 240 }))
+vi.mock('./scene.ts', () => ({ drawWorld: vi.fn(), releaseSceneCache: vi.fn(), galleryScene: vi.fn(() => ({ exhibits: [], tape: [], theme: null })), SCENE_W: 160, SCENE_H: 240 }))
 /** 명예의 전당 불러오기(플랫폼). 테스트마다 결과를 정한다 */
 const fameGate = vi.hoisted(() => ({ load: null as null | ((game: string, admin: boolean) => Promise<unknown>) }))
 vi.mock('../../platform/world/hallOfFame.ts', () => ({
@@ -3389,14 +3389,29 @@ describe('마을회관', () => {
     expect(screen.getByText('곤의 라면가게 · 준비 중이에요')).toBeInTheDocument()
   })
 
-  test('엘리베이터: 2·3·4층은 공사 중이라 못 누른다', async () => {
+  test('엘리베이터: 1층에서 2층을 누르면 2층 엘리베이터 앞(37,4), 3·4층은 공사 중; 2층에서는 1층으로', async () => {
     stubTouch()
     await mount(makeView(), at(37, 4, 'right'))
     expect(actionButton()).toHaveTextContent('엘리베이터')
     await act1()
     expect(screen.getByRole('region', { name: '엘리베이터' })).toBeInTheDocument()
-    for (const f of ['2층', '3층', '4층']) expect(screen.getByRole('button', { name: new RegExp(f) })).toBeDisabled()
-    expect(screen.getAllByText('공사 중')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: /1층/ })).toBeDisabled()
+    for (const f of ['3층', '4층']) expect(screen.getByRole('button', { name: new RegExp(f) })).toBeDisabled()
+    expect(screen.getAllByText('공사 중')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '2층' }))
+    await advance(1500)
+    expect(lastScene().map.id).toBe('hall2')
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: 37, ty: 4 })
+    key('ArrowRight', true)
+    await advance(60)
+    key('ArrowRight', false)
+    await advance(50)
+    expect(actionButton()).toHaveTextContent('엘리베이터')
+    await act1()
+    expect(screen.getByRole('button', { name: /2층/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '1층' }))
+    await advance(1500)
+    expect(lastScene().map.id).toBe('hall')
   })
 
   test('명예의 전당 게임 액자: 불러온 게시판의 첫 게임, 다음으로 넘김, 비었으면 안내', async () => {
@@ -3448,6 +3463,22 @@ describe('마을회관', () => {
     await mount(makeView(), at(5, 9, 'down'))
     expect(actionButton()).toHaveTextContent('낚시')
     expect(actionButton()).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('계단: 1층 계단 입구로 걸어 들어가면 바로 2층 같은 자리, 2층 계단으로 들어가면 다시 1층 (37,12)', async () => {
+    await mount(makeView(), at(37, 12, 'right'))
+    key('ArrowRight', true)
+    await advance(300)
+    key('ArrowRight', false)
+    await advance(1500)
+    expect(lastScene().map.id).toBe('hall2')
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: 37, ty: 12 })
+    key('ArrowRight', true)
+    await advance(300)
+    key('ArrowRight', false)
+    await advance(1500)
+    expect(lastScene().map.id).toBe('hall')
+    expect(tileOf(lastScene().player.pos)).toEqual({ tx: 37, ty: 12 })
   })
 
   test('마을 문으로 걸어 들어가면 회관 (4,16), 회관 아래 출구로 나가면 마을 문 앞 (13,8)', async () => {
