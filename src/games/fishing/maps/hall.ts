@@ -30,8 +30,9 @@ const FIXTURES: Fixture[] = [
   ...many([[21, 10], [22, 10]], 'down', { kind: 'notice', text: '들어갈 수 없어요' }),
   // 엘리베이터(문은 왼쪽 벽) · 계단(왼쪽 위가 열림)
   ...many([[37, 3], [37, 4], [37, 5]], 'right', { kind: 'elevator' }),
-  ...many([[37, 11], [37, 12]], 'right', { kind: 'notice', text: '2층은 공사 중이에요' }),
-  ...many([[38, 10], [39, 10], [40, 10]], 'down', { kind: 'notice', text: '2층은 공사 중이에요' }),
+  // 계단 → 2층 전시관(maps/hall2.ts 계단 앞). 기능 플래그 exhibit가 꺼져 있으면 화면이 "2층은 공사 중이에요"를 띄운다
+  ...many([[37, 11], [37, 12]], 'right', { kind: 'stairs', target: 'hall2', entry: { tx: 21, ty: 13, facing: 'left' } }),
+  ...many([[38, 10], [39, 10], [40, 10]], 'down', { kind: 'stairs', target: 'hall2', entry: { tx: 21, ty: 13, facing: 'left' } }),
 ]
 
 export const HALL = defineMap('hall', [

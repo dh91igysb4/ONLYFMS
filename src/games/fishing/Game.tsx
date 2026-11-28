@@ -20,6 +20,7 @@ import { BAIT_RECIPES, LICENSE_PRICE, featureOn, type BaitKind } from './researc
 import { EconSection, econOf, type CastBait } from './EconPanel.tsx'
 import { GalleryPanel, galleryOf } from './GalleryPanel.tsx'
 import { CALM_BAR, potionOn, stageB } from './gallery.ts'
+import { galleryScene } from './scene.ts'
 import { PREVIEW_ISLE_KEY, fishSellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -399,7 +400,7 @@ function interactionKey(i: Interaction): string {
 }
 /** 마을회관 고정물 앞 행동 버튼 이름 */
 const FIXTURE_ACTION: Readonly<Partial<Record<NonNullable<Interaction>['kind'], ActionLabel>>> = {
-  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대',
+  wardrobe: '옷 가게', laptop: '노트북', elevator: '엘리베이터', fame: '보기', notice: '살펴보기', fridge: '냉장고', trash: '쓰레기통', workbench: '작업대', stairs: '계단', gallery: '전시관',
 }
 /** 개간 구역 나무·바위 앞 안내 */
 const ZONE_TREE_NOTICE = '작업대에서 개간하면 치울 수 있어요. 열매·반짝이 표시가 있는 나무·바위를 캐 주세요'
@@ -409,7 +410,8 @@ const MAT_NAMES = { wood: '나무', stone: '돌', iron: '철' } as const
 const tpOpen = (view: View | null, area: AreaId): boolean =>
   !!view && teleporterOpen({ areas: view.areas, challenges: view.challenges ?? {} }, area)
 /** 열린 지역: 기본 지역(마을·강·숲)과 서버 상태의 areas. 아직 못 받았으면 기본 지역만 */
-const openedOf = (view: View | null): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...(view?.areas ?? [])])
+// 마을회관 2층(hall2)은 서버 areas에 없다: 기능 플래그 exhibit가 켜져 있으면 화면이 연다
+const openedOf = (view: View | null): Opened => new Set<AreaId>([...DEFAULT_AREAS, ...(view?.areas ?? []), ...(featureOn('exhibit') ? (['hall2'] as const) : [])])
 
 export function Game({ gameId, onOpenGames }: WorldGameProps) {
   const { profile } = useAuth()
@@ -853,6 +855,13 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       } else if (at.kind === 'elevator') {
         setNotice(null)
         setMenu('elevator')
+      } else if (at.kind === 'stairs') {
+        // 2층 전시관은 기능 플래그 exhibit가 켜져야 열린다
+        if (!opened.has(at.target)) flashInfo('2층은 공사 중이에요', TIDE_NOTICE_MS)
+        else startTransition(at.target, at.entry)
+      } else if (at.kind === 'gallery') {
+        setNotice(null)
+        setMenu('gallery')
       } else if (at.kind === 'fame') {
         if (deadFame(at)) return
         setNotice(null)
@@ -1264,7 +1273,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       mythicFlashMs: rt.mythicAt === null ? null : now - rt.mythicAt,
       others,
       holding: showRef.current?.show.kind === 'brag' ? showRef.current.show.species : null,
-      fame: rt.map.backdrop ? fameFramesRef.current : undefined,
+      fame: rt.map.id === 'hall' ? fameFramesRef.current : undefined,
+      gallery: rt.map.id === 'hall2' && viewRef.current ? galleryScene(galleryOf(viewRef.current)) : undefined,
     }, size)
   }
 

@@ -111,7 +111,7 @@ function baseStarts(map: MapDef): Tile[] {
 
 describe('맵 등록부', () => {
   it('모든 지역에 맵이 있고 mapFor가 같은 값을 준다', () => {
-    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'hall', 'island', 'lake', 'river', 'summit', 'swamp', 'tideflat', 'village', 'wreck'])
+    expect(Object.keys(MAPS).sort()).toEqual(['cave', 'forest', 'hall', 'hall2', 'island', 'lake', 'river', 'summit', 'swamp', 'tideflat', 'village', 'wreck'])
     // 내 섬(isle)은 섬 모양마다 맵이 달라 등록부에 없다(isle.test.ts)
     for (const { id } of AREAS) {
       if (id === 'isle' || id === 'home') continue

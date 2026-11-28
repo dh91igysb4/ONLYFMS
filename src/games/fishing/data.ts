@@ -4,7 +4,7 @@ import { inHours, tideAt, type Conditions, type Season, type Weather } from './c
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legend' | 'mythic'
 /** 신화 버프(신화를 잡으면 얻는 영구 강화). 신화마다 서로 다른 하나 */
 export type BuffId = 'imugi-scale' | 'dragon-breath' | 'dragon-pearl'
-export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck' | 'hall' | 'isle' | 'home'
+export type AreaId = 'village' | 'river' | 'forest' | 'lake' | 'cave' | 'island' | 'tideflat' | 'swamp' | 'summit' | 'wreck' | 'hall' | 'hall2' | 'isle' | 'home'
 /** surge(용솟음): 신화만 쓴다. 고요(가운데에서 천천히)와 용솟음(멀리 빠르게)을 시간으로 되풀이 */
 export type Behavior = 'mixed' | 'smooth' | 'dart' | 'floater' | 'sinker' | 'surge'
 export type Species = {
@@ -60,6 +60,8 @@ export const AREAS: readonly AreaDef[] = [
   { id: 'wreck', name: '난파선 앞바다', spots: ['wreck', 'abyss'], minRod: 5 },
   // 마을회관(실내, 낚시 자리 없음). 낚시 자리가 빈 지역은 낚시 지역이 아니다(물고기 목록·경제 계산에서 뺀다)
   { id: 'hall', name: '마을회관', spots: [] },
+  // 마을회관 2층 전시관(경제 P2, 기능 플래그 exhibit가 켜져야 화면이 연다). 서버 areas에는 넣지 않는다
+  { id: 'hall2', name: '마을회관 2층', spots: [] },
   // 내 섬(내 섬 설계 §5): 배로 가는 개인 섬. A단계에는 낚시터가 없다
   { id: 'isle', name: '내 섬', spots: [] },
   // 내 섬 집 안(C단계): 섬의 집 문으로 들어간다

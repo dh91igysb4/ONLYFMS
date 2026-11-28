@@ -915,7 +915,8 @@ describe('마을회관', () => {
     expect(interactionAt(HALL, center(34, 2), 'up', ALL_AREAS_OPEN)).toEqual({ kind: 'fame', slot: { group: 'site', index: 10 } })
     expect(interactionAt(HALL, center(11, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '곤의 라면가게 · 준비 중이에요' })
     expect(interactionAt(HALL, center(22, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '들어갈 수 없어요' })
-    expect(interactionAt(HALL, center(39, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'notice', text: '2층은 공사 중이에요' })
+    // 계단은 2층 전시관으로(경제 P2, 화면이 플래그로 막는다)
+    expect(interactionAt(HALL, center(39, 10), 'down', ALL_AREAS_OPEN)).toEqual({ kind: 'stairs', target: 'hall2', entry: { tx: 21, ty: 13, facing: 'left' } })
   })
   it('회관에는 낚시 자리가 없고, 이동기는 왼쪽 벽 로비(1~2, 8~9), 앞 (3,8) 오른쪽', () => {
     expect(HALL.spots).toEqual({})

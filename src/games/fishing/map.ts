@@ -155,6 +155,10 @@ export type FixtureAct =
   | { kind: 'fridge' }
   | { kind: 'trash' }
   | { kind: 'workbench' }
+  // 계단(마을회관 1·2층): 그 지역의 entry로 옮긴다. 2층은 기능 플래그 exhibit가 꺼져 있으면 화면이 막는다
+  | { kind: 'stairs'; target: AreaId; entry: TileFacing }
+  // 2층 전시관 받침대·데스크 → 전시관 창
+  | { kind: 'gallery' }
 /** front 칸에 서서 front.facing을 보면 act */
 export type Fixture = { front: TileFacing; act: FixtureAct }
 /**

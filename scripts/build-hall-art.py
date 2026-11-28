@@ -3,7 +3,7 @@
 
   python3 scripts/build-hall-art.py
 
-scripts/hall-art/exterior.py(외관 v2)와 interior.py(1층 실내 배경, 평면 v7)를 그려
+scripts/hall-art/exterior.py(외관 v2), interior.py(1층 실내 배경, 평면 v7), gallery.py(2층 전시관)를 그려
 스프라이트 데이터(행 문자열 + 팔레트)로 바꾼다. hallArt.ts는 직접 고치지 않는다.
 """
 import os
@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, 'hall-art'))
 import exterior  # noqa: E402
 import interior  # noqa: E402
+import gallery  # noqa: E402
 
 OUT = os.path.join(HERE, '..', 'src', 'games', 'fishing', 'hallArt.ts')
 # '.'은 투명. 따옴표·백슬래시는 TS 문자열을 깨므로 뺀다
@@ -53,7 +54,8 @@ def main():
     body = '// 생성 파일: python3 scripts/build-hall-art.py — 직접 고치지 않는다\n'
     body += '// 마을회관 외관(바닥 정렬, 마을 건물 사각형 왼쪽 위에서 x 0)과 1층 실내 배경(672×288 = 42×18칸)\n\n'
     body += ts('HALL_EXTERIOR', to_sprite(exterior.render())) + '\n'
-    body += ts('HALL_INTERIOR', to_sprite(interior.render()))
+    body += ts('HALL_INTERIOR', to_sprite(interior.render())) + '\n'
+    body += ts('HALL_GALLERY', to_sprite(gallery.render()))
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(body)
     print('wrote', os.path.relpath(OUT))

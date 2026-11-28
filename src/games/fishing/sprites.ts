@@ -5,7 +5,7 @@
 // 마을회관 외관·실내 배경은 생성 파일 hallArt.ts(scripts/build-hall-art.py)에서 온다.
 
 import { FISH_ART } from './fishArt.ts'
-import { HALL_EXTERIOR, HALL_INTERIOR } from './hallArt.ts'
+import { HALL_EXTERIOR, HALL_GALLERY, HALL_INTERIOR } from './hallArt.ts'
 
 export type Sprite = { w: number; h: number; rows: string[]; palette: Record<string, string> }
 
@@ -6020,6 +6020,7 @@ export const SPRITES: Record<string, Sprite> = {
   'node-tree': NODE_TREE,
   'node-rock': NODE_ROCK,
   'hall-interior': HALL_INTERIOR,
+  'hall-gallery': HALL_GALLERY,
   'map-you': MAP_YOU,
   'map-spot': MAP_SPOT,
   'map-exit': MAP_EXIT,
