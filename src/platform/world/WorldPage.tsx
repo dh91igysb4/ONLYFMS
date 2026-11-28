@@ -46,7 +46,7 @@ export function WorldPage() {
 
   return (
     <div className="stack">
-      <h2 className="page-title">{mod.manifest.name}</h2>
+      <h2 className="page-title sr-only">{mod.manifest.name}</h2>
       <Component key={game} gameId={game} onOpenGames={() => navigate('/games')} />
       {capped && (
         <p className="wallet-cap-toast" role="status">

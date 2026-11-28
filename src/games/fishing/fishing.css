@@ -4,7 +4,7 @@
 .fish-gold { font-size: 20px; font-variant-numeric: tabular-nums; color: var(--accent-strong); }
 
 .fish-stage { width: 100%; display: flex; justify-content: center; }
-.fish-frame { position: relative; max-width: 100%; }
+.fish-frame { position: relative; max-width: 100%; background: var(--panel); border-radius: 8px; overflow: hidden; }
 .fish-canvas {
   display: block;
   border-radius: 8px;
@@ -226,9 +226,12 @@
 .fish-bag-count { color: var(--muted); }
 .fish-bag-count strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .fish-menu { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-/* 좁은 폰(≈320~380px): 메뉴 다섯 개가 한 줄을 다 쓰고 버튼 여백을 줄여 한 줄에 들어간다 */
-@media (max-width: 400px) {
-  .fish-menu { flex: 1 1 100%; flex-wrap: nowrap; gap: 4px; }
+/* 폰(≤600px): 캔버스 배율은 정수라 남은 높이가 480px보다 작으면 1배로 작아진다. 캔버스 위·아래 줄을 줄여 2배를 지킨다.
+   - 게임 위 골드 줄은 숨긴다(머리글 지갑에 같은 골드가 있다). 전체화면에서는 머리글이 없으니 그대로 둔다.
+   - 메뉴 버튼은 한 줄을 고르게 나눠 쓰고, 버튼이 많아 넘치면(내 섬의 꾸미기) 고르게 두 줄로 내려간다. */
+@media (max-width: 600px) {
+  .fish:not(.fish-full) > .fish-top { display: none; }
+  .fish-menu { flex: 1 1 100%; flex-wrap: wrap; gap: 4px; }
   .fish-menu .btn { flex: 1 1 auto; padding: 0 6px; }
 }
 

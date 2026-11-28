@@ -53,6 +53,8 @@ function renderAt(game: string) {
 test('renders the registered component with its gameId and the manifest name', () => {
   renderAt('test-world')
   expect(screen.getByRole('heading', { name: '테스트 월드' })).toBeInTheDocument()
+  // 탭과 겹치는 큰 제목은 숨긴다(폰에서 캔버스가 쓸 높이를 늘린다)
+  expect(screen.getByRole('heading', { name: '테스트 월드' }).className).toContain('sr-only')
   expect(screen.getByText('fake:test-world')).toBeInTheDocument()
 })
 
