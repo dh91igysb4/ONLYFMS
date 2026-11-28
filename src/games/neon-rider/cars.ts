@@ -12,12 +12,12 @@ export type CarDef = { id: string; label: string; price: number; headOffset: num
 export const DEFAULT_CAR = 'coupe'
 
 export const CARS: readonly CarDef[] = [
-  // 쿠페(지금 노란 차): 지금 상수 그대로 → 쿠페로 달리면 차 도입 전과 같은 결과
-  { id: 'coupe', label: '쿠페', price: 0, headOffset: HEAD_OFFSET, headR: HEAD_R, bodyDY: BODY_DY, bodyR: BODY_R }, // 지붕 380 mm
-  { id: 'pickup', label: '픽업', price: 5000, headOffset: 270 * MM, headR: 180 * MM, bodyDY: 150 * MM, bodyR: 190 * MM }, // 450 mm
-  { id: 'buggy', label: '버기', price: 15000, headOffset: 175 * MM, headR: 155 * MM, bodyDY: 120 * MM, bodyR: 170 * MM }, // 330 mm
-  { id: 'sports', label: '스포츠카', price: 30000, headOffset: 150 * MM, headR: 130 * MM, bodyDY: 90 * MM, bodyR: 150 * MM }, // 280 mm
-  { id: 'f1', label: 'F1', price: 60000, headOffset: 125 * MM, headR: 105 * MM, bodyDY: 60 * MM, bodyR: 130 * MM }, // 230 mm
+  // 실제 차 비율(2026-11-28): 땅에서 지붕까지 ≈ 바퀴 지름의 배수로 맞춘다. 지붕 원 아래 끝은 모두 축선 위 20 mm(지형 긁힘 검사, cars.test).
+  { id: 'coupe', label: '쿠페', price: 0, headOffset: HEAD_OFFSET, headR: HEAD_R, bodyDY: BODY_DY, bodyR: BODY_R }, // 지붕 580 mm
+  { id: 'pickup', label: '픽업', price: 5000, headOffset: 360 * MM, headR: 340 * MM, bodyDY: 210 * MM, bodyR: 190 * MM }, // 700 mm
+  { id: 'buggy', label: '버기', price: 15000, headOffset: 270 * MM, headR: 250 * MM, bodyDY: 130 * MM, bodyR: 170 * MM }, // 520 mm
+  { id: 'sports', label: '스포츠카', price: 30000, headOffset: 250 * MM, headR: 230 * MM, bodyDY: 150 * MM, bodyR: 150 * MM }, // 480 mm
+  { id: 'f1', label: 'F1', price: 60000, headOffset: 180 * MM, headR: 160 * MM, bodyDY: 60 * MM, bodyR: 130 * MM }, // 340 mm
   { id: 'skate', label: '스케이트보드', price: 100000, headOffset: 110 * MM, headR: 90 * MM, bodyDY: 40 * MM, bodyR: 120 * MM }, // 200 mm
 ]
 

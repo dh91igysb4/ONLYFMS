@@ -737,8 +737,8 @@ describe('위험물 판정', () => {
   })
 
   it('두 바퀴 사이로 들어온 가는 레이저는 차대 캡슐에 걸려 crash', () => {
-    // 차체 판정원은 중점 위 200 mm, 반지름 180 mm라 중점 위 20 mm까지만 내려온다. 바퀴(반지름 180 mm)는 x로 700 mm 떨어져 있다.
-    // 차대 캡슐은 축선에서 BODY_DY 올라 있어 아래 끝이 축선 아래 40 mm(BODY_R − BODY_DY)다. 중점 아래 30 mm의 가는 레이저(반지름 10 mm)는 차대에만 닿는다.
+    // 쿠페 차체 판정원은 중점 위 300 mm, 반지름 280 mm라 중점 위 20 mm까지만 내려온다. 바퀴(반지름 180 mm)는 x로 700 mm 떨어져 있다.
+    // 차대 캡슐은 축선에서 BODY_DY 올라 있어 아래 끝이 축선 아래 20 mm(BODY_R − BODY_DY)다. 중점 아래 5 mm의 가는 레이저(반지름 10 mm)는 차대에만 닿는다.
     const base = initSimAt(courseFromTemplates([flatT]), TPL_X, 0)
     const mx = Math.floor((base.rear.x + base.front.x) / 2)
     const my = base.rear.y
@@ -747,12 +747,12 @@ describe('위험물 판정', () => {
       const c = courseFromTemplates([{ id: 'lz', tier: 1, prims: [{ t: 'hazard', dx: mx - TPL_X, dy: y, h: laser(0) }, { t: 'line', dx: mm(400000), dy: 0 }] }])
       return step(initSimAt(c, TPL_X, 0), false, c)
     }
-    expect(probe(my - mm(30)).dead).toBe('crash') // 차대 안, 차체 판정원·바퀴 밖
-    expect(probe(my - mm(150)).dead).toBeNull() // 차대 아래(−40 mm 밖), 땅(−180 mm) 위
+    expect(probe(my - mm(5)).dead).toBe('crash') // 차대 안, 차체 판정원·바퀴 밖
+    expect(probe(my - mm(150)).dead).toBeNull() // 차대 아래(−20 mm 밖), 땅(−180 mm) 위
   })
 
-  // 평지 축선(바퀴 중심, 땅 위 WHEEL_R) 위 300 mm에 진행 방향으로 누운 가는 막대(반지름 20 mm): 아래 끝은 축선 위 280 mm.
-  // f1(지붕 230, 캡슐 위 끝 190)·skate(200, 160)는 그 아래로 지나가고, coupe(캡슐 위 끝 340, 지붕 380)·pickup(지붕 450)은 걸린다.
+  // 평지 축선(바퀴 중심, 땅 위 WHEEL_R) 위 450 mm에 진행 방향으로 누운 가는 막대(반지름 20 mm): 아래 끝은 축선 위 430 mm.
+  // f1(지붕 340, 캡슐 위 끝 190)·skate(200, 160)는 그 아래로 지나가고, coupe(지붕 580)·pickup(지붕 700)은 걸린다.
   const BAR_X = mm(20000)
   const BAR_LEN = mm(500)
   const lowBar = courseFromTemplates([
@@ -760,7 +760,7 @@ describe('위험물 판정', () => {
       id: 'bar',
       tier: 1,
       prims: [
-        { t: 'hazard', dx: BAR_X, dy: WHEEL_R + mm(300), h: { shape: { s: 'bar', x0: 0, y0: 0, x1: BAR_LEN, y1: 0, r: mm(20) }, motion: still, look: 'laser' } },
+        { t: 'hazard', dx: BAR_X, dy: WHEEL_R + mm(450), h: { shape: { s: 'bar', x0: 0, y0: 0, x1: BAR_LEN, y1: 0, r: mm(20) }, motion: still, look: 'laser' } },
         { t: 'line', dx: mm(400000), dy: 0 },
       ],
     },
@@ -835,16 +835,17 @@ describe('움직이는 길', () => {
   const roadVx = (m: Motion, tick: number): number => poseAt(m, (tick + 1) * SUBSTEPS, null).dx - poseAt(m, tick * SUBSTEPS, null).dx
   const carVx = (s: SimState): number => Math.floor((vxOf(s.rear) + vxOf(s.front)) / 2)
 
-  it('움직이는 것이 없는 지형: 이 기능 전과 같은 결과(상태에 빈 movers·moversDone·blocks·blocksDone과 gemFloor -1, car "coupe"만 늘었다)', () => {
-    // 움직이는 길을 넣기 전 코드로 만든 최종 상태(JSON). 앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱.
-    const before = [
-      '{"tick":175,"rear":{"x":428420,"y":-36936,"px":425174,"py":-32900,"ground":false},"front":{"x":439806,"y":-17643,"px":438991,"py":-15044,"ground":false},"progress":18,"nextSection":0,"sectionScore":0,"flipScore":0,"airAngle":4718,"pending":null,"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
-      '{"tick":378,"rear":{"x":936344,"y":52061,"px":934107,"py":52520,"ground":false},"front":{"x":916208,"y":61878,"px":915063,"py":64574,"ground":false},"progress":88,"nextSection":1,"sectionScore":1,"flipScore":1,"airAngle":1705,"pending":{"flips":0,"perfect":false,"grace":9},"lastAward":{"tick":195,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":false}',
-      '{"tick":502,"rear":{"x":1316789,"y":-42439,"px":1314078,"py":-42586,"ground":false},"front":{"x":1295148,"y":-48213,"px":1292396,"py":-48213,"ground":true},"progress":211,"nextSection":2,"sectionScore":2,"flipScore":1,"airAngle":2198,"pending":null,"lastAward":{"tick":291,"flips":1,"perfect":false,"points":1},"gems":0,"takenGems":[],"dead":"crash","airBefore":true}',
-      '{"tick":249,"rear":{"x":478770,"y":-72646,"px":477591,"py":-69925,"ground":false},"front":{"x":456536,"y":-75391,"px":455326,"py":-72398,"ground":false},"progress":8,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2125,"pending":null,"lastAward":null,"gems":1,"takenGems":[3],"dead":"crash","airBefore":true}',
-      '{"tick":232,"rear":{"x":662729,"y":11678,"px":659826,"py":10166,"ground":true},"front":{"x":640476,"y":9103,"px":637102,"py":11678,"ground":false},"progress":76,"nextSection":1,"sectionScore":1,"flipScore":0,"airAngle":2044,"pending":{"flips":0,"perfect":false,"grace":3},"lastAward":null,"gems":0,"takenGems":[],"dead":"crash","airBefore":false}'
+  it('움직이는 것이 없는 지형: v7 기준 결과 고정(실제 차 비율 쿠페)', () => {
+    // v7(2026-11-28)에서 쿠페 지붕·차대가 실제 차 비율로 커져(지붕 380 → 580 mm) 이 기능 전(eadbecc) 값과는 같을 수 없다.
+    // 그래서 같은 시나리오의 v7 결과를 고정한다(앞 셋은 고정 템플릿에 무작위 입력 1500틱, 뒤 둘은 시드 코스에 규칙 입력 3000틱).
+    // 다섯 판 모두 v6보다 1~3틱 일찍 끝난다(커진 지붕이 먼저 땅에 닿음).
+    const expected = [
+      "{\"tick\":174,\"rear\":{\"x\":426277,\"y\":-34213,\"px\":423096,\"py\":-30153,\"ground\":false},\"front\":{\"x\":439242,\"y\":-15943,\"px\":438362,\"py\":-13518,\"ground\":false},\"progress\":18,\"nextSection\":0,\"sectionScore\":0,\"flipScore\":0,\"airAngle\":4636,\"pending\":null,\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":376,\"rear\":{\"x\":931879,\"y\":52969,\"px\":929713,\"py\":53401,\"ground\":true},\"front\":{\"x\":914344,\"y\":66910,\"px\":913648,\"py\":69187,\"ground\":false},\"progress\":88,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":1,\"airAngle\":1565,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":11},\"lastAward\":{\"tick\":195,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":499,\"rear\":{\"x\":1308820,\"y\":-43118,\"px\":1305908,\"py\":-43447,\"ground\":false},\"front\":{\"x\":1286543,\"y\":-40754,\"px\":1283930,\"py\":-38271,\"ground\":false},\"progress\":209,\"nextSection\":2,\"sectionScore\":2,\"flipScore\":1,\"airAngle\":1952,\"pending\":null,\"lastAward\":{\"tick\":291,\"flips\":1,\"perfect\":false,\"points\":1},\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":248,\"rear\":{\"x\":477591,\"y\":-69976,\"px\":476411,\"py\":-67331,\"ground\":false},\"front\":{\"x\":455326,\"y\":-72447,\"px\":454117,\"py\":-69528,\"ground\":false},\"progress\":8,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":2117,\"pending\":null,\"lastAward\":null,\"gems\":1,\"takenGems\":[3],\"dead\":\"crash\",\"airBefore\":true,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
+      "{\"tick\":230,\"rear\":{\"x\":657339,\"y\":9235,\"px\":653792,\"py\":7748,\"ground\":true},\"front\":{\"x\":635317,\"y\":13340,\"px\":632499,\"py\":15763,\"ground\":false},\"progress\":75,\"nextSection\":1,\"sectionScore\":1,\"flipScore\":0,\"airAngle\":1813,\"pending\":{\"flips\":0,\"perfect\":false,\"grace\":5},\"lastAward\":null,\"gems\":0,\"takenGems\":[],\"dead\":\"crash\",\"airBefore\":false,\"movers\":[],\"moversDone\":[],\"blocks\":[],\"blocksDone\":[],\"gemFloor\":-1,\"car\":\"coupe\"}",
     ]
-    // 위험물을 더한 템플릿(waves·boostjump·crestgap·loop·spikepit)과 새 템플릿을 빼고 바뀌지 않은 템플릿으로 바꿨다(둘째·넷째·다섯째 값은 이 기능 전 코드 eadbecc에서 같은 시나리오로 뽑음).
     const PRE_HAZARD_IDS = [
       'hill', 'waves', 'bowl', 'boostflat', 'spikes', 'valley', 'cliff', 'ledge', 'bigdrop', 'rampflat', 'ramp',
       'cup', 'quarter', 'boostjump', 'spikefloor', 'spikepit', 'roofs', 'stepup', 'crestgap', 'stairs', 'bowldrop',
@@ -862,7 +863,7 @@ describe('움직이는 길', () => {
       const c = makeSeededCourse(seed, statics)
       after.push(JSON.stringify(run(initSim(c), 3000, (_, i) => i % 50 < 30, c)))
     }
-    expect(after).toEqual(before.map((b) => b.slice(0, -1) + ',"movers":[],"moversDone":[],"blocks":[],"blocksDone":[],"gemFloor":-1,"car":"coupe"}'))
+    expect(after).toEqual(expected)
   })
 
   it('수평으로 왕복하는 길 위에 (길에 대해) 정지한 차는 방향이 네 번 바뀌는 동안 길과 함께 움직인다', () => {
@@ -1415,7 +1416,7 @@ describe('넘어지는 블록', () => {
     expect(s1.blocksDone).toEqual([0])
   })
 
-  it('C1: 시드 코스의 blocks 구간을 계속 누름으로 지나면 구덩이를 건너고, 어떤 블록도 자기 구간 끝 x를 넘어 남지 않으며, 다음 템플릿에서 멈추지 않는다', () => {
+  it('C1: 시드 코스의 blocks 구간을 계속 누름으로 지나고, 어떤 블록도 자기 구간 끝 x를 넘어 남지 않으며, 다음 템플릿에서 멈추지 않는다', () => {
     // 최종 리뷰의 재현: 이 시드들은 쓰러진 막대를 다음 템플릿(bowl·spiral·sinuous·stepup·pacman·rampflat·hill·stairs·loop2)까지 밀고 가 멈췄다.
     const centre = (b: BlockState) => Math.floor((Math.min(b.p[0], b.p[4], b.p[8], b.p[12]) + Math.max(b.p[0], b.p[4], b.p[8], b.p[12])) / 2)
     const run = (c: Course, k: number, s0: SimState, label: string) => {
@@ -1437,7 +1438,7 @@ describe('넘어지는 블록', () => {
         }
         expect(t - bestT, `${label}: 600틱 넘게 200 mm도 못 나아감(x ${Math.floor((cx - sec.endX) / MM)} mm, 구간 끝 기준)`).toBeLessThan(600)
       }
-      expect(cleared, `${label}: blocks 구간(구덩이)을 살아서 넘지 못함 (${s.dead})`).toBe(true)
+      expect(cleared, `${label}: blocks 구간을 살아서 넘지 못함 (${s.dead})`).toBe(true)
     }
     for (const n of [2, 4, 5, 7, 8, 11, 14, 20, 36]) {
       const c = makeSeededCourse(`review-seed-${n}`, TEMPLATES)

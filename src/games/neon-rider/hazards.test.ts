@@ -277,7 +277,7 @@ describe('차대 캡슐 (설계 §5.1)', () => {
     expect(hitAt(laser, car)).toBe(true)
   })
   it('바퀴 사이로 들어온 작은 날도 캡슐로 잡는다', () => {
-    const blade = hz({ s: 'blades', x: WHEELBASE / 2, y: -1500, rIn: 0, rOut: 1000, n: 1, w: TURN / 4 }, fixedAngle(TURN / 8)) // 위쪽 날
+    const blade = hz({ s: 'blades', x: WHEELBASE / 2, y: -900, rIn: 0, rOut: 1000, n: 1, w: TURN / 4 }, fixedAngle(TURN / 8)) // 위쪽 날
     expect(hitAt(blade, circlesOnly)).toBe(false)
     expect(hitAt(blade, car)).toBe(true)
   })

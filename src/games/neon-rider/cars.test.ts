@@ -9,11 +9,11 @@ const roof = (c: { headOffset: number; headR: number }): number => c.headOffset 
 describe('차 정의 (설계 §5)', () => {
   it('표의 6대: 순서·이름·가격·판정 치수(mm)', () => {
     expect(CARS.map((c) => [c.id, c.label, c.price, c.headOffset / MM, c.headR / MM, c.bodyDY / MM, c.bodyR / MM])).toEqual([
-      ['coupe', '쿠페', 0, 200, 180, 150, 190],
-      ['pickup', '픽업', 5000, 270, 180, 150, 190],
-      ['buggy', '버기', 15000, 175, 155, 120, 170],
-      ['sports', '스포츠카', 30000, 150, 130, 90, 150],
-      ['f1', 'F1', 60000, 125, 105, 60, 130],
+      ['coupe', '쿠페', 0, 300, 280, 170, 190],
+      ['pickup', '픽업', 5000, 360, 340, 210, 190],
+      ['buggy', '버기', 15000, 270, 250, 130, 170],
+      ['sports', '스포츠카', 30000, 250, 230, 150, 150],
+      ['f1', 'F1', 60000, 180, 160, 60, 130],
       ['skate', '스케이트보드', 100000, 110, 90, 40, 120],
     ])
     for (const c of CARS) for (const v of [c.headOffset, c.headR, c.bodyDY, c.bodyR]) expect(v % MM).toBe(0)
@@ -43,8 +43,8 @@ describe('차 정의 (설계 §5)', () => {
     expect(carById('skate').id).toBe('skate')
   })
 
-  it('CAR_REACH_MAX는 모든 차의 판정이 축선에서 닿는 최대 거리(픽업 지붕 450 mm)', () => {
-    expect(CAR_REACH_MAX).toBe(450 * MM)
+  it('CAR_REACH_MAX는 모든 차의 판정이 축선에서 닿는 최대 거리(픽업 지붕 700 mm)', () => {
+    expect(CAR_REACH_MAX).toBe(700 * MM)
     for (const c of CARS) expect(Math.max(roof(c), c.bodyDY + c.bodyR)).toBeLessThanOrEqual(CAR_REACH_MAX)
   })
 })

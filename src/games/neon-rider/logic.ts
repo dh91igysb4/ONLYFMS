@@ -18,7 +18,7 @@ const ERR_DONE = 'finished'
 const hex8 = (n: number): string => (n >>> 0).toString(16).padStart(8, '0')
 
 export const logic: GameLogic<Puzzle, Action, State, PublicState> = {
-  version: 6,
+  version: 7,
 
   pickPuzzle(rng, options) {
     let seed = ''
