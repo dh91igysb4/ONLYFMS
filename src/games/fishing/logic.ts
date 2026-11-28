@@ -17,7 +17,7 @@ import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } fro
 const FURN_CAP = 99
 import type { NodeKind } from './map.ts'
 import {
-  ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, LICENSE_PRICE, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
+  ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, LICENSE_PRICE, MAX_BAIT_BATCH, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
   type BaitKind, type Econ,
 } from './research.ts'
 import {
@@ -297,7 +297,7 @@ export type Action =
   | { type: 'cast'; area: string; power: number; spot?: string; bait?: BaitKind; target?: string }
   // 경제 P1(v27, 기능 플래그): 일반 물고기 → 어분, 미끼 만들기(price는 화면이 본 골드), 연구 해금
   | { type: 'grind'; items: { index: number; id?: number }[] }
-  | { type: 'makeBait'; kind: BaitKind; price: number }
+  | { type: 'makeBait'; kind: BaitKind; price: number; count?: number }
   | { type: 'buyLicense'; price: number }
   // 경제 P2(v27, 플래그 exhibit·alchemy): 재포획 기증, 영구 전시, 지역 재료 추출, 포션 만들어 마시기, 전시관 확장
   | { type: 'donate'; index: number; id?: number }
@@ -1149,7 +1149,8 @@ export const logic: WorldLogic<State, Action, View> = {
   //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종), 경제 P2(gallery: 기증·전시·재료·포션·확장, Fish.bonus).
   //     새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
   // 28: 연구 낚시 대상 입질 확률 전설 3% → 1.5%, 신화 1% → 0.75%(보장 50·100번은 그대로). 세이브 형식은 27과 같다
-  version: 28,
+  // 29: makeBait의 count(미끼 여러 개 한 번에, 최대 MAX_BAIT_BATCH). count 없으면 1개로 28과 같다. 세이브 형식은 28과 같다
+  version: 29,
   wallet: true,
   init,
   migrate,
@@ -1374,21 +1375,23 @@ function grind(state: State, a: Record<string, unknown>): Out {
   }
 }
 
-/** 미끼 만들기(P1): 1회 1개. 집어는 플래그 bait, 전설·신화는 research + 연구 해금 + 그 등급 발견 */
+/** 미끼 만들기(P1): count개(없으면 1, v29). 모자라면 하나도 만들지 않는다. 집어는 플래그 bait, 전설·신화는 research + 연구 해금 + 그 등급 발견 */
 function makeBait(state: State, a: Record<string, unknown>, gold: number): Out {
   if (typeof a.kind !== 'string' || !BAIT_KINDS.includes(a.kind as BaitKind)) return { error: 'bad_action' }
   const kind = a.kind as BaitKind
   if (!featureOn(kind === 'attractor' ? 'bait' : 'research')) return { error: 'feature_off' }
   const r = BAIT_RECIPES[kind]
+  const n = a.count === undefined ? 1 : a.count
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > MAX_BAIT_BATCH) return { error: 'bad_action' }
   if (a.price !== r.gold) return { error: 'price_changed' }
   if (kind !== 'attractor') {
     if (!state.econ.license) return { error: 'no_license' }
     if (!state.legends.some((id) => speciesById(id).rarity === kind)) return { error: 'not_discovered' }
   }
-  if (state.econ.meal < r.meal) return { error: 'no_meal' }
-  if (gold < r.gold) return { error: 'not_enough_gold' }
-  const econ: Econ = { ...state.econ, meal: state.econ.meal - r.meal, baits: { ...state.econ.baits, [kind]: state.econ.baits[kind] + 1 } }
-  return { state: { ...state, econ }, gold: -r.gold }
+  if (state.econ.meal < r.meal * n) return { error: 'no_meal' }
+  if (gold < r.gold * n) return { error: 'not_enough_gold' }
+  const econ: Econ = { ...state.econ, meal: state.econ.meal - r.meal * n, baits: { ...state.econ.baits, [kind]: state.econ.baits[kind] + n } }
+  return { state: { ...state, econ }, gold: -r.gold * n }
 }
 
 /** 연구 해금(P1, 플래그 research): 계정당 한 번, 전설 1종 이상 발견 */

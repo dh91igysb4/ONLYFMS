@@ -1,7 +1,7 @@
 // 낚시 경제 P1 화면(경제 설계 r4 §2.2): 어분·미끼 만들기, 연구 해금, 다음 투척에 쓸 미끼·대상 고르기.
 // 값과 규칙은 서버 view(econ)와 research.ts를 그대로 보여 주고, 행동은 콜백으로만 올린다. 기능 플래그가 꺼져 있으면 Game이 그리지 않는다.
 import { SPECIES } from './data.ts'
-import { BAIT_RECIPES, LICENSE_PRICE, newEcon, type BaitKind, type Econ } from './research.ts'
+import { BAIT_RECIPES, LICENSE_PRICE, maxBait, newEcon, type BaitKind, type Econ } from './research.ts'
 import type { View } from './logic.ts'
 
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
@@ -20,7 +20,8 @@ type Props = {
   research: boolean
   selected: CastBait | null
   onSelect(b: CastBait | null): void
-  onMake(kind: BaitKind): void
+  /** count는 최대로 만들기에서만(없으면 1개) */
+  onMake(kind: BaitKind, count?: number): void
   onLicense(): void
   /** 전시관 열기(경제 P2, 플래그 exhibit). 없으면 버튼을 보이지 않는다 */
   onOpenGallery?(): void
@@ -59,15 +60,22 @@ export function EconSection({ view, busy, research, selected, onSelect, onMake, 
       <ul className="fish-rods" aria-label="미끼">
         {kinds.map((k) => {
           const r = BAIT_RECIPES[k]
+          const n = canMake(k) ? maxBait(k, e.meal, view.gold) : 0
           return (
             <li key={k} className="fish-rod">
               <div className="fish-rod-info">
                 <strong>{`${BAIT_NAMES[k]} ${e.baits[k]}개`}</strong>
                 <span className="muted">{`${BAIT_DESC[k]} · ${gold(r.gold)} + 어분 ${r.meal}`}</span>
+                {n > 1 && <span className="muted">{`최대 ${n}개 · ${gold(r.gold * n)} + 어분 ${r.meal * n}`}</span>}
               </div>
-              <button type="button" className="btn btn-primary btn-sm" aria-label={`${BAIT_NAMES[k]} 만들기`} disabled={busy || !canMake(k)} onClick={() => onMake(k)}>
-                만들기
-              </button>
+              <div className="fish-bait-actions">
+                <button type="button" className="btn btn-primary btn-sm" aria-label={`${BAIT_NAMES[k]} 만들기`} disabled={busy || !canMake(k)} onClick={() => onMake(k)}>
+                  만들기
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" aria-label={`${BAIT_NAMES[k]} 최대 ${n}개 만들기`} disabled={busy || n < 2} onClick={() => onMake(k, n)}>
+                  {n > 1 ? `최대 ${n}개` : '최대'}
+                </button>
+              </div>
             </li>
           )
         })}

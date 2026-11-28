@@ -34,6 +34,18 @@ describe('EconSection', () => {
     fireEvent.click(screen.getByRole('button', { name: '집어 미끼 만들기' }))
     expect(on.onMake).toHaveBeenCalledWith('attractor')
   })
+  test('최대로 만들기: 어분·골드로 만들 수 있는 만큼 → onMake(attractor, n), 개수와 총액을 보여 준다', () => {
+    const on = econ(makeView({ gold: 120, econ: { ...newEcon(), meal: 10 } }))
+    const max = screen.getByRole('button', { name: '집어 미끼 최대 2개 만들기' })
+    expect(max.textContent).toContain('최대 2개')
+    expect(screen.getByText(/2개 · 100 G \+ 어분 2/)).toBeTruthy()
+    fireEvent.click(max)
+    expect(on.onMake).toHaveBeenCalledWith('attractor', 2)
+  })
+  test('최대가 1개 이하면 최대로 만들기 버튼은 막힌다(만들기 버튼과 같다)', () => {
+    econ(makeView({ gold: 1000, econ: { ...newEcon(), meal: 1 } }))
+    expect((screen.getByRole('button', { name: /집어 미끼 최대 .*만들기/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
   test('연구 해금: 전설 발견 전에는 막히고, 발견 뒤 누르면 onLicense', () => {
     econ(makeView())
     expect((screen.getByRole('button', { name: '해금' }) as HTMLButtonElement).disabled).toBe(true)
