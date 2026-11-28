@@ -21,10 +21,10 @@ export const BAIT_RECIPES: Readonly<Record<BaitKind, { gold: number; meal: numbe
 export const LICENSE_PRICE = 50_000
 /** 집어 미끼: 그 투척 1회의 일반 rare 등급 가중치 배율. 전설·신화 확률에는 영향 없다 */
 export const ATTRACTOR_RARE = 1.2
-/** 연구 낚시: 대상 입질 확률(호기심 찌면 ×1.5)과 대상별 입질 보장 횟수 */
+/** 연구 낚시: 대상 입질 확률(호기심 찌면 ×1.5)과 대상별 입질 보장 횟수. 확률은 v28(2026-11-28)에 3%·1% → 1.5%·0.75% */
 export const RESEARCH = {
-  legend: { chance: 0.03, guarantee: 50 },
-  mythic: { chance: 0.01, guarantee: 100 },
+  legend: { chance: 0.015, guarantee: 50 },
+  mythic: { chance: 0.0075, guarantee: 100 },
 } as const
 export const RESEARCH_CURIOUS = 1.5
 /** 다시 잡은 전설·신화(origin recatch) 판매가 배율: round(판매가 × 0.5) */

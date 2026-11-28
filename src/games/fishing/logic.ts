@@ -1148,7 +1148,8 @@ export const logic: WorldLogic<State, Action, View> = {
   // 27: 서버 싸움 시간 검사(챈 뒤 180초 넘은 성공은 놓침, 12초 넘은 퍼펙트는 일반), 경제 P1(econ: 어분·미끼·연구 해금·대상별 보장, cast의 bait·target, grind·makeBait·buyLicense, recatch 판매가 50%)과
   //     지역 가격 보정(섬·갯벌·산정 호수 일반 50종), 경제 P2(gallery: 기증·전시·재료·포션·확장, Fish.bonus).
   //     새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
-  version: 27,
+  // 28: 연구 낚시 대상 입질 확률 전설 3% → 1.5%, 신화 1% → 0.75%(보장 50·100번은 그대로). 세이브 형식은 27과 같다
+  version: 28,
   wallet: true,
   init,
   migrate,
