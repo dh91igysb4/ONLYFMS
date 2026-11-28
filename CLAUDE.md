@@ -51,6 +51,12 @@
 - `timeoutAction`은 아직 보이지 않은 무작위 결과에 기대지 않는 "다음 행동 하나"를 돌려준다. 서버가 턴이 넘어갈 때까지 반복 호출한다.
 - `duel.prepare`(선택)는 대국 시작 때 DB에서 판 같은 준비 값을 받는 RPC 이름이다(`^[a-z_]+$`, 인자 `p_options jsonb`, `authenticated`에 실행 권한). `duel` 함수가 시작 트랜잭션에서 `select public.<prepare>(options)`를 불러 그 결과를 `DuelLogic.init(rng, options, prepared?)`의 세 번째 인자로 넘기고, 한 화면 대전 페이지는 `supabase.rpc(prepare, { p_options })`로 같은 값을 받는다. 호출이 실패하거나 null을 돌려주거나 결과 모양이 틀려 `init`이 던지면 409 `prepare_failed`(같은 트랜잭션 롤백). 한 화면 대전은 manifest `options`를 먼저 고르게 하고(`src/platform/duel/OptionSelects.tsx`, 대국 만들기와 공용) 그 설정으로 준비·`init`한다. `DuelLogic.view(state, viewer, ended?)`의 `ended`는 대국이 끝났는지(status가 active가 아님, 같은 화면은 `result.over`)이고, 거절 이유 `error`가 영문 코드(`^[a-z0-9_]+$`)가 아니면 화면에 그대로 뜬다. 준비 값이 필요 없는 게임은 두지 않는다(티키타카토: `ttt_pick_puzzle`)
 
+실시간 대전(레이싱, 설계 `docs/superpowers/specs/2026-11-28-duel-racer-design.md`)은 다음이 더 다르다:
+- manifest `duel.realtime: { raceSeconds }`가 있으면 실시간 대전이다. 플랫폼은 이 값으로만 가른다(게임 id 분기 금지). `turnSeconds`는 쓰지 않지만 타입 때문에 레이스 시간으로 채운다. `sameScreen: false`.
+- 화면은 `src/games/ui.ts`의 `getRealtimeComponent`(`RealtimeGameProps`, 지금은 `mode: 'practice'`만). 혼자 연습은 `/duel/practice/:game`(`DuelPracticePage`, 터치 전용 기기는 `isPcCapable`로 막음), 대전 홈의 "혼자 연습" 패널이 연다.
+- 2단계(온라인 대국·결과 보고 `report`) 전까지 `duel` 함수 `create`가 409 `realtime_unsupported`를 돌려주고, 대국 만들기 목록에서도 뺀다.
+- `src/games/duel-racer/`: Deno가 번들하는 `manifest.ts`·`logic.ts`·`constants.ts`는 `three`·Rapier·`physics/`·`render/`를 import하지 않는다. 물리(Rapier, `physics/`)·장면(Three, `render/`)·레이스(`race.ts`)는 `RacerGame.tsx`가 동적 `import()`로만 불러 메인 번들에 들어가지 않는다. 수치는 `constants.ts` 한 곳. 코스는 `course/`(neon-1은 제어점을 펴서 3,400m로 맞춘 고가 도로).
+
 상점 품목 추가(설계 `2026-11-24-neon-rider-cars-design.md` §7·§10): 게임 옵션 하나를 상점 품목으로 팔려면 manifest 그 옵션에 `shop: true`, `Manifest.shop: { option, items: [{ id, price }] }`(items는 옵션 choices와 같은 id 집합, 가격 0은 모두가 가진 기본 품목)을 둔다. 마이그레이션에는 고정 형식 `insert into public.shop_items (game_id, item_id, price) values (…);` 한 문장을 쓰고, 가격을 바꿀 때는 새 마이그레이션에 `update public.shop_items set price = N where game_id = '…' and item_id = '…';`을 쓰고 manifest도 함께 바꾼다(`registry.test.ts`가 마이그레이션 최종 상태와 비교, 품목 삭제는 다루지 않는다). 구매·장착·목록은 RPC `buy_item`(화면이 본 가격을 보내고 다르면 `price_mismatch`)·`equip_item`·`my_items`만이고 지갑은 `_gold_move` reason `shop`(지출이라 사이트 하루 상한과 무관)으로만 바뀐다. 경쟁 모드(데일리·대회·대전)는 `pinShopOptions`(play·duel 함수가 부른다)로 `shop` 옵션을 manifest `default`에 고정해 산 품목이 들어가지 않게 한다. 품목을 만지면 `play`·`duel` 함수를 다시 배포한다.
 
 지속형(world) 게임은 대전과 비슷하게 추가한다:
