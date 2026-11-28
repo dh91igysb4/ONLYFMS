@@ -3,11 +3,11 @@ import { useEffect, useRef } from 'react'
 import { WHEELBASE, WHEEL_R } from './constants.ts'
 import { paintCar } from './render.ts'
 
-// 차 좌표(mm): 꼬리 -230 ~ 앞끝 1620, 바닥 -180(바퀴 바닥) ~ 위 720(가장 높은 지붕 700).
-const A0 = -230
-const A1 = 1620
-const B0 = -180
-const B1 = 720
+// 차 좌표(mm): 꼬리 -280 ~ 앞끝 1680(바퀴 220 mm와 빛 번짐), 바닥 -260(바퀴 바닥) ~ 위 740(가장 높은 지붕 705).
+const A0 = -280
+const A1 = 1680
+const B0 = -260
+const B1 = 740
 
 /** size는 캔버스 가로 px(세로는 그림 비율에 맞춘다). */
 export function CarPreview({ itemId, size }: { itemId: string; size: number }) {

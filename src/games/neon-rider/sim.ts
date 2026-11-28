@@ -54,7 +54,7 @@ import {
   wakeNear,
 } from './blocks.ts'
 import type { BlockState, BlockWork } from './blocks.ts'
-import { CAR_REACH_MAX, DEFAULT_CAR, carById, type CarDef } from './cars.ts'
+import { CAR_REACH_MAX, DEFAULT_CAR, carById, headStops, type CarDef } from './cars.ts'
 import type { Course } from './course.ts'
 import { hazardHit } from './hazards.ts'
 import { motionDone, subtick } from './motion.ts'
@@ -332,15 +332,16 @@ function union(a: Box, b: Box): Box {
   return { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) }
 }
 
-// 지붕 판정원 중심: 두 바퀴 중점에서 차의 윗방향으로 off(차의 headOffset).
-function headOf(r: Body, f: Body, off: number): { x: number; y: number } {
+// 지붕 판정 원들의 중심: 두 바퀴 중점에서 차의 윗방향으로 off(차의 headOffset), 축 방향으로 headStops(차)의 각 값만큼.
+function headsOf(r: Body, f: Body, car: CarDef): { x: number; y: number }[] {
   const dx = f.x - r.x
   const dy = f.y - r.y
   const dist = Math.max(1, rodLen(r, f))
-  return {
-    x: Math.floor((r.x + f.x) / 2) + divRound(-dy * off, dist),
-    y: Math.floor((r.y + f.y) / 2) + divRound(dx * off, dist),
-  }
+  const off = car.headOffset
+  return headStops(car).map((t) => ({
+    x: Math.floor((r.x + f.x) / 2) + divRound(-dy * off + dx * t, dist),
+    y: Math.floor((r.y + f.y) / 2) + divRound(dx * off + dy * t, dist),
+  }))
 }
 
 // 차 중심 x가 든 구간의 최저점(첫 구간 앞의 시작 평지는 y = 0).
@@ -429,7 +430,7 @@ export function initSim(course: Course, car?: string): SimState {
 export function step(s: SimState, hold: boolean, course: Course): SimState {
   if (s.dead) return s
   const car: CarDef = carById(s.car)
-  const head = (a: Body, b: Body) => headOf(a, b, car.headOffset)
+  const head = (a: Body, b: Body) => headsOf(a, b, car)
   // pushCar에 넘길 블록을 고르는 여유: 바퀴는 바퀴 중심에서 WHEEL_R, 판정원은 그 중심에서 headR, 캡슐은 바퀴 중심에서 bodyDY + bodyR 안.
   // 쿠페는 캡슐이 가장 멀다(340 mm). 낮은 차(스케이트보드 160 mm)는 바퀴가 더 멀어 WHEEL_R이 정한다.
   const pushReach = Math.max(WHEEL_R, car.headR, car.bodyDY + car.bodyR)
@@ -487,7 +488,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     for (let it = 0; it < CONSTRAINT_ITERS; it++) {
       rod(r, f)
       if (bws.length > 0) {
-        pushCar(r, f, head, blocksNearCar(bws, [r, f, head(r, f)], pushReach), car)
+        pushCar(r, f, head, blocksNearCar(bws, [r, f, ...head(r, f)], pushReach), car)
         solveBlocks(bws)
         bc = blockWorkCands(blocksNearCar(bws, [r, f], WHEEL_R + GROUND_TOL + V_TERMINAL)) // 이번 반복에 바퀴가 더 움직여도 닿을 수 있는 것
       }
@@ -501,8 +502,8 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     }
     const all = bc.length > 0 ? sub.concat(bc) : sub
     // ⑤ 차체 판정원(이동 단계마다 확인해 빠른 회전에서도 놓치지 않는다). 블록에 닿는 것은 죽음이 아니다(설계 §7.2).
-    const h = head(r, f)
-    if (hitsCircle(h.x, h.y, car.headR, sub)) crashed = true
+    const hs = head(r, f)
+    for (const h of hs) if (hitsCircle(h.x, h.y, car.headR, sub)) crashed = true
     const moving = runs.length > 0 || bws.length > 0
     if (!crashed && moving && (crushed(r, ox[0], oy[0], all) || crushed(f, ox[1], oy[1], all))) crashed = true
     // ⑤' 위험물: 바퀴 둘·차체 판정원·차대 캡슐을 그 이동 단계의 시각으로 확인한다.
@@ -511,7 +512,7 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
         circles: [
           { x: r.x, y: r.y, r: WHEEL_R },
           { x: f.x, y: f.y, r: WHEEL_R },
-          { x: h.x, y: h.y, r: car.headR },
+          ...hs.map((h) => ({ x: h.x, y: h.y, r: car.headR })),
         ],
         capsule: { ...chassisOf(r, f, car.bodyDY), r: car.bodyR },
       }
@@ -591,14 +592,14 @@ export function step(s: SimState, hold: boolean, course: Course): SimState {
     else gemFloor = Math.max(gemFloor, id)
   }
   const taken = new Set(takenGems)
-  const h = head(r, f)
+  const hs = head(r, f)
   for (const g of list) {
     if (g.id <= gemFloor || taken.has(g.id)) continue
     if (
       near(r.x, r.y, g.x, g.y, WHEEL_R) ||
       near(f.x, f.y, g.x, g.y, WHEEL_R) ||
       near(cx, cy, g.x, g.y, WHEEL_R) ||
-      near(h.x, h.y, g.x, g.y, car.headR)
+      hs.some((h) => near(h.x, h.y, g.x, g.y, car.headR))
     ) {
       takenGems.push(g.id)
       gems++
