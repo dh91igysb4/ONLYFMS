@@ -393,3 +393,9 @@ a.fm-row:hover .fm-row-sub, a.fm-row:hover .fm-row-go { color: var(--ink); }
 .fm-tabs > .active, .fm-tabs > [aria-selected='true'] { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent-strong); }
 
 .btn-text { font: inherit; background: transparent; border: 0; padding: 0; color: var(--accent-strong); font-weight: 700; text-decoration: none; cursor: pointer; }
+
+/* 상점 패널 (자유 플레이) */
+.shop-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.shop-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.shop-name { flex: 1 1 80px; min-width: 0; font-weight: 600; }
+.shop-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
