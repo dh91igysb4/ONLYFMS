@@ -135,3 +135,26 @@ test('landing assist rights a tilted car', () => {
 test('no assist beyond LANDING_ASSIST_MAX_DEG', () => {
   expect(dropTest(120)).toBeLessThan(0.5)
 })
+
+function jumpLanding(speed: number): { minUpInAir: number; endUp: number } {
+  const c = rampCourse()
+  const { w, car } = setup(c, { pos: { x: 0, y: 1.1, z: 300 }, yaw: 0 })
+  run(w, car, NO_CONTROLS, 0.3)
+  car.body.setLinvel({ x: 0, y: 0, z: speed }, true)
+  let air = false
+  let minUp = 1
+  run(w, car, GAS, 6, false, () => {
+    const s = carState(car)
+    if (!s.grounded && s.pos.z > 395) air = true
+    if (air) minUp = Math.min(minUp, s.up.y)
+  })
+  return { minUpInAir: minUp, endUp: carState(car).up.y }
+}
+
+test('without air input the car stays level over a jump and lands on its wheels', () => {
+  for (const v of [30, 45, 55]) {
+    const r = jumpLanding(v)
+    expect(r.minUpInAir).toBeGreaterThan(0.9)
+    expect(r.endUp).toBeGreaterThan(0.95)
+  }
+})
