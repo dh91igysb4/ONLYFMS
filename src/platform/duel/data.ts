@@ -30,6 +30,9 @@ export const POLL_MS = 5000
 const CLOCK_MS = 1000
 /** tick이 네트워크 오류 등으로 실패했을 때 다시 보내기까지 */
 const TICK_RETRY_MS = 5000
+/** 실시간 대전 보고 재시도 첫 간격과 최대 간격(ms) */
+const REPORT_RETRY_MS = 2000
+const REPORT_RETRY_MAX_MS = 10_000
 
 const RANK: Record<DuelView['status'], number> = { waiting: 0, active: 1, finished: 2, void: 2 }
 
@@ -265,7 +268,8 @@ export function useDuelMatch(id: string): DuelMatch {
   )
   /**
    * 실시간 대전 결과 보고(레이싱 설계 §7). 차례·busy와 무관하게 보낸다(기권 버튼과 겹쳐도 버리지 않는다).
-   * 거절(409 already_reported·finished 등)은 실린 화면으로 맞추고, 네트워크 실패는 한 번 더 보낸다.
+   * 거절(409 already_reported·finished 등)은 실린 화면으로 맞춘다. 네트워크·5xx 실패는 대국 마감까지 간격을 늘려
+   * 가며 다시 보낸다(최종 리뷰 I5: 잠깐 끊긴 사이 보고를 잃으면 완주가 미완주 패가 된다). 화면을 떠나도 계속 보낸다.
    */
   const report = useCallback(
     (payload: unknown) => {
@@ -273,18 +277,19 @@ export function useDuelMatch(id: string): DuelMatch {
       if (!v || v.status !== 'active' || v.my_seat === null) return
       const g = gen.current
       const forId = v.match_id
-      const attempt = (left: number): void => {
+      const deadline = v.turn_deadline ? Date.parse(v.turn_deadline) : now() + REPORT_RETRY_MAX_MS
+      const attempt = (wait: number): void => {
         duel({ action: 'report', match_id: forId, payload })
           .then((r) => { if (current(g, forId)) apply(r) })
           .catch((e) => {
-            if (!current(g, forId)) return
             const fresh = bodyView(e)
-            if (fresh) apply(fresh)
-            else if (left > 0 && !(e instanceof ApiError && e.status < 500)) setTimeout(() => attempt(left - 1), TICK_RETRY_MS)
-            else void refresh()
+            if (fresh) { if (current(g, forId)) apply(fresh); return }
+            const retryable = !(e instanceof ApiError) || e.status >= 500
+            if (retryable && now() + wait < deadline) setTimeout(() => attempt(Math.min(wait * 2, REPORT_RETRY_MAX_MS)), wait)
+            else if (current(g, forId)) void refresh()
           })
       }
-      attempt(1)
+      attempt(REPORT_RETRY_MS)
     },
     [apply, current, refresh],
   )

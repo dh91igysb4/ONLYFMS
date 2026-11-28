@@ -624,3 +624,24 @@ test('unmount closes the link', async () => {
   r.unmount()
   expect(links[0].close).toHaveBeenCalled()
 })
+
+test('a report that keeps failing on the network is retried until it lands (최종 리뷰 I5)', async () => {
+  current = rt()
+  renderAt()
+  await flush()
+  const done = rt({ status: 'finished', winner: 0, end_reason: 'normal', final_scores: [4300, 4500], turn_deadline: null })
+  let fails = 3
+  duelMock.mockImplementation(async (b: { action: string }) => {
+    if (b.action === 'report') {
+      if (fails-- > 0) throw new ApiError('internal', 503)
+      current = done
+      return done
+    }
+    if (b.action === 'view') return current
+    throw new Error(`unexpected ${b.action}`)
+  })
+  act(() => rtProps!.report!({ my: 4300, opp: null, met: true }))
+  await advance(60_000)
+  expect(calls('report')).toHaveLength(4)
+  expect(rtProps!.result).toEqual({ winner: 0, void: false, scores: [4300, 4500] })
+})
