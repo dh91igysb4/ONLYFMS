@@ -18,7 +18,7 @@ function makeView(over: Partial<View> = {}): View {
 }
 const fish = (id: number, species: string, extra: Partial<Fish> = {}): Fish => ({ id, origin: 'normal', species, sizeCm: 12, perfect: false, ...extra })
 const econ = (view: View, research = true, selected = null as Parameters<typeof EconSection>[0]['selected']) => {
-  const on = { onSelect: vi.fn(), onMake: vi.fn(), onLicense: vi.fn() }
+  const on = { onSelect: vi.fn(), onMake: vi.fn(), onLicense: vi.fn(), onAutoMeal: vi.fn() }
   render(<EconSection view={view} busy={false} research={research} selected={selected} {...on} />)
   return on
 }
@@ -45,6 +45,28 @@ describe('EconSection', () => {
   test('최대가 1개 이하면 최대로 만들기 버튼은 막힌다(만들기 버튼과 같다)', () => {
     econ(makeView({ gold: 1000, econ: { ...newEcon(), meal: 1 } }))
     expect((screen.getByRole('button', { name: /집어 미끼 최대 .*만들기/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  test('자동 어분: 꺼져 있으면 꺼짐, 기준을 넣고 저장하면 onAutoMeal(값)', () => {
+    const on = econ(makeView())
+    const box = screen.getByRole('group', { name: '자동 어분' })
+    expect(box.textContent).toContain('꺼짐')
+    const input = within(box).getByRole('spinbutton', { name: '자동 어분 기준 판매가' })
+    const save = within(box).getByRole('button', { name: '저장' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '0' } })
+    expect(save.disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '40' } })
+    fireEvent.click(save)
+    expect(on.onAutoMeal).toHaveBeenCalledWith(40)
+    expect(within(box).queryByRole('button', { name: '끄기' })).toBeNull()
+  })
+  test('자동 어분이 켜져 있으면 기준을 보여 주고 끄기 → onAutoMeal(null)', () => {
+    const on = econ(makeView({ econ: { ...newEcon(), autoMeal: 30 } }))
+    const box = screen.getByRole('group', { name: '자동 어분' })
+    expect(box.textContent).toContain('30 G 이하')
+    expect((within(box).getByRole('spinbutton') as HTMLInputElement).value).toBe('30')
+    fireEvent.click(within(box).getByRole('button', { name: '끄기' }))
+    expect(on.onAutoMeal).toHaveBeenCalledWith(null)
   })
   test('연구 해금: 전설 발견 전에는 막히고, 발견 뒤 누르면 onLicense', () => {
     econ(makeView())

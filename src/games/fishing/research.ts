@@ -46,7 +46,11 @@ export type Econ = {
   license: boolean
   /** 대상별 유효 미끼 투척 수(대상을 잡으면 0, 놓치면 유지). 0인 키는 두지 않는다 */
   pity: Record<string, number>
+  /** 자동 어분 기준 판매가(G, v30). 잡은 일반 물고기의 판매가가 이 값 이하면 가방 대신 어분. 없으면 꺼짐 */
+  autoMeal?: number
 }
+/** 자동 어분 기준의 상한(G) */
+export const AUTO_MEAL_MAX = 1_000_000
 export const newEcon = (): Econ => ({ meal: 0, baits: { attractor: 0, legend: 0, mythic: 0 }, license: false, pity: {} })
 
 const speciesOf = (id: string): Species | undefined => SPECIES.find((s) => s.id === id)
