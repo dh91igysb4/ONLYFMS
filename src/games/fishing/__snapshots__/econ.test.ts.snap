@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`지역 가격 보정(r4) > 섬·갯벌·산정 호수만 오르고 전설·신화 가격은 그대로 1`] = `
+[
+  [
+    "grouper",
+    2500,
+  ],
+  [
+    "golden-mandarin",
+    3000,
+  ],
+  [
+    "century-snakehead",
+    2800,
+  ],
+  [
+    "silver-king-trout",
+    4000,
+  ],
+  [
+    "fire-dragonfish",
+    6000,
+  ],
+  [
+    "rainbow-marlin",
+    8000,
+  ],
+  [
+    "king-croaker",
+    5000,
+  ],
+  [
+    "thousand-turtle",
+    5500,
+  ],
+  [
+    "imugi",
+    20000,
+  ],
+  [
+    "snowwhite-taimen",
+    6500,
+  ],
+  [
+    "white-dragon",
+    24000,
+  ],
+  [
+    "oarfish",
+    9000,
+  ],
+  [
+    "dragon-king",
+    30000,
+  ],
+]
+`;

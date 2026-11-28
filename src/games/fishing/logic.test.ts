@@ -7,6 +7,8 @@ import { AREAS, FISHING_AREAS, FRIDGE_SIZE, TP_BASE, TP_PER_10, BAGS, bagSize, B
 import { canDecorate, isleArrival, isleMap, isleNodes, isleZoneTiles } from './isle.ts'
 import { ALL_AREAS_OPEN, isWalkable, reachableTiles } from './map.ts'
 import { challengeMatches, decayedSale, discardFee, freeBonus, kstDay, sellRatePct, soldToday, LAST_GOLD_IN_SAVE, logic, pickPool, price, progressChallenges, rollCatch, PREVIEW_AREAS_KEY, PREVIEW_ISLE_KEY, sellPrice, sizePercentile, teleporterOpen, type Action, type CastCtx, type Fish, type IsleState, type Pending, type State, type View } from './logic.ts'
+import { newEcon } from './research.ts'
+import { newGallery } from './gallery.ts'
 import { M1_FIXTURE, SPECIES_BEFORE_EXPANSION, TMP_DEEP, TMP_FLAT, TMP_MYTH, withSpeciesPrefix, withTempData } from './testFixtures.ts'
 
 const seedBytes = (n: number): Uint8Array => new Uint8Array(32).map((_, i) => (i * 7 + n) & 255)
@@ -339,9 +341,22 @@ const viewW = (s: WS, c: { now: number }): View => {
  * 기존 migrate 시험은 "세이브 + 지갑"을 WS 한 객체로 비교한다. migrate 결과에는 gold가 없어야 한다.
  */
 function migrateW(raw: unknown, from: number): WS {
-  const m = logic.migrate(raw, from)
+  const m = asNoEcon(raw, logic.migrate(raw, from), from)
   expect(m, 'v14 migrate 결과에는 gold가 없다').not.toHaveProperty('gold')
   return { ...(from < 26 ? asOldFish(raw, m) : m), gold: logic.legacyGold!(raw, from) }
+}
+/**
+ * v27 econ 계약(옛 세이브는 빈 econ)을 확인한 뒤, 옛 migrate 시험이 v26 모양 그대로 비교하도록 econ을 지운다.
+ * logic.init()으로 만든 fixture는 econ을 들고 있으니 그 값이면 남긴다.
+ */
+function asNoEcon(raw: unknown, m: State, from: number): State {
+  if (from >= 27) return m
+  expect(m.econ).toEqual(newEcon())
+  expect(m.gallery).toEqual(newGallery())
+  const { econ: _e, gallery: _g, ...rest } = m
+  const had = (raw as { econ?: unknown } | null)?.econ
+  const hadG = (raw as { gallery?: unknown } | null)?.gallery
+  return { ...rest, ...(had !== undefined ? { econ: had } : {}), ...(hadG !== undefined ? { gallery: hadG } : {}) } as State
 }
 /**
  * v26 물고기 id 계약을 확인한 뒤, 옛 migrate 시험이 v25 모양 그대로 비교하도록 되돌린다:
@@ -388,9 +403,9 @@ const withHooked = (over: Partial<WS> = {}): WS =>
 
 describe('fishing WorldLogic', () => {
   it('init and version', () => {
-    expect(logic.version).toBe(26)
+    expect(logic.version).toBe(27)
     expect(logic.init()).toEqual({
-      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1,
+      totalEarned: 0, rodTier: 1, bagTier: 1, areas: [...DEFAULT_AREAS], bag: [], dex: {}, legends: [], tackles: [], equipped: [], challenges: {}, buffs: [], pending: null, ...W0, nextFishId: 1, econ: newEcon(), gallery: newGallery(),
     })
   })
 
@@ -460,7 +475,9 @@ describe('fishing WorldLogic', () => {
     const later = now + 2 * WEEK + 5_000_000
     expect(conditionsAt(later).season).not.toBe(p.cond.season)
     expect(conditionsAt(later).gameDay).not.toBe(p.cond.gameDay)
-    const r = ok(play(hooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
+    // 싸움 시간 상한(v27, MAX_FIGHT_MS) 안에서 거두도록 챈 시각만 옮긴다: 판정은 던질 때 조건
+    const lateHooked = { ...hooked, pending: { ...hooked.pending!, hookedAt: later - 5000 } }
+    const r = ok(play(lateHooked, { type: 'resolve', success: true, perfect: false }, ctx(later)))
     expect(r.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: p.species, sizeCm: p.sizeCm, perfect: false }])
   })
 
@@ -735,7 +752,8 @@ describe('fishing WorldLogic', () => {
   })
 
   it('resolve success adds to bag and dex; maxCm keeps the larger', () => {
-    const late = ctx(T0 + 100_000)
+    // 퍼펙트 상한(v27, PERFECT_MAX_MS 12초) 안
+    const late = ctx(BITE + 5000)
     let s = withHooked({ dex: { anchovy: { count: 1, maxCm: 14 } } })
     let r = ok(play(s, { type: 'resolve', success: true, perfect: true }, late))
     expect(r.result).toEqual({ caught: { id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: true } })
@@ -853,7 +871,7 @@ describe('fishing WorldLogic', () => {
 
   it('migrate fills missing fields and keeps gold/dex', () => {
     const m = migrateW({ gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } }, 0)
-    const { nextFishId: _n, ...init0 } = logic.init()
+    const { nextFishId: _n, econ: _e, gallery: _g, ...init0 } = logic.init()
     expect(m).toEqual({ ...init0, gold: 500, dex: { anchovy: { count: 2, maxCm: 12 } } })
     expect(logic.migrate(null, 1)).toEqual(logic.init())
     expect(logic.migrate('x', 1)).toEqual(logic.init())
@@ -1096,11 +1114,11 @@ describe('가방 잠금', () => {
   it('resolve: 전설은 잠긴 채 가방에 들어가고, 일반 어종은 잠기지 않는다', () => {
     const p = withHooked().pending!
     const legend = withHooked({ pending: { ...p, species: 'grouper', sizeCm: 120 } })
-    const r = ok(play(legend, { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    const r = ok(play(legend, { type: 'resolve', success: true, perfect: false }, ctx(BITE + 5000)))
     const fish = { id: 1, origin: 'first' as const, species: 'grouper', sizeCm: 120, perfect: false, locked: true }
     expect(r.state.bag).toEqual([fish])
     expect(r.result).toEqual({ caught: fish })
-    const n = ok(play(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(T0 + 1e6)))
+    const n = ok(play(withHooked(), { type: 'resolve', success: true, perfect: false }, ctx(BITE + 5000)))
     expect(n.state.bag).toEqual([{ id: 1, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false }])
   })
 
@@ -1161,9 +1179,9 @@ describe('도전과제', () => {
   })
 
   it('강 비: 비 오는 날 던지고 맑은 날 거둬도 센다; 맑은 날 던지고 비 올 때 거두면 안 센다', () => {
-    const rainCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'rain') })
-    // 거두는 시각(now)은 맑은 날·다른 계절이어도 된다
+    // 거두는 시각(now)은 맑은 날·다른 계절이어도 된다(챈 시각은 싸움 시간 상한 안으로)
     const sunnyNow = nowAt(5, 9)
+    const rainCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'rain'), hookedAt: sunnyNow - 5000 })
     expect(conditionsAt(sunnyNow).weather === 'sun' || conditionsAt(sunnyNow).season !== 'summer').toBe(true)
     expect(land(rainCast, false, sunnyNow).state.challenges['river-rain']).toEqual({ progress: 1, done: false })
     const sunCast = hooked({ area: 'river', spot: 'river', species: 'pale-chub', cond: cond('summer', 12, 'sun') })
@@ -2047,7 +2065,7 @@ describe('v14 지갑 계약', () => {
     const { gold: _g, ...rest } = v13
     expect(m).not.toHaveProperty('gold')
     const legacyBag = rest.bag.map((f, i) => ({ ...f, id: i + 1, origin: 'legacy' }))
-    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null })
+    expect(m).toEqual({ ...rest, bag: legacyBag, nextFishId: 3, sold: { day: '', n: 0 }, fridge: [], shoesTier: 1, isle: null, econ: newEcon(), gallery: newGallery() })
     expect(logic.legacyGold!(v13, 13)).toBe(123_456)
     // 이전 뒤(v14) 세이브를 다시 읽어도 같고, 골드는 다시 나오지 않는다
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 14)).toEqual(m)
@@ -2256,8 +2274,8 @@ describe('버리기', () => {
     expect(err(play(s, { type: 'discard', index: 1, fee, species: 'anchovy', sizeCm: 40 }, ctx()))).toBe('bag_changed')
     expect(ok(play(s, { type: 'discard', index: 1, fee, species: 'mackerel', sizeCm: 40 }, ctx())).state.bag).toEqual([mack(30)])
   })
-  it('version 25', () => {
-    expect(logic.version).toBe(26)
+  it('version 27', () => {
+    expect(logic.version).toBe(27)
   })
 })
 
