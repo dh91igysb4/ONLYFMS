@@ -12,7 +12,9 @@ export async function fetchMyItems(gameId: string): Promise<{ owned: string[]; e
 /** price는 화면이 본 가격. 다르면 서버가 price_mismatch를 던진다 */
 export async function buyItem(gameId: string, itemId: string, price: number): Promise<{ balance: number }> {
   const d = await rpc<{ balance: number | string }>('buy_item', { p_game: gameId, p_item: itemId, p_price: price })
-  return { balance: Number(d?.balance) }
+  const balance = Number(d?.balance)
+  if (d?.balance == null || !Number.isFinite(balance)) throw new Error('bad_response')
+  return { balance }
 }
 
 export async function equipItem(gameId: string, itemId: string): Promise<void> {

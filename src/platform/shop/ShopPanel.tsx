@@ -2,12 +2,13 @@ import { useState } from 'react'
 import type { Manifest } from '../../games/types.ts'
 import { getShopPreview } from '../../games/ui.ts'
 import { setBalance } from '../../lib/walletStore.ts'
+import { fetchMyWallet } from '../wallet/api.ts'
 import { formatGold } from '../wallet/format.ts'
 import { buyItem } from './api.ts'
 
 const MESSAGES: Record<string, string> = {
   not_enough_gold: 'JWD가 부족해요',
-  price_mismatch: '가격이 바뀌었어요. 다시 열어 주세요',
+  price_mismatch: '가격이 바뀌었어요. 페이지를 새로 고쳐 주세요',
   already_owned: '이미 가진 품목이에요',
 }
 
@@ -22,10 +23,12 @@ type Props = {
   selected: string
   onBought(itemId: string): void
   onSelect(itemId: string): void
+  /** 산 품목 목록을 다시 읽는다 (사기에 실패했어도 서버에선 샀을 수 있다) */
+  onRefresh(): void
   onClose(): void
 }
 
-export function ShopPanel({ gameId, manifest, owned, selected, onBought, onSelect, onClose }: Props) {
+export function ShopPanel({ gameId, manifest, owned, selected, onBought, onSelect, onRefresh, onClose }: Props) {
   const shop = manifest.shop
   const [confirming, setConfirming] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -45,6 +48,9 @@ export function ShopPanel({ gameId, manifest, owned, selected, onBought, onSelec
     } catch (e) {
       setError(shopErrorMessage(e instanceof Error ? e.message : ''))
       setConfirming(null)
+      // 응답만 잃고 서버에서는 샀을 수 있으니 보유 목록과 잔액을 다시 읽는다
+      onRefresh()
+      void fetchMyWallet().catch(() => {})
     } finally {
       setBusy(false)
     }

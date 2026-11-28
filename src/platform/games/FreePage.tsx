@@ -80,6 +80,7 @@ function FreeBody({ game, mod, items }: { game: string; mod: GameModule; items: 
           manifest={manifest}
           owned={owned}
           selected={options[shop.option]}
+          onRefresh={items.refresh}
           onBought={(id) => { setBought((b) => [...b, id]); items.refresh(); choose(shop.option, id) }}
           onSelect={(id) => choose(shop.option, id)}
           onClose={() => setShopOpen(false)}

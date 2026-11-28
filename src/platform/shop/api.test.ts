@@ -40,3 +40,10 @@ test('equipItem: equip_item을 부르고, 오류 코드를 던진다', async () 
   rpcMock.mockResolvedValue({ data: null, error: { message: 'not_owned', code: 'P0001', details: null } })
   await expect(equipItem('neon-rider', 'f1')).rejects.toThrow('not_owned')
 })
+
+test('buyItem: 응답이 비었거나 잔액이 숫자가 아니면 bad_response', async () => {
+  rpcMock.mockResolvedValue({ data: {}, error: null })
+  await expect(buyItem('g', 'x', 1)).rejects.toThrow('bad_response')
+  rpcMock.mockResolvedValue({ data: { balance: 'abc' }, error: null })
+  await expect(buyItem('g', 'x', 1)).rejects.toThrow('bad_response')
+})

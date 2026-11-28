@@ -34,7 +34,8 @@ create table public.user_items (
   equipped  boolean not null default false,
   bought_at timestamptz not null default now(),
   primary key (user_id, game_id, item_id),
-  foreign key (game_id, item_id) references public.shop_items (game_id, item_id) on delete cascade
+  -- restrict: 품목 행을 지워도 산 사람의 보유(와 장부)가 사라지지 않게 한다
+  foreign key (game_id, item_id) references public.shop_items (game_id, item_id) on delete restrict
 );
 
 -- 한 게임에 장착은 하나

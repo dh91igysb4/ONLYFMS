@@ -2,7 +2,7 @@
 -- 승인 사용자 역할로 RPC를 부르고, 잔액·장부·보유 행은 슈퍼유저로 확인한다.
 -- 같은 품목을 동시에 두 번 사는 경우는 pgTAP(한 세션)로 재현할 수 없어 supabase/functions/play/shop.test.ts가 본다.
 begin;
-select plan(55);
+select plan(56);
 
 \set a '00000000-0000-0000-0000-0000000009a1'
 \set b '00000000-0000-0000-0000-0000000009a2'
@@ -166,6 +166,10 @@ set local role authenticated;
 set local request.jwt.claims = :'B';
 select is((select count(*)::int from public.my_items('neon-rider')), 0, '아무것도 안 산 사용자의 my_items는 비었다');
 reset role;
+
+-- 보유자가 있는 품목 행은 지울 수 없다 (on delete restrict)
+select throws_ok($$delete from public.shop_items where game_id = 'neon-rider' and item_id = 'skate'$$,
+  '23503', null, '보유자가 있는 shop_items 행은 못 지운다');
 
 select * from finish();
 rollback;
