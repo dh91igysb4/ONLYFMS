@@ -28,6 +28,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
   const [hud, setHud] = useState<RaceSnapshot | null>(null)
   const [best, setBest] = useState<number | null>(null)
   const [round, setRound] = useState(0)
+  const [touch] = useState(isTouchDevice)
   const keys = useRef(new Set<string>())
   // 공중에 뜬 뒤 새로 누른 키(기울기용). 땅에 닿으면 비운다
   const airKeys = useRef(new Set<string>())
@@ -35,6 +36,20 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
   const raceRef = useRef<{ mod: RaceMod; race: Race } | null>(null)
   const exitRef = useRef(onExit)
   exitRef.current = onExit
+
+  // 키·화면 버튼: 같은 키 집합을 쓴다. 공중에 뜬 뒤 새로 누른 키는 airKeys에도 넣는다(기울기용).
+  const press = useCallback((code: string) => {
+    if (airborneRef.current && !keys.current.has(code)) airKeys.current.add(code)
+    keys.current.add(code)
+  }, [])
+  const release = useCallback((code: string) => {
+    keys.current.delete(code)
+    airKeys.current.delete(code)
+  }, [])
+  const reset = useCallback(() => {
+    const r = raceRef.current
+    if (r) r.mod.requestReset(r.race)
+  }, [])
 
   // 키: 게임 키는 기본 동작(스크롤)을 막는다. 포커스를 잃으면 모두 뗀다.
   useEffect(() => {
@@ -44,36 +59,31 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
         return
       }
       if (e.code === 'KeyR') {
-        const r = raceRef.current
-        if (r) r.mod.requestReset(r.race)
+        reset()
         return
       }
       if (GAME_KEYS.has(e.code)) {
         e.preventDefault()
-        if (!e.repeat && airborneRef.current) airKeys.current.add(e.code)
-        keys.current.add(e.code)
+        if (!e.repeat) press(e.code)
       }
     }
-    const up = (e: KeyboardEvent) => {
-      keys.current.delete(e.code)
-      airKeys.current.delete(e.code)
-    }
-    const release = () => {
+    const up = (e: KeyboardEvent) => release(e.code)
+    const releaseAll = () => {
       keys.current.clear()
       airKeys.current.clear()
     }
-    const vis = () => { if (document.visibilityState === 'hidden') release() }
+    const vis = () => { if (document.visibilityState === 'hidden') releaseAll() }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    window.addEventListener('blur', release)
+    window.addEventListener('blur', releaseAll)
     document.addEventListener('visibilitychange', vis)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', release)
+      window.removeEventListener('blur', releaseAll)
       document.removeEventListener('visibilitychange', vis)
     }
-  }, [])
+  }, [press, release, reset])
 
   // 불러오기 → 레이스·장면 만들기 → rAF 루프. round가 바뀌면(다시 달리기) 새로.
   useEffect(() => {
@@ -163,7 +173,7 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
   const filled = snap ? Math.floor(snap.nitro.gauge * NITRO_CELLS + 1e-9) : 0
 
   return (
-    <div className="dr">
+    <div className={touch ? 'dr dr-touch' : 'dr'}>
       <div className="dr-stage">
         <canvas ref={canvasRef} className="dr-canvas" aria-label="레이스 화면" />
         {phase === 'loading' && <p className="dr-overlay" role="status">불러오는 중…</p>}
@@ -202,7 +212,56 @@ export function RacerGame({ onExit }: RealtimeGameProps) {
           </>
         )}
       </div>
-      <p className="dr-help">방향키·WASD 운전 · 공중에서 A/D 방향, W/S 기울기 · Shift 니트로(안 쓰면 잠시 뒤 저절로 참) · R 복귀 · Esc 나가기</p>
+      {touch && phase === 'ready' && (
+        <>
+          <div className="dr-corner">
+            <button type="button" className="btn btn-ghost" onClick={reset}>복귀</button>
+            <button type="button" className="btn btn-ghost" onClick={onExit}>나가기</button>
+          </div>
+          <TouchPad press={press} release={release} />
+        </>
+      )}
+      {!touch && <p className="dr-help">방향키·WASD 운전 · 공중에서 A/D 방향, W/S 기울기 · Shift 니트로(안 쓰면 잠시 뒤 저절로 참) · R 복귀 · Esc 나가기</p>}
+    </div>
+  )
+}
+
+/** 터치 위주 기기인지(손가락이 주 입력). 버튼 패드를 띄운다 */
+function isTouchDevice(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+}
+
+const PAD: { code: string; label: string; text: string; area: string }[] = [
+  { code: 'ArrowLeft', label: '왼쪽', text: '◀', area: 'left' },
+  { code: 'ArrowRight', label: '오른쪽', text: '▶', area: 'right' },
+  { code: 'ShiftLeft', label: '니트로', text: '니트로', area: 'nitro' },
+  { code: 'ArrowDown', label: '브레이크', text: '브레이크', area: 'brake' },
+  { code: 'ArrowUp', label: '가속', text: '가속', area: 'gas' },
+]
+
+/** 화면 아래 1/3 조작 버튼. 손가락마다 따로 누르고 뗀다(여러 개 동시에) */
+function TouchPad({ press, release }: { press(code: string): void; release(code: string): void }) {
+  return (
+    <div className="dr-pad">
+      {PAD.map((b) => (
+        <button
+          key={b.code}
+          type="button"
+          aria-label={b.label}
+          className={`dr-pad-btn dr-pad-${b.area}`}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+            press(b.code)
+          }}
+          onPointerUp={() => release(b.code)}
+          onPointerCancel={() => release(b.code)}
+          onLostPointerCapture={() => release(b.code)}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {b.text}
+        </button>
+      ))}
     </div>
   )
 }

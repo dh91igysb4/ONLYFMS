@@ -7,8 +7,6 @@ let admin = true
 vi.mock('../auth/AuthProvider.tsx', () => ({
   useAuth: () => ({ profile: { id: 'u1', handle: 'kane', status: 'approved', is_admin: admin } }),
 }))
-let pc = true
-vi.mock('./pcOnly.ts', () => ({ isPcCapable: () => pc }))
 vi.mock('../../games/index.ts', async (orig) =>
   (await import('../../test-fixtures/duel.ts')).withRealtimeDuel(await orig<typeof import('../../games/index.ts')>()))
 const onExitSeen = vi.hoisted(() => ({ fn: null as null | (() => void) }))
@@ -37,7 +35,6 @@ function renderAt(game: string) {
 beforeEach(() => {
   cleanup()
   admin = true
-  pc = true
 })
 
 test('admin on a PC sees the realtime game in practice mode', () => {
@@ -52,11 +49,10 @@ test('hidden realtime game is not found for non-admins', () => {
   expect(screen.queryByTestId('race')).toBeNull()
 })
 
-test('touch-only device sees the PC notice', () => {
-  pc = false
+test('practice opens on touch devices too (no PC-only notice)', () => {
   renderAt('realtime-duel')
-  expect(screen.getByText('PC에서만 할 수 있어요')).toBeTruthy()
-  expect(screen.queryByTestId('race')).toBeNull()
+  expect(screen.queryByText('PC에서만 할 수 있어요')).toBeNull()
+  expect(screen.getByTestId('race')).toBeTruthy()
 })
 
 test('turn-based duel has no practice page', () => {

@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Controls } from './physics/controls.ts'
 
 type Snap = Record<string, unknown> & { car: Record<string, unknown>; nitro: { gauge: number; burning: boolean } }
@@ -173,4 +173,47 @@ test('in the air the arrow keys turn and tilt instead of steering (tilt only for
   expect(c.yaw).toBe(1)
   expect(c.pitch).toBe(1)
   expect(c.steer).toBe(0)
+})
+
+describe('touch pad', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('coarse'), media: q, addEventListener() {}, removeEventListener() {} }))
+  })
+
+  test('touch devices get on-screen buttons below the game', async () => {
+    mount()
+    await loaded()
+    for (const name of ['왼쪽', '오른쪽', '가속', '브레이크', '니트로']) expect(screen.getByRole('button', { name })).toBeTruthy()
+  })
+
+  test('holding gas and left drives; letting go stops', async () => {
+    h.snap = { ...baseSnap(), tick: 100, countdown: null }
+    mount()
+    await loaded()
+    fireEvent.pointerDown(screen.getByRole('button', { name: '가속' }), { pointerId: 1 })
+    fireEvent.pointerDown(screen.getByRole('button', { name: '왼쪽' }), { pointerId: 2 })
+    await frame()
+    expect(h.advanced.at(-1)!.throttle).toBe(1)
+    expect(h.advanced.at(-1)!.steer).toBe(-1)
+    fireEvent.pointerUp(screen.getByRole('button', { name: '왼쪽' }), { pointerId: 2 })
+    fireEvent.pointerCancel(screen.getByRole('button', { name: '가속' }), { pointerId: 1 })
+    await frame()
+    expect(h.advanced.at(-1)!.throttle).toBe(0)
+    expect(h.advanced.at(-1)!.steer).toBe(0)
+  })
+
+  test('nitro button boosts', async () => {
+    h.snap = { ...baseSnap(), tick: 100, countdown: null }
+    mount()
+    await loaded()
+    fireEvent.pointerDown(screen.getByRole('button', { name: '니트로' }), { pointerId: 3 })
+    await frame()
+    expect(h.advanced.at(-1)!.nitro).toBe(true)
+  })
+})
+
+test('mouse devices get no on-screen buttons', async () => {
+  mount()
+  await loaded()
+  expect(screen.queryByRole('button', { name: '가속' })).toBeNull()
 })
