@@ -9,6 +9,7 @@ import {
 import { teleportFee, teleporterWorld } from './teleport.ts'
 import { DEFAULT_OUTFIT, isShopItem, isWearSlot, newlyEarned, ownsWear, WEAR, WEAR_SLOTS, wearItem, wearKey, type Outfit } from './wardrobe.ts'
 import { canDecorate, isleNodes } from './isle.ts'
+import { ownedFacilities } from './facility.ts'
 import { DECOS, DECO_MAX, isDecoId, type DecoId, type DecoPlaced } from './deco.ts'
 import { HOUSE_MAX, ISLE_ZONES, MAT_CAP, TOOL_IDS, TOOL_MAX, clearCost, houseCost, houseNeedsCleared, toolCost, zoneNeeds, type Mats, type ToolId } from './isleEcon.ts'
 import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } from './home.ts'
@@ -1176,6 +1177,8 @@ export const logic: WorldLogic<State, Action, View> = {
   publicView: (state) => ({
     isle: state.isle && { layout: state.isle.layout, cleared: state.isle.cleared, house: state.isle.house, placed: state.isle.placed, deco: state.isle.deco },
     outfit: state.outfit,
+    // 섬 시설 외형(facility.ts). 남의 섬에서도 보이게
+    facilities: ownedFacilities(state.gallery.projects),
   }),
   freeBonus,
 }

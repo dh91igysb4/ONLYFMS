@@ -21,6 +21,7 @@ import { EconSection, econOf, type CastBait } from './EconPanel.tsx'
 import { GalleryPanel, galleryOf } from './GalleryPanel.tsx'
 import { CALM_BAR, potionOn, stageB } from './gallery.ts'
 import { galleryScene } from './scene.ts'
+import { facilityScene } from './facility.ts'
 import { PREVIEW_ISLE_KEY, fishSellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -184,7 +185,7 @@ type Runtime = {
   /** 남의 섬에 있으면 그 주인 id, 아니면 null(내 섬 설계 §5.6) */
   owner: string | null
   /** 남의 섬 구경 값(publicView: 섬 모양·옷차림). 남의 섬이 아니면 null */
-  isleView: { isle: IsleLike; outfit: unknown } | null
+  isleView: { isle: IsleLike; outfit: unknown; facilities?: unknown } | null
   /** 지역 전환 페이드 알파(0~1) */
   fade: number
   /** 이 방문에 뚫은 얼음 구멍("tx,ty", 오래된 순). 맵을 떠나면 비운다 */
@@ -992,6 +993,15 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     startTransition('isle', isleArrival(shape.layout), owner && handle ? `${handle}의 섬` : undefined, { ...shape, owner })
   }
   /** 지금 있는(또는 갈) 섬·집의 맵 값: 남의 섬이면 구경 값, 아니면 내 서버 상태 */
+  /** 지금 섬(내 섬 또는 구경하는 섬)의 시설 외형. 남의 섬은 publicView의 facilities(옛 서버면 없음) */
+  const facilitiesHere = () => {
+    if (rt.owner !== null) {
+      const v = rt.isleView
+      return v?.isle && Array.isArray(v.facilities) ? facilityScene(v.isle.layout, v.facilities) : []
+    }
+    const v = viewRef.current
+    return v?.isle ? facilityScene(v.isle.layout, galleryOf(v).projects) : []
+  }
   const shapeNow = (): IsleShape | null => (rt.owner !== null ? shapeOf(rt.isleView?.isle) : shapeOf(viewRef.current?.isle))
   /** 내 섬·집에서 서버 상태가 바뀌었으면(짓기·놓기·치우기) 페이드 없이 맵만 바꾼다(서 있는 칸은 그대로 걸을 수 있다) */
   const refreshOwnPlace = () => {
@@ -1026,7 +1036,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     rt.busy = true
     setBusy(true)
     try {
-      const res = await worldVisit<{ isle: IsleLike; outfit: unknown }>(gameId, p.id)
+      const res = await worldVisit<{ isle: IsleLike; outfit: unknown; facilities?: unknown }>(gameId, p.id)
       if (!alive.current) return
       const shape = shapeOf(res.view?.isle)
       if (!shape) {
@@ -1275,6 +1285,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       holding: showRef.current?.show.kind === 'brag' ? showRef.current.show.species : null,
       fame: rt.map.id === 'hall' ? fameFramesRef.current : undefined,
       gallery: rt.map.id === 'hall2' && viewRef.current ? galleryScene(galleryOf(viewRef.current)) : undefined,
+      facilities: rt.map.id === 'isle' ? facilitiesHere() : undefined,
     }, size)
   }
 

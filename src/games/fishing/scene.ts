@@ -4,6 +4,7 @@
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
 import { HALL2_PEDESTALS, HALL2_THEME_FLOOR, HALL2_WINGS } from './maps/hall2.ts'
+import type { FacilityId } from './facility.ts'
 import { THEME_LOOK, themeLook, type Gallery, type ThemeId } from './gallery.ts'
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
 import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
@@ -57,6 +58,8 @@ export type WorldScene = {
   fame?: readonly FameFrame[]
   /** 마을회관 2층 전시관(hall2): 전시한 물고기 받침대와 확장 안 한 구역(공사 테이프) */
   gallery?: GalleryScene
+  /** 내 섬(또는 구경하는 섬)의 시설 외형(facility.ts). 바다 칸 위에 그린다 */
+  facilities?: readonly { id: FacilityId; tx: number; ty: number }[]
 }
 
 /** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
@@ -1383,6 +1386,100 @@ function drawGallery(ctx: CanvasRenderingContext2D, g: GalleryScene): void {
   }
 }
 
+const FAC_C = {
+  rock: '#7d7a83', rockL: '#a3a0a8', rockD: '#55525c', foam: '#e8f6fb',
+  sand: '#e9d6a3', sandD: '#cdb47c', grass: '#79b55a', grassD: '#4f8a3c',
+  white: '#f4f1ea', red: '#c8443c', redD: '#93302b', iron: '#3b3f4a', glassL: '#fff2a8', glassOff: '#9fb7c4', beam: '#fff6c9',
+  pool: '#5cc6c8', poolL: '#9be3e0', stone: '#9a948a', stoneL: '#c4beb2', steam: '#f2f6f8', trunk: '#7a5634', leaf: '#3f7f46', blossom: '#f2a6c0',
+  dome: '#9fd6ee', domeL: '#d9f2fb', domeD: '#5a9fc0', ring: '#4a5262', ringL: '#6d778a', bubble: '#d4f1fb', lamp: '#ffd36a',
+} as const
+/** 가로 띠(행마다 [왼쪽 여백, 폭])로 둥근 모양을 칠한다 */
+function spans(ctx: CanvasRenderingContext2D, x: number, y: number, rows: readonly (readonly [number, number])[], color: string): void {
+  rows.forEach(([l, w], i) => rect(ctx, x + l, y + i, w, 1, color))
+}
+const oval = (w: number, h: number): [number, number][] =>
+  Array.from({ length: h }, (_, i) => {
+    const t = (i + 0.5) / h * 2 - 1
+    const half = Math.round((w / 2) * Math.sqrt(1 - t * t))
+    return [Math.round(w / 2) - half, 2 * half]
+  })
+/** 섬 시설(바다 위 바위섬). x·y는 자리 왼쪽 위 월드 픽셀, night는 0~1 */
+function drawFacility(ctx: CanvasRenderingContext2D, id: FacilityId, x: number, y: number, tMs: number, night: number): void {
+  const C = FAC_C
+  if (id === 'lighthouse') {
+    // 바위섬(3×3칸 아래쪽) + 흰·빨강 줄무늬 탑(위로 솟음) + 등롱
+    spans(ctx, x + 2, y + 26, oval(44, 22), C.foam)
+    spans(ctx, x + 4, y + 26, oval(40, 19), C.rockD)
+    spans(ctx, x + 5, y + 25, oval(38, 16), C.rock)
+    rect(ctx, x + 10, y + 28, 6, 3, C.rockL); rect(ctx, x + 32, y + 32, 5, 2, C.rockL); rect(ctx, x + 22, y + 36, 4, 2, C.rockL)
+    const tx = x + 18
+    for (let i = 0; i < 6; i++) rect(ctx, tx, y + 30 - i * 7 - 7, 12, 7, i % 2 ? C.red : C.white)
+    rect(ctx, tx + 9, y - 12, 3, 42, 'rgba(0,0,0,0.12)')
+    rect(ctx, tx - 3, y - 14, 18, 3, C.iron)
+    rect(ctx, tx + 1, y - 22, 10, 8, C.iron)
+    const on = night > 0.2 || Math.floor(tMs / 900) % 2 === 0
+    rect(ctx, tx + 2, y - 21, 8, 6, on ? C.glassL : C.glassOff)
+    spans(ctx, tx, y - 28, [[4, 4], [2, 8], [1, 10], [0, 12]].map(([l, w]) => [l, w] as const), C.redD)
+    if (night > 0.2) {
+      // 도는 빛줄기: 왼쪽·오른쪽으로 번갈아 뻗는다
+      const dir = Math.sin(tMs / 700) >= 0 ? 1 : -1
+      const len = 10 + Math.round(Math.abs(Math.sin(tMs / 700)) * 22)
+      for (let k = 0; k < len; k += 2) rect(ctx, dir > 0 ? tx + 10 + k : tx + 2 - k - 2, y - 19 - Math.floor(k / 6), 2, 2 + Math.floor(k / 6) * 2, C.beam)
+    }
+    return
+  }
+  if (id === 'spring') {
+    // 모래·풀 섬(4×3칸) + 돌 테두리 온천 + 김 + 벚나무
+    spans(ctx, x + 1, y + 3, oval(62, 44), C.foam)
+    spans(ctx, x + 3, y + 4, oval(58, 40), C.sandD)
+    spans(ctx, x + 4, y + 4, oval(56, 38), C.sand)
+    spans(ctx, x + 8, y + 7, oval(48, 30), C.grass)
+    rect(ctx, x + 12, y + 30, 6, 2, C.grassD); rect(ctx, x + 44, y + 14, 5, 2, C.grassD)
+    spans(ctx, x + 18, y + 17, oval(30, 18), C.stone)
+    spans(ctx, x + 20, y + 18, oval(26, 16), C.stoneL)
+    spans(ctx, x + 22, y + 20, oval(22, 12), C.pool)
+    rect(ctx, x + 27, y + 23, 6, 1, C.poolL); rect(ctx, x + 35, y + 27, 4, 1, C.poolL)
+    for (let k = 0; k < 3; k++) {
+      const ph = ((tMs / 1600 + k / 3) % 1)
+      const sx = x + 26 + k * 6 + Math.round(Math.sin(tMs / 500 + k) * 1.5)
+      const sy = y + 20 - Math.round(ph * 16)
+      if (ph < 0.85) {
+        rect(ctx, sx, sy, 4, 3, C.steam)
+        rect(ctx, sx + 1, sy - 1, 2, 1, C.steam)
+      }
+    }
+    rect(ctx, x + 11, y + 10, 3, 12, C.trunk)
+    spans(ctx, x + 4, y - 2, oval(18, 14), C.leaf)
+    for (const [bx, by] of [[8, 1], [14, 3], [10, 6], [17, 7], [7, 8]] as const) rect(ctx, x + bx, y + by, 2, 2, C.blossom)
+    rect(ctx, x + 48, y + 22, 4, 3, C.stone); rect(ctx, x + 47, y + 24, 6, 2, C.stoneL)
+    return
+  }
+  // observatory: 바다에 반쯤 잠긴 유리 돔(4×3칸) + 쇠 테두리 + 둥근 창 불빛 + 올라오는 거품
+  spans(ctx, x + 2, y + 18, oval(60, 26), C.foam)
+  spans(ctx, x + 4, y + 20, oval(56, 22), C.ring)
+  spans(ctx, x + 6, y + 20, oval(52, 18), C.ringL)
+  const dome: [number, number][] = Array.from({ length: 22 }, (_, i) => {
+    const t = 1 - i / 22
+    const half = Math.round(22 * Math.sqrt(1 - t * t))
+    return [24 - half, 2 * half]
+  })
+  spans(ctx, x + 8, y + 6, dome, C.domeD)
+  spans(ctx, x + 10, y + 8, dome.slice(0, 20).map(([l, w]) => [l, Math.max(0, w - 4)] as [number, number]), C.dome)
+  rect(ctx, x + 20, y + 11, 3, 8, C.domeL); rect(ctx, x + 24, y + 9, 6, 2, C.domeL)
+  rect(ctx, x + 31, y + 6, 2, 22, C.ring); rect(ctx, x + 10, y + 18, 44, 2, C.ring)
+  const lit = night > 0.2
+  for (const px of [16, 28, 40]) {
+    rect(ctx, x + px, y + 22, 6, 5, C.ring)
+    rect(ctx, x + px + 1, y + 23, 4, 3, lit ? C.lamp : C.domeD)
+  }
+  for (let k = 0; k < 4; k++) {
+    const ph = ((tMs / 2200 + k / 4) % 1)
+    const bx = x + 6 + k * 15 + Math.round(Math.sin(tMs / 600 + k * 2) * 2)
+    const by = y + 44 - Math.round(ph * 14)
+    if (ph < 0.9) rect(ctx, bx, by, 2, 2, C.bubble)
+  }
+}
+
 /** 명예의 전당 벽 전시(1줄): 박제는 나무 판 + 물고기, 액자는 금테 + 1위 얼굴(없으면 빈 얼굴) */
 function drawFame(ctx: CanvasRenderingContext2D, frames: readonly FameFrame[]): void {
   const y = FAME_ROW * TILE
@@ -1419,6 +1516,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
   if (s.map.backdrop && s.fame) drawFame(ctx, s.fame)
   if (s.map.backdrop && s.gallery) drawGallery(ctx, s.gallery)
   if (s.map.backdrop && s.gallery?.theme?.light) drawThemeLight(ctx, s.gallery.theme.id, t)
+  if (s.facilities) for (const f of s.facilities) drawFacility(ctx, f.id, f.tx * TILE, f.ty * TILE, t, nightLevel(s.cond.gameMinute))
   drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
   drawHoles(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 
