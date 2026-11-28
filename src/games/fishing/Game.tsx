@@ -18,6 +18,8 @@ import type { DecoId, DecoPlaced } from './deco.ts'
 import { ISLE_ZONES, type ToolId } from './isleEcon.ts'
 import { BAIT_RECIPES, LICENSE_PRICE, featureOn, type BaitKind } from './research.ts'
 import { EconSection, econOf, type CastBait } from './EconPanel.tsx'
+import { GalleryPanel, galleryOf } from './GalleryPanel.tsx'
+import { CALM_BAR, potionOn, stageB } from './gallery.ts'
 import { PREVIEW_ISLE_KEY, fishSellPrice, teleporterOpen, type Action, type DiscardAt, type Fish, type PendingView, type View } from './logic.ts'
 import { barParams, barResult, gaugeAt, initBar, stepBar, type Bar, type BarParams } from './minigame.ts'
 import { conditionsAt, nextTideChange, tideAt, type Conditions } from './clock.ts'
@@ -102,7 +104,7 @@ export function availableHeight(innerH: number, stageTop: number, belowH: number
 }
 
 /** unlock: 잠긴 문·선착장 앞에서 연 지역 해금 창, teleport: 순간이동기 앞에서 연 창, challenges: 도전과제 목록, map: 큰 지도 */
-type Menu = 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash' | 'boat' | 'isle' | 'workbench' | 'furn' | 'deco'
+type Menu = 'gallery' | 'bag' | 'shop' | 'dex' | 'unlock' | 'teleport' | 'challenges' | 'map' | 'wardrobe' | 'fame' | 'elevator' | 'fridge' | 'trash' | 'boat' | 'isle' | 'workbench' | 'furn' | 'deco'
 /** 열린 뒤 잠깐 누르기·클릭을 막는 창(서 있는 자리에서 행동으로 여는 창) */
 const outfitMemo = new WeakMap<object, Outfit>()
 /** 서버 view의 옷차림(모르는 id는 기본값). view 객체마다 한 번만 정리해 매 프레임 새 객체를 만들지 않는다 */
@@ -300,6 +302,16 @@ const FISHING_MESSAGES: Record<string, string> = {
   wrong_place: '그 물고기가 사는 지역·자리에서 던져 주세요',
   need_power: '더 세게 던져야 해요',
   bad_target: RETRY,
+  // 경제 P2~P4(v27)
+  not_recatch: '연구로 다시 잡은 물고기만 기증할 수 있어요',
+  exhibited: '이미 전시했어요',
+  donated_full: '이미 2마리를 기증했어요',
+  need_donation: '같은 물고기를 2마리 기증해야 전시할 수 있어요',
+  need_mythic_exhibit: '첫 신화를 전시하면 열려요',
+  need_all_exhibits: '13종을 모두 전시하면 열려요',
+  potion_full: '포션 시간이 가득 찼어요',
+  no_potion: '보관한 포션이 없어요',
+  stock_full: '보관함이 가득 찼어요',
 }
 const fishingMessage = (code: string) => FISHING_MESSAGES[code] ?? errorMessage(code)
 /** 서버에 낚시(pending)가 남아 있어 지역을 못 열 때. 다시 던졌다 거두면 풀린다 */
@@ -739,6 +751,8 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     rt.hookServerNow = res.server_now
     rt.bar = initBar()
     rt.params = barParams(res.result.species, res.view.rodTier, res.view.equipped ?? [], res.view.buffs ?? [])
+    // 안정 포션(경제 P2): 켜져 있으면 바 기본폭 ×1.10(화면만)
+    if (featureOn('alchemy') && potionOn(galleryOf(res.view), 'calm')) rt.params = { ...rt.params, barSize: rt.params.barSize * CALM_BAR }
     rt.settling = false
     setPhase('fighting')
   }
@@ -1679,6 +1693,31 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
       if (alive.current) setNotice({ kind: 'error', text: fishingMessage(codeOf(e)) })
     }
   }
+  /** 재포획 기증(경제 P2): 칸 하나 */
+  async function donate(index: number) {
+    const f = viewRef.current?.bag[index]
+    if (!f) return
+    setNotice(null)
+    try {
+      const res = await act<{ donated: number }>({ type: 'donate', index, id: f.id })
+      if (alive.current && res.result) setNotice({ kind: 'info', text: `${speciesName(f.species)} 기증 ${res.result.donated}/2` })
+    } catch (e) {
+      await failMove(codeOf(e))
+    }
+  }
+  /** 지역 재료 추출(경제 P2): 고른 일반 물고기를 한 번에 */
+  async function extract(indices: number[]) {
+    setNotice(null)
+    const bag = viewRef.current?.bag ?? []
+    const items = indices.flatMap((index) => (bag[index] ? [{ index, id: bag[index].id }] : []))
+    if (items.length === 0 || items.length !== indices.length) return
+    try {
+      await act({ type: 'extract', items })
+      if (alive.current) setNotice({ kind: 'info', text: `${items.length}마리를 재료로 바꿨어요` })
+    } catch (e) {
+      await failMove(codeOf(e))
+    }
+  }
   const makeBait = (kind: BaitKind) => void econAct({ type: 'makeBait', kind, price: BAIT_RECIPES[kind].gold }, '미끼를 만들었어요')
   const buyLicense = () => void econAct({ type: 'buyLicense', price: LICENSE_PRICE }, '연구를 해금했어요')
 
@@ -1929,7 +1968,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
             : { label: '낚시', enabled: false }
   const unlockName = unlockTarget ? AREAS.find((a) => a.id === unlockTarget)?.name ?? unlockTarget : ''
   const PANEL_TITLES: Record<Menu, string> = {
-    bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
+    gallery: '전시관', bag: '가방', shop: '상점', wardrobe: '옷장', fame: '명예의 전당', elevator: '엘리베이터', fridge: '냉장고', trash: '쓰레기통', boat: '배', isle: '섬 고르기', workbench: '작업대', furn: '가구 놓기', deco: '꾸미기 놓기', unlock: unlockName, dex: '도감', challenges: '도전과제', map: '지도', teleport: `${areaNameOf(tpArea)} 순간이동기`,
   }
   const panelTitle = menu ? PANEL_TITLES[menu] : ''
 
@@ -2036,11 +2075,25 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                   {...(featureOn('bait')
                     ? {
                         onGrind: (is: number[]) => void grind(is),
-                        econ: <EconSection view={view} busy={busy} research={featureOn('research')} selected={castBait} onSelect={setCastBait} onMake={makeBait} onLicense={buyLicense} />,
+                        ...(featureOn('exhibit') ? { onDonate: (i: number) => void donate(i) } : {}),
+                        ...(featureOn('alchemy') && stageB(galleryOf(view)) ? { onExtract: (is: number[]) => void extract(is) } : {}),
+                        econ: (
+                          <EconSection
+                            view={view}
+                            busy={busy}
+                            research={featureOn('research')}
+                            selected={castBait}
+                            onSelect={setCastBait}
+                            onMake={makeBait}
+                            onLicense={buyLicense}
+                            {...(featureOn('exhibit') ? { onOpenGallery: () => setMenu('gallery') } : {})}
+                          />
+                        ),
                       }
                     : {})}
                 />
               )}
+              {menu === 'gallery' && featureOn('exhibit') && <GalleryPanel view={view} busy={busy} onAct={(a, done) => void econAct(a, done)} />}
               {menu === 'trash' && (
                 <BagPanel view={view} atShop={false} busy={busy} discardAt="trash" onEquip={(ids) => void equip(ids)} onLock={(i, l) => void lockFish(i, l)} onDiscard={(is, fee, at) => void discard(is, fee, at)} />
               )}

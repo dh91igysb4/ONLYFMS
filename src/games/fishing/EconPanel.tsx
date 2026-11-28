@@ -22,11 +22,13 @@ type Props = {
   onSelect(b: CastBait | null): void
   onMake(kind: BaitKind): void
   onLicense(): void
+  /** 전시관 열기(경제 P2, 플래그 exhibit). 없으면 버튼을 보이지 않는다 */
+  onOpenGallery?(): void
 }
 
 export const econOf = (view: Pick<View, 'econ'>): Econ => view.econ ?? newEcon()
 
-export function EconSection({ view, busy, research, selected, onSelect, onMake, onLicense }: Props) {
+export function EconSection({ view, busy, research, selected, onSelect, onMake, onLicense, onOpenGallery }: Props) {
   const e = econOf(view)
   const found = (rarity: 'legend' | 'mythic') => SPECIES.filter((s) => s.rarity === rarity && view.legends.includes(s.id))
   const kinds: BaitKind[] = research ? ['attractor', 'legend', 'mythic'] : ['attractor']
@@ -39,6 +41,11 @@ export function EconSection({ view, busy, research, selected, onSelect, onMake, 
   return (
     <div className="fish-gear" role="group" aria-label="미끼·연구">
       <h3 className="fish-panel-sub">미끼·연구</h3>
+      {onOpenGallery && (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onOpenGallery}>
+          전시관
+        </button>
+      )}
       <p className="muted">{`어분 ${e.meal}개 · 일반 물고기를 "어분" 모드로 갈아 만들어요`}</p>
       {research && !e.license && (
         <div className="fish-discard-confirm">

@@ -101,22 +101,30 @@ type BagProps = {
   discardAt?: DiscardAt
   /** 어분 만들기(경제 P1, 플래그 bait): 고른 일반 물고기 칸(오름차순). 없으면 어분 모드를 보이지 않는다 */
   onGrind?(indices: number[]): void
+  /** 재포획 기증(경제 P2, 플래그 exhibit): 칸 하나 */
+  onDonate?(index: number): void
+  /** 지역 재료 추출(경제 P2, 플래그 alchemy·첫 신화 전시 뒤): 고른 일반 물고기 칸 */
+  onExtract?(indices: number[]): void
   /** 미끼·연구 영역(경제 P1). Game이 플래그가 켜졌을 때만 넘긴다 */
   econ?: ReactNode
 }
 
-type BagMode = 'lock' | 'brag' | 'discard' | 'grind'
+type BagMode = 'lock' | 'brag' | 'discard' | 'grind' | 'donate' | 'extract'
 const BAG_MODES: readonly { mode: BagMode; label: string }[] = [
   { mode: 'lock', label: '잠금' },
   { mode: 'brag', label: '자랑하기' },
   { mode: 'discard', label: '버리기' },
   { mode: 'grind', label: '어분' },
+  { mode: 'extract', label: '재료' },
+  { mode: 'donate', label: '기증' },
 ]
+/** 여러 마리 골라 한 번에 하는 모드 */
+const MULTI: readonly BagMode[] = ['discard', 'grind', 'extract']
 /** 어분 재료: 전설·신화가 아닌 아는 어종 */
 const isOrdinaryFish = (id: string) => knownSpecies(id) && !isLegend(id) && !isMythic(id)
 
 /** atShop: 상점(마을회관 자판기) 앞에 서 있는가. 아니면 어디서 팔 수 있는지 알려 준다. 칸을 누르면 모드에 따라 잠금·자랑·버리기. */
-export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard, discardAt = 'bag', onGrind, econ }: BagProps) {
+export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBrag, onDiscard, discardAt = 'bag', onGrind, onDonate, onExtract, econ }: BagProps) {
   const [mode, setMode] = useState<BagMode>(discardAt === 'trash' ? 'discard' : 'lock')
   /** 버리기 모드에서 고른 칸(오름차순). 가방이 바뀌면(버림·다른 탭) 칸이 밀리므로 비운다 */
   const [picked, setPicked] = useState<number[]>([])
@@ -124,7 +132,7 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
     setPicked([])
   }, [view.bag])
   const togglePick = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i].sort((a, b) => a - b)))
-  const pickable = view.bag.flatMap((f, i) => (!f.locked && (mode === 'grind' ? isOrdinaryFish(f.species) : knownSpecies(f.species)) ? [i] : []))
+  const pickable = view.bag.flatMap((f, i) => (!f.locked && (mode === 'grind' || mode === 'extract' ? isOrdinaryFish(f.species) : knownSpecies(f.species)) ? [i] : []))
   const cells = Array.from({ length: bagSize(view.bagTier) }, (_, i) => view.bag[i] ?? null)
   const slots = tackleSlots(view.rodTier)
   const fishing = view.pending !== null
@@ -188,9 +196,9 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
         {view.bag.length}/{bagSize(view.bagTier)}칸
       </p>
       {!atShop && <p className="fish-shop-note">마을회관 상점에서 팔 수 있어요</p>}
-      {(onBrag || onDiscard || onGrind) && view.bag.length > 0 && (
+      {(onBrag || onDiscard || onGrind || onDonate || onExtract) && view.bag.length > 0 && (
         <div className="fish-bag-modes" role="group" aria-label="물고기를 누르면">
-          {BAG_MODES.filter((m) => m.mode === 'lock' || (m.mode === 'brag' ? onBrag : m.mode === 'grind' ? onGrind : onDiscard)).map((m) => (
+          {BAG_MODES.filter((m) => m.mode === 'lock' || ({ brag: onBrag, grind: onGrind, extract: onExtract, donate: onDonate, discard: onDiscard }[m.mode as Exclude<BagMode, 'lock'>])).map((m) => (
             <button
               key={m.mode}
               type="button"
@@ -208,11 +216,11 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
       )}
       {view.bag.length > 0 && (
         <p className="muted">
-          {mode === 'lock' ? '물고기를 누르면 잠가서 팔리지 않게 해요' : mode === 'brag' ? '들어 올릴 물고기를 골라요' : mode === 'grind' ? '어분으로 만들 물고기를 골라요 · 잠긴 물고기·전설·신화는 안 돼요' : '버릴 물고기를 골라요 · 잠긴 물고기는 못 버려요'}
+          {mode === 'lock' ? '물고기를 누르면 잠가서 팔리지 않게 해요' : mode === 'brag' ? '들어 올릴 물고기를 골라요' : mode === 'grind' ? '어분으로 만들 물고기를 골라요 · 잠긴 물고기·전설·신화는 안 돼요' : mode === 'extract' ? '재료로 바꿀 물고기를 골라요 · 그 지역 재료가 흔함 1·드묾 2·희귀 3개 나와요' : mode === 'donate' ? '연구로 다시 잡은 물고기를 눌러 전시에 기증해요(되팔 수 없어요)' : '버릴 물고기를 골라요 · 잠긴 물고기는 못 버려요'}
         </p>
       )}
-      {(mode === 'discard' || mode === 'grind') && pickable.length > 0 && (
-        <div className="fish-bag-modes" role="group" aria-label={mode === 'grind' ? '어분으로 만들 물고기 고르기' : '버릴 물고기 고르기'}>
+      {MULTI.includes(mode) && pickable.length > 0 && (
+        <div className="fish-bag-modes" role="group" aria-label={mode === 'grind' ? '어분으로 만들 물고기 고르기' : mode === 'extract' ? '재료로 바꿀 물고기 고르기' : '버릴 물고기 고르기'}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPicked(pickable)}>
             잠기지 않은 것 모두 선택
           </button>
@@ -252,6 +260,17 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
           </button>
         </div>
       )}
+      {mode === 'extract' && picked.length > 0 && picked.every((i) => view.bag[i] && isOrdinaryFish(view.bag[i].species)) && (
+        <div className="fish-discard-confirm">
+          <span>{`${picked.length}마리를 재료로`}</span>
+          <button type="button" className="btn btn-primary btn-sm" aria-label="재료 만들기 확인" disabled={busy} onClick={() => { setPicked([]); onExtract?.(picked) }}>
+            재료 만들기
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPicked([])}>
+            취소
+          </button>
+        </div>
+      )}
       <ul className="fish-bag">
         {cells.map((f, i) =>
           f ? (
@@ -259,12 +278,13 @@ export function BagPanel({ view, atShop, busy, onEquip, onLock, onWardrobe, onBr
               <button
                 type="button"
                 className={`fish-cell${f.locked ? ' fish-cell-locked' : ''}${isLegend(f.species) ? ' fish-cell-legend' : ''}${isMythic(f.species) ? ' fish-cell-mythic' : ''}`}
-                aria-pressed={mode === 'lock' ? !!f.locked : mode === 'discard' || mode === 'grind' ? picked.includes(i) : undefined}
-                aria-label={`${isLegend(f.species) ? '전설 ' : isMythic(f.species) ? '신화 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.origin === 'recatch' ? ' 재포획' : ''} ${mode === 'brag' ? '자랑하기' : mode === 'discard' ? '버리기' : mode === 'grind' ? '어분' : f.locked ? '잠금 해제' : '잠금'}`}
-                disabled={busy || (mode !== 'lock' && !knownSpecies(f.species)) || (mode === 'discard' && !!f.locked) || (mode === 'grind' && (!!f.locked || !isOrdinaryFish(f.species)))}
+                aria-pressed={mode === 'lock' ? !!f.locked : MULTI.includes(mode) ? picked.includes(i) : undefined}
+                aria-label={`${isLegend(f.species) ? '전설 ' : isMythic(f.species) ? '신화 ' : ''}${speciesName(f.species)} ${f.sizeCm}cm ${f.origin === 'recatch' ? ' 재포획' : ''} ${mode === 'brag' ? '자랑하기' : mode === 'discard' ? '버리기' : mode === 'grind' ? '어분' : mode === 'extract' ? '재료' : mode === 'donate' ? '기증' : f.locked ? '잠금 해제' : '잠금'}`}
+                disabled={busy || (mode !== 'lock' && !knownSpecies(f.species)) || (mode === 'discard' && !!f.locked) || ((mode === 'grind' || mode === 'extract') && (!!f.locked || !isOrdinaryFish(f.species))) || (mode === 'donate' && f.origin !== 'recatch')}
                 onClick={() => {
                   if (mode === 'brag') onBrag?.(i)
-                  else if (mode === 'discard' || mode === 'grind') togglePick(i)
+                  else if (MULTI.includes(mode)) togglePick(i)
+                  else if (mode === 'donate') onDonate?.(i)
                   else onLock(i, !f.locked)
                 }}
               >
