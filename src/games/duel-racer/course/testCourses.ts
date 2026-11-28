@@ -58,3 +58,9 @@ export function hairpinCourse(): Course {
     start: { pos: { x: 0, y: 1.2, z: 8 }, yaw: 0 },
   }
 }
+
+/** 폭 14m 직선, 양쪽 벽 있음(벽 충돌 시험용) */
+export function walledCourse(): Course {
+  const c = flatCourse()
+  return { ...c, id: 'test-walled', width: c.width.map(() => 14), openWalls: [] }
+}

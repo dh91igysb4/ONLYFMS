@@ -27,9 +27,11 @@ export function createWorld(R: Rapier, course: Course): PhysWorld {
   world.timestep = 1 / TICK_HZ
   const road = buildRoad(course)
   const ground = world.createRigidBody(R.RigidBodyDesc.fixed())
-  world.createCollider(R.ColliderDesc.trimesh(road.positions, road.indices).setFriction(0.9), ground)
+  // 삼각형 사이 이음매에서 법선이 튀어 차가 튕겨 나가지 않게 FIX_INTERNAL_EDGES(겹친 꼭짓점 합치기 포함)
+  const flags = R.TriMeshFlags.FIX_INTERNAL_EDGES
+  world.createCollider(R.ColliderDesc.trimesh(road.positions, road.indices, flags).setFriction(0.9), ground)
   if (road.walls.indices.length > 0) {
-    world.createCollider(R.ColliderDesc.trimesh(road.walls.positions, road.walls.indices).setFriction(0.05).setRestitution(0.3), ground)
+    world.createCollider(R.ColliderDesc.trimesh(road.walls.positions, road.walls.indices, flags).setFriction(0.05).setRestitution(0.3), ground)
   }
   for (const b of course.boxes) {
     const q = quatYPR(b.rot.yaw, b.rot.pitch, b.rot.roll)

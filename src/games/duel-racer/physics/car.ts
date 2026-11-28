@@ -60,6 +60,9 @@ const REAR_GRIP_RECOVER_SEC = 0.3
 const ROLL_DAMP = 6
 const AIR_RATE = 4.5
 const AIR_GAIN = 10
+/** 공중에서 입력 없는 축의 회전 감쇠(1/s)와 수평 복원 강도 */
+const AIR_HOLD_DAMP = 3
+const AIR_HOLD_LEVEL = 4
 const ASSIST_SEC = 0.3
 const ASSIST_GAIN = 40
 const ASSIST_DAMP = 8
@@ -215,10 +218,13 @@ export function stepCar(car: Car, c: Controls, boost: boolean, dt: number): void
     const want = { x: c.pitch * AIR_RATE, y: -c.yaw * AIR_RATE, z: -c.roll * AIR_RATE }
     const err = { x: want.x - lw.x, y: want.y - lw.y, z: want.z - lw.z }
     const active = { x: c.pitch !== 0, y: c.yaw !== 0, z: c.roll !== 0 }
+    // 입력이 없는 축은 자세를 지킨다: 회전을 줄이고 수평 쪽으로 천천히 되돌린다(점프대에서 앞이 처박히지 않게)
+    const upL = rot(conj(q), { x: 0, y: 1, z: 0 })
+    const level = { x: upL.z, z: -upL.x }
     const tl = {
-      x: active.x ? err.x * AIR_GAIN * 2080 * dt : 0,
-      y: active.y ? err.y * AIR_GAIN * 2336 * dt : 0,
-      z: active.z ? err.z * AIR_GAIN * 900 * dt : 0,
+      x: active.x ? err.x * AIR_GAIN * 2080 * dt : (-lw.x * AIR_HOLD_DAMP + level.x * AIR_HOLD_LEVEL) * 2080 * dt,
+      y: active.y ? err.y * AIR_GAIN * 2336 * dt : -lw.y * AIR_HOLD_DAMP * 0.5 * 2336 * dt,
+      z: active.z ? err.z * AIR_GAIN * 900 * dt : (-lw.z * AIR_HOLD_DAMP + level.z * AIR_HOLD_LEVEL) * 900 * dt,
     }
     body.applyTorqueImpulse(rot(q, tl), true)
   }
