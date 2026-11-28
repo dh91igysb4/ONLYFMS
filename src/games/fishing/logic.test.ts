@@ -2433,7 +2433,7 @@ describe('내 섬 A단계(v22, 내 섬 설계 §5)', () => {
   it('publicView: 섬과 옷차림만, 가방·골드·도감은 없다', () => {
     const s = fresh({ isle: { ...ISLE0, layout: 'twin', cleared: 2, mats: { wood: 5, stone: 1, iron: 0 } }, bag: [{ id: 954, origin: 'normal' as const, species: 'anchovy', sizeCm: 12, perfect: false }], dex: { anchovy: { count: 1, maxCm: 12 } } })
     const v = logic.publicView!(s) as Record<string, unknown>
-    expect(v).toEqual({ isle: { layout: 'twin', cleared: 2, house: 0, placed: [], deco: [] }, outfit: s.outfit })
+    expect(v).toEqual({ isle: { layout: 'twin', cleared: 2, house: 0, placed: [], deco: [] }, outfit: s.outfit, facilities: [] })
     for (const k of ['bag', 'gold', 'dex', 'fridge', 'totalEarned']) expect(v).not.toHaveProperty(k)
   })
   it('migrate: 옛 세이브·모르는 값은 null, 저장된 모양은 유지', () => {
@@ -2577,9 +2577,14 @@ describe('내 섬 C단계 집 (v24, 설계 2026-11-26-my-isle-c §4.4)', () => {
     expect(m.placed).toEqual([{ id: 'chair', tx: 1, ty: 2 }])
     expect(m.furniture).toEqual({ bed: 2, lamp: 1, clock: 1 })
   })
+  it('publicView에 산 시설(남의 섬에서도 보인다)', () => {
+    const s = fresh({ isle: isle() })
+    const v = logic.publicView!({ ...s, gallery: { ...s.gallery, projects: ['sea-bg', 'observatory', 'lighthouse'] } }) as { facilities: string[] }
+    expect(v.facilities).toEqual(['lighthouse', 'observatory'])
+  })
   it('publicView·기록·미리보기에 집', () => {
     const s = fresh({ isle: isle({ house: 2, placed: [{ id: 'bed', tx: 1, ty: 2 }], furniture: { lamp: 3 } }) })
-    expect(logic.publicView!(s)).toEqual({ isle: { layout: 'crescent', cleared: 0, house: 2, placed: [{ id: 'bed', tx: 1, ty: 2 }], deco: [] }, outfit: s.outfit })
+    expect(logic.publicView!(s)).toEqual({ isle: { layout: 'crescent', cleared: 0, house: 2, placed: [{ id: 'bed', tx: 1, ty: 2 }], deco: [] }, outfit: s.outfit, facilities: [] })
     expect(logic.records!(s).find((r) => r.key === 'house')).toEqual({ key: 'house', value: 2, detail: '2/4' })
     expect(logic.records!(fresh({ isle: isle() })).map((r) => r.key)).not.toContain('house')
   })
