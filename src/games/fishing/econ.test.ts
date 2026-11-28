@@ -8,7 +8,7 @@ vi.mock('./research.ts', async (orig) => {
 import { MIN_FIGHT_MS, SPECIES } from './data.ts'
 import { fishSellPrice, logic, rollCatch, sellPrice, type Fish, type State } from './logic.ts'
 import { conditionsAt } from './clock.ts'
-import { MAX_BAIT_BATCH, maxBait, newEcon, researchChance } from './research.ts'
+import { AUTO_MEAL_MAX, MAX_BAIT_BATCH, maxBait, newEcon, researchChance } from './research.ts'
 
 const T0 = Date.UTC(2026, 10, 28, 3)
 type R = { state: State; result?: unknown; gold?: number } | { error: string }
@@ -182,6 +182,61 @@ describe('미끼 여러 개 한 번에 (logic.version 29)', () => {
     const m = logic.migrate(JSON.parse(JSON.stringify(raw)), 28)
     expect(m.econ).toEqual(raw.econ)
     expect(logic.migrate(JSON.parse(JSON.stringify(m)), 28)).toEqual(m)
+  })
+})
+
+describe('자동 어분 (logic.version 30)', () => {
+  const HOOK = T0 + 3000
+  // 멸치 12cm(기본 20G 근처) 를 낚아 거두기 직전 상태
+  const hooked = (over: Partial<State> = {}, sizeCm = 12, species = 'anchovy'): State => base({
+    pending: { species, sizeCm, biteDelayMs: 3000, startedAt: T0, hookedAt: HOOK, area: 'village', spot: 'shore', cond: conditionsAt(T0), power: 0.5 },
+    ...over,
+  })
+  const reel = (s: State) => ok(act(s, { type: 'resolve', success: true, perfect: false }, { now: HOOK + MIN_FIGHT_MS }))
+  const price = (s: State, sizeCm = 12, species = 'anchovy') => fishSellPrice({ origin: 'normal', species, sizeCm, perfect: false }, s.buffs ?? [])
+  const seen = (maxCm = 14) => ({ anchovy: { count: 3, maxCm } })
+
+  it('setAutoMeal: 판매가 기준(1 이상 정수, AUTO_MEAL_MAX 이하)을 저장하고, null이면 끈다', () => {
+    const on = ok(act(base(), { type: 'setAutoMeal', price: 30 }))
+    expect(on.state.econ.autoMeal).toBe(30)
+    const off = ok(act(on.state, { type: 'setAutoMeal', price: null }))
+    expect(off.state.econ.autoMeal).toBeUndefined()
+    for (const price of [0, -1, 1.5, '30', AUTO_MEAL_MAX + 1]) expect(err(act(base(), { type: 'setAutoMeal', price } as never))).toBe('bad_action')
+  })
+  it('기준 이하 일반 물고기는 가방에 안 들어가고 어분 1개. 도감·과제 기록은 남는다', () => {
+    const s0 = hooked({ dex: seen(), econ: { ...newEcon(), autoMeal: 1000 } })
+    const r = reel(s0)
+    expect(r.state.bag).toEqual([])
+    expect(r.state.econ.meal).toBe(1)
+    expect(r.state.dex.anchovy.count).toBe(4)
+    expect(r.result).toMatchObject({ caught: { species: 'anchovy' }, autoMeal: true })
+    expect(r.state.nextFishId).toBe(s0.nextFishId + 1)
+  })
+  it('기준보다 비싸면 가방에 넣는다(기준과 같으면 어분)', () => {
+    const s0 = hooked({ dex: seen() })
+    const p = price(s0)
+    expect(reel({ ...s0, econ: { ...newEcon(), autoMeal: p - 1 } }).state.bag).toHaveLength(1)
+    expect(reel({ ...s0, econ: { ...newEcon(), autoMeal: p } }).state.bag).toHaveLength(0)
+  })
+  it('처음 잡은 어종, 최대 크기 기록을 새로 쓴 물고기는 기준 이하여도 가방에 남긴다', () => {
+    const econ = { ...newEcon(), autoMeal: 1000 }
+    expect(reel(hooked({ econ })).state.bag).toHaveLength(1)
+    expect(reel(hooked({ econ, dex: seen(11) })).state.bag).toHaveLength(1)
+    expect(reel(hooked({ econ, dex: seen(12) })).state.bag).toHaveLength(0)
+  })
+  it('전설·신화는 자동 어분이 되지 않는다, 기준이 없으면 그대로', () => {
+    const econ = { ...newEcon(), autoMeal: AUTO_MEAL_MAX }
+    const g = hooked({ econ, legends: ['grouper'], dex: { grouper: { count: 1, maxCm: 999 } } }, 100, 'grouper')
+    expect(reel(g).state.bag).toHaveLength(1)
+    expect(reel(hooked({ dex: seen() })).state.bag).toHaveLength(1)
+  })
+  it('v29 세이브: autoMeal 없음은 그대로, 깨진 값은 버리고 맞는 값은 살린다', () => {
+    const raw = (autoMeal: unknown) => ({ ...logic.init(), econ: { meal: 2, baits: { attractor: 0, legend: 0, mythic: 0 }, license: false, pity: {}, autoMeal } })
+    expect(logic.migrate(raw(undefined), 29).econ.autoMeal).toBeUndefined()
+    expect(logic.migrate(raw(-3), 29).econ.autoMeal).toBeUndefined()
+    expect(logic.migrate(raw(250), 30).econ.autoMeal).toBe(250)
+    const m = logic.migrate(raw(250), 30)
+    expect(logic.migrate(JSON.parse(JSON.stringify(m)), 30)).toEqual(m)
   })
 })
 

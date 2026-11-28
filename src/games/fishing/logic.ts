@@ -17,7 +17,7 @@ import { FURNITURE, ROOM_MAX, canPlace, isFurnId, type FurnId, type Placed } fro
 const FURN_CAP = 99
 import type { NodeKind } from './map.ts'
 import {
-  ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, LICENSE_PRICE, MAX_BAIT_BATCH, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
+  ATTRACTOR_RARE, BAIT_KINDS, BAIT_RECIPES, AUTO_MEAL_MAX, LICENSE_PRICE, MAX_BAIT_BATCH, RECATCH_SALE_PCT, baitMatches, featureOn, isOrdinary, newEcon, researchChance, researchEligibility,
   type BaitKind, type Econ,
 } from './research.ts'
 import {
@@ -298,6 +298,7 @@ export type Action =
   // 경제 P1(v27, 기능 플래그): 일반 물고기 → 어분, 미끼 만들기(price는 화면이 본 골드), 연구 해금
   | { type: 'grind'; items: { index: number; id?: number }[] }
   | { type: 'makeBait'; kind: BaitKind; price: number; count?: number }
+  | { type: 'setAutoMeal'; price: number | null }
   | { type: 'buyLicense'; price: number }
   // 경제 P2(v27, 플래그 exhibit·alchemy): 재포획 기증, 영구 전시, 지역 재료 추출, 포션 만들어 마시기, 전시관 확장
   | { type: 'donate'; index: number; id?: number }
@@ -539,16 +540,19 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     perfect,
     ...(isLegend ? { locked: true as const } : {}),
   }
-  // 금전 포션(이 투척 동안 켜져 있었으면): 일반 개체에 판매가 15% 보너스, 남은 예산까지
+  const prev = state.dex[p.species]
+  // 자동 어분(v30): 기준 판매가 이하 일반 물고기는 가방 대신 어분 1개. 처음 잡은 어종과 최대 크기 기록 갱신은 남긴다
+  const autoMeal = featureOn('bait') && state.econ.autoMeal !== undefined && !isLegend && isOrdinary(p.species)
+    && prev !== undefined && p.sizeCm <= prev.maxCm && fishSellPrice(fish, state.buffs ?? []) <= state.econ.autoMeal
+  // 금전 포션(이 투척 동안 켜져 있었으면): 일반 개체에 판매가 15% 보너스, 남은 예산까지(어분이 될 물고기는 쓰지 않는다)
   let gallery = gallery0
-  if (!isLegend && featureOn('alchemy') && potionOn(state.gallery, 'gold') && state.gallery.goldBudget > 0) {
+  if (!autoMeal && !isLegend && featureOn('alchemy') && potionOn(state.gallery, 'gold') && state.gallery.goldBudget > 0) {
     const bonus = Math.min(state.gallery.goldBudget, Math.round((fishSellPrice(fish, state.buffs ?? []) * GOLD_PCT) / 100))
     if (bonus > 0) {
       fish.bonus = bonus
       gallery = { ...gallery, goldBudget: state.gallery.goldBudget - bonus }
     }
   }
-  const prev = state.dex[p.species]
   const dex = {
     ...state.dex,
     [p.species]: { count: (prev?.count ?? 0) + 1, maxCm: Math.max(prev?.maxCm ?? 0, p.sizeCm) },
@@ -563,10 +567,12 @@ function resolve(state: State, a: Record<string, unknown>, now: number): Out {
     const { [p.species]: _done, ...pity } = state.econ.pity
     econ = { ...state.econ, pity }
   }
+  if (autoMeal) econ = { ...econ, meal: econ.meal + 1 }
   return {
-    state: { ...state, bag: [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null, econ, gallery },
+    state: { ...state, bag: autoMeal ? state.bag : [...state.bag, fish], nextFishId: state.nextFishId + 1, dex, legends, challenges: judged.challenges, buffs: gained.buffs, pending: null, econ, gallery },
     result: {
       caught: fish,
+      ...(autoMeal ? { autoMeal: true } : {}),
       ...(judged.completed.length > 0 ? { completed: judged.completed } : {}),
       ...(gained.buff ? { buff: gained.buff } : {}),
     },
@@ -970,6 +976,7 @@ function migrateEcon(raw: unknown, legends: readonly string[]): Econ {
     baits: { attractor: count(baits.attractor), legend: count(baits.legend), mythic: count(baits.mythic) },
     license: raw.license === true,
     pity,
+    ...(isNum(raw.autoMeal) && Number.isInteger(raw.autoMeal) && raw.autoMeal >= 1 && raw.autoMeal <= AUTO_MEAL_MAX ? { autoMeal: raw.autoMeal } : {}),
   }
 }
 
@@ -1150,7 +1157,9 @@ export const logic: WorldLogic<State, Action, View> = {
   //     새 행동은 research.ts 기능 플래그가 켜져야 동작(경제 설계 r4)
   // 28: 연구 낚시 대상 입질 확률 전설 3% → 1.5%, 신화 1% → 0.75%(보장 50·100번은 그대로). 세이브 형식은 27과 같다
   // 29: makeBait의 count(미끼 여러 개 한 번에, 최대 MAX_BAIT_BATCH). count 없으면 1개로 28과 같다. 세이브 형식은 28과 같다
-  version: 29,
+  // 30: 자동 어분(econ.autoMeal, setAutoMeal). 기준 판매가 이하 일반 물고기는 잡는 순간 어분, 처음 잡은 어종·최대 크기 갱신은 가방에.
+  //     autoMeal이 없는 v29 세이브는 그대로(꺼짐)
+  version: 30,
   wallet: true,
   init,
   migrate,
@@ -1373,6 +1382,18 @@ function grind(state: State, a: Record<string, unknown>): Out {
     state: { ...state, bag: state.bag.filter((_, j) => !picked.has(j)), econ: { ...state.econ, meal: state.econ.meal + picked.size } },
     result: { meal: picked.size },
   }
+}
+
+/** 자동 어분 기준(v30, 플래그 bait): 1..AUTO_MEAL_MAX 정수 G, null이면 끈다 */
+function setAutoMeal(state: State, a: Record<string, unknown>): Out {
+  if (!featureOn('bait')) return { error: 'feature_off' }
+  if (a.price === null) {
+    const { autoMeal: _off, ...econ } = state.econ
+    return { state: { ...state, econ } }
+  }
+  const p = a.price
+  if (typeof p !== 'number' || !Number.isInteger(p) || p < 1 || p > AUTO_MEAL_MAX) return { error: 'bad_action' }
+  return { state: { ...state, econ: { ...state.econ, autoMeal: p } } }
 }
 
 /** 미끼 만들기(P1): count개(없으면 1, v29). 모자라면 하나도 만들지 않는다. 집어는 플래그 bait, 전설·신화는 research + 연구 해금 + 그 등급 발견 */
@@ -1612,6 +1633,8 @@ function applyAction(state: State, action: unknown, ctx: Ctx): Out {
       return grind(state, action)
     case 'makeBait':
       return makeBait(state, action, ctx.gold)
+    case 'setAutoMeal':
+      return setAutoMeal(state, action)
     case 'buyLicense':
       return buyLicense(state, action, ctx.gold)
     case 'donate':

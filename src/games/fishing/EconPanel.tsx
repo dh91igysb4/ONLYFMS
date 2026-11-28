@@ -1,7 +1,8 @@
 // 낚시 경제 P1 화면(경제 설계 r4 §2.2): 어분·미끼 만들기, 연구 해금, 다음 투척에 쓸 미끼·대상 고르기.
 // 값과 규칙은 서버 view(econ)와 research.ts를 그대로 보여 주고, 행동은 콜백으로만 올린다. 기능 플래그가 꺼져 있으면 Game이 그리지 않는다.
 import { SPECIES } from './data.ts'
-import { BAIT_RECIPES, LICENSE_PRICE, maxBait, newEcon, type BaitKind, type Econ } from './research.ts'
+import { useState } from 'react'
+import { AUTO_MEAL_MAX, BAIT_RECIPES, LICENSE_PRICE, maxBait, newEcon, type BaitKind, type Econ } from './research.ts'
 import type { View } from './logic.ts'
 
 const gold = (n: number) => `${n.toLocaleString('ko-KR')} G`
@@ -23,13 +24,15 @@ type Props = {
   /** count는 최대로 만들기에서만(없으면 1개) */
   onMake(kind: BaitKind, count?: number): void
   onLicense(): void
+  /** 자동 어분 기준 저장(G), null이면 끈다(v30) */
+  onAutoMeal(price: number | null): void
   /** 전시관 열기(경제 P2, 플래그 exhibit). 없으면 버튼을 보이지 않는다 */
   onOpenGallery?(): void
 }
 
 export const econOf = (view: Pick<View, 'econ'>): Econ => view.econ ?? newEcon()
 
-export function EconSection({ view, busy, research, selected, onSelect, onMake, onLicense, onOpenGallery }: Props) {
+export function EconSection({ view, busy, research, selected, onSelect, onMake, onLicense, onAutoMeal, onOpenGallery }: Props) {
   const e = econOf(view)
   const found = (rarity: 'legend' | 'mythic') => SPECIES.filter((s) => s.rarity === rarity && view.legends.includes(s.id))
   const kinds: BaitKind[] = research ? ['attractor', 'legend', 'mythic'] : ['attractor']
@@ -48,6 +51,7 @@ export function EconSection({ view, busy, research, selected, onSelect, onMake, 
         </button>
       )}
       <p className="muted">{`어분 ${e.meal}개 · 일반 물고기를 "어분" 모드로 갈아 만들어요`}</p>
+      <AutoMeal current={e.autoMeal} busy={busy} onSave={onAutoMeal} />
       {research && !e.license && (
         <div className="fish-discard-confirm">
           <span>{`연구 해금 ${gold(LICENSE_PRICE)} · 발견한 전설·신화를 다시 낚을 수 있어요`}</span>
@@ -117,6 +121,44 @@ export function EconSection({ view, busy, research, selected, onSelect, onMake, 
           </ul>
         ) : null,
       )}
+    </div>
+  )
+}
+
+/** 자동 어분(v30): 판매가 기준 이하 일반 물고기는 잡자마자 어분. 처음 잡은 어종·최대 크기 기록은 가방에 남는다 */
+function AutoMeal({ current, busy, onSave }: { current: number | undefined; busy: boolean; onSave(price: number | null): void }) {
+  const [text, setText] = useState(current !== undefined ? String(current) : '')
+  const n = Number(text)
+  const valid = text.trim() !== '' && Number.isInteger(n) && n >= 1 && n <= AUTO_MEAL_MAX
+  return (
+    <div className="fish-auto-meal" role="group" aria-label="자동 어분">
+      <span>
+        <strong>자동 어분</strong> <span className="muted">{current !== undefined ? `켜짐 · ${gold(current)} 이하` : '꺼짐'}</span>
+      </span>
+      <span className="muted">판매가가 기준 이하인 일반 물고기는 잡자마자 어분이 돼요. 처음 잡은 어종·최대 크기 기록은 가방에 남겨요</span>
+      <span className="fish-auto-meal-row">
+        <input
+          className="input input-sm"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={AUTO_MEAL_MAX}
+          step={1}
+          aria-label="자동 어분 기준 판매가"
+          placeholder="예: 100"
+          value={text}
+          onChange={(ev) => setText(ev.target.value)}
+        />
+        <span>G 이하</span>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy || !valid || n === current} onClick={() => onSave(n)}>
+          저장
+        </button>
+        {current !== undefined && (
+          <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => { setText(''); onSave(null) }}>
+            끄기
+          </button>
+        )}
+      </span>
     </div>
   )
 }

@@ -129,7 +129,7 @@ const HOTKEY_LABEL = { map: 'M', bag: 'E', dex: 'Q', challenges: 'G', chat: 'T',
 /** 메뉴 창(.fish-panel) 좌우 안쪽 여백(css px). 큰 지도 배율 계산용 */
 const PANEL_PAD = 12
 type Outcome =
-  | { kind: 'caught'; fish: Fish; isNew: boolean; buff?: BuffId }
+  | { kind: 'caught'; fish: Fish; isNew: boolean; buff?: BuffId; meal?: boolean }
   | { kind: 'lost'; early: boolean }
 type Notice = { kind: 'bag_full' } | { kind: 'error'; text: string } | { kind: 'info'; text: string }
 type Keys = { up: boolean; down: boolean; left: boolean; right: boolean }
@@ -770,9 +770,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
 
   async function finishFight(success: boolean, perfect: boolean) {
     const before = viewRef.current
-    let res: WorldView<View, { caught: Fish | null; completed?: string[]; buff?: BuffId }>
+    let res: WorldView<View, { caught: Fish | null; completed?: string[]; buff?: BuffId; autoMeal?: boolean }>
     try {
-      res = await act<{ caught: Fish | null; completed?: string[]; buff?: BuffId }>({ type: 'resolve', success, perfect })
+      res = await act<{ caught: Fish | null; completed?: string[]; buff?: BuffId; autoMeal?: boolean }>({ type: 'resolve', success, perfect })
     } catch (e) {
       if (alive.current) await recover(codeOf(e))
       return
@@ -780,7 +780,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     if (!alive.current) return
     const fish = res.result?.caught ?? null
     const buff = BUFFS.find((b) => b.id === res.result?.buff)?.id
-    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species], ...(buff ? { buff } : {}) })
+    if (fish) showOutcome({ kind: 'caught', fish, isNew: !before?.dex[fish.species], ...(buff ? { buff } : {}), ...(res.result?.autoMeal ? { meal: true } : {}) })
     else showOutcome({ kind: 'lost', early: false })
     // 이번 잡이로 깬 과제(서버가 정한다): 첫 과제를 알린다. 나머지는 과제 목록에서 보인다
     const done = CHALLENGES.find((c) => res.result?.completed?.includes(c.id))
@@ -1749,6 +1749,10 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
     count > 1 ? `미끼 ${count}개를 만들었어요` : '미끼를 만들었어요',
   )
   const buyLicense = () => void econAct({ type: 'buyLicense', price: LICENSE_PRICE }, '연구를 해금했어요')
+  const setAutoMeal = (price: number | null) => void econAct(
+    { type: 'setAutoMeal', price },
+    price === null ? '자동 어분을 껐어요' : `판매가 ${gold(price)} 이하는 잡자마자 어분이 돼요`,
+  )
 
   /** 마을회관 냉장고: 가방 칸 넣기(store)·냉장고 칸 꺼내기(takeOut) */
   async function moveFish(type: 'store' | 'takeOut', index: number) {
@@ -2070,7 +2074,9 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                     const b = BUFFS.find((x) => x.id === outcome.buff)!
                     return <span className="fish-toast-buff">{`새 힘: ${b.name} — ${b.desc}`}</span>
                   })()}
-                  {safePrice(outcome.fish, view.buffs ?? []) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish, view.buffs ?? [])!)}</span>}
+                  {outcome.meal ? (
+                    <span className="muted">자동 어분 → 어분 1개</span>
+                  ) : safePrice(outcome.fish, view.buffs ?? []) !== null && <span className="fish-toast-price">{gold(safePrice(outcome.fish, view.buffs ?? [])!)}</span>}
                 </>
               ) : (
                 <span>{outcome.early ? '너무 일찍 챘어요' : '놓쳤어요'}</span>
@@ -2115,6 +2121,7 @@ export function Game({ gameId, onOpenGames }: WorldGameProps) {
                             onSelect={setCastBait}
                             onMake={makeBait}
                             onLicense={buyLicense}
+                            onAutoMeal={setAutoMeal}
                             {...(featureOn('exhibit') ? { onOpenGallery: () => setMenu('gallery') } : {})}
                           />
                         ),
