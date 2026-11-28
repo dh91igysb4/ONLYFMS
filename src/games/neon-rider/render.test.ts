@@ -9,7 +9,7 @@ import { TEMPLATES, buildTemplate, type Template } from './pieces.ts'
 import { shapeAt, type HazardShape } from './hazards.ts'
 import { initSim, initSimAt, step } from './sim.ts'
 import type { SimState } from './sim.ts'
-import { CAR_ART, CAR_BARS, CAR_WINDOW, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
+import { CAR_ART, CAR_BARS, CAR_COLOR, CAR_DECAL, CAR_WINDOW, cameraFor, createRenderer, praiseFor, sawOutline, spearOutline, spikeOutline, toScreen, visibleSegRange } from './render.ts'
 import type { Camera } from './render.ts'
 
 const course = courseOf(['hill', 'ramp'])
@@ -71,7 +71,12 @@ describe('차 그림', () => {
     }
   })
 
-  it.each(Object.entries(CAR_WINDOW))('%s: 유리창 다각형은 차 그림 안에 있다', (id, win) => {
+  it('CAR_COLOR·CAR_DECAL의 키 집합은 CARS의 id 집합과 같다', () => {
+    expect(Object.keys(CAR_COLOR).sort()).toEqual(CARS.map((c) => c.id).sort())
+    expect(Object.keys(CAR_DECAL).sort()).toEqual(CARS.map((c) => c.id).sort())
+  })
+
+  it.each([...Object.entries(CAR_WINDOW).map(([id, p]) => [`창 ${id}`, id, p] as const), ...Object.entries(CAR_DECAL).map(([id, p]) => [`데칼 ${id}`, id, p] as const)])('%s: 다각형은 차 그림 안에 있다', (_name, id, win) => {
     const art = CAR_ART[id]
     const inside = (x: number, y: number): boolean => {
       let o = false

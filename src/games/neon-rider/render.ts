@@ -40,8 +40,8 @@ const TRACK_MID = '#ff4fc3'
 const YELLOW = '#ffe14a'
 const CAR_BODY = '#ffd93a'
 const CAR_DARK = '#3b1d5c'
-const WHEEL_FILL = '#160a2c'
 const WHITE = '#ffffff'
+const TIRE = '#14121c'
 // 위험물(빨강), 움직이는 길(노랑·초록 고리), 블록(흰 윤곽): 캔버스 내부 색 예외.
 const HAZ_RED = '#ff3355'
 const HAZ_GLOW = 'rgba(255, 51, 85, 0.3)'
@@ -60,34 +60,53 @@ const PRAISE_MS = 800
 const DEATH_PARTICLES = 24
 const GEM_PARTICLES = 8
 
-// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 쿠페 지붕 꼭대기 380 mm [M13].
+// 차 옆모습(mm). a: 뒷바퀴 중심에서 앞바퀴 쪽, b: 축선에서 위. 실제 차 비율(쿠페 지붕 꼭대기 580 mm).
 // 판정은 두 바퀴(반지름 180)·지붕 원(축 가운데 위 headOffset, 반지름 headR)·차대 캡슐(축선을 bodyDY 올린 선분, 반지름 bodyR)이고 차마다 cars.ts 값이다.
 // 그림의 모든 가장자리는 그 차의 이 합집합에서 40 mm 안에 둔다(render.test가 차마다 변마다 표본을 잡아 확인한다).
 // 쿠페의 꼬리~앞끝은 녹화의 2000 mm(CAR_LEN, 화면 축척 단위)보다 짧은 약 1815 mm다.
 export type CarArt = readonly (readonly [number, number])[]
 export const CAR_ART: Record<string, CarArt> = {
-  coupe: [[-215, 40], [-120, 170], [550, 330], [650, 380], [860, 300], [1320, 190], [1600, 70], [1560, 20]],
-  // 픽업: 뒤 짐칸(평평) + 앞 운전석 + 짧은 보닛
-  pickup: [[-170, 70], [-160, 300], [-100, 335], [480, 340], [580, 420], [820, 420], [900, 340], [1500, 300], [1580, 150], [1540, 20]],
+  // 쿠페: 트렁크·보닛은 캡슐 위 끝(360), 실내는 지붕 원(580)
+  coupe: [[-170, 40], [-185, 200], [-150, 330], [350, 360], [480, 470], [620, 572], [820, 572], [940, 400], [1150, 365], [1500, 300], [1585, 200], [1580, 60], [1450, 30]],
+  // 픽업: 뒤 짐칸(평평, 410) + 높은 운전석(700) + 보닛
+  pickup: [[-170, 40], [-160, 360], [-120, 390], [440, 405], [460, 640], [560, 700], [860, 700], [985, 430], [1480, 400], [1585, 250], [1580, 60], [1450, 30]],
   // 버기: 낮은 통 차체(지붕 없음). 롤케이지 막대는 CAR_BARS
-  buggy: [[-170, 60], [-155, 220], [430, 240], [1450, 200], [1560, 120], [1500, 20]],
-  // 스포츠카: 매끈한 쐐기에 꼬리 스포일러 립
-  sports: [[-150, 50], [-140, 170], [-90, 232], [-30, 205], [450, 225], [600, 265], [800, 265], [950, 215], [1450, 140], [1550, 70], [1500, 10]],
-  // F1: 얇은 차체, 조종석 둥근 턱, 뾰족한 코와 앞날개, 꼬리 뒷날개
-  f1: [[-110, 30], [-150, 110], [-150, 150], [-100, 190], [-30, 212], [10, 175], [150, 120], [500, 115], [600, 150], [640, 225], [740, 225], [780, 150], [900, 110], [1350, 70], [1560, 45], [1540, -10], [1440, -10]],
+  buggy: [[-150, 30], [-160, 260], [-100, 300], [450, 300], [1450, 280], [1560, 180], [1520, 30]],
+  // 스포츠카: 낮고 긴 쐐기에 꼬리 립, 둥근 실내
+  sports: [[-130, 40], [-145, 190], [-110, 280], [-40, 300], [450, 300], [540, 420], [640, 478], [790, 478], [890, 360], [1050, 310], [1450, 230], [1545, 130], [1500, 20]],
+  // F1: 얇은 차체, 조종석 턱(헬멧), 뾰족한 코와 앞날개, 꼬리 뒷날개
+  f1: [[-110, 30], [-150, 110], [-150, 150], [-100, 190], [-30, 212], [10, 175], [150, 120], [500, 115], [600, 170], [640, 300], [760, 300], [800, 170], [900, 110], [1350, 70], [1560, 45], [1540, -10], [1440, -10]],
   // 스케이트보드: 얇은 판과 위로 휜 양 끝
   skate: [[-120, 70], [-110, 160], [1420, 160], [1520, 100], [1490, 40], [1400, 80], [0, 80], [-80, 40]],
 }
 // 롤케이지 막대(차 id → 꺾은선 목록). 굵은 선으로 그려 사이가 비어 보인다. 판정 합집합에서 40 mm 안.
 export const CAR_BARS: Record<string, readonly CarArt[]> = {
-  buggy: [[[520, 235], [590, 325], [810, 325], [880, 235]], [[700, 325], [700, 235]]],
+  buggy: [[[480, 300], [560, 470], [840, 470], [920, 300]], [[700, 470], [700, 300]]],
+}
+// 차마다 네온 색(캔버스 내부 색 예외). 평평한 단색 + 같은 색 빛 번짐 두 겹 + 흰 데칼 + 흰 바퀴.
+export const CAR_COLOR: Record<string, string> = {
+  coupe: '#fff23a',
+  pickup: '#39ff88',
+  buggy: '#ff8a1f',
+  sports: '#ff2bd6',
+  f1: '#b46bff',
+  skate: '#00e5ff',
+}
+// 흰 데칼(차 id → 다각형, 차 그림 안). 번개·사선 한 줄.
+export const CAR_DECAL: Record<string, CarArt> = {
+  coupe: [[100, 150], [800, 240], [650, 265], [1350, 240], [400, 190], [550, 180]],
+  pickup: [[0, 200], [700, 270], [580, 295], [1350, 270], [300, 230], [450, 220]],
+  buggy: [[0, 150], [600, 210], [500, 225], [1250, 200], [300, 175], [420, 168]],
+  sports: [[100, 120], [700, 200], [580, 220], [1250, 190], [350, 160], [480, 150]],
+  f1: [[200, 60], [700, 90], [620, 100], [1100, 75], [400, 75], [480, 70]],
+  skate: [[0, 112], [1400, 112], [1400, 128], [0, 128]],
 }
 // 유리창(차 id → 다각형). 없으면 안 그린다.
 export const CAR_WINDOW: Record<string, CarArt> = {
-  coupe: [[420, 290], [620, 345], [800, 280], [450, 255]],
-  pickup: [[580, 350], [640, 400], [780, 400], [840, 350]],
-  sports: [[610, 235], [690, 255], [790, 255], [890, 225]],
-  f1: [[660, 160], [670, 205], [720, 205], [730, 160]],
+  coupe: [[470, 380], [600, 540], [830, 540], [930, 400]],
+  pickup: [[490, 430], [580, 650], [840, 650], [960, 440]],
+  sports: [[540, 320], [640, 450], [790, 450], [880, 330]],
+  f1: [[660, 190], [670, 270], [740, 270], [750, 190]],
 }
 
 const PRAISE: readonly (readonly string[])[] = [
@@ -271,21 +290,41 @@ export function paintCar(c: CanvasRenderingContext2D, carId: string, R: { x: num
     })
     c.closePath()
   }
-  c.lineJoin = 'round'
-  poly(CAR_ART[id])
-  c.fillStyle = CAR_BODY
-  c.fill()
-  for (const bar of CAR_BARS[id] ?? []) {
+  const col = CAR_COLOR[id] ?? CAR_BODY
+  const path = (pts: CarArt) => {
     c.beginPath()
-    bar.forEach(([a, b], i) => {
+    pts.forEach(([a, b], i) => {
       const x = R.x + (ux * a + uy * b) * k
       const y = R.y + (uy * a - ux * b) * k
       if (i === 0) c.moveTo(x, y)
       else c.lineTo(x, y)
     })
-    c.strokeStyle = CAR_BODY
-    c.lineWidth = Math.max(1.5, 50 * k)
-    c.lineCap = 'round'
+  }
+  const bars = CAR_BARS[id] ?? []
+  const barW = Math.max(1.5, 50 * k)
+  c.lineJoin = 'round'
+  c.lineCap = 'round'
+  // 빛 번짐: 같은 색 반투명 테두리 두 겹(블러 없이)
+  for (const [alpha, mm] of [[0.13, 110], [0.3, 45]] as const) {
+    c.globalAlpha = alpha
+    c.strokeStyle = col
+    c.lineWidth = Math.max(1, mm * k)
+    poly(CAR_ART[id])
+    c.stroke()
+    for (const bar of bars) {
+      path(bar)
+      c.lineWidth = barW + Math.max(1, mm * k)
+      c.stroke()
+    }
+  }
+  c.globalAlpha = 1
+  poly(CAR_ART[id])
+  c.fillStyle = col
+  c.fill()
+  for (const bar of bars) {
+    path(bar)
+    c.strokeStyle = col
+    c.lineWidth = barW
     c.stroke()
   }
   if (CAR_WINDOW[id]) {
@@ -293,14 +332,33 @@ export function paintCar(c: CanvasRenderingContext2D, carId: string, R: { x: num
     c.fillStyle = CAR_DARK
     c.fill()
   }
-  c.lineWidth = Math.max(1, wr * 0.32)
-  for (const p of [R, F]) {
-    c.beginPath()
-    c.arc(p.x, p.y, Math.max(1.5, wr - c.lineWidth / 2), 0, Math.PI * 2)
-    c.fillStyle = WHEEL_FILL
+  if (CAR_DECAL[id]) {
+    poly(CAR_DECAL[id])
+    c.fillStyle = WHITE
     c.fill()
-    c.strokeStyle = WHITE
-    c.stroke()
+  }
+  // 바퀴: 검은 타이어 + 흰 휠 + 차 색 허브, 바깥에만 차 색 반투명 빛 띠
+  for (const p of [R, F]) {
+    for (const [alpha, f] of [[0.12, 1.3], [0.22, 1.13]] as const) {
+      c.globalAlpha = alpha
+      c.beginPath()
+      c.arc(p.x, p.y, Math.max(2, wr * f), 0, TAU)
+      c.fillStyle = col
+      c.fill()
+    }
+    c.globalAlpha = 1
+    c.beginPath()
+    c.arc(p.x, p.y, Math.max(1.5, wr), 0, TAU)
+    c.fillStyle = TIRE
+    c.fill()
+    c.beginPath()
+    c.arc(p.x, p.y, Math.max(1, wr * 0.62), 0, TAU)
+    c.fillStyle = WHITE
+    c.fill()
+    c.beginPath()
+    c.arc(p.x, p.y, Math.max(0.8, wr * 0.26), 0, TAU)
+    c.fillStyle = col
+    c.fill()
   }
 }
 
