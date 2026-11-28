@@ -4,6 +4,8 @@ import { logic, type RacerReport, type RacerState } from './logic.ts'
 import { manifest } from './manifest.ts'
 
 const fresh = () => logic.init(() => 0, {})
+/** 둘이 서로 소식을 들은 보통 대국 */
+const met = (r: Omit<RacerReport, 'met'>): RacerReport => ({ ...r, met: true })
 function both(r0: RacerReport, r1: RacerReport): RacerState {
   const a = logic.report!(fresh(), 0, r0)
   if ('error' in a) throw new Error(a.error)
@@ -43,30 +45,41 @@ test('second report from the same seat is refused', () => {
 })
 
 test('shorter time wins when both agree', () => {
-  expect(logic.result(both({ my: 4300, opp: 4500 }, { my: 4500, opp: 4300 }))).toEqual({ over: true, winner: 0, scores: [4300, 4500] })
-  expect(logic.result(both({ my: 4600, opp: 4500 }, { my: 4500, opp: 4600 }))).toEqual({ over: true, winner: 1, scores: [4600, 4500] })
+  expect(logic.result(both(met({ my: 4300, opp: 4500 }), { my: 4500, opp: 4300 }))).toEqual({ over: true, winner: 0, scores: [4300, 4500] })
+  expect(logic.result(both(met({ my: 4600, opp: 4500 }), { my: 4500, opp: 4600 }))).toEqual({ over: true, winner: 1, scores: [4600, 4500] })
 })
 
 test('equal times draw', () => {
-  expect(logic.result(both({ my: 4300, opp: 4300 }, { my: 4300, opp: 4300 }))).toEqual({ over: true, winner: null, scores: [4300, 4300] })
+  expect(logic.result(both(met({ my: 4300, opp: 4300 }), { my: 4300, opp: 4300 }))).toEqual({ over: true, winner: null, scores: [4300, 4300] })
 })
 
 test('a finisher beats a DNF', () => {
-  expect(logic.result(both({ my: 4300, opp: null }, { my: null, opp: 4300 }))).toEqual({ over: true, winner: 0, scores: [4300, 0] })
+  expect(logic.result(both(met({ my: 4300, opp: null }), { my: null, opp: 4300 }))).toEqual({ over: true, winner: 0, scores: [4300, 0] })
 })
 
 test('cross-check mismatch voids', () => {
-  expect(logic.result(both({ my: 4300, opp: 4500 }, { my: 4500, opp: 4400 }))).toEqual({ over: true, winner: null, void: true })
+  expect(logic.result(both(met({ my: 4300, opp: 4500 }), { my: 4500, opp: 4400 }))).toEqual({ over: true, winner: null, void: true })
   // 상대 기록을 모르면(opp null) 맞춰 보지 않는다
-  expect(logic.result(both({ my: 4300, opp: null }, { my: null, opp: null }))).toEqual({ over: true, winner: 0, scores: [4300, 0] })
+  expect(logic.result(both(met({ my: 4300, opp: null }), { my: null, opp: null }))).toEqual({ over: true, winner: 0, scores: [4300, 0] })
 })
 
 test('unknown opp (null) skips the cross-check', () => {
-  expect(logic.result(both({ my: 4300, opp: null }, { my: 4500, opp: null }))).toEqual({ over: true, winner: 0, scores: [4300, 4500] })
+  expect(logic.result(both(met({ my: 4300, opp: null }), { my: 4500, opp: null }))).toEqual({ over: true, winner: 0, scores: [4300, 4500] })
 })
 
 test('both DNF voids', () => {
-  expect(logic.result(both({ my: null, opp: null }, { my: null, opp: null }))).toEqual({ over: true, winner: null, void: true })
+  expect(logic.result(both(met({ my: null, opp: null }), { my: null, opp: null }))).toEqual({ over: true, winner: null, void: true })
+})
+
+test('a match where nobody ever heard the other voids (출발 전 연결 실패, 설계 §7)', () => {
+  expect(logic.result(both({ my: 4300, opp: null }, { my: null, opp: null }))).toEqual({ over: true, winner: null, void: true })
+  expect(logic.result(both({ my: 4300, opp: null, met: false }, { my: 4500, opp: null, met: false }))).toEqual({ over: true, winner: null, void: true })
+})
+
+test('abort (version mismatch before the start) voids', () => {
+  expect(logic.result(both(met({ my: 4300, opp: null }), { my: null, opp: null, abort: true }))).toEqual({ over: true, winner: null, void: true })
+  expect(logic.report!(fresh(), 0, { my: null, opp: null, abort: 'yes' })).toEqual({ error: 'bad_report' })
+  expect(logic.report!(fresh(), 0, { my: null, opp: null, met: 1 })).toEqual({ error: 'bad_report' })
 })
 
 test('reportTimeout is a DNF with unknown opp', () => {

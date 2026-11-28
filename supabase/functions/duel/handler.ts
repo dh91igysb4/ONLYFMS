@@ -864,6 +864,9 @@ async function resign(tx: Tx, deps: DuelDeps, reg: Registry, me: Me, id: string)
     const vc = await voidIfVersionChanged(tx, m, me, game.logic, now)
     if (vc) return vc
   }
+  // 실시간 대전은 출발 뒤 기권하면 패다(보고 전이라 moved가 비어 있어도 무효로 빠지지 않게, 설계 §7). 출발 전 기권은 무효
+  const delay = game?.manifest.duel?.realtime?.startDelaySec
+  if (delay !== undefined && m.started_at && now >= m.started_at.getTime() + delay * 1000) m.moved = [true, true]
   finish(m, seat === 0 ? 1 : 0, 'resign', now)
   await save(tx, m)
   return { out: out(200, await buildView(tx, m, me, game?.logic, now)), signal: signalOf(m) }

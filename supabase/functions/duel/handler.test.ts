@@ -380,6 +380,26 @@ t('realtime_nobody_reports_void', async () => {
   assert.equal((r.body as unknown as View).status, 'void')
 })
 
+t('realtime_resign_after_start_is_a_loss_even_before_anyone_reported', async () => {
+  // 기권(최종 리뷰 C1): 지는 사람이 기권으로 무효를 만들어 판돈을 지키면 안 된다
+  const s = await rtStarted({ rated: true })
+  const r = await call(s.second, { action: 'resign', match_id: s.id }, T0 + 100 * SEC)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  const v = r.body as unknown as View
+  assert.equal(v.status, 'finished')
+  assert.equal(v.end_reason, 'resign')
+  assert.equal(v.winner, 0)
+  assert.ok(v.rating_change)
+})
+
+t('realtime_resign_before_the_start_voids', async () => {
+  const s = await rtStarted({ rated: true })
+  // 참가 T0+1초, 출발 지연 5초 → T0+3초는 출발 전
+  const r = await call(s.second, { action: 'resign', match_id: s.id }, T0 + 3 * SEC)
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  assert.equal((r.body as unknown as View).status, 'void')
+})
+
 t('report_on_turn_based_game_409_not_realtime', async () => {
   const s = await started()
   const r = await report(s.first, s.id, { my: 1 }, T0 + 2 * SEC)
