@@ -149,7 +149,7 @@ function AutoMeal({ current, busy, onSave }: { current: number | undefined; busy
           value={text}
           onChange={(ev) => setText(ev.target.value)}
         />
-        <span>G 이하</span>
+        <span>JWD 이하</span>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy || !valid || n === current} onClick={() => onSave(n)}>
           저장
         </button>
