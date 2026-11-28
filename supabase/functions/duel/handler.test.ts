@@ -255,6 +255,14 @@ t('hidden_game_admin_only', async () => {
   assert.equal(j.body.error, 'unknown_game')
 })
 
+t('realtime_game_create_409_until_phase_2', async () => {
+  // 실시간 대전(레이싱 설계 §7)은 2단계에서 결과 보고 경로가 생기기 전까지 대국을 만들 수 없다. 관리자도 같다.
+  const admin = await user('approved', true)
+  const r = await create(admin, T0, { game: 'duel-racer' })
+  assert.equal(r.status, 409)
+  assert.equal(r.body.error, 'realtime_unsupported')
+})
+
 t('malformed_requests_400', async () => {
   const u = await user()
   for (const body of [

@@ -23,8 +23,10 @@ vi.mock('../wallet/useWallet.ts', async (orig) => ({
   refreshWallet: () => refreshMock(),
 }))
 
-vi.mock('../../games/index.ts', async (orig) =>
-  (await import('../../test-fixtures/duel.ts')).withHiddenDuel(await orig<typeof import('../../games/index.ts')>()))
+vi.mock('../../games/index.ts', async (orig) => {
+  const f = await import('../../test-fixtures/duel.ts')
+  return f.withRealtimeDuel(f.withHiddenDuel(await orig<typeof import('../../games/index.ts')>()))
+})
 
 import { DuelHomePage } from './DuelHomePage.tsx'
 import { resetWallet, setWallet } from '../../lib/walletStore.ts'
@@ -343,4 +345,26 @@ test('맨 위 숫자 칸: 대기실 n, 내 대국 n', async () => {
   ])
   expect(pairs).toEqual([['대기실', '1'], ['내 대국', '2']])
   expect(screen.getByRole('heading', { name: '대전' }).className).toContain('sr-only')
+})
+
+test('home_practice: realtime games get a solo practice link, admin only when hidden', async () => {
+  renderHome()
+  await flush()
+  const panel = screen.getByRole('region', { name: '혼자 연습' })
+  const link = within(panel).getByRole('link', { name: /실시간 대전/ })
+  expect(link.getAttribute('href')).toBe('/duel/practice/realtime-duel')
+})
+
+test('home_practice: create form does not offer realtime games', async () => {
+  renderHome()
+  await flush()
+  const game = screen.getByLabelText('게임') as HTMLSelectElement
+  expect(Array.from(game.options).map((o) => o.textContent)).not.toContain('실시간 대전')
+})
+
+test('home_practice: hidden realtime games are hidden from non-admins', async () => {
+  admin = false
+  renderHome()
+  await flush()
+  expect(screen.queryByRole('region', { name: '혼자 연습' })).toBeNull()
 })

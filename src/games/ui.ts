@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Game as WhoAreYaGame } from './who-are-ya/Game.tsx'
 import { Game as ToothbrushGame } from './toothbrush/Game.tsx'
 import { Game as YachtGame } from './yacht/Game.tsx'
+import { RacerGame } from './duel-racer/RacerGame.tsx'
 import { Game as TikiTakaToeGame } from './tiki-taka-toe/Game.tsx'
 import { Game as BallRunGame } from './ball-run/Game.tsx'
 import { Game as SneakExamGame } from './sneak-exam/Game.tsx'
@@ -68,6 +69,21 @@ const duelComponents: Record<string, ComponentType<DuelGameProps>> = {
 
 export function getDuelComponent(id: string): ComponentType<DuelGameProps> | undefined {
   return duelComponents[id]
+}
+
+/**
+ * 실시간 대전 화면이 받는 props (레이싱 설계 §7). manifest `duel.realtime`이 있는 게임만.
+ * 1단계는 혼자 연습(`practice`)만 있다. 온라인 대국(`match`)은 2단계가 더한다.
+ */
+export type RealtimeGameProps = { gameId: string; mode: 'practice'; onExit(): void }
+
+/** 실시간 대전 화면 등록부. 화면 코드는 레이스 화면에서만 무거운 모듈(물리·3D)을 불러온다. */
+const realtimeComponents: Record<string, ComponentType<RealtimeGameProps>> = {
+  'duel-racer': RacerGame,
+}
+
+export function getRealtimeComponent(id: string): ComponentType<RealtimeGameProps> | undefined {
+  return realtimeComponents[id]
 }
 
 /**

@@ -501,6 +501,8 @@ async function create(deps: DuelDeps, reg: Registry, me: Me, b: Record<string, u
   if (typeof b.game_id !== 'string') return bad('game_id가 필요해요')
   const game = reg.getDuel(b.game_id)
   if (!game) return err(404, 'unknown_game')
+  // 실시간 대전(레이싱 설계 §7)은 결과 보고 경로(2단계)가 생기기 전까지 대국을 만들 수 없다. 2단계에서 지운다.
+  if (game.manifest.duel?.realtime) return err(409, 'realtime_unsupported')
   const options = parseOptions(game.manifest, b.options)
   if (!options) return bad('설정이 잘못됐어요')
   if (typeof b.rated !== 'boolean') return bad('rated가 잘못됐어요')
