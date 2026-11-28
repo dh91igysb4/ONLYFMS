@@ -3,6 +3,7 @@
 // 캔버스는 CSS로 정수 배 확대하고 image-rendering: pixelated, ctx.imageSmoothingEnabled = false.
 // 그리기는 fillRect만 쓴다(정적 레이어 캐시를 화면에 옮길 때만 drawImage). HUD 시계 글자도 픽셀 숫자 스프라이트다.
 // 캔버스 내부 색은 theme 토큰 규칙의 승인된 예외(설계 §5)다.
+import { HALL2_PEDESTALS, HALL2_WINGS } from './maps/hall2.ts'
 import { effectiveBarSize, surgePhase, type Bar, type BarParams } from './minigame.ts'
 import { STATIC_DYNAMIC, TILE, tileAt, type Facing, type MapDef, type MapDynamic, type Opened, type Rect, type TileKind, type Vec } from './map.ts'
 import type { Player } from './walk.ts'
@@ -52,6 +53,8 @@ export type WorldScene = {
   others?: ScenePeer[]
   /** 마을회관 명예의 전당 액자(fame.ts). backdrop 맵에서만 그린다 */
   fame?: readonly FameFrame[]
+  /** 마을회관 2층 전시관(hall2): 전시한 물고기 받침대와 확장 안 한 구역(공사 테이프) */
+  gallery?: GalleryScene
 }
 
 /** 같은 지역 친구 한 명. pos는 발 중앙(월드 픽셀) */
@@ -1227,6 +1230,42 @@ function faceOf(avatar: string): Sprite {
   return sp
 }
 
+export type GalleryScene = { exhibits: readonly { tx: number; ty: number; species: string }[]; tape: readonly { tx: number; ty: number; w: number; h: number }[] }
+/** 전시관 그림 입력: 전시한 어종의 받침대 칸, 확장 단계보다 뒤 구역 */
+export function galleryScene(g: { exhibits: readonly string[]; expansions: number }): GalleryScene {
+  return {
+    exhibits: g.exhibits.flatMap((id) => (HALL2_PEDESTALS[id] ? [{ ...HALL2_PEDESTALS[id], species: id }] : [])),
+    tape: HALL2_WINGS.slice(g.expansions),
+  }
+}
+const GALLERY_C = { glass: '#d8f0f7', glassEdge: '#9fd0e0', tapeA: '#f2c14e', tapeB: '#2a2135' }
+/** 전시관 덧그림: 받침대 위 유리 상자 + 물고기, 확장 전 구역은 노랑·검정 사선 테이프 테두리 */
+function drawGallery(ctx: CanvasRenderingContext2D, g: GalleryScene): void {
+  for (const e of g.exhibits) {
+    const x = e.tx * TILE
+    const y = e.ty * TILE
+    rect(ctx, x + 1, y - 6, TILE - 2, TILE + 2, GALLERY_C.glassEdge)
+    rect(ctx, x + 2, y - 5, TILE - 4, TILE, GALLERY_C.glass)
+    if (SPRITES[`fish-${e.species}`]) drawSprite(ctx, `fish-${e.species}`, x + TILE / 2, y - 6, 1)
+  }
+  for (const t of g.tape) {
+    const x0 = t.tx * TILE
+    const y0 = t.ty * TILE
+    const w = t.w * TILE
+    const h = t.h * TILE
+    for (let i = 0; i < w; i += 4) {
+      const c = (i / 4) % 2 ? GALLERY_C.tapeA : GALLERY_C.tapeB
+      rect(ctx, x0 + i, y0, 4, 2, c)
+      rect(ctx, x0 + i, y0 + h - 2, 4, 2, c)
+    }
+    for (let j = 0; j < h; j += 4) {
+      const c = (j / 4) % 2 ? GALLERY_C.tapeA : GALLERY_C.tapeB
+      rect(ctx, x0, y0 + j, 2, 4, c)
+      rect(ctx, x0 + w - 2, y0 + j, 2, 4, c)
+    }
+  }
+}
+
 /** 명예의 전당 벽 전시(1줄): 박제는 나무 판 + 물고기, 액자는 금테 + 1위 얼굴(없으면 빈 얼굴) */
 function drawFame(ctx: CanvasRenderingContext2D, frames: readonly FameFrame[]): void {
   const y = FAME_ROW * TILE
@@ -1261,6 +1300,7 @@ function drawWorldLayer(ctx: CanvasRenderingContext2D, s: WorldScene, pose: Pose
 
   // 바닥에 붙은 것(잠긴 문·배·얼음 구멍·뚫는 금)이 맨 먼저
   if (s.map.backdrop && s.fame) drawFame(ctx, s.fame)
+  if (s.map.backdrop && s.gallery) drawGallery(ctx, s.gallery)
   drawPlaces(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
   drawHoles(ctx, s, waterFrame(t), tx0, ty0, tx1, ty1)
 

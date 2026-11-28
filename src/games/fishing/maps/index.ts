@@ -7,6 +7,7 @@ import type { MapDef } from '../map.ts'
 import { CAVE } from './cave.ts'
 import { FOREST } from './forest.ts'
 import { HALL } from './hall.ts'
+import { HALL2 } from './hall2.ts'
 import { ISLAND } from './island.ts'
 import { LAKE } from './lake.ts'
 import { RIVER } from './river.ts'
@@ -17,7 +18,7 @@ import { VILLAGE } from './village.ts'
 import { WRECK } from './wreck.ts'
 
 export const MAPS: Readonly<Partial<Record<AreaId, MapDef>>> = {
-  village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP, summit: SUMMIT, wreck: WRECK, hall: HALL,
+  village: VILLAGE, river: RIVER, forest: FOREST, lake: LAKE, cave: CAVE, island: ISLAND, tideflat: TIDEFLAT, swamp: SWAMP, summit: SUMMIT, wreck: WRECK, hall: HALL, hall2: HALL2,
 }
 
 /** 지역의 맵. 내 섬·집 안은 섬 상태(shape)가 있을 때만 그 맵(집 0단계면 집 안 없음), 다른 지역은 shape를 무시한다. 맵이 없으면 null. */
